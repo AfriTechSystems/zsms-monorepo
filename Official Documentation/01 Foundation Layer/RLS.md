@@ -67,9 +67,11 @@ AS $$
 $$;
 
 -- Returns the user's Clerk role within their current organisation.
--- Possible values: 'org:owner' | 'org:principal' | 'org:admin' |
---                  'org:accountant' | 'org:teacher' | 'org:parent' |
---                  'org:student' | 'none'
+-- Canonical values per 02 Authentication and Identity/ROLES.md:
+--   'org:owner' | 'org:principal' | 'org:admin' | 'org:accountant' |
+--   'org:teacher' | 'org:staff' | 'org:parent' | 'org:student' | 'none'
+-- 'org:staff' is the zero-default-access base role for custom-role holders
+-- (ADR-012); its permissions come entirely from staff_permission_grants.
 CREATE OR REPLACE FUNCTION get_user_role()
 RETURNS TEXT
 LANGUAGE SQL STABLE
@@ -1118,3 +1120,5 @@ The following rules are enforced at both the RLS layer and the application layer
 | Date | Change | Reason |
 |------|--------|--------|
 | 2026-04-26 | Initial complete draft | Pre-development documentation — covers all confirmed design decisions |
+| 2026-08-13 | Added `org:staff` to the `get_user_role()` canonical value list | ROLES.md defines eight `org:*` roles; this comment listed seven, omitting the custom-role base role |
+| 2026-08-13 | Helper functions implemented verbatim in migration `0001` and applied to `zsms-dev` | Phase 0 scaffold — RLS.md remains authoritative for all seven bodies |

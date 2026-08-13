@@ -41,10 +41,23 @@ File naming convention: `NNNN_description_of_change.sql`
 
 ### Foundation (Must Run First)
 
-**`0001_rls_helper_functions.sql`**
-Creates the seven PostgreSQL helper functions that all RLS policies depend on. This migration must run before any other migration.
+**`0001_rls_helper_functions.sql`** — ✅ **APPLIED to `zsms-dev` 2026-08-13**
+Enables required extensions and creates the seven PostgreSQL helper functions that all RLS policies depend on. Must run before any other migration.
+- Enables: `vector`, `pgtap` — both `WITH SCHEMA extensions`, never `public`
 - Creates: `get_school_id()`, `get_user_role()`, `get_user_id()`, `is_afritech_admin()`, `is_impersonation_session()`, `get_actor_id()`, `has_permission_grant()`
-- Related: `docs/RLS.md`
+- Grants: EXECUTE to `authenticated` and `anon` (`has_permission_grant` to `authenticated` only)
+- Related: `01 Foundation Layer/RLS.md` — authoritative for all seven bodies, implemented verbatim
+
+**Helper naming — reconciled to one set.** Phase 0 scaffolding proposed two additional helpers, `is_afritech_staff()` and `is_school_admin()`. Neither was created: both duplicate capability that already exists, and competing near-synonyms in a security layer are how the wrong check ends up in a policy. The mapping is:
+
+| Proposed | Resolution |
+|---|---|
+| `is_afritech_staff()` | **Dropped** — use `is_afritech_admin()`. Broader AfriTech-role scoping is handled by `afritech.staff_scope_assignments` (migration `0032`), not a JWT predicate. |
+| `is_school_admin()` | **Dropped** — use `get_user_role() IN ('org:owner','org:principal','org:admin')`, the pattern `RLS.md` already uses throughout. |
+
+**`SET LOCAL check_function_bodies = off`.** `has_permission_grant()` reads `public.schools` (migration `0003`) and `public.staff_permission_grants` (`0017`), neither of which exists at `0001`. `LANGUAGE SQL` bodies are validated at CREATE time, so body checking is disabled for this transaction only. The function is never called before those tables exist.
+
+**Migration history version.** Applying via the Supabase MCP records a timestamp version. The history row was corrected to `0001` so it matches the `NNNN_` filename convention in `CONVENTIONS.md` and `supabase db push` reconciles cleanly. Apply subsequent migrations with the Supabase CLI where possible, or repeat this correction.
 
 ---
 
@@ -351,6 +364,9 @@ This section is updated each time a migration reaches production.
 | 2026-08-13 | Gap scope corrected from five tables to eight | Cross-check found `platform_settings`, `platform_products`, and `commission_rates` also missing |
 | 2026-08-13 | Corrected stale "Next Available Sequence Number" from `0036` to `0066` | The mid-document pointer had not tracked migrations `0036`–`0060` |
 | 2026-08-13 | Documented `afritech` RLS convention (deny-by-default, service role only) | Consistent with `0032`, `0053`, `0054`, and the `audit_logs` pattern in `0035` |
+| 2026-08-13 | **Migration `0001` written and APPLIED to `zsms-dev`** | Phase 0 scaffold — extensions in `extensions` schema, seven RLS helpers in `public`, zero tables |
+| 2026-08-13 | Reconciled proposed `is_afritech_staff()` / `is_school_admin()` to the existing set | Competing near-synonyms in a security layer cause the wrong check to be used in a policy |
+| 2026-08-13 | Documented the MCP timestamp-version correction to `0001` | Keeps remote history aligned with the `NNNN_` filename convention for `supabase db push` |
 
 ---
 

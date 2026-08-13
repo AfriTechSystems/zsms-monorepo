@@ -77,7 +77,9 @@ AfriTechSystems/zsms-monorepo/
 │   ├── web/                    Next.js 14 App Router — school portal, parent portal, admin panel, Teacher Hub
 │   └── mobile/                 React Native / Expo — teacher attendance, parent app
 ├── packages/
-│   ├── auth-provider/          Clerk wrapper — abstracted for future self-hosted swap (Keycloak)
+│   ├── auth-provider/          Clerk wrapper — the ONLY module importing @clerk/* (Keycloak swap point)
+│   ├── queue/                  Job queue abstraction — BullMQ default, QStash fallback (ADR-035)
+│   ├── storage/                S3-compatible storage wrapper — R2 default, MinIO for Tier 2
 │   ├── utils/                  Shared pure functions — grading, behaviour score, formatting, ID generation
 │   ├── types/                  Shared TypeScript types generated from Supabase schema
 │   └── config/                 Country configs, feature flag keys, constants
@@ -118,9 +120,14 @@ User logs in (email OTP)
 | Platform | `platform:alumni` | Historical read-only access to own records |
 | School | `org:owner` | Full school access |
 | School | `org:principal` | Academic operations |
+| School | `org:admin` | School administration |
 | School | `org:accountant` | Fees and payments |
 | School | `org:teacher` | Own classes only |
 | School | `org:staff` | Base role for custom-role holders (zero default access) |
+| School | `org:parent` | Own children's records |
+| School | `org:student` | Own records, read-only |
+
+All eight `org:*` roles are canonical per `02 Authentication and Identity/ROLES.md`, which is authoritative. They are the exact string values the RLS helper `get_user_role()` reads from the JWT `o.rol` claim.
 
 Custom school roles are defined in `public.school_custom_roles` and applied to `org:staff` base users.
 
@@ -131,20 +138,34 @@ Custom school roles are defined in `public.school_custom_roles` and applied to `
 Every school is a separate Clerk organisation. Every database table with school-scoped data has a `school_id` column with an RLS policy that filters to the authenticated user's school.
 
 ```sql
--- Example RLS policy on students table
-CREATE POLICY "Students: school members only"
-  ON public.students
-  FOR ALL
-  USING (school_id = get_school_id());  -- get_school_id() reads from JWT
-
--- Extracts school_id from Clerk JWT metadata
-CREATE OR REPLACE FUNCTION get_school_id() RETURNS uuid AS $$
+-- Returns the Clerk organisation ID from the session JWT.
+-- This equals schools.clerk_org_id and is the primary tenant key.
+-- Returns TEXT, not UUID — see the note below.
+CREATE OR REPLACE FUNCTION public.get_school_id()
+RETURNS TEXT
+LANGUAGE SQL STABLE
+AS $$
   SELECT COALESCE(
-    current_setting('request.jwt.claims', true)::jsonb -> 'user_metadata' ->> 'school_id',
-    current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'school_id'
-  )::uuid
-$$ LANGUAGE sql STABLE;
+    auth.jwt() -> 'o' ->> 'id',
+    auth.jwt() ->> 'sub'
+  )::TEXT;
+$$;
+
+-- Policy on a table keyed by clerk_org_id (e.g. public.schools)
+CREATE POLICY "school_staff_read_own_school"
+  ON public.schools FOR SELECT
+  USING (clerk_org_id = get_school_id());
+
+-- Policy on a table keyed by the internal schools.id UUID
+-- (every other public table). Resolve through schools.clerk_org_id.
+CREATE POLICY "school_members_read_students"
+  ON public.students FOR SELECT
+  USING (
+    school_id = (SELECT id FROM public.schools WHERE clerk_org_id = get_school_id())
+  );
 ```
+
+**`get_school_id()` returns TEXT, not UUID.** It yields the Clerk organisation ID, which maps to `schools.clerk_org_id`. Tables keyed by the internal `schools.id` UUID must resolve through that mapping, as the second policy above shows — comparing a UUID column directly against `get_school_id()` is a type error. `01 Foundation Layer/RLS.md` is authoritative for all seven helper functions and their exact bodies; migration `0001` implements them verbatim.
 
 No query ever returns data from a different school — even if the application layer has a bug, the database refuses.
 
@@ -406,3 +427,6 @@ Per-country isolation:
 | 2026-08-13 | Added Deployment Topology section (three tiers) | ADR-032 — formalises the hosting model behind the residency layers |
 | 2026-08-13 | Added thirteen-layer compliance reference | ADR-030 — architecture is now audited layer by layer |
 | 2026-08-13 | Decisions summary extended with configuration and deployment rows | ADR-031 and ADR-032 |
+| 2026-08-13 | **Corrected `get_school_id()` — returns TEXT (Clerk org ID), not UUID** | The illustrative body here read `user_metadata`/`app_metadata` and returned `uuid`, contradicting RLS.md. RLS.md is authoritative and self-consistent: `has_permission_grant()` joins `schools.clerk_org_id = get_school_id()`. Migration `0001` implements RLS.md's version. |
+| 2026-08-13 | Corrected the example RLS policy — UUID-keyed tables resolve through `schools.clerk_org_id` | The old example compared a UUID column directly to `get_school_id()`, which is a type error under the corrected signature |
+| 2026-08-13 | Added missing `org:admin`, `org:parent`, `org:student` to the roles table | ROLES.md defines eight `org:*` roles; this table listed five |

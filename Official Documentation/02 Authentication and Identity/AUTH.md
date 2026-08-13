@@ -45,13 +45,15 @@ Every Clerk JWT contains these claims used by ZSMS:
 ```typescript
 interface ZsmsJwtClaims {
   sub: string              // Clerk user ID — primary identifier
-  org_id?: string          // Clerk org ID (school) — present for school users
-  org_role?: string        // 'org:owner' | 'org:teacher' | 'org:parent' etc.
-  org_slug?: string        // School's Clerk org slug
-  metadata: {
-    school_id?: string     // ZSMS school UUID — set in Clerk user metadata
+  o?: {                    // Organisation claim — absent for platform accounts
+    id: string             // Clerk org ID. Equals schools.clerk_org_id.
+    slg: string            // Org slug. 'afritech-systems-admin' => is_afritech_admin()
+    rol: string            // 'org:owner' | 'org:teacher' | 'org:parent' etc.
+  }
+  act?: { sub: string }    // Actor claim — present only during impersonation
+  metadata?: {
     platform_roles?: string[]  // ['platform:teacher'] | ['platform:alumni']
-    country_code?: string  // 'ZM'
+    country_code?: string      // 'ZM'
   }
 }
 ```
@@ -59,22 +61,25 @@ interface ZsmsJwtClaims {
 Supabase RLS helper functions extract these claims:
 
 ```sql
-CREATE OR REPLACE FUNCTION get_school_id() RETURNS uuid AS $$
+-- Returns the Clerk organisation ID (equals schools.clerk_org_id).
+-- TEXT, not UUID — tables keyed by schools.id resolve through that mapping.
+CREATE OR REPLACE FUNCTION get_school_id() RETURNS TEXT
+LANGUAGE SQL STABLE AS $$
   SELECT COALESCE(
-    current_setting('request.jwt.claims', true)::jsonb
-      -> 'user_metadata' ->> 'school_id',
-    current_setting('request.jwt.claims', true)::jsonb
-      -> 'app_metadata' ->> 'school_id'
-  )::uuid
-$$ LANGUAGE sql STABLE;
+    auth.jwt() -> 'o' ->> 'id',
+    auth.jwt() ->> 'sub'
+  )::TEXT;
+$$;
 
-CREATE OR REPLACE FUNCTION get_user_role() RETURNS text AS $$
-  SELECT current_setting('request.jwt.claims', true)::jsonb ->> 'org_role'
-$$ LANGUAGE sql STABLE;
+CREATE OR REPLACE FUNCTION get_user_role() RETURNS TEXT
+LANGUAGE SQL STABLE AS $$
+  SELECT COALESCE(auth.jwt() -> 'o' ->> 'rol', 'none')::TEXT;
+$$;
 
-CREATE OR REPLACE FUNCTION get_user_id() RETURNS text AS $$
-  SELECT current_setting('request.jwt.claims', true)::jsonb ->> 'sub'
-$$ LANGUAGE sql STABLE;
+CREATE OR REPLACE FUNCTION get_user_id() RETURNS TEXT
+LANGUAGE SQL STABLE AS $$
+  SELECT auth.jwt() ->> 'sub';
+$$;
 ```
 
 ---
@@ -166,7 +171,8 @@ Graduated students and parents of graduated students:
 2. Enters email or phone
 3. OTP sent → verified
 4. System checks alumni_profiles for their Clerk user ID
-5. Session issued — indefinite duration (alumni access never expires)
+5. Session issued — 30-day duration (SESSIONS.md, revised 2026-06-23).
+   Historical record ACCESS is permanent; the SESSION is not.
 6. Access: historical records only (read-only)
    - Report cards from their enrolled period
    - Attendance certificates
@@ -237,7 +243,7 @@ Developer production access requires a time-limited grant (max 4 hours) approved
 3. Session durations are role-specific — see SESSIONS.md for the complete table.
 4. The role selector is shown whenever a user has more than one active context. Single-context users bypass it.
 5. Standalone teacher accounts are not org members. Their JWT has no `org_id` — only `platform:teacher` in metadata. ZSMS middleware routes them to the Teacher Hub.
-6. Alumni accounts have indefinite sessions — they may need to access historical records years after graduation for university applications or scholarship submissions.
+6. Alumni retain permanent read-only ACCESS to their historical records — needed years later for university applications and scholarship submissions. Their SESSIONS are capped at 30 days like every other end-user role (SESSIONS.md, SOC 2 CC6.1); they re-authenticate by email OTP.
 
 ---
 
@@ -252,3 +258,6 @@ Developer production access requires a time-limited grant (max 4 hours) approved
 | 2026-04-26 | Added role selector for multi-context users | Linked teachers need context switching |
 | 2026-04-26 | Added student 365-day session | Students log in infrequently |
 | 2026-08-13 | Corrected student session from 365 days to 30 days | Reconciled with the 2026-06-23 revision in SESSIONS.md |
+| 2026-08-13 | **Corrected all three RLS helper bodies to match RLS.md** | `get_school_id()` returned `uuid` from `user_metadata`; `get_user_role()` and `get_user_id()` read `request.jwt.claims` directly. RLS.md is authoritative and uses `auth.jwt()` with the compact `o`/`act` claims. Migration `0001` implements RLS.md's versions. |
+| 2026-08-13 | Corrected `ZsmsJwtClaims` to the compact `o`/`act` claim shape | Interface declared `org_id`/`org_role`/`metadata.school_id`, which the RLS helpers do not read |
+| 2026-08-13 | Corrected alumni login from indefinite session to 30 days | Missed by the earlier sweep because it said "indefinite" rather than "365"; permanent record access is unchanged |

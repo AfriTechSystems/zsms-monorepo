@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "ZSMS",
+    "slug": "zsms",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true, "bundleIdentifier": "zm.co.zsms.app" },
+    "android": { "package": "zm.co.zsms.app" },
+    "plugins": ["expo-status-bar"]
+  }
+}

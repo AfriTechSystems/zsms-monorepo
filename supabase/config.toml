@@ -1,0 +1,15 @@
+project_id = "zsms-dev"
+
+[db]
+major_version = 17
+
+[db.migrations]
+schema_paths = []
+
+[api]
+enabled = true
+port = 54321
+# Only `public` is exposed. `private` and `afritech` are service-role only.
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000

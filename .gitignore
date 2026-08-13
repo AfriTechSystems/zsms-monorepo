@@ -82,6 +82,10 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
+# === Reference documents (not source artifacts) ===
+# Working/reference material kept alongside the repo but not part of the build.
+ZSMS_Master_Tracker.*
+
 # === Office lock files ===
 # Word/Excel leave these behind when a document is open.
 ~$*.docx

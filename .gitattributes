@@ -1,0 +1,49 @@
+# Normalise line endings across platforms.
+# Repository stores LF; Git converts on checkout per platform.
+* text=auto eol=lf
+
+# Explicitly text
+*.md        text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.sql       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.toml      text eol=lf
+*.sh        text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary — never normalise, never diff
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.webp      binary
+*.pdf       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.otf       binary
+*.eot       binary
+*.zip       binary
+*.docx      binary
+*.xlsx      binary
+*.pptx      binary
+
+# Generated — collapse in diffs and exclude from language stats
+packages/types/database.ts linguist-generated=true
+package-lock.json          linguist-generated=true -diff
+pnpm-lock.yaml             linguist-generated=true -diff
+yarn.lock                  linguist-generated=true -diff

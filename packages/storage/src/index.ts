@@ -10,8 +10,8 @@
  * endpoint and credential change, never a code branch.
  */
 
-import { R2StorageClient } from './r2-client.js'
-import { StorageBucket, type StorageClient } from './types.js'
+import { R2StorageClient } from './r2-client'
+import { StorageBucket, type StorageClient } from './types'
 
 const instances = new Map<StorageBucket, StorageClient>()
 
@@ -43,4 +43,4 @@ export {
   type PutObjectOptions,
   type SignedUrlOptions,
   type StorageObject,
-} from './types.js'
+} from './types'

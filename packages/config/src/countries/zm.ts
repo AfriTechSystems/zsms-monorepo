@@ -1,4 +1,4 @@
-import type { CountryConfig } from '../types.js'
+import type { CountryConfig } from '../types'
 
 /** Source of truth: `04 Country and Configuration/ZM.md`. */
 export const ZM_CONFIG: CountryConfig = {

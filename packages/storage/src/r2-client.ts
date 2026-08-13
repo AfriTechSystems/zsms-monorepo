@@ -14,7 +14,7 @@ import {
   type SignedUrlOptions,
   type StorageClient,
   type StorageObject,
-} from './types.js'
+} from './types'
 
 interface S3ClientLike {
   send(command: unknown): Promise<Record<string, unknown>>

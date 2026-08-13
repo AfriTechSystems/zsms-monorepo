@@ -5,11 +5,11 @@
  * country is a reviewed, tested event (ADDING_COUNTRY.md) — not a form
  * submission. Everything else configurable lives in the afritech schema.
  */
-export { ZM_CONFIG } from './countries/zm.js'
-export type { CountryConfig } from './types.js'
+export { ZM_CONFIG } from './countries/zm'
+export type { CountryConfig } from './types'
 
-import { ZM_CONFIG } from './countries/zm.js'
-import type { CountryConfig } from './types.js'
+import { ZM_CONFIG } from './countries/zm'
+import type { CountryConfig } from './types'
 
 const COUNTRIES: Record<string, CountryConfig> = { ZM: ZM_CONFIG }
 

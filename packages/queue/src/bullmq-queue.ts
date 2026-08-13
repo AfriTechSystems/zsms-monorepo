@@ -17,7 +17,7 @@ import {
   type JobQueue,
   type JobType,
   type QueueProvider,
-} from './types.js'
+} from './types'
 
 /** Minimal structural type for the bullmq Queue surface we use. */
 interface BullQueueLike {

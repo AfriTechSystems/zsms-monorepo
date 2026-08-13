@@ -11,8 +11,8 @@
  * else silently converts it back into a refactor.
  */
 
-import { ClerkAuthProvider } from './clerk-provider.js'
-import type { AuthProvider, AuthProviderName } from './types.js'
+import { ClerkAuthProvider } from './clerk-provider'
+import type { AuthProvider, AuthProviderName } from './types'
 
 let instance: AuthProvider | null = null
 
@@ -56,4 +56,4 @@ export {
   type Role,
   type SessionUser,
   type JwtClaims,
-} from './types.js'
+} from './types'

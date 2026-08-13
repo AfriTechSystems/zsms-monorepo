@@ -20,7 +20,7 @@ import {
   type JobQueue,
   type JobType,
   type QueueProvider,
-} from './types.js'
+} from './types'
 
 interface QStashClientLike {
   publishJSON(opts: Record<string, unknown>): Promise<{ messageId: string }>

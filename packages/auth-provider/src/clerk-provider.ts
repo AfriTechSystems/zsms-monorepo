@@ -16,7 +16,7 @@ import {
   type JwtClaims,
   type Role,
   type SessionUser,
-} from './types.js'
+} from './types'
 
 interface ClerkAuthLike {
   userId: string | null

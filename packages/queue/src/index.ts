@@ -14,9 +14,9 @@
  *   import { Client } from '@upstash/qstash' // ✗
  */
 
-import { BullMQQueue } from './bullmq-queue.js'
-import { QStashQueue } from './qstash-queue.js'
-import { DEFAULT_QUEUE_PROVIDER, type JobQueue, type QueueProvider } from './types.js'
+import { BullMQQueue } from './bullmq-queue'
+import { QStashQueue } from './qstash-queue'
+import { DEFAULT_QUEUE_PROVIDER, type JobQueue, type QueueProvider } from './types'
 
 let instance: JobQueue | null = null
 
@@ -62,4 +62,4 @@ export {
   type JobPriorityValue,
   type EnqueueResult,
   type QueueProvider,
-} from './types.js'
+} from './types'

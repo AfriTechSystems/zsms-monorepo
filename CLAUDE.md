@@ -2,13 +2,21 @@
 
 ## What this repository currently is
 
-**Documentation only. There is no source code here yet.**
+**Phase 0 scaffold complete. Phase 1 not started.**
 
-The tree is `Official Documentation/` (108 markdown files across 18 numbered folders) and `.claude/`. The `apps/`, `packages/`, and `supabase/` directories described throughout the docs **do not exist** — they are the specification for what will be built.
+ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development, so the docs specify far more than exists.
 
-ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development.
+The tree is:
 
-Before writing any code, confirm with the user whether you are scaffolding the project for the first time.
+| Path | State |
+|---|---|
+| `Official Documentation/` | 118 markdown files across 18 numbered folders — the specification |
+| `apps/web` | Next.js 14 App Router. Builds. Contains `/` and `/api/health` only |
+| `apps/mobile` | Expo 52 / RN 0.76. Type-checks. No screens yet |
+| `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config` — interface-complete stubs |
+| `supabase/` | `migrations/0001` applied to `zsms-dev`; `functions/`, `tests/`, `seed/` empty |
+
+**What exists is scaffolding, not implementation.** No business tables, no RLS policies, no Edge Functions, no UI. Migrations `0002`–`0065` are specified in `MIGRATIONS.md` and unwritten. Read `JOURNAL.md` for what the last session actually did and what it left open.
 
 ---
 
@@ -67,7 +75,21 @@ Only the dev project exists. Build against it exclusively.
 
 **Never load real school data into `zsms-dev`** — no production dumps, no anonymised extracts, no pilot records. The region exception depends entirely on that constraint. Generate fixtures per `TEST_DATA.md`.
 
-Extensions already enabled on dev beyond Supabase defaults: `vector` (pgvector, for the AI knowledge base) and `pgtap` (for RLS tests). Migration 0001 should still declare them idempotently with `CREATE EXTENSION IF NOT EXISTS`, since staging and production start clean.
+Extensions already enabled on dev beyond Supabase defaults: `vector` (pgvector, for the AI knowledge base) and `pgtap` (for RLS tests), both in the `extensions` schema — never `public`. Migration 0001 declares them idempotently with `CREATE EXTENSION IF NOT EXISTS ... WITH SCHEMA extensions`, since staging and production start clean.
+
+### Applying migrations
+
+**Use the Supabase CLI, never the MCP.** `MIGRATIONS.md` → *Migration Versioning and Application Procedure* is authoritative; the short version:
+
+```bash
+npm run db:push     # apply to the linked project
+npm run db:list     # versions must be four-digit and match filenames
+npm run db:types    # regenerate types after every migration
+```
+
+- Create migration files **by hand** as `NNNN_description.sql`. Never run `supabase migration new` — it generates a timestamp filename, breaking the `NNNN_` convention.
+- The MCP's `apply_migration` records a **timestamp version** in `supabase_migrations.schema_migrations` regardless of filename. This desynced `0001` and had to be corrected by hand. Timestamp versions also sort *after* every four-digit version, silently reordering the sequence. Use it on `zsms-dev` for exploration only, and correct the history row in the same session.
+- **Only `zsms-dev` may be migrated by automated tooling.** Staging and production are release actions requiring explicit human approval each time (prohibition 10). Re-link to dev immediately after touching either.
 
 ---
 

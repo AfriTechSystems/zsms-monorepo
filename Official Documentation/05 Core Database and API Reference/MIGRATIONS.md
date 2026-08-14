@@ -25,7 +25,8 @@ This document is the master migration reference. It lists every planned migratio
 4. Test every migration on `zsms-dev` before applying to `zsms-staging`, and on `zsms-staging` before applying to `zsms-zm` (production).
 5. After applying a migration, regenerate TypeScript types: `supabase gen types typescript --linked > packages/types/database.ts`.
 6. Add a CHANGELOG.md entry after every production migration.
-7. Migrations that affect RLS policies must be reviewed alongside `docs/RLS.md`.
+7. Migrations that affect RLS policies must be reviewed alongside `01 Foundation Layer/RLS.md`.
+8. Apply migrations with the Supabase CLI (`npm run db:push`), never with `supabase migration new` and never with the MCP on staging or production. See *Migration Versioning and Application Procedure* below — the four-digit version must always match the filename.
 
 ---
 
@@ -34,6 +35,73 @@ This document is the master migration reference. It lists every planned migratio
 All migration files live in: `supabase/migrations/`
 
 File naming convention: `NNNN_description_of_change.sql`
+
+---
+
+## Migration Versioning and Application Procedure
+
+**The Supabase CLI is the only supported way to apply a migration.** This is not a preference — it is the mechanism that keeps the remote migration history aligned with the filenames in `supabase/migrations/`.
+
+### Why the convention is strict
+
+Supabase records applied migrations in `supabase_migrations.schema_migrations`, keyed by a **version string** taken from the leading digits of the filename. ZSMS uses four-digit versions (`0001`, `0002`, …) per `CONVENTIONS.md`.
+
+Two things break that alignment:
+
+| Hazard | Effect |
+|---|---|
+| `supabase migration new <name>` | Generates a **timestamp-prefixed** filename (`20260813143727_name.sql`), not `NNNN_`. |
+| Applying via the Supabase MCP `apply_migration` tool | Records a **timestamp version** in history regardless of the filename, so history and file no longer correspond. |
+
+Either produces a history row with no matching file, and `supabase db push` can then re-apply or skip migrations incorrectly.
+
+**The ordering hazard is the serious one.** Versions sort as strings. A timestamp version (`20260813143727`) sorts *after* every four-digit version, so once one exists, all subsequent `NNNN_` migrations sort before it. Migration order is the one property the whole sequence depends on — `0003` creates `schools`, `0017` creates `staff_permission_grants`, and `0001`'s helpers assume both arrive in order.
+
+### Procedure — creating and applying a migration
+
+1. **Read the next available number** from *Next Available Sequence Number* below. Never guess it.
+2. **Create the file by hand** at `supabase/migrations/NNNN_description.sql`, four-digit zero-padded, snake_case description.
+   **Do not run `supabase migration new`** — it generates a timestamp name.
+3. **Link the project once per machine** (dev only):
+   ```bash
+   npx supabase link --project-ref tevblmcebsqqjgzjptgw
+   ```
+4. **Apply to `zsms-dev`:**
+   ```bash
+   npm run db:push
+   ```
+5. **Verify local and remote versions match** — the two columns must show the same four-digit numbers, with no timestamp rows:
+   ```bash
+   npm run db:list
+   ```
+6. **Confirm no schema drift:**
+   ```bash
+   npm run db:diff      # expected: no differences
+   ```
+7. **Regenerate types** (never hand-write them — prohibition 3 in `CONVENTIONS.md`):
+   ```bash
+   npm run db:types
+   ```
+8. **Update this document** — mark the migration applied, add a Change Log row, and advance *Next Available Sequence Number*.
+
+The CLI is pinned as a root `devDependency`, so `npm run db:*` uses the same version for every developer and in CI. Do not rely on a globally installed `supabase` binary.
+
+### If the MCP is used instead
+
+The MCP `apply_migration` tool is acceptable for **exploration on `zsms-dev` only**. It is never used on `zsms-staging` or `zsms-zm`. When it is used, the history row must be corrected **in the same session**, before any further migration is applied:
+
+```sql
+-- Replace the MCP's timestamp version with the four-digit filename version
+UPDATE supabase_migrations.schema_migrations
+SET    version = 'NNNN'
+WHERE  version = '<timestamp the MCP recorded>';
+```
+
+Then re-run `npm run db:list` and confirm no timestamp versions remain. This correction was required for `0001` (see below).
+
+### Staging and production
+
+`supabase db push` against `zsms-staging` or `zsms-zm` is a **release action, not a development action**. It follows prohibition 10 in `CONVENTIONS.md` — dev verified, then staging verified, then production — and requires explicit human approval each time. Automated tooling and AI assistants apply migrations to `zsms-dev` only.
 
 ---
 
@@ -57,7 +125,7 @@ Enables required extensions and creates the seven PostgreSQL helper functions th
 
 **`SET LOCAL check_function_bodies = off`.** `has_permission_grant()` reads `public.schools` (migration `0003`) and `public.staff_permission_grants` (`0017`), neither of which exists at `0001`. `LANGUAGE SQL` bodies are validated at CREATE time, so body checking is disabled for this transaction only. The function is never called before those tables exist.
 
-**Migration history version.** Applying via the Supabase MCP records a timestamp version. The history row was corrected to `0001` so it matches the `NNNN_` filename convention in `CONVENTIONS.md` and `supabase db push` reconciles cleanly. Apply subsequent migrations with the Supabase CLI where possible, or repeat this correction.
+**Migration history version.** `0001` was applied via the Supabase MCP, which recorded the timestamp version `20260813143727`. The history row was corrected to `0001` so it matches the `NNNN_` filename convention in `CONVENTIONS.md` and `supabase db push` reconciles cleanly. This is why the CLI is now mandatory for every subsequent migration — see *Migration Versioning and Application Procedure* above.
 
 ---
 
@@ -307,28 +375,39 @@ When creating a new migration, use `0066` and update this document with the new 
 
 ## Migration Application Commands
 
+Use the npm scripts rather than a global binary — they resolve the CLI version pinned in the root `devDependencies`, so every developer and CI runner applies migrations with the same tool.
+
 ```bash
-# Apply all pending migrations to development
-supabase link --project-ref zsms-dev-ref
-supabase db push
+# Development — the only environment automated tooling may apply to
+npx supabase link --project-ref tevblmcebsqqjgzjptgw   # zsms-dev, once per machine
+npm run db:push
 
-# Apply to staging (run after dev validation)
-supabase link --project-ref zsms-staging-ref
-supabase db push
+# Verify: local and remote versions match, no timestamp rows
+npm run db:list
 
-# Apply to production (run after staging validation)
-supabase link --project-ref zsms-zm-ref
-supabase db push
+# Verify: no schema drift
+npm run db:diff
 
 # After any migration, regenerate TypeScript types
-supabase gen types typescript --linked > packages/types/database.ts
+npm run db:types
 
-# Check which migrations have been applied
-supabase migration list
-
-# Verify schema matches migrations (should show no diff)
-supabase db diff
+# Run the pgTAP suite
+npm run db:test
 ```
+
+**Staging and production — release actions, human-approved each time.** Project refs are assigned when the projects are provisioned (`zsms-staging` in Phase 0's final steps, `zsms-zm` in Phase 6); both are `af-south-1`.
+
+```bash
+# Staging — only after dev is verified
+npx supabase link --project-ref <zsms-staging-ref>
+npm run db:push
+
+# Production — only after staging is verified (CONVENTIONS.md prohibition 10)
+npx supabase link --project-ref <zsms-zm-ref>
+npm run db:push
+```
+
+Re-link back to `zsms-dev` immediately after any staging or production operation. A stale link is how a development migration reaches production by accident.
 
 ---
 
@@ -336,9 +415,10 @@ supabase db diff
 
 After every migration applied to production:
 
-- [ ] TypeScript types regenerated: `supabase gen types typescript`
+- [ ] TypeScript types regenerated: `npm run db:types`
+- [ ] `npm run db:list` shows matching four-digit versions, no timestamp rows
 - [ ] Supabase dashboard — verify table appears correctly in Table Editor
-- [ ] RLS policy verified using the RLS testing SQL in `docs/infra/SUPABASE.md`
+- [ ] RLS policy verified using the RLS testing SQL in `03 Infrastructure Services/SUPABASE.md`
 - [ ] Railway standby replication verified — lag under 5 seconds
 - [ ] CHANGELOG.md updated with migration entry
 - [ ] This document updated if new migration was added
@@ -367,6 +447,10 @@ This section is updated each time a migration reaches production.
 | 2026-08-13 | **Migration `0001` written and APPLIED to `zsms-dev`** | Phase 0 scaffold — extensions in `extensions` schema, seven RLS helpers in `public`, zero tables |
 | 2026-08-13 | Reconciled proposed `is_afritech_staff()` / `is_school_admin()` to the existing set | Competing near-synonyms in a security layer cause the wrong check to be used in a policy |
 | 2026-08-13 | Documented the MCP timestamp-version correction to `0001` | Keeps remote history aligned with the `NNNN_` filename convention for `supabase db push` |
+| 2026-08-14 | **Added *Migration Versioning and Application Procedure*** | Establishes the Supabase CLI as the only supported application path, after the MCP desynced `0001`'s history version from its filename |
+| 2026-08-14 | Pinned the Supabase CLI as a root `devDependency`; added `db:push`, `db:list`, `db:diff` scripts | The existing `db:types` / `db:test` scripts called a bare `supabase` that was not installed anywhere and would have failed on first use |
+| 2026-08-14 | Documented the version **ordering** hazard | Timestamp versions sort after every four-digit version, so one stray timestamp silently reorders the whole sequence |
+| 2026-08-14 | Corrected placeholder project refs and the generated-types path in *Migration Application Commands* | `zsms-dev-ref` was a placeholder; the types path omitted `src/` and disagreed with `package.json` |
 
 ---
 

@@ -12,10 +12,14 @@
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",
+    "db:push": "supabase db push",
+    "db:list": "supabase migration list",
+    "db:diff": "supabase db diff --linked",
     "db:types": "supabase gen types typescript --linked > packages/types/src/database.ts",
     "db:test": "supabase test db"
   },
   "devDependencies": {
+    "supabase": "^2.114.0",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
   }

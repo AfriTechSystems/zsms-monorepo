@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "permissions": {
+    "defaultMode": "ask",
+
+    "allow": [
+      "Read(//c/dev/ZSMS Source Code/**)",
+      "Glob(//c/dev/ZSMS Source Code/**)",
+      "Grep(//c/dev/ZSMS Source Code/**)",
+
+      "Edit(//c/dev/ZSMS Source Code/**)",
+      "Write(//c/dev/ZSMS Source Code/**)",
+
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(npm install)",
+      "Bash(npm install --no-audit --no-fund)",
+      "Bash(npm ci *)",
+      "Bash(npm audit *)",
+      "Bash(npm view *)",
+      "Bash(npm ls *)",
+      "Bash(npx turbo *)",
+      "Bash(npx tsc *)",
+      "Bash(npx next build *)",
+      "Bash(npx next lint *)",
+      "Bash(npx eslint *)",
+      "Bash(npx prettier *)",
+      "Bash(npx jest *)",
+      "Bash(npx vitest *)",
+      "Bash(npx playwright test *)",
+      "Bash(npx expo *)",
+      "Bash(npx k6 *)",
+      "Bash(node *)",
+
+      "Bash(npx supabase migration list *)",
+      "Bash(npx supabase db push)",
+      "Bash(npx supabase db diff *)",
+      "Bash(npx supabase gen types *)",
+      "Bash(npx supabase test db *)",
+      "Bash(npx supabase inspect *)",
+      "Bash(npx supabase status *)",
+
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git switch *)",
+      "Bash(git checkout -b *)",
+      "Bash(git stash *)",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
+      "Bash(git ls-remote *)",
+      "Bash(git ls-tree *)",
+      "Bash(git blame *)",
+      "Bash(git config --get *)",
+      "Bash(git config --list*)",
+
+      "Bash(ls *)",
+      "Bash(pwd)",
+      "Bash(echo *)",
+      "Bash(mkdir *)",
+      "Bash(which *)",
+      "Bash(where *)",
+
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__list_extensions",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__list_edge_functions",
+      "mcp__claude_ai_Supabase__get_project",
+      "mcp__claude_ai_Supabase__get_project_url",
+      "mcp__claude_ai_Supabase__get_advisors",
+      "mcp__claude_ai_Supabase__get_edge_function",
+      "mcp__claude_ai_Supabase__search_docs",
+      "mcp__claude_ai_Supabase__query_logs",
+      "mcp__claude_ai_Supabase__generate_typescript_types",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__apply_migration"
+    ],
+
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git branch -d *)",
+      "Bash(git branch -D *)",
+      "Bash(git branch --delete *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(git rebase *)",
+      "Bash(git revert *)",
+      "Bash(git cherry-pick *)",
+      "Bash(git tag *)",
+      "Bash(git remote *)",
+      "Bash(git config --global *)",
+      "Bash(git filter-branch *)",
+      "Bash(git update-ref *)",
+      "Bash(git reflog delete *)",
+
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(mv *)",
+      "Bash(del *)",
+      "Bash(Remove-Item *)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(Clear-Content *)",
+
+      "Bash(npx supabase link *)",
+      "Bash(npx supabase db reset *)",
+      "Bash(npx supabase db remote *)",
+      "Bash(npx supabase projects *)",
+      "Bash(npx supabase secrets *)",
+      "Bash(npx supabase functions deploy *)",
+      "Bash(npx supabase branches *)",
+
+      "Bash(npm publish *)",
+      "Bash(npm audit fix *)",
+      "Bash(gh *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(winget *)",
+
+      "mcp__claude_ai_Supabase__create_project",
+      "mcp__claude_ai_Supabase__pause_project",
+      "mcp__claude_ai_Supabase__restore_project",
+      "mcp__claude_ai_Supabase__deploy_edge_function",
+      "mcp__claude_ai_Supabase__create_branch",
+      "mcp__claude_ai_Supabase__delete_branch",
+      "mcp__claude_ai_Supabase__merge_branch",
+      "mcp__claude_ai_Supabase__reset_branch",
+      "mcp__claude_ai_Supabase__rebase_branch",
+      "mcp__claude_ai_Supabase__confirm_cost"
+    ],
+
+    "deny": [
+      "Read(//c/dev/ZSMS Source Code/.env)",
+      "Read(//c/dev/ZSMS Source Code/.env.*)",
+      "Read(//c/dev/ZSMS Source Code/**/.env)",
+      "Read(//c/dev/ZSMS Source Code/**/.env.*)",
+      "Read(//c/dev/ZSMS Source Code/**/*.pem)",
+      "Read(//c/dev/ZSMS Source Code/**/*.key)",
+      "Read(//c/dev/ZSMS Source Code/**/*.p12)",
+      "Read(//c/dev/ZSMS Source Code/**/service-account*.json)",
+
+      "Edit(//c/dev/ZSMS Source Code/.env)",
+      "Edit(//c/dev/ZSMS Source Code/.env.*)",
+      "Edit(//c/dev/ZSMS Source Code/**/.env)",
+      "Edit(//c/dev/ZSMS Source Code/**/.env.*)",
+
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(git push --delete *)",
+      "Bash(git push --mirror *)",
+
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+
+      "Bash(printenv*)",
+      "Bash(env)"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*[Ss]upabase.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/guard-supabase-sql.js",
+            "timeout": 20,
+            "statusMessage": "Checking SQL for destructive statements"
+          }
+        ]
+      }
+    ]
+  }
+}

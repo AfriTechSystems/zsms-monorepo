@@ -232,6 +232,8 @@ This document records every significant architectural and product decision made 
 | 2026-08-13 | ADR-034 — Context-aware navigational AI assistant with approval-gated writes | Extends the assistant to all roles; writes never bypass confirmation |
 | 2026-08-13 | ADR-035 — BullMQ as the default job queue implementation | Job priorities, concurrency control, cost at volume, Tier 2 parity |
 | 2026-08-13 | ADR-005 marked superseded in its implementation choice by ADR-035 | Queue reasoning stands; the named provider changed |
+| 2026-08-14 | ADR-036 — Next.js 15 as the web framework baseline | The 14.x line stopped receiving security backports; ~21 advisories fixed only in 15.5.x, several affecting tenant isolation |
+| 2026-08-14 | ADR-036 amended — `apps/web` moves to React 19; React pinned at the workspace root | The upgrade surfaced a hoisting fault: root-hoisted `styled-jsx` resolved React against the root, loading a second instance during prerender |
 
 **Note on document structure:** this Change Log sits mid-document for historical reasons — ADR-026 onward were appended after it. ADRs are numbered sequentially throughout; read to the end of the file for the complete set.
 
@@ -351,3 +353,54 @@ This document records every significant architectural and product decision made 
 
 **Alternatives considered:** Retaining QStash as default and adding BullMQ later (rejected — migrating a live queue is riskier than starting on the target implementation, and the abstraction means BullMQ costs nothing extra to adopt now); dropping QStash entirely (rejected — a fallback with no persistent-worker requirement is genuinely useful for constrained deployments and for Railway incidents).
 **Consequences:** Railway workers and Redis are provisioned in Phase 0 of `BUILD_SEQUENCE.md` rather than being a later addition. Switching providers in either direction remains a one-line configuration change. When switching, cron schedules on the provider being left must be cancelled first — schedules active on both providers cause double dispatch.
+
+---
+
+## ADR-036 — Next.js 15 as the Web Framework Baseline
+
+**Status:** Confirmed — supersedes the Next.js 14 pin recorded in `CHANGELOG.md` (2026-04-26)
+**Decision:** **`apps/web` targets the Next.js 15.5 line, pinned at an exact patch version.** The App Router, the `packages/*` abstraction boundaries, and every other architectural decision are unchanged — this is a framework version decision only.
+
+**Reason:**
+
+The original stack selection named Next.js 14. Verification during the pre-Phase-1 cleanup showed that **the 14.x line no longer receives security backports.** Patching the December 2025 React Server Components advisory moved `apps/web` to `14.2.35` — the newest release the 14 line will get — and `npm audit` still reported roughly twenty-one further advisories against it, every one of them fixed only in `15.5.x` or later.
+
+Several are directly relevant to a multi-tenant system whose isolation guarantees are the product:
+
+| Advisory class | Fixed in |
+|---|---|
+| SSRF in rewrites via attacker-controlled destination hostname | 15.5.21 |
+| SSRF in Server Actions on custom servers | 15.5.21 |
+| Unauthenticated disclosure of internal Server Function endpoints | 15.5.21 |
+| Cross-site scripting in App Router applications using CSP nonces | 15.5.16 |
+| Cache poisoning in React Server Component responses | 15.5.16 |
+| HTTP request smuggling in rewrites | 15.5.13 |
+
+Cache poisoning and response-body confusion are the sharpest of these. ZSMS serves every school from one deployment, so a cached response crossing a tenant boundary is a data breach under the Zambia Data Protection Act 2021, with a 72-hour notification obligation (`COMPLIANCE.md`). RLS protects the database; it does not protect an HTTP cache.
+
+**Timing.** The upgrade was taken while `apps/web` contained two routes and no business logic, before Phase 1. The cost of a framework major rises monotonically with the amount of application code built on it, and never falls.
+
+**Version choice.** `15.5.23` — above the `15.5.21` threshold that clears every advisory listed above, and the newest patch on the line at the time of decision. Next.js 16 was considered and rejected for now: it is two majors from the specification, carries a larger reconciliation and breaking-change surface, and 15.5 already resolves every known advisory. Revisit before production launch.
+
+**React version — `apps/web` moves to React 19.** This was not the original intent. Next.js 15.5 declares `^18.2.0 || ^19.0.0`, so React 18.3.x appeared viable, but the build failed while prerendering `/_error` with `Cannot read properties of null (reading 'useContext')` — the signature of two React copies in one bundle.
+
+**The cause is npm hoisting, not application code.** The failing module was identified from the require stack:
+
+```
+node_modules/styled-jsx/dist/index/index.js        ← monorepo ROOT
+  └─ next/dist/compiled/next-server/pages.runtime.prod.js
+      └─ apps/web/.next/server/pages/_document.js
+```
+
+`styled-jsx` is a transitive dependency of `next`. npm hoists it to the **workspace root**, while `next` itself stays nested in `apps/web`. From the root, `styled-jsx` resolves `react` against the **root** `node_modules` — and the root held `react@18.3.1`, hoisted there because `apps/mobile` requires exactly that version for React Native 0.76. Prerendering `_document` therefore instantiated a second React, and the two instances shared no dispatcher.
+
+The repository genuinely needs two React majors: Next.js 15's App Router expects 19, and React Native 0.76 pins 18.3.1. They cannot be reconciled by choosing one. What matters is **which version occupies the root slot**, because hoisted transitive dependencies resolve against it.
+
+The fix declares `react` and `react-dom` at `19.2.8` in the **root** `package.json`. The root builds nothing; the entry exists solely to control hoisting. It puts `apps/web`, Clerk, and `styled-jsx` on one React instance, and nests Expo's 18.3.1 under `apps/mobile`. A scoped `overrides` entry additionally pins `@clerk/nextjs`'s `next` peer to `15.5.23`, so npm's automatic peer installation cannot place a second Next.js at the root.
+
+**Three hypotheses were tested and rejected before this one**, each by experiment rather than reasoning: React major mismatch (the build failed with 18 *and* 19 in `apps/web`); `transpilePackages` pulling `packages/auth-provider` into the bundle (removing it changed nothing, and `apps/web` imports only `@zsms/config`); and a mismatched SWC binary (the `@next/swc` warning proved to be a benign hoisting artifact, correct at `15.5.23`). A pristine Next.js 15.5.23 + React 19.2.8 application outside the monorepo built cleanly, which localised the fault to the dependency tree rather than the framework.
+
+**The general lesson:** in an npm workspace, a hoisted transitive dependency resolves its own peers against the root, not against the workspace that owns it. Where two majors of a framework-coupled library must coexist, the root slot is a deliberate architectural choice — not something to leave to npm's resolution order. Revisit when React Native supports React 19; the whole repository can then share one version and both entries can be removed.
+
+**Alternatives considered:** Remaining on `14.2.35` and accepting the open advisories (rejected — the exposure is permanent, since no fix will ever be backported, and the affected classes are exactly those that breach tenant isolation); jumping to Next.js 16.3.x (rejected for now — no additional security benefit over 15.5.23, at higher migration cost).
+**Consequences:** `ARCHITECTURE.md`, `THIRTEEN_LAYER_COMPLIANCE.md`, and `CLAUDE.md` are updated to state Next.js 15. Phase 1 work must follow Next.js 15 conventions — most importantly that `cookies()`, `headers()`, `draftMode()`, `params`, and `searchParams` are **asynchronous** and must be awaited, and that `fetch` and `GET` route handlers are **no longer cached by default**. The Phase 0 scaffold used none of these APIs, so the upgrade required no code changes. The exact patch version stays pinned; `npm audit` is checked against `next` at every phase boundary.

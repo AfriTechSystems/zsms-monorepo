@@ -74,7 +74,7 @@ This architecture is audited against a thirteen-layer model in `THIRTEEN_LAYER_C
 ```
 AfriTechSystems/zsms-monorepo/
 ├── apps/
-│   ├── web/                    Next.js 14 App Router — school portal, parent portal, admin panel, Teacher Hub
+│   ├── web/                    Next.js 15 App Router — school portal, parent portal, admin panel, Teacher Hub
 │   └── mobile/                 React Native / Expo — teacher attendance, parent app
 ├── packages/
 │   ├── auth-provider/          Clerk wrapper — the ONLY module importing @clerk/* (Keycloak swap point)
@@ -430,3 +430,4 @@ Per-country isolation:
 | 2026-08-13 | **Corrected `get_school_id()` — returns TEXT (Clerk org ID), not UUID** | The illustrative body here read `user_metadata`/`app_metadata` and returned `uuid`, contradicting RLS.md. RLS.md is authoritative and self-consistent: `has_permission_grant()` joins `schools.clerk_org_id = get_school_id()`. Migration `0001` implements RLS.md's version. |
 | 2026-08-13 | Corrected the example RLS policy — UUID-keyed tables resolve through `schools.clerk_org_id` | The old example compared a UUID column directly to `get_school_id()`, which is a type error under the corrected signature |
 | 2026-08-13 | Added missing `org:admin`, `org:parent`, `org:student` to the roles table | ROLES.md defines eight `org:*` roles; this table listed five |
+| 2026-08-14 | `apps/web` framework updated to Next.js 15 App Router | ADR-036 — Next.js 14 no longer receives security backports; ~21 advisories are fixed only in 15.5.x |

@@ -38,7 +38,7 @@ This document is an audit, not a design. Each layer below states what ZSMS actua
 
 | # | Layer | ZSMS Implementation | Owning Document | Verdict |
 |---|---|---|---|---|
-| 1 | Frontend | Next.js 14 App Router, React Native/Expo | *(distributed)* | **Thin** |
+| 1 | Frontend | Next.js 15 App Router, React Native/Expo | *(distributed)* | **Thin** |
 | 2 | APIs / Backend | Next.js API routes + Supabase Edge Functions | `05/ENDPOINTS.md`, `05/EDGE_FUNCTIONS.md` | **Complete** |
 | 3 | Database / Storage | Supabase PostgreSQL, Cloudflare R2 | `01/DATABASE.md`, `13/STORAGE.md` | **Complete** |
 | 4 | Auth / Permissions | Clerk + `packages/auth-provider`, DB permission grants | `02/AUTH.md`, `02/PERMISSIONS.md` | **Complete** |
@@ -56,7 +56,7 @@ This document is an audit, not a design. Each layer below states what ZSMS actua
 
 ## Layer 1 — Frontend
 
-**Implementation.** Next.js 14 App Router serves the school portal, parent portal, admin panel, and Teacher Hub from `apps/web`. React Native/Expo serves the teacher attendance app and parent mobile app from `apps/mobile`. Component conventions, folder flatness, and PascalCase component naming are specified in `CONVENTIONS.md`.
+**Implementation.** Next.js 15 App Router (ADR-036) serves the school portal, parent portal, admin panel, and Teacher Hub from `apps/web`. React Native/Expo serves the teacher attendance app and parent mobile app from `apps/mobile`. Component conventions, folder flatness, and PascalCase component naming are specified in `CONVENTIONS.md`.
 
 **Coverage: Thin.** Frontend concerns are distributed across module documents — each module document describes its own screens — but no document owns frontend architecture as a whole. There is no specification for the component library choice, state management approach, form handling strategy, error boundary placement, loading-state conventions, or accessibility baseline.
 
@@ -221,3 +221,4 @@ This document is an architectural inventory and contains no credentials, endpoin
 |---|---|---|
 | 2026-08-13 | Initial complete draft | Architectural completeness audit — thirteen-layer model adopted in ADR-030 |
 | 2026-08-13 | Flagged layers 1 and 7 as Thin with remediation targets | Honest coverage assessment — frontend architecture and CI pipeline undocumented |
+| 2026-08-14 | Layer 1 framework updated to Next.js 15 | ADR-036 — the 14.x line no longer receives security backports |

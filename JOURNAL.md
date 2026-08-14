@@ -27,9 +27,43 @@ Verified after the bump: `turbo type-check` 8/8 pass, `turbo build` pass.
 
 `npm audit` reports `fixAvailable: next@16.3.0 (isSemVerMajor)`.
 
-**This is a decision for the user, not a defect to fix silently.** The docs pin Next.js 14 and the instruction was to stay within 14. That has been honoured. But the scaffold is currently two routes — a framework major is cheaper now than at any later point, and several of the unpatched issues (SSRF, cache poisoning, CSP-nonce XSS) are exactly the classes that matter for a multi-tenant system where isolation is the product. Raised, awaiting a call.
+**Raised as a decision rather than fixed silently — the user chose to upgrade.** `apps/web` now runs **Next.js 15.5.23** (ADR-036). `npm audit` confirms **`next` has zero advisories of its own**; it is now flagged only transitively through `postcss` and `sharp`.
 
-Also noted: `tar` is **critical** (hardlink path traversal), transitive under `apps/mobile` via Expo 52; the fix requires Expo 57, a major. It is build-time only and never ships to a production runtime, so it ranks below the Next decision.
+#### The upgrade exposed a hoisting fault — worth reading before Phase 1
+
+The build failed on `15.5.23` with `Cannot read properties of null (reading 'useContext')` while prerendering `/_error`. The require stack named the culprit:
+
+```
+node_modules/styled-jsx/dist/index/index.js        ← monorepo ROOT
+  └─ next/dist/compiled/next-server/pages.runtime.prod.js
+      └─ apps/web/.next/server/pages/_document.js
+```
+
+`styled-jsx` is a transitive dependency of `next`. npm hoists it to the **root**, while `next` stays nested in `apps/web`. It therefore resolves `react` against the **root** `node_modules` — which held `18.3.1`, hoisted there for React Native 0.76. Prerendering loaded a second React instance, and the two shared no dispatcher.
+
+The repo genuinely needs two React majors (Next 15 App Router wants 19; RN 0.76 pins 18.3.1). They cannot be reconciled by picking one — what matters is **which version occupies the root slot**, because hoisted transitive dependencies resolve against it. Fixed by declaring `react`/`react-dom` at `19.2.8` in the root `package.json` purely to control hoisting, plus a scoped `overrides` pinning Clerk's `next` peer.
+
+**Three hypotheses were tested and rejected first, each by experiment:**
+
+| Hypothesis | How it was killed |
+|---|---|
+| React major mismatch in `apps/web` | Failed with React 18 *and* React 19 |
+| `transpilePackages` pulling `auth-provider` in | Removing it changed nothing; `apps/web` imports only `@zsms/config` |
+| Mismatched SWC binary | The `@next/swc` warning was a benign hoisting artifact, correct at `15.5.23` |
+
+A pristine Next 15.5.23 + React 19.2.8 app built outside the monorepo compiled cleanly — that is what localised the fault to the dependency tree rather than the framework. **The lesson: I guessed twice before isolating, and both guesses cost a full reinstall cycle. The pristine-app comparison should have been the first move, not the fourth.**
+
+Verified after the fix: `turbo type-check` 8/8, `turbo build` clean and stable across repeat runs.
+
+**What remains after the upgrade**, none of it currently reachable, all of it needing a decision before it becomes reachable:
+
+| Package | Issue | Reachable when | Fix |
+|---|---|---|---|
+| `sharp` `<0.35.0` | libvips CVEs | a user-uploaded image passes through `next/image` | sharp ≥ 0.35, or serve images straight from R2/Cloudflare and bypass the Next optimizer |
+| `postcss` | sourceMappingURL path traversal, stringify XSS | only if we ever process untrusted CSS | build-time only; we author all CSS |
+| `tar` **critical** | hardlink path traversal | build/install time under Expo 52 | needs Expo 57 (major) |
+
+`sharp` is the one that matters: ZSMS will serve student photos and school logos. **Resolve it before any user-uploaded image is served through `next/image`.**
 
 ### 2. Branch protection — **not done, needs the user**
 
@@ -217,13 +251,16 @@ Two scaffold defects found and fixed during verification:
 
 ### Blocking before Phase 1
 
-- **Branch protection on `main` is not yet enabled** — needs the user to apply it in the GitHub UI, or `gh` installed so it can be set by API. Until then ADR-011's workflow rests on discipline, not enforcement.
-- **Next.js major-version decision** — staying on 14 means shipping with ~21 unpatched advisories (see the 2026-08-14 entry). Cheapest to resolve now, while `apps/web` is two routes.
+- **Branch protection on `main` is not yet enabled** — needs the user to apply it in the GitHub UI, or `gh` installed so it can be set by API. Until then ADR-011's workflow rests on discipline, not enforcement. **This is the only item still blocking.**
+
+Resolved: the Next.js version decision (upgraded to 15.5.23 per ADR-036; all 21 advisories cleared).
 
 ### Open items carried forward
 
 - `INDEXES.md` still needs the eight `afritech` index entries when `0065` is written
 - Layer 1 (Frontend) and Layer 7 (CI-CD) remain **Thin** in `THIRTEEN_LAYER_COMPLIANCE.md`
+- `sharp` `<0.35.0` — **must be resolved before user-uploaded images pass through `next/image`**
 - `tar` critical advisory under `apps/mobile` — needs Expo 57 (major); build-time only
+- The root `react`/`react-dom` pin and the Clerk `next` override exist only to control npm hoisting — remove both once React Native supports React 19
 - PowerSync has no documented self-hosted path — largest open risk in the Tier 2 deployment model
 - Clerk per-MAU billing vs permanent alumni accounts (ADR-015) — unmodelled cost growth

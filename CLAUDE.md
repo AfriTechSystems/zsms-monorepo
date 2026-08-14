@@ -11,7 +11,7 @@ The tree is:
 | Path | State |
 |---|---|
 | `Official Documentation/` | 118 markdown files across 18 numbered folders — the specification |
-| `apps/web` | Next.js 14 App Router. Builds. Contains `/` and `/api/health` only |
+| `apps/web` | Next.js 15 App Router. Builds. Contains `/` and `/api/health` only |
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. No screens yet |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config` — interface-complete stubs |
 | `supabase/` | `migrations/0001` applied to `zsms-dev`; `functions/`, `tests/`, `seed/` empty |
@@ -47,7 +47,7 @@ Start any substantive task by reading `01 Foundation Layer/CONVENTIONS.md` and `
 
 Modular monolith (explicitly **not** microservices), Turborepo monorepo.
 
-- **Clients** — Next.js 14 App Router (`apps/web`), React Native/Expo (`apps/mobile`)
+- **Clients** — Next.js 15 App Router (`apps/web`, pinned `15.5.23` per ADR-036), React Native/Expo (`apps/mobile`)
 - **API** — Next.js API routes + Supabase Edge Functions (Deno), rate-limited via Upstash Redis
 - **Data** — Supabase PostgreSQL, Upstash Redis, Cloudflare R2 (two buckets: public + private), Railway Postgres hot standby
 - **Async** — Upstash QStash; `03 Infrastructure Services/BULLMQ.md` defines a queue abstraction so BullMQ can replace it in Phase 2

@@ -6,6 +6,22 @@ This document records all significant changes to ZSMS by date. It serves as the 
 
 ---
 
+## 2026-08-14 — Pre-Phase-1 Cleanup
+
+### Security
+- **Upgraded `apps/web` from Next.js 14 to 15.5.23** (ADR-036). The 14.x line no longer receives security backports — patching the December 2025 RSC advisory to `14.2.35` still left roughly twenty-one advisories fixed only in `15.5.x`, including SSRF in rewrites and Server Actions, cache poisoning in RSC responses, and XSS via CSP nonces. Cache poisoning is the sharpest for ZSMS: one deployment serves every school, and a cached response crossing a tenant boundary is a ZDPA-reportable breach.
+- `apps/web` moved to React 19.2.x, and a scoped `overrides` entry pins `@clerk/nextjs`'s `next` peer. Both were forced by a dependency-tree defect found during the upgrade — see ADR-036.
+- Remaining known exposure: `postcss` (build-time only) and `sharp` (`<0.35.0`, libvips CVEs) reach the tree through Next.js. Neither is currently reachable — no image passes through the Next.js optimizer yet. **This must be resolved before any user-uploaded image is served through `next/image`.**
+
+### Database
+- Established the migration versioning procedure (`MIGRATIONS.md`). The Supabase CLI is now the only supported way to apply a migration; it is pinned as a root `devDependency`. The MCP's `apply_migration` writes a timestamp version that desynced `0001` from its filename, and timestamp versions sort after every four-digit version, silently reordering the sequence.
+- Only `zsms-dev` may be migrated by automated tooling. Staging and production are release actions requiring explicit human approval.
+
+### Tooling
+- Added a tracked permission configuration and a `PreToolUse` guard hook that escalates destructive SQL and any non-`zsms-dev` project to human approval.
+
+---
+
 ## 2026-04-26 — Pre-Development Documentation Complete
 
 ### Architecture

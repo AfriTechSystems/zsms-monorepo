@@ -186,6 +186,26 @@ Creates the onboarding progress tracking table.
 
 ### Student and Parent Tables
 
+> **ORDERING CORRECTION (2026-08-14) — `0014`–`0018` differ from the original plan.**
+>
+> The sequence below originally read: `0014` student RLS · `0015` staff tables · `0016` staff RLS · `0017` permission tables · `0018` permission RLS.
+>
+> That order cannot execute. The student policies (`management_write_students`, `management_update_students`) and the staff policy (`management_write_assignments`) all call `has_permission_grant()`, which reads `public.staff_permission_grants` — created at `0017`. A policy evaluated before its table exists raises `relation does not exist`, so every query against `students` would error rather than filter.
+>
+> The student policies also resolve a teacher's classes through `public.staff_assignments`, created at `0015`. The `SECURITY DEFINER` helper encoding that lookup is `LANGUAGE SQL`, whose body is validated at `CREATE` time — so the staff tables must precede the student policies too.
+>
+> **Corrected order, as implemented:**
+>
+> | Version | Contents |
+> |---|---|
+> | `0014` | Permission tables — `school_permissions`, `staff_permission_grants` (moved up from `0017`) |
+> | `0015` | Staff tables — `staff_members`, `staff_assignments`, `staff_requests` |
+> | `0016` | Student, parent, and link RLS |
+> | `0017` | Staff RLS |
+> | `0018` | Permission RLS |
+>
+> `0014` and `0015` enable RLS on their tables immediately and defer only the policies. A table with RLS enabled and no policies denies everything, so each gap fails closed rather than leaving the permission-grant table readable.
+
 **`0011_create_students_table.sql`**
 Creates the central student entity table.
 - Creates: `public.students`

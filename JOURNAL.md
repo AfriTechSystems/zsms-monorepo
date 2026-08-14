@@ -65,13 +65,20 @@ Verified after the fix: `turbo type-check` 8/8, `turbo build` clean and stable a
 
 `sharp` is the one that matters: ZSMS will serve student photos and school logos. **Resolve it before any user-uploaded image is served through `next/image`.**
 
-### 2. Branch protection — **not done, needs the user**
+### 2. Branch protection — **DEFERRED, not skipped**
 
-`gh` is not installed on this machine (neither on the Windows PATH nor in Git Bash), and no GitHub token is configured, so the API route was unavailable. Exact click-through settings were handed to the user instead. **`main` is still unprotected.**
+**Blocked by GitHub plan, not by configuration.** Rulesets and branch protection are not enforced on a **free private organisation repository**. The rules can be created, but GitHub does not apply them, so a direct push to `main` still succeeds. The user set protection on `main` manually; it will not take effect until the org moves to **GitHub Team**.
 
-Caveat worth remembering: with a single maintainer, setting *Require approvals ≥ 1* makes `main` unmergeable, since GitHub forbids approving your own PR. Start at 0 approvals, raise it when a second reviewer exists.
+**Until then, ADR-011's workflow rests on PR discipline, not platform enforcement.** Treat `feature/* → integration → main` as a convention that nothing prevents you from violating. Do not assume a failed push means the rule worked.
 
-Required status checks were deliberately left unconfigured — there is no CI yet (the Layer 7 gap). They should be added the moment `CI_CD.md` lands.
+Re-attempt when the org upgrades to Team. Two settings to get right at that point:
+
+- **Required approvals: 0**, not 1, while there is a single maintainer — GitHub forbids approving your own PR, so 1 makes `main` unmergeable.
+- **Leave "Do not allow bypassing" off** until the workflow is proven; with 0 reviewers it can lock the owner out of the default branch.
+
+Required status checks were deliberately left unconfigured — there is no CI yet (the Layer 7 gap). They should be added the moment `CI_CD.md` lands. **That is what actually makes prohibition 4 — no table without an RLS policy — enforceable rather than aspirational.**
+
+`gh` is also not installed on this machine (neither Windows PATH nor Git Bash) and no token is configured, so any future attempt needs `winget install GitHub.cli` and `gh auth login` first.
 
 ### 3. Migration versioning convention — established
 
@@ -251,9 +258,12 @@ Two scaffold defects found and fixed during verification:
 
 ### Blocking before Phase 1
 
-- **Branch protection on `main` is not yet enabled** — needs the user to apply it in the GitHub UI, or `gh` installed so it can be set by API. Until then ADR-011's workflow rests on discipline, not enforcement. **This is the only item still blocking.**
+Nothing blocking. Both prior blockers are closed:
 
-Resolved: the Next.js version decision (upgraded to 15.5.23 per ADR-036; all 21 advisories cleared).
+- **Next.js version decision** — resolved; upgraded to 15.5.23 per ADR-036, all 21 advisories cleared.
+- **Branch protection** — **deferred, not skipped.** Not enforceable on a free private org repo; revisit at GitHub Team. Until then the ADR-011 workflow is convention only, with nothing preventing a direct push to `main`.
+
+`integration` fast-forwarded to `main` at `8ffbddb`, so Phase 1 feature branches start from the security fix rather than from vulnerable Next 14.
 
 ### Open items carried forward
 

@@ -176,7 +176,7 @@ SELECT ok(
   (SELECT bool_and(relrowsecurity AND relforcerowsecurity)
    FROM pg_class
    WHERE relname IN ('schools','students','parents','student_parent_links',
-                     'staff_members','staff_assignments','staff_requests',
+                     'staff_members','staff_requests','class_subjects','teacher_assignments',
                      'school_permissions','staff_permission_grants')
      AND relnamespace = 'public'::regnamespace),
   'every core table has RLS both ENABLED and FORCED'
@@ -258,10 +258,10 @@ SELECT is(
 );
 
 SELECT is(
-  (SELECT count(*)::INT FROM public.staff_assignments
+  (SELECT count(*)::INT FROM public.teacher_assignments
    WHERE school_id = '22222222-2222-2222-2222-222222222222'),
   0,
-  'ATTACK owner A cannot read school B staff assignments'
+  'ATTACK owner A cannot read school B teaching assignments'
 );
 
 SELECT is(

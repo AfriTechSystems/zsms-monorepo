@@ -25,7 +25,7 @@ BEGIN;
 -- An explicit plan, not no_plan(): if a section stops executing, the count
 -- mismatch fails the run. A security suite that silently runs fewer assertions
 -- than intended is worse than one that fails loudly.
-SELECT plan(60);
+SELECT plan(72);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures. Seeded as the superuser, which bypasses RLS — this is setup, not
@@ -46,6 +46,8 @@ VALUES
    '11111111-1111-1111-1111-111111111111', 'Alice', 'Alpha', 'grade_7', 'grade_7a', 'user_student_a'),
   ('aaaaaaaa-0000-0000-0000-000000000002', 'STU-ZM-LSK-0001-00002',
    '11111111-1111-1111-1111-111111111111', 'Amos',  'Alpha', 'grade_8', 'grade_8a', NULL),
+  ('aaaaaaaa-0000-0000-0000-000000000003', 'STU-ZM-LSK-0001-00003',
+   '11111111-1111-1111-1111-111111111111', 'Bertha','Alpha', 'grade_9', 'grade_9b', NULL),
   ('bbbbbbbb-0000-0000-0000-000000000001', 'STU-ZM-NDL-0002-00001',
    '22222222-2222-2222-2222-222222222222', 'Bella', 'Beta',  'grade_7', 'grade_7a', NULL);
 
@@ -54,14 +56,42 @@ INSERT INTO public.staff_members
 VALUES
   ('aaaaaaaa-1111-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
    'user_teacher_a', 'Tendai', 'Teacher', 'full_time'),
+  ('aaaaaaaa-1111-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
+   'user_teacher_subject', 'Mutale', 'Subject', 'full_time'),
+  ('aaaaaaaa-1111-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111',
+   'user_teacher_both', 'Chanda', 'Both', 'full_time'),
   ('bbbbbbbb-1111-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
    'user_teacher_b', 'Bwalya', 'Teacher', 'full_time');
 
-INSERT INTO public.staff_assignments
-  (school_id, staff_user_id, class_id, subject_code, academic_year)
+INSERT INTO public.school_subjects
+  (id, school_id, subject_code, subject_name, level_type, is_core)
 VALUES
-  ('11111111-1111-1111-1111-111111111111', 'user_teacher_a', 'grade_7a', 'MAT',
-   EXTRACT(YEAR FROM NOW())::TEXT);
+  ('dddddddd-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'MAT', 'Mathematics', 'secondary', TRUE);
+
+INSERT INTO public.class_subjects
+  (school_id, class_id, subject_id, academic_year)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', 'grade_8a',
+   'dddddddd-0000-0000-0000-000000000001', EXTRACT(YEAR FROM NOW())::TEXT);
+
+-- The three teacher shapes ADR-037 exists to express, all at one school and all
+-- resolved by the same predicate:
+--   teacher_a       — scope 'class'   on grade_7a          (primary model)
+--   teacher_subject — scope 'subject' on grade_8a only     (secondary model)
+--   teacher_both    — scope 'class' on grade_9b AND
+--                     scope 'subject' on grade_8a          (mixed)
+INSERT INTO public.teacher_assignments
+  (school_id, teacher_user_id, scope, class_id, subject_id, academic_year)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', 'user_teacher_a',
+   'class',   'grade_7a', NULL, EXTRACT(YEAR FROM NOW())::TEXT),
+  ('11111111-1111-1111-1111-111111111111', 'user_teacher_subject',
+   'subject', 'grade_8a', 'dddddddd-0000-0000-0000-000000000001', EXTRACT(YEAR FROM NOW())::TEXT),
+  ('11111111-1111-1111-1111-111111111111', 'user_teacher_both',
+   'class',   'grade_9b', NULL, EXTRACT(YEAR FROM NOW())::TEXT),
+  ('11111111-1111-1111-1111-111111111111', 'user_teacher_both',
+   'subject', 'grade_8a', 'dddddddd-0000-0000-0000-000000000001', EXTRACT(YEAR FROM NOW())::TEXT);
 
 INSERT INTO public.parents (id, clerk_user_id, phone_e164, full_name)
 VALUES
@@ -118,6 +148,12 @@ CREATE OR REPLACE FUNCTION pg_temp.owner_b() RETURNS JSONB LANGUAGE SQL AS $$
 $$;
 CREATE OR REPLACE FUNCTION pg_temp.teacher_a() RETURNS JSONB LANGUAGE SQL AS $$
   SELECT '{"sub":"user_teacher_a","o":{"id":"org_school_a","slg":"alpha-academy","rol":"org:teacher"}}'::JSONB;
+$$;
+CREATE OR REPLACE FUNCTION pg_temp.teacher_subject() RETURNS JSONB LANGUAGE SQL AS $$
+  SELECT '{"sub":"user_teacher_subject","o":{"id":"org_school_a","slg":"alpha-academy","rol":"org:teacher"}}'::JSONB;
+$$;
+CREATE OR REPLACE FUNCTION pg_temp.teacher_both() RETURNS JSONB LANGUAGE SQL AS $$
+  SELECT '{"sub":"user_teacher_both","o":{"id":"org_school_a","slg":"alpha-academy","rol":"org:teacher"}}'::JSONB;
 $$;
 CREATE OR REPLACE FUNCTION pg_temp.parent_a() RETURNS JSONB LANGUAGE SQL AS $$
   SELECT '{"sub":"user_parent_a","o":{"id":"org_school_a","slg":"alpha-academy","rol":"org:parent"}}'::JSONB;
@@ -177,8 +213,8 @@ SET LOCAL ROLE authenticated;
 SELECT pg_temp.act_as(pg_temp.owner_a());
 
 -- Baseline: the boundary is not simply closed to everyone.
-SELECT is((SELECT count(*)::INT FROM public.students), 2,
-  'BASELINE owner A sees exactly their own 2 students');
+SELECT is((SELECT count(*)::INT FROM public.students), 3,
+  'BASELINE owner A sees exactly their own 3 students');
 SELECT is((SELECT count(*)::INT FROM public.schools), 1,
   'BASELINE owner A sees exactly 1 school row');
 SELECT is((SELECT school_id FROM public.schools), 'ZM-LSK-0001',
@@ -463,6 +499,110 @@ SELECT throws_ok(
 RESET ROLE;
 
 -- ===========================================================================
+-- SECTION 3B — the scope-based teaching model (ADR-037)
+--
+-- The point of the model is that one predicate covers a primary school, a
+-- secondary school, and the mixed case without branching on school type. These
+-- assertions check both scopes reach what they should, and — the ones that
+-- matter — that neither scope reaches further than it should.
+-- ===========================================================================
+
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.act_as(pg_temp.teacher_subject());
+
+SELECT is(
+  (SELECT count(*)::INT FROM public.students),
+  1,
+  'SCOPE subject-teacher sees exactly the 1 student in the class they teach'
+);
+
+SELECT is(
+  (SELECT first_name FROM public.students),
+  'Amos',
+  'SCOPE the visible student is the one in grade_8a, the class they teach'
+);
+
+-- The assertion the model exists for.
+SELECT is(
+  (SELECT count(*)::INT FROM public.students WHERE class_id = 'grade_7a'),
+  0,
+  'ATTACK subject-teacher CANNOT see students in a class they do not teach'
+);
+
+SELECT is(
+  (SELECT count(*)::INT FROM public.students WHERE class_id = 'grade_9b'),
+  0,
+  'ATTACK subject-teacher cannot see a class owned by another teacher at scope=class'
+);
+
+SELECT ok(
+  teacher_reaches_class('grade_8a'),
+  'SCOPE teacher_reaches_class is TRUE for the class they hold a subject in'
+);
+
+SELECT ok(
+  NOT teacher_reaches_class('grade_7a'),
+  'SCOPE teacher_reaches_class is FALSE for a class they hold nothing in'
+);
+
+-- A teacher who could staff themselves could grant themselves any class's
+-- students, so the write policy — not just the read policy — is load-bearing.
+SELECT throws_ok(
+  $$INSERT INTO public.teacher_assignments
+      (school_id, teacher_user_id, scope, class_id, subject_id, academic_year)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'user_teacher_subject',
+            'class', 'grade_7a', NULL, EXTRACT(YEAR FROM NOW())::TEXT)$$,
+  '42501',
+  NULL,
+  'ATTACK a teacher cannot assign themselves to a class they do not teach'
+);
+
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.act_as(pg_temp.teacher_both());
+
+SELECT is(
+  (SELECT count(*)::INT FROM public.students),
+  2,
+  'SCOPE mixed teacher sees both classes they reach — one by class, one by subject'
+);
+
+SELECT is(
+  (SELECT count(*)::INT FROM public.students WHERE class_id = 'grade_7a'),
+  0,
+  'ATTACK mixed teacher still cannot see a class they hold no assignment for'
+);
+
+SELECT ok(
+  teacher_reaches_class('grade_9b') AND teacher_reaches_class('grade_8a'),
+  'SCOPE both scopes resolve through the same predicate for one teacher'
+);
+
+RESET ROLE;
+
+-- The scope field and the subject column cannot disagree. A scope='subject' row
+-- with no subject would read as "teaches the whole class" to the predicate.
+SELECT throws_ok(
+  $$INSERT INTO public.teacher_assignments
+      (school_id, teacher_user_id, scope, class_id, subject_id, academic_year)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'user_teacher_a',
+            'subject', 'grade_7a', NULL, '2026')$$,
+  '23514',
+  NULL,
+  'CONSTRAINT scope=subject without a subject_id is rejected'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.teacher_assignments
+      (school_id, teacher_user_id, scope, class_id, subject_id, academic_year)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'user_teacher_a',
+            'class', 'grade_7a', 'dddddddd-0000-0000-0000-000000000001', '2026')$$,
+  '23514',
+  NULL,
+  'CONSTRAINT scope=class carrying a subject_id is rejected'
+);
+
+-- ===========================================================================
 -- SECTION 4 — parents see their own child and nothing else
 -- ===========================================================================
 
@@ -548,7 +688,7 @@ SELECT ok(is_afritech_admin(), 'the afritech-systems-admin slug resolves to supe
 SELECT is((SELECT count(*)::INT FROM public.schools), 2,
   'super admin sees BOTH schools — cross-tenant access is intentional here');
 
-SELECT is((SELECT count(*)::INT FROM public.students), 3,
+SELECT is((SELECT count(*)::INT FROM public.students), 4,
   'super admin sees all students across both schools');
 
 RESET ROLE;

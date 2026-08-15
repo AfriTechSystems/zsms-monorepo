@@ -895,6 +895,91 @@ CREATE INDEX idx_assignments_class ON public.staff_assignments(school_id, class_
 
 ---
 
+### `public.class_subjects`
+
+Which subjects are taught to which class in a given academic year. The curriculum half of the teaching model (ADR-037); `teacher_assignments` is the staffing half.
+
+```sql
+CREATE TABLE public.class_subjects (
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  school_id      UUID NOT NULL REFERENCES public.schools(id),
+
+  class_id       TEXT NOT NULL,
+  -- Same identifier as students.class_id. TEXT and not a foreign key: classes
+  -- are a per-school naming convention, not a registry.
+
+  subject_id     UUID NOT NULL REFERENCES public.school_subjects(id),
+  academic_year  TEXT NOT NULL,
+  is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (school_id, class_id, subject_id, academic_year)
+);
+
+CREATE INDEX idx_class_subjects_school_class
+  ON public.class_subjects(school_id, class_id, academic_year);
+CREATE INDEX idx_class_subjects_subject ON public.class_subjects(subject_id);
+```
+
+---
+
+### `public.teacher_assignments`
+
+What a teacher teaches, at one of two scopes. **This is a security table** — it decides which students a teacher may read, via `teacher_reaches_class()` (see `RLS.md`).
+
+```sql
+CREATE TABLE public.teacher_assignments (
+  id               UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  school_id        UUID NOT NULL REFERENCES public.schools(id),
+
+  teacher_user_id  TEXT NOT NULL,
+  -- Clerk user ID. Matches staff_members.clerk_user_id at this school.
+
+  scope            TEXT NOT NULL CHECK (scope IN ('class', 'subject')),
+  -- 'class'   — owns the whole class (primary model, form teacher)
+  -- 'subject' — teaches ONE subject to ONE class (secondary model)
+  --
+  -- A teacher may hold any number of rows of either scope, including both.
+
+  class_id         TEXT NOT NULL,
+  -- Set for BOTH scopes. Every assignment reaches exactly one class, which is
+  -- what lets teacher reach be a single lookup rather than a branch.
+
+  subject_id       UUID REFERENCES public.school_subjects(id),
+  -- NULL for scope='class'; required for scope='subject'.
+
+  academic_year    TEXT NOT NULL,
+  term_number      INT,
+  is_active        BOOLEAN NOT NULL DEFAULT TRUE,
+
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT teacher_assignment_scope_shape CHECK (
+    (scope = 'class'   AND subject_id IS NULL)
+    OR
+    (scope = 'subject' AND subject_id IS NOT NULL)
+  )
+);
+
+CREATE UNIQUE INDEX idx_teacher_assignments_class_scope
+  ON public.teacher_assignments(school_id, teacher_user_id, class_id, academic_year)
+  WHERE scope = 'class';
+CREATE UNIQUE INDEX idx_teacher_assignments_subject_scope
+  ON public.teacher_assignments(school_id, teacher_user_id, class_id, subject_id, academic_year)
+  WHERE scope = 'subject';
+CREATE INDEX idx_teacher_assignments_teacher
+  ON public.teacher_assignments(teacher_user_id, school_id, academic_year) WHERE is_active;
+CREATE INDEX idx_teacher_assignments_class
+  ON public.teacher_assignments(school_id, class_id, academic_year) WHERE is_active;
+```
+
+**The scope constraint is a security control, not tidiness.** A `scope='subject'` row with a NULL `subject_id` would read to `teacher_reaches_class()` as an assignment reaching the whole class.
+
+---
+
 ### `public.staff_requests`
 
 Pending self-registration requests from teachers who have requested to join a school before being approved by the admin. These are not Clerk Organisation members yet — they are waiting for approval.

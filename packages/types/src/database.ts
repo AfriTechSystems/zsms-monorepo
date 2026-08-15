@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      class_subjects: {
+        Row: {
+          academic_year: string
+          class_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          school_id: string
+          subject_id: string
+          updated_at: string
+        }
+        Insert: {
+          academic_year: string
+          class_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string
+          class_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_subjects_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_subjects_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "school_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_checklists: {
         Row: {
           completed_at: string | null
@@ -823,6 +871,63 @@ export type Database = {
           },
         ]
       }
+      teacher_assignments: {
+        Row: {
+          academic_year: string
+          class_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          school_id: string
+          scope: string
+          subject_id: string | null
+          teacher_user_id: string
+          term_number: number | null
+          updated_at: string
+        }
+        Insert: {
+          academic_year: string
+          class_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          scope: string
+          subject_id?: string | null
+          teacher_user_id: string
+          term_number?: number | null
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string
+          class_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          scope?: string
+          subject_id?: string | null
+          teacher_user_id?: string
+          term_number?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_assignments_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "school_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -848,10 +953,7 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: boolean
       }
-      teacher_assigned_to_class: {
-        Args: { p_class_id: string }
-        Returns: boolean
-      }
+      teacher_reaches_class: { Args: { p_class_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

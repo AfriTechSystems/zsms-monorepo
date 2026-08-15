@@ -8,7 +8,36 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 Branch `feature/phase-1-core-domain`, cut from `integration` at `8ffbddb`.
 
-**Status: APPLIED to `zsms-dev` and verified. Isolation suite passes 60/60.**
+**Status: APPLIED to `zsms-dev` and verified. Isolation suite passes 72/72. Merged to `integration`.**
+
+### The teaching-assignment model — ADR-037 (migrations `0020`, `0021`)
+
+The `class_enrolments` gap was closed at its root rather than worked around. `class_subjects` records which subjects a class is taught; `teacher_assignments` records what a teacher teaches, discriminated by a `scope` field:
+
+| scope | Shape | Models |
+|---|---|---|
+| `class` | `class_id` set, `subject_id` NULL | primary school, form teacher |
+| `subject` | both set | secondary school subject teacher |
+
+A teacher may hold any number of rows of either scope, including both. **Both scopes carry `class_id`** — that is the load-bearing detail, because it lets `teacher_reaches_class()` ignore `scope` entirely and therefore never branch on school type. The shape of a school is data, not a code path.
+
+The scope/subject `CHECK` constraint is a security control, not tidiness: a `scope='subject'` row with a NULL `subject_id` would read to the predicate as reaching the *whole* class, silently widening that teacher.
+
+Write access is owner and principal only. Teacher reach is derived from this table, so a teacher who could insert their own row could grant themselves any class's students — the suite asserts that directly.
+
+`teacher_assigned_to_class()`, the `0016` interim helper, is **dropped** rather than left in place. Two predicates answering "which students may this teacher see" is exactly how the wrong one ends up in a future policy. `staff_assignments` is marked superseded via `COMMENT` and retained — dropping is irreversible and wants explicit approval.
+
+**Twelve new assertions**, covering both scopes, the mixed case, the two constraint violations, self-assignment, and the one that matters: *a subject teacher cannot see students in a class they do not teach*. Suite is now 72, all passing.
+
+### I collided with reserved migration numbers
+
+`0019`, `0020`, and `0021` were **already claimed** by the plan — `create_fee_tables`, `create_fee_rls`, `create_message_quota_table`. I named files by looking at the highest number on disk instead of reading *Next Available Sequence Number*, which said `0066`.
+
+Mine are applied, and an applied version cannot be renumbered — it is the identity `supabase db push` reconciles against. So the *planned* migrations moved instead: fees and message quota are now `0066`–`0068`, next available `0069`.
+
+The document also carried **three conflicting "next available" pointers** (`0022`, `0056`, `0066`) in different sections. Reconciled, with the one near the top declared authoritative.
+
+**Rule 3 exists for exactly this and I skipped it.** Most of the sequence is planned in the document long before it exists on disk, so the filesystem is never the source of truth for the next number.
 
 ### The isolation suite caught a real defect on its first run
 
@@ -36,17 +65,18 @@ Fixed by **migration `0019`**, which revokes `DELETE, TRUNCATE` from `authentica
 
 | Check | Result |
 |---|---|
-| `public` tables | 15 |
-| RLS enabled | 15 / 15 |
-| RLS **forced** | 15 / 15 |
+| `public` tables | 17 |
 | Tables without RLS | **0** |
-| Policies | 57 |
+| Tables without `FORCE` | **0** |
+| Policies | 64 |
 | `DELETE`/`TRUNCATE` granted to end-user roles | **0** |
-| Migrations applied | 19 |
+| Migrations applied | 21 (`0001`–`0021`) |
 | Non-four-digit versions | **0** |
+| Stale `teacher_assigned_to_class()` | **0** — dropped in `0021` |
 | Leftover test fixtures | 0 (suite cleans up after itself) |
+| pgTAP isolation suite | **72 / 72** |
 
-`turbo type-check` 8/8 · `turbo build` clean · types regenerated from the live schema (986 lines, 17 row types).
+`turbo type-check` 8/8 · `turbo build` clean · types regenerated from the live schema.
 
 ### On the CLI
 
@@ -64,7 +94,7 @@ Written contiguously rather than only the three tables named in the brief. Leavi
 |---|---|
 | **Migration order is impossible.** `MIGRATIONS.md` put the permission tables at `0017`, *after* the student RLS (`0014`) and staff RLS (`0016`) whose policies call `has_permission_grant()` — which reads `staff_permission_grants`. A policy evaluated before its table exists raises `relation does not exist`, so every `students` query would error rather than filter. | Permission tables → `0014`, staff tables → `0015`, student RLS → `0016`. Corrected order recorded in `MIGRATIONS.md`. |
 | **Policy recursion.** `RLS.md` writes three policies as cross-table subqueries: `students` reads `student_parent_links`, whose policy reads `students`. Literally applied, PostgreSQL aborts with *infinite recursion detected in policy*. | Predicates unchanged, relocated into four `SECURITY DEFINER` lookups (`is_linked_parent_of`, `student_in_current_school`, `parent_has_student_in_current_school`, `teacher_assigned_to_class`) which do not re-trigger RLS on the inner table. |
-| **`class_enrolments` does not exist.** `RLS.md` resolves a teacher's students through it. It has no DDL in `DATABASE.md`, no entry in `SCHEMA.md`'s 58-table inventory, and no migration — yet four documents reference it (`RLS.md`, `ASSIGNMENTS.md`, `POWERSYNC.md`, `OFFLINE_SYNC.md`). | `teacher_read_assigned_students` resolves through `students.class_id`, which *is* defined and `NOT NULL`. Flagged rather than inventing an unspecified table mid-phase. **Needs a decision.** |
+| **`class_enrolments` did not exist.** `RLS.md` resolves a teacher's students through it. It has no DDL in `DATABASE.md`, no entry in `SCHEMA.md`'s 58-table inventory, and no migration — yet four documents reference it (`RLS.md`, `ASSIGNMENTS.md`, `POWERSYNC.md`, `OFFLINE_SYNC.md`). | `teacher_read_assigned_students` resolves through `students.class_id`, which *is* defined and `NOT NULL`. **RESOLVED** by ADR-037 — see the teaching-assignment section above. `class_subjects` and `teacher_assignments` replace it. |
 
 ### Two hardening choices beyond the spec
 

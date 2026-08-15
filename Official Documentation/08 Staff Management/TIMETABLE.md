@@ -167,7 +167,7 @@ The admin selects which class to view/edit using a class dropdown above the grid
 
   Subject: [dropdown — school's configured subjects for this grade level]
   Teacher: [dropdown — teachers assigned to this subject for this class
-            via staff_assignments]
+            via teacher_assignments]
   Room: [text — optional]
   Notes: [text — optional]
 
@@ -339,7 +339,7 @@ VALUES (school_id, 'timetable', 'active', 100.00);
 
 ## Business Rules
 
-1. A timetable slot can only assign a teacher who has a matching entry in `staff_assignments` for that subject and class. The teacher dropdown enforces this — unassigned teachers are not shown.
+1. A timetable slot can only assign a teacher who has a matching entry in `teacher_assignments` for that subject and class. The teacher dropdown enforces this — unassigned teachers are not shown.
 2. A teacher cannot be assigned to two simultaneous slots (same day, same period, same timetable). The conflict check runs on every save.
 3. Non-teaching periods (breaks, assembly, lunch) cannot have lessons assigned. The slot_type check enforces this.
 4. Only published timetables are visible to teachers, students, and parents. Draft timetables are visible to admins and principals only.

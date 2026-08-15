@@ -4,6 +4,37 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-15 — Pre-Phase-3 documentation reconciliation
+
+Documentation only. No schema or code changes.
+
+### CLAUDE.md brought current
+
+It still opened *"Phase 0 scaffold complete. Phase 1 not started."* — four phases of work out of date, and it is the file every session reads first. Now states Phases 0–2 plus arrears, 12 API routes, 29 applied migrations, three pgTAP suites (155 assertions), 23 tables, 97 policies, and — importantly — **that there is no user interface at all**, which the old text left ambiguous.
+
+Its *Known documentation inconsistencies* table was entirely stale: all five conflicts (session lengths, schema counts, QStash vs BullMQ, missing WAF, missing ADRs) had been resolved sessions ago. Replaced with the four items actually open, and with the pattern worth knowing: **repeatedly a document has described something the schema could not do**, and each case was found by implementing against the doc rather than reading it.
+
+### Stale table references — larger than flagged
+
+The readiness report listed four stale `class_enrolments` references. Fixing them surfaced **28 further `staff_assignments` references across 10 documents** — a table dropped in `0069`. `ASSIGNMENTS.md` is structurally built around it, and `POWERSYNC.md` carried three sync rules joining two tables that no longer exist; anyone implementing PowerSync from that document would have written SQL that cannot run.
+
+Corrected in `POWERSYNC.md`, `ASSIGNMENTS.md`, `OFFLINE_SYNC.md`, `RESULTS.md`, `REPORT_CARDS.md`, `TIMETABLE.md`, `INVITATIONS.md`, `CONVENTIONS.md`, `DATABASE.md`, and `INDEXES.md`. The DDL blocks in `DATABASE.md` and `INDEXES.md` are retained under a **REMOVED** banner so older references resolve to an explanation instead of a dead end.
+
+**The lesson: dropping a table is not one migration.** The schema change took one file; the documentation it invalidated took ten.
+
+### Two gaps recorded as ADRs
+
+- **ADR-040 — multi-country config hardening (deferred).** Catalogues the hardcoded CHECK constraints and the `reference_subjects_zm` naming. Deferred on purpose: designing a configuration vocabulary against one known market usually produces the wrong abstraction, and the `custom` escape hatch means a new market is degraded rather than blocked.
+- **ADR-041 — grading-scale versioning (open data-integrity gap).** `exam_results` stores a grade letter without the scale that produced it. A mid-year revision makes every historical grade unexplainable, and **the column cannot be backfilled for rows already written** — which is the argument for fixing it before a school accumulates a year of results. `score_config` already solves exactly this for loan scoring.
+
+Both are listed in `BUILD_SEQUENCE.md` under *Tracked pre-launch decisions*, with ADR-041 carrying a deadline of the Phase 6 pilot.
+
+### Process note
+
+The previous commit landed **directly on `integration`** rather than through a feature branch — the prior merge left me on that branch and I did not check before committing. Agreed with the user to leave it rather than rewrite a pushed shared branch. It is exactly what branch protection would catch, and cannot, on the free plan.
+
+---
+
 ## 2026-08-15 — AI-assisted capture design; pre-Phase-3 readiness
 
 Branch `feature/fee-arrears-model` (continued). **Design and documentation only — no capture code built.**

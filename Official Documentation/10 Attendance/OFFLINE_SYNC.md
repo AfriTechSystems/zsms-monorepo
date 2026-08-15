@@ -31,9 +31,9 @@ PowerSync downloads a scoped subset of data to the teacher's device based on the
 
 | Table | Rows Synced | Scope Rule |
 |---|---|---|
-| `students` | Students in assigned classes | Via staff_assignments → class_id → class_enrolments |
+| `students` | Students in classes the teacher reaches | Via `teacher_assignments.class_id` = `students.class_id`, at either scope (ADR-037) |
 | `attendance_records` | Current and previous term | Last 6 months of records for assigned students |
-| `staff_assignments` | Own assignments only | Where staff_user_id = teacher's Clerk user ID |
+| `teacher_assignments` | Own assignments only | Where `teacher_user_id` = teacher's Clerk user ID. **Replaces `staff_assignments`, dropped in `0069`** |
 | `school_grade_levels` | All active levels | School-wide — small table, sync all |
 | `school_subjects` | All active subjects | School-wide — small table, sync all |
 | `timetable_slots` | Own slots only | Where staff_user_id = teacher's Clerk user ID |

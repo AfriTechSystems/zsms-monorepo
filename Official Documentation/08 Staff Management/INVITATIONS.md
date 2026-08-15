@@ -271,7 +271,7 @@ Are you sure?"
 Admin confirms →
 → Clerk API: deleteOrganizationMembership(orgId, userId)
 → staff_members.is_active = FALSE
-→ staff_assignments deactivated for this staff member at this school
+→ teacher_assignments deactivated (is_active = FALSE) for this staff member at this school
 → Any active staff_permission_grants for this user at this school deactivated
 → staff_requests for this user at this school archived
 → Parent notification if they were a class teacher:

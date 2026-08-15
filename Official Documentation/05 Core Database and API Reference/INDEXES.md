@@ -349,7 +349,9 @@ CREATE INDEX idx_staff_active
 
 ---
 
-### `public.staff_assignments`
+### `public.staff_assignments` — REMOVED (migration `0069`)
+
+> Superseded by `public.teacher_assignments` (ADR-037), whose indexes are defined in migration `0020`.
 
 ```sql
 CREATE INDEX idx_assignments_school

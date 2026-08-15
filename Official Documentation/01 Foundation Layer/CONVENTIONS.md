@@ -207,7 +207,7 @@ interface Student {
 public.students
 public.fee_records
 public.student_parent_links
-public.staff_assignments
+public.teacher_assignments
 
 -- ❌ Incorrect
 public.Student

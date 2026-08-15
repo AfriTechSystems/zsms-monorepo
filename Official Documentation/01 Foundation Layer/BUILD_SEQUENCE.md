@@ -175,6 +175,17 @@ Super admin panel (`SUPERADMIN.md`), dynamic pricing (`PRICING.md`, `DYNAMIC_CON
 
 ---
 
+## Tracked pre-launch decisions
+
+Two items recorded against the sequence rather than a phase, because they are decisions with a deadline rather than features.
+
+| Item | ADR | Deadline | Why |
+|---|---|---|---|
+| **Grading-scale versioning on `exam_results`** | ADR-041 | **Before Phase 6 pilot**, and certainly before any school completes a full academic year | A grade letter is stored without the scale that produced it. A mid-year revision makes historical grades unexplainable, and the column cannot be backfilled for rows already written. `score_config` already solves this for loans. |
+| **Multi-country config hardening** | ADR-040 | When a second country becomes real | `curriculum_type`, `grading_system`, `examination_type`, `level_type`, and `term_number` are hardcoded CHECKs; `reference_subjects_zm` names a country it need not. Deferred deliberately — the second market is what reveals the right abstraction. |
+
+---
+
 ## Phase 6 — Production, Pilot, and Launch
 
 **Goal:** real schools, real data.

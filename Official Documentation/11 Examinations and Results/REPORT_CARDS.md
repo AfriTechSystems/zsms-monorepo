@@ -64,7 +64,7 @@ Examination No.: 2024/001234  ← only shown for examination classes
 - Student full name
 - Student ID
 - Grade and class using the school's configured display name
-- Class teacher name (from staff_assignments where is_class_teacher = TRUE)
+- Class teacher name (from `teacher_assignments` where `scope = 'class'` — the form teacher who owns the class)
 - Date of birth (optional — configurable in template settings)
 - Examination number (only shown for Grade 6, Form 4, Form 6 — when `examination_number` is set)
 

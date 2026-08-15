@@ -2,21 +2,27 @@
 
 ## What this repository currently is
 
-**Phase 0 scaffold complete. Phase 1 not started.**
+**Phases 0–2 complete, plus the fee arrears model. Phase 3 not started.**
 
-ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development, so the docs specify far more than exists.
+ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development, so the docs still specify more than exists.
 
 The tree is:
 
 | Path | State |
 |---|---|
-| `Official Documentation/` | 118 markdown files across 18 numbered folders — the specification |
-| `apps/web` | Next.js 15 App Router. Builds. Contains `/` and `/api/health` only |
-| `apps/mobile` | Expo 52 / RN 0.76. Type-checks. No screens yet |
-| `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config` — interface-complete stubs |
-| `supabase/` | `migrations/0001` applied to `zsms-dev`; `functions/`, `tests/`, `seed/` empty |
+| `Official Documentation/` | 119 markdown files across 18 numbered folders — the specification |
+| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **12 API routes**, no UI beyond `/` |
+| `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
+| `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config` — abstractions wired, `types/database.ts` generated from the live schema |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0081` applied to `zsms-dev`** (29 migrations) |
+| `supabase/tests/rls/` | **3 pgTAP suites, 155 assertions** — tenant isolation (72), fees/attendance/results (45), fee arrears (38) |
+| `supabase/functions/`, `seed/` | Empty — no Edge Functions yet |
 
-**What exists is scaffolding, not implementation.** No business tables, no RLS policies, no Edge Functions, no UI. Migrations `0002`–`0065` are specified in `MIGRATIONS.md` and unwritten. Read `JOURNAL.md` for what the last session actually did and what it left open.
+**What exists is a backend, not a product.** 23 `public` tables with RLS enabled *and* forced on every one, 97 policies, and the API routes below. **There is no user interface** — no dashboard, no parent portal, no mobile screens. No Edge Functions, no queue workers, no WhatsApp, no PDFs.
+
+**API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish`
+
+**Read `JOURNAL.md` first.** It records what each session actually did, the defects found, and what was deliberately deferred — including several cases where a documented claim turned out not to match the schema.
 
 ---
 
@@ -88,6 +94,8 @@ npm run db:types    # regenerate types after every migration
 ```
 
 - Create migration files **by hand** as `NNNN_description.sql`. Never run `supabase migration new` — it generates a timestamp filename, breaking the `NNNN_` convention.
+- **Take the number from `MIGRATIONS.md` → *Next Available Sequence Number*, never from the highest file on disk.** Most of the sequence is planned in that document long before it exists as a file; reading the filesystem instead is how `0019`–`0021` were written onto numbers already claimed for fee migrations. `0022`–`0068` are now void — they sort below the applied high-water mark, so `db push` would skip anything written there.
+- Run the pgTAP suites after any migration touching RLS: `npm run db:test`. **This needs Docker**, which is not installed on the current machine — until it is, the suites are executed through the Supabase MCP with session-scoped `SET ROLE` instead of the file's `SET LOCAL`. Same assertions, different identity-switching mechanism.
 - The MCP's `apply_migration` records a **timestamp version** in `supabase_migrations.schema_migrations` regardless of filename. This desynced `0001` and had to be corrected by hand. Timestamp versions also sort *after* every four-digit version, silently reordering the sequence. Use it on `zsms-dev` for exploration only, and correct the history row in the same session.
 - **Only `zsms-dev` may be migrated by automated tooling.** Staging and production are release actions requiring explicit human approval each time (prohibition 10). Re-link to dev immediately after touching either.
 
@@ -135,17 +143,20 @@ From `01 Foundation Layer/CONVENTIONS.md` — that file is authoritative; this i
 
 ## Known documentation inconsistencies
 
-The docs were written in two waves — **2026-04-26** (420 change-log entries) and **2026-06-23** (23 entries, adding a SOC 2 / ZDPA compliance layer). The April docs were **not** fully reconciled with the June revisions. Where they disagree, the June doc wins.
+The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 41 ADRs.
 
-| Conflict | Resolution |
-|---|---|
-| Session length | `SESSIONS.md` (June) caps **all** end-user sessions at **30 days** — parent/student revised down from 365, alumni from indefinite. `CHANGELOG.md` and `ARCHITECTURE.md` still state the old values. **30 days is correct.** |
-| Schema count | `DATABASE.md` opens "two PostgreSQL schemas" and describes only `public` and `private`, but references `afritech.` 14 times in its own body. There are **three** schemas: `public` (46 tables), `private` (4), `afritech` (8) — 58 total. |
-| Queue technology | `ARCHITECTURE.md` names QStash directly. `BULLMQ.md` (June) introduces a queue abstraction with QStash as the Phase 1 implementation. **Build against the abstraction.** |
-| Missing WAF | `ARCHITECTURE.md` omits the Cloudflare WAF layer added in `CLOUDFLARE_WAF.md` (June). |
-| Missing ADRs | `DECISIONS.md` stops at ADR-029 (April). The June decisions — WAF, queue abstraction, the session-length reversal, school health scoring — have no ADRs. |
+**A pattern worth knowing before you trust any doc:** repeatedly, a document has described something the schema could not do. `class_enrolments` was referenced by four documents and defined by none. `GLOSSARY.md` promised a fee statement with a running balance that nothing could produce. `DATABASE.md`'s `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, not by reading it. **Verify against the applied schema before building on a documented claim.**
 
-If you resolve any of these in the docs, remove the corresponding row here.
+### Open, tracked
+
+| Item | Where | Status |
+|---|---|---|
+| **Multi-country config hardening** | ADR-040 | Deferred. `curriculum_type`, `grading_system`, `examination_type`, `level_type`, and `term_number` are hardcoded CHECK constraints; `reference_subjects_zm` bakes the country into a table name. Each needs a migration to admit a second country. Decide when the second country is real. |
+| **Grading-scale versioning on `exam_results`** | ADR-041 | **Open data-integrity gap.** A grade letter is stored without the scale that produced it, so a mid-year scale revision makes historical grades unexplainable. Needs fixing before results are relied on long term. |
+| Migration numbering | `MIGRATIONS.md` | `0022`–`0068` are **void** — they sort below the applied high-water mark and `db push` would skip them. Numbers are assigned when a migration is written, never reserved. Read *Next Available Sequence Number*. |
+| Layer 1 (Frontend), Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. |
+
+If you resolve one of these, remove its row.
 
 ---
 

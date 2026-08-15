@@ -882,7 +882,9 @@ CREATE INDEX idx_staff_active ON public.staff_members(school_id, is_active);
 
 ---
 
-### `public.staff_assignments`
+### `public.staff_assignments` — REMOVED (migration `0069`)
+
+> Superseded by `public.teacher_assignments` (ADR-037), defined earlier in this document. The DDL below is retained only so that older references resolve to an explanation. **Do not create this table.**
 
 Links teachers to the classes and subjects they are responsible for. One teacher can have multiple rows — one per class-subject combination. This table drives the RLS policies that scope teachers to their own classes and subjects.
 
@@ -1548,7 +1550,7 @@ schools
   ├── fee_structures (school_id)
   ├── grade_config (school_id)
   ├── staff_members (school_id)
-  │     └── staff_assignments (staff_user_id)
+  │     └── teacher_assignments (teacher_user_id)
   ├── staff_requests (school_id)
   ├── staff_permission_grants (school_id)
   ├── school_permissions (school_id)

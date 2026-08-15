@@ -491,3 +491,60 @@ Zambian teachers mark on paper. Transcription into ZSMS is the slowest and most 
 **Alternatives considered:** direct write above a confidence threshold (rejected — creates a class of error nobody reviews, and the threshold would inevitably be tuned down under time pressure); matching against the full student body (rejected — the accuracy gain is illusory and the failure mode is cross-grade misattribution); bundling capture into a subscription tier (rejected — transfers all volume risk to AfriTech and caps a metered feature at a flat price); building it in Phase 3 (rejected — it depends on BullMQ workers and on marks/attendance being settled, and it is not on the launch path).
 
 **Consequences:** `DYNAMIC_CONFIG.md` gains the capture-credit keys. `BUILD_SEQUENCE.md` lists the module in Phase 4/5. `PRICING.md` gains a usage-based revenue line alongside subscription tiers, and `COST_MANAGEMENT.md` must track cost-per-capture as a first-class metric once live — the credit price has to clear the vision-API cost with headroom for a provider price change. A pilot against real Zambian mark sheets is required before pricing is fixed, since the credit price depends on the retry rate.
+
+---
+
+## ADR-040 — Multi-Country Config Hardening (Deferred)
+
+**Status:** Open — deferred. **Decide when a second country becomes real.**
+**Decision:** **Recorded, not resolved.** Several schema constraints encode Zambia/Cambridge assumptions that contradict ADR-031's dynamic-configuration principle. They are catalogued here so the debt is visible and costed rather than rediscovered mid-expansion.
+
+**What is genuinely config-driven today** — and should not be disturbed:
+
+- Grading scales: `school_grading_scales.grade_bands` is JSONB, so a school defines its own bands, pass mark, and credit mark.
+- `exam_results.grade_letter` (TEXT) and `grade_points` (INT) are **scale-agnostic** — no Zambian grading is baked into the results table.
+- Grade and form structures: `school_grade_levels` is per school, supporting ECZ grades, Cambridge forms, and the transitional both-at-once case (`ZM.md`).
+- Class identifiers, report-card format, subject lists, and `marks_total` are all per school.
+
+**What is hardcoded** — each requires a migration to admit another country's system:
+
+| Column | Constrained to | Table(s) |
+|---|---|---|
+| `curriculum_type` | `ecz_grades`, `cambridge_forms`, `hybrid`, `custom` | `school_academic_config` |
+| `grading_system` | `ecz_percentage`, `cambridge_o_level`, `cambridge_a_level`, `custom` | `school_academic_config` |
+| `examination_type` | `ecz`, `cambridge`, `internal`, `none` | `school_grade_levels` |
+| `curriculum_type` | `ecz`, `cambridge`, `both` | `school_subjects`, `reference_subjects_zm` |
+| `level_type` | `primary` / `secondary` / `a_level` (+ junior/senior variants) | 3 tables |
+| `term_number` | `BETWEEN 1 AND 4` | `fee_structures`, `fee_records`, `attendance_records`, `exam_results` |
+
+Also: **`reference_subjects_zm` bakes the country into the table name** even though it carries a `country_code` column and a uniqueness key that already spans countries. The schema supports multi-country; the name implies one table per country.
+
+**Why this is deferred rather than fixed now.** The `custom` escape hatch means a new market is not blocked — it is degraded. A Kenyan school on CBC, or anywhere running two semesters rather than three or four terms, would either be forced into `custom` (losing the semantic value of the field) or wait for a migration. That is a real cost, but it is a cost paid once per country, and paying it now would mean designing a configuration vocabulary against a single known market — which usually produces the wrong abstraction. **The second country is what will reveal the right shape.**
+
+**What to do when that happens** — in preference order: promote the constrained values into `afritech` reference tables keyed by `country_code` (consistent with ADR-031); or, if only one or two markets are ever in scope, extend the CHECK constraints and accept the migration. Do **not** relax the constraints to free text without a reference table — the CHECKs are currently the only thing preventing a typo becoming a silently unmatched curriculum.
+
+**`term_number BETWEEN 1 AND 4` deserves separate thought.** It is a ceiling rather than a country assumption, and four accommodates every configuration currently documented. It is listed because it is still a hardcoded bound on an axis that varies by education system, not because it is known to be wrong.
+
+**Consequences:** No code changes now. `CLAUDE.md` carries this as a tracked open item. Any Phase 3+ work that adds a country-shaped enum should add it to this list rather than assuming it is fine.
+
+---
+
+## ADR-041 — Grading Scale Versioning for Exam Results (Open Data-Integrity Gap)
+
+**Status:** Open — **must be resolved before results are relied on long term.** Not a multi-country concern; it affects a single Zambian school.
+**Decision:** **Recorded as a defect, not yet fixed.** `public.exam_results` stores `grade_letter` and `grade_points` but no reference to the grading scale that produced them. A school that revises its scale mid-year makes every historical grade unexplainable.
+
+**The problem, concretely.** A school grades on ECZ percentages where 75 is a `B`. In Term 2 the board revises the bands and 75 becomes an `A`. `exam_results` now holds Term 1 rows saying `B` and Term 2 rows saying `A` for the same mark, with **nothing recording that the rule changed**. Nobody can answer *"why is this a B?"* — and a parent disputing a report card is asking exactly that. Recomputing from `marks_obtained` against the current scale silently rewrites history; not recomputing leaves two inconsistent letters with no explanation.
+
+**This is a solved problem elsewhere in ZSMS.** `afritech.score_config` versions loan scoring precisely so that a historical behaviour score remains explainable after weights change, and a loan application records the `config_version` it was scored under (ADR-020). Results need the same treatment and did not get it.
+
+**Sketch of the fix** (not built, and the shape is not final):
+
+- Version `school_grading_scales` — either a `version` column with the scale immutable once used, or a separate `school_grading_scale_versions` table holding the bands.
+- Add `grading_scale_version_id` to `exam_results`, populated at mark-entry time.
+- Treat a scale in use as immutable: a revision creates a new version rather than editing bands in place, exactly as the loan score config does.
+- Backfill is impossible for rows written before the column exists, which is the argument for doing this **before** a school accumulates a year of results.
+
+**Why it is not fixed in this pass.** It changes the marks-entry write path and needs a decision on whether published results are ever recomputed — a product question, not a schema one. It is recorded here so it is not rediscovered when a parent disputes a grade.
+
+**Consequences:** Flagged in `CLAUDE.md` as an open data-integrity item. Should be scheduled before the first cohort's results are treated as a permanent record — realistically before Phase 6 pilot, and certainly before any school completes a full academic year in ZSMS.

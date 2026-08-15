@@ -77,10 +77,11 @@ export const AppSchema = new Schema([
     ],
   }),
   new Table({
-    name: 'staff_assignments',
+    name: 'teacher_assignments',
     columns: [
       column.text('class_id'),
-      column.text('subject_code'),
+      column.text('scope'),
+      column.text('subject_id'),
       column.text('academic_year'),
       column.integer('is_class_teacher'),
     ],
@@ -99,28 +100,43 @@ export const AppSchema = new Schema([
 
 **Sync scope for teachers:** Only students in the teacher's assigned classes sync. Specifically:
 
+> **CORRECTED 2026-08-15.** These rules previously joined `class_enrolments` and `staff_assignments`. **Neither table exists** — `class_enrolments` never did, and `staff_assignments` was dropped in migration `0069`. Both are replaced by `teacher_assignments` (ADR-037), which reaches a class at either `scope='class'` or `scope='subject'`, and by `students.class_id` for the student's own class.
+
 ```sql
 -- PowerSync sync rule (defined in Supabase PowerSync configuration)
--- Students: only those in teacher's assigned classes
+-- Students: only those in classes this teacher reaches, at either scope
 SELECT s.* FROM students s
-JOIN class_enrolments ce ON ce.student_id = s.id
-JOIN staff_assignments sa ON sa.class_id = ce.class_id
-WHERE sa.staff_user_id = token_parameters.user_id
-  AND sa.academic_year = current_setting('app.current_academic_year')
-  AND s.school_id = token_parameters.school_id;
+JOIN teacher_assignments ta
+  ON ta.class_id = s.class_id
+ AND ta.school_id = s.school_id
+WHERE ta.teacher_user_id = token_parameters.user_id
+  AND ta.is_active = TRUE
+  AND ta.academic_year = current_setting('app.current_academic_year')
+  AND s.school_id = token_parameters.school_id
+  AND s.is_deleted = FALSE;
 
--- Attendance: current and previous term only
+-- Attendance: current and previous term only.
+-- Joined on attendance_records.class_id, which is denormalised at marking time
+-- and therefore still correct if the student later changes class.
 SELECT ar.* FROM attendance_records ar
-JOIN class_enrolments ce ON ce.student_id = ar.student_id
-JOIN staff_assignments sa ON sa.class_id = ce.class_id
-WHERE sa.staff_user_id = token_parameters.user_id
+JOIN teacher_assignments ta
+  ON ta.class_id = ar.class_id
+ AND ta.school_id = ar.school_id
+WHERE ta.teacher_user_id = token_parameters.user_id
+  AND ta.is_active = TRUE
   AND ar.attendance_date >= current_date - interval '6 months';
 
--- Exam results: teacher's assigned subjects only
+-- Exam results: teacher's assigned subjects only.
+-- A scope='class' assignment covers every subject in that class; a
+-- scope='subject' assignment covers only its own subject.
 SELECT er.* FROM exam_results er
-JOIN staff_assignments sa ON sa.subject_code = er.subject_code
-  AND sa.class_id = er.class_id
-WHERE sa.staff_user_id = token_parameters.user_id;
+JOIN teacher_assignments ta
+  ON ta.class_id = er.class_id
+ AND ta.school_id = er.school_id
+LEFT JOIN school_subjects ss ON ss.id = ta.subject_id
+WHERE ta.teacher_user_id = token_parameters.user_id
+  AND ta.is_active = TRUE
+  AND (ta.scope = 'class' OR ss.subject_code = er.subject_code);
 ```
 
 ### Parent Device Sync Rules

@@ -1,0 +1,22 @@
+{
+  "name": "@zsms/workers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/worker.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "dev": "node --experimental-strip-types src/worker.ts"
+  },
+  "dependencies": {
+    "@zsms/documents": "*",
+    "@zsms/notifications": "*",
+    "@zsms/queue": "*",
+    "@zsms/types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.2"
+  }
+}

@@ -204,6 +204,17 @@ Derived arrears (ADR-038).
 
 ---
 
+**`0082`-`0089`** - APPLIED to `zsms-dev` 2026-08-15 (Phase 3)
+- `0082` `afritech.subscription_tiers` - the empty `afritech` schema finally gets its first table, because per-tier WhatsApp quotas cannot be "admin controlled, never hardcoded" while the ceilings live only in a markdown table
+- `0083`/`0084` `message_log`, `school_message_quotas`, `notification_templates` + RLS, `consume_message_quota()`, `resolve_notification_template()`, `record_message_dispatch()`
+- `0085` platform-default message wording for every Phase 3 notification
+- `0086` `announcements`, `announcement_reads` + RLS
+- `0087` `generated_documents`, `job_runs` + RLS and their writer functions
+- `0088` fixes an ambiguous column reference in `consume_message_quota()` - the same `RETURNS TABLE` collision as `0080`, which made quota enforcement fail on every call
+- `0089` closes the default-privilege class. Third instance of one mechanism (after `0019` and `0076`): Supabase grants `ALL` on new objects, so a migration that only adds grants leaves the rest switched on. Sets `ALTER DEFAULT PRIVILEGES` so new tables arrive with nothing, and verifies inline.
+
+---
+
 ### Core Schemas
 
 **`0002_create_schemas.sql`**
@@ -470,9 +481,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0082`** — available for the next migration.
+**`0090`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0081` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0089` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -701,7 +712,7 @@ Creates AfriTech financial tracking and nightly metrics cache tables.
 Creates all indexes for tables added in migrations 0036-0054.
 - Indexes for: `timetable_slots`, `announcements`, `announcement_reads`, `parent_push_tokens`, `alumni_profiles`, `lenders`, `school_integrations`, `integration_log`, `afritech.school_feature_overrides`, `afritech.loan_commissions`, `afritech.platform_metrics`
 - Related: `docs/api/INDEXES.md`
-**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0082`.**
+**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0090`.**
 
 ---
 
@@ -1013,4 +1024,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 
 ---
 
-**NEXT AVAILABLE: `0082`** — see *Next Available Sequence Number* above, which is authoritative.
+**NEXT AVAILABLE: `0090`** — see *Next Available Sequence Number* above, which is authoritative.

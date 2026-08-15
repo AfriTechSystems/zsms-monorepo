@@ -149,6 +149,39 @@ Repoints `teacher_read_assigned_students` at `teacher_reaches_class()`.
 
 ---
 
+**`0070_create_fee_tables.sql`** — ✅ **APPLIED to `zsms-dev` 2026-08-15**
+Fee structures, the per-student ledger, payments with the submission/verification workflow, and gateway configuration.
+- Creates: `public.fee_structures`, `public.fee_records`, `public.payments`, `public.payment_gateways`
+- **Resolves a document conflict:** `SCHEMA.md` and the 2026-04-26 `CHANGELOG.md` entry specify the payment verification columns; `DATABASE.md`'s DDL omitted them. SCHEMA.md governs; `DATABASE.md` corrected alongside.
+
+**`0071_create_fee_rls.sql`** — ✅ **APPLIED 2026-08-15**
+RLS for the fee tables, plus `parent_has_child_at_school()`, `parent_can_access_fee_record()`, and `is_own_student_record()`.
+- Adds `parent_submit_payment`: a parent may submit against their own child's record, pinned to `pending_verification` and to themselves as recorder.
+- Teachers get no fee policy at all — teaching scope and financial scope are separate.
+
+**`0072_create_attendance_table.sql`** — ✅ **APPLIED 2026-08-15**
+- Creates: `public.attendance_records`
+
+**`0073_create_exam_results_table.sql`** — ✅ **APPLIED 2026-08-15**
+- Creates: `public.exam_results`, `public.report_generation_jobs`
+
+**`0074_create_academic_rls.sql`** — ✅ **APPLIED 2026-08-15**
+RLS for attendance and results, plus `teacher_teaches_subject()` (ADR-037).
+- Attendance uses `teacher_reaches_class()`; marks use the narrower `teacher_teaches_subject()`.
+- **The publication lock moved into the policy.** `RLS.md` left it to the application layer, which would let any direct PostgREST call edit a published mark.
+
+**`0075_fee_lifecycle_functions.sql`** — ✅ **APPLIED 2026-08-15**
+- Creates: `generate_fee_records()`, `assign_receipt_number()` trigger, `recalculate_fee_record_balance()` trigger, `verify_payment()`, `publish_results()`
+- Receipt numbering locks the school row — two concurrent payments computing `count + 1` would otherwise collide.
+- `fee_records.amount_paid` is derived from **verified** payments only, by trigger, so it cannot drift.
+
+**`0076_revoke_payment_update_privilege.sql`** — ✅ **APPLIED 2026-08-15**
+Revokes the inherited `UPDATE` on `public.payments`.
+- Found by the Phase 2 suite. Same root cause as `0019`: Supabase's default grant, never revoked. `afritech_admin_all_payments` is `FOR ALL`, so a super admin could have edited a payment in place, bypassing `verify_payment()`.
+- Verifies itself inline.
+
+---
+
 ### Core Schemas
 
 **`0002_create_schemas.sql`**
@@ -415,9 +448,19 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0069`** — available for the next migration.
+**`0077`** — available for the next migration.
 
-`0002`–`0021` are written and applied. `0022`–`0065` are specified in this document but not yet written, and their numbers are **claimed** — do not reuse them. `0066`–`0068` are the renumbered fee and message-quota migrations.
+`0001`–`0021` and `0069`–`0076` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+
+### Why the middle block is void
+
+Reserving a block of numbers for planned-but-unwritten migrations does not work, and this document tried to do it. Writing reached `0021`, then `0069`. Everything reserved in between now sorts **below the applied high-water mark**, and `supabase db push` skips a migration older than the last applied one unless `--include-all` is passed — a flag that exists to override a safety check, not to be part of a normal workflow.
+
+So a migration written today as `0030_create_timetables.sql` would simply never apply. The number is not merely taken; it is unreachable.
+
+**The rule going forward: numbers are assigned when a migration is written, never in advance.** The planned entries throughout this document describe *what* is still to be built and in what dependency order — they no longer dictate a number. Each takes the next free number at the time it is authored, and this pointer is updated in the same commit.
+
+The `0022`–`0068` labels are retained in the sequence below only so the descriptions stay findable; read them as ordering, not as filenames.
 
 When creating a new migration, use `0069` and update this document with the new entry before committing. Read this pointer rather than the highest number in `supabase/migrations/` — most of the sequence is planned here before it exists on disk, which is exactly how the `0019`–`0021` collision happened.
 
@@ -506,6 +549,9 @@ This section is updated each time a migration reaches production.
 | 2026-08-15 | **Added `0019` — revoke inherited DELETE/TRUNCATE** | Caught by the isolation suite: Supabase's default grants left `authenticated` holding DELETE, live on every `FOR ALL` policy path |
 | 2026-08-15 | **Added `0020`/`0021` — scope-based teaching assignments (ADR-037)** | Closes the `class_enrolments` gap at its root; supports primary, secondary, and mixed schools without branching on school type |
 | 2026-08-15 | **Renumbered the planned fee and message-quota migrations `0019`–`0021` → `0066`–`0068`** | Phase 1 consumed those numbers and its migrations are applied; an applied version cannot move, because it is the identity `supabase db push` reconciles against. Next available is `0069`. |
+| 2026-08-15 | **Added `0070`–`0076` — Phase 2 fees, attendance, and results** | Fee lifecycle, teaching-scoped attendance and marks, plus the `0076` privilege fix the suite caught |
+| 2026-08-15 | **Declared `0022`–`0068` void as numbers** | They sort below the applied high-water mark, so `db push` would skip them. Numbers are now assigned when a migration is written, never reserved in advance. |
+| 2026-08-15 | Corrected the `payments` DDL in `DATABASE.md` | It omitted the verification columns that `SCHEMA.md` and the 2026-04-26 CHANGELOG specify |
 | 2026-08-15 | Reconciled the three conflicting *next available* pointers | The document carried `0022`, `0056`, and `0066` in different sections; the pointer under *Next Available Sequence Number* is now stated as authoritative |
 
 ---
@@ -633,7 +679,7 @@ Creates AfriTech financial tracking and nightly metrics cache tables.
 Creates all indexes for tables added in migrations 0036-0054.
 - Indexes for: `timetable_slots`, `announcements`, `announcement_reads`, `parent_push_tokens`, `alumni_profiles`, `lenders`, `school_integrations`, `integration_log`, `afritech.school_feature_overrides`, `afritech.loan_commissions`, `afritech.platform_metrics`
 - Related: `docs/api/INDEXES.md`
-**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0069`.**
+**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0077`.**
 
 ---
 
@@ -945,4 +991,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 
 ---
 
-**NEXT AVAILABLE: `0069`** — see *Next Available Sequence Number* above, which is authoritative.
+**NEXT AVAILABLE: `0077`** — see *Next Available Sequence Number* above, which is authoritative.

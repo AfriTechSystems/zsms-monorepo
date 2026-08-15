@@ -578,6 +578,29 @@ CREATE TABLE public.payments (
   notes                 TEXT,
   -- Optional notes by the accountant. For reversals: mandatory reason.
 
+  -- --- submission / verification workflow ---
+  -- ADDED 2026-08-15. SCHEMA.md and the 2026-04-26 CHANGELOG entry
+  -- ("Removed OTP for financial submissions — replaced with confirmation
+  -- workflow") specified these columns; this DDL was never updated to match.
+  -- Implemented in migration 0070.
+  status                TEXT NOT NULL DEFAULT 'pending_verification'
+                        CHECK (status IN (
+                          'pending_verification', 'verified', 'rejected', 'queried'
+                        )),
+  -- Only 'verified' payments count toward fee_records.amount_paid. A submitted
+  -- payment reduces nothing until someone with financial authority confirms it.
+
+  proof_of_payment_url  TEXT,
+  confirmation_checkbox_at TIMESTAMPTZ,
+  -- When the submitter affirmed the details. Replaces the removed OTP step.
+
+  verified_by           TEXT,
+  verified_at           TIMESTAMPTZ,
+  rejection_reason      TEXT,
+  -- CHECK constraints require a reason on rejection, and both verified_by and
+  -- verified_at on verification: "verified by nobody at no time" is not a valid
+  -- state for a money record.
+
   reversal_of_payment_id UUID REFERENCES public.payments(id),
   -- Populated when payment_method = 'reversal'.
   -- References the original payment being reversed.

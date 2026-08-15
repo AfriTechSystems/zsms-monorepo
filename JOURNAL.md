@@ -4,6 +4,61 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-15 — Phase 2: fees, attendance, and results
+
+Branch `feature/phase-2-fees-attendance-results`. **Migrations `0070`–`0076` applied to `zsms-dev`. Phase 2 suite passes 45/45; Phase 1 suite still 72/72.**
+
+### The suite caught the same class of bug again
+
+First run was **44/45**:
+
+```
+not ok 3 - authenticated holds no UPDATE on payments   (have 1, want 0)
+```
+
+Identical root cause to `0019`: **Supabase's default privileges grant `ALL` on a new `public` table to `authenticated`.** `0070` granted `SELECT, INSERT` and revoked `DELETE`/`TRUNCATE`, but adding a grant does not remove the `UPDATE` already held — and `0019`'s `ALTER DEFAULT PRIVILEGES` only covered `DELETE` and `TRUNCATE`.
+
+`0070`'s own comment asserted *"no UPDATE privilege for end users at all."* **That was false when written.** `payments` has no UPDATE policy, so RLS filtered direct updates to zero rows for ordinary roles — but `afritech_admin_all_payments` is `FOR ALL`, which covers UPDATE. A super admin could have edited a payment in place, bypassing `verify_payment()` and its guard against re-verifying. Payments are supposed to be immutable with corrections as reversal rows; an in-place edit leaves no trace.
+
+Fixed in `0076`, which verifies itself inline. **Twice now the same default-privilege mechanism has produced a hole, both times found by an assertion rather than by review.** The lesson is that `GRANT` is not a whitelist — the baseline is already permissive, so every new table needs an explicit revoke of what it must not expose.
+
+### Fee lifecycle, proven end to end
+
+Structure → generated records → parent submits → accountant verifies → balance moves. Twelve assertions walk it, and two carry the design:
+
+- **A pending payment moves nothing.** `amount_paid` stays 0 and the record stays `unpaid` until verification. Without that assertion, "verification" would be decorative.
+- **Verification is attributed.** A `CHECK` requires `verified_by` and `verified_at` together — *verified by nobody at no time* is not a valid state for a money record.
+
+Three things are database functions rather than route code because they must be atomic: receipt numbering (locks the school row; two concurrent cashiers would otherwise compute the same number), balance derivation (a trigger over **verified** payments only, so it cannot drift), and verification itself.
+
+`generate_fee_records()` is idempotent — asserted, because a second run silently doubling every balance is the worst plausible failure here.
+
+### Teaching scope reaches attendance and marks
+
+ADR-037 paid off exactly where intended. Attendance uses `teacher_reaches_class()`; marks use the narrower `teacher_teaches_subject()`, where a `scope='class'` teacher owns every subject in their class and a `scope='subject'` teacher only their own. The suite asserts a subject teacher cannot enter marks for **a different subject in a class they do reach** — the case a coarser model would have allowed.
+
+**One deviation from `RLS.md`, deliberate.** It left the publication lock to the application layer. That would leave a published mark editable by any direct PostgREST call, so `results_published = FALSE` is in the UPDATE policy's `USING` clause. The suite asserts a teacher cannot edit after publication and cannot publish by flipping the flag on their own row.
+
+### Numbering: the reserved block was unusable
+
+`0022`–`0068` sort **below** the applied high-water mark (`0069`), and `supabase db push` skips anything older than the last applied without `--include-all`. A migration written as `0030` today would simply never run. Phase 2 therefore starts at `0070`, and `MIGRATIONS.md` now states the rule plainly: **numbers are assigned when a migration is written, never reserved in advance.**
+
+### Document conflict resolved: `payments`
+
+`SCHEMA.md` and the 2026-04-26 `CHANGELOG.md` entry specify `status`, `verified_by`, `verified_at`, `rejection_reason`, `proof_of_payment_url`, and `confirmation_checkbox_at` — the change that *"removed OTP for financial submissions, replaced with confirmation workflow"*. `DATABASE.md`'s DDL had none of them. Without those columns there is no verification step at all. SCHEMA.md governs; `DATABASE.md` corrected.
+
+### API routes
+
+`/api/fees/structures` · `/api/fees/records` (GET, POST=generate) · `/api/payments` (GET, POST=submit) · `/api/payments/[id]/verify` · `/api/attendance` · `/api/results` · `/api/results/publish`. Twelve routes total across Phases 1–2, all registering in the build.
+
+Two rules held throughout: **the client never names its own status** — every submission lands `pending_verification`, and the field is absent from the schema — and **teaching-scope checks are not duplicated in route code**. The policy is the check; a second copy in TypeScript is a second thing to drift.
+
+### Verified
+
+Phase 2 suite 45/45 · Phase 1 suite 72/72 · `turbo type-check` 8/8 · `turbo build` clean · types regenerated · fixtures cleaned up.
+
+---
+
 ## 2026-08-15 — Phase 1: core domain backend (schools, students, staff)
 
 Branch `feature/phase-1-core-domain`, cut from `integration` at `8ffbddb`.

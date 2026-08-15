@@ -112,3 +112,152 @@ export type UpdateStudentInput = z.infer<typeof updateStudentSchema>
 export type CreateStaffInput = z.infer<typeof createStaffSchema>
 export type UpdateStaffInput = z.infer<typeof updateStaffSchema>
 export type UpdateSchoolInput = z.infer<typeof updateSchoolSchema>
+
+// ---------------------------------------------------------------------------
+// Phase 2 — fees, attendance, results
+//
+// Money is validated as a number with at most two decimal places and is stored
+// in NUMERIC(12,2) columns (prohibition 5). Note the API accepts a JSON number
+// here but never performs arithmetic on it — all balance derivation happens in
+// the database, where the type is exact.
+// ---------------------------------------------------------------------------
+
+const money = z
+  .number()
+  .nonnegative()
+  .max(9_999_999_999.99)
+  .refine((v) => Number.isFinite(v) && Math.round(v * 100) === v * 100, {
+    message: 'At most two decimal places',
+  })
+
+const academicYear = z.string().regex(/^\d{4}$/, 'Must be a four-digit year')
+const termNumber = z.coerce.number().int().min(1).max(4)
+
+export const createFeeStructureSchema = z.object({
+  academicYear,
+  termNumber,
+  gradeId: z.string().trim().min(1).max(50),
+  studentType: z.enum(['all', 'day', 'boarding']).optional(),
+  feeLabel: z.string().trim().min(1).max(100),
+  amount: money,
+  currencyCode: z.string().trim().length(3).optional(),
+  isMandatory: z.boolean().optional(),
+})
+
+export const generateFeeRecordsSchema = z.object({
+  academicYear,
+  termNumber,
+  dueDate: z.string().datetime().optional(),
+})
+
+export const listFeeRecordsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(25),
+  studentId: z.string().uuid().optional(),
+  academicYear: academicYear.optional(),
+  termNumber: termNumber.optional(),
+  status: z
+    .enum(['unpaid', 'partial', 'paid', 'waived', 'loan_pending', 'loan_paid', 'overpaid'])
+    .optional(),
+})
+
+export const submitPaymentSchema = z.object({
+  feeRecordId: z.string().uuid(),
+  amount: money.refine((v) => v > 0, { message: 'Must be greater than zero' }),
+  paymentMethod: z.enum(['cash', 'bank_deposit', 'cheque', 'online_gateway']),
+  // 'reversal', 'waiver', and 'loan_disbursement' are deliberately absent: they
+  // are finance-role operations, not something a submission endpoint accepts.
+  bankName: z.string().trim().max(100).optional(),
+  chequeNumber: z.string().trim().max(50).optional(),
+  gatewayName: z.string().trim().max(50).optional(),
+  gatewayReference: z.string().trim().max(200).optional(),
+  proofOfPaymentUrl: z.string().url().optional(),
+  notes: z.string().trim().max(1000).optional(),
+  paidAt: z.string().datetime().optional(),
+  // status is NOT accepted. Every submission lands as pending_verification;
+  // letting a client name its own status would make verification decorative.
+})
+
+export const verifyPaymentSchema = z.object({
+  decision: z.enum(['verified', 'rejected', 'queried']),
+  reason: z.string().trim().max(1000).optional(),
+})
+
+export const markAttendanceSchema = z.object({
+  records: z
+    .array(
+      z.object({
+        studentId: z.string().uuid(),
+        classId: z.string().trim().min(1).max(50),
+        status: z.enum(['present', 'absent', 'late', 'excused', 'holiday']),
+        arrivalTime: z
+          .string()
+          .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Must be HH:MM or HH:MM:SS')
+          .optional(),
+        excuseReason: z.string().trim().max(500).optional(),
+      }),
+    )
+    .min(1)
+    .max(200),
+  attendanceDate: isoDate,
+  academicYear,
+  termNumber,
+  syncSource: z.enum(['web', 'mobile_online', 'mobile_offline']).optional(),
+  localCreatedAt: z.string().datetime().optional(),
+})
+  // Mirrors the database CHECK. Catching it here turns a 500 from the driver
+  // into a 400 naming the offending record.
+  .refine(
+    (v) => v.records.every((r) => r.status !== 'excused' || Boolean(r.excuseReason)),
+    { message: 'An excused absence requires excuseReason' },
+  )
+
+export const listAttendanceQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(200).default(50),
+  classId: z.string().trim().max(50).optional(),
+  studentId: z.string().uuid().optional(),
+  attendanceDate: isoDate.optional(),
+  status: z.enum(['present', 'absent', 'late', 'excused', 'holiday']).optional(),
+})
+
+export const enterMarksSchema = z.object({
+  classId: z.string().trim().min(1).max(50),
+  academicYear,
+  termNumber,
+  subjectCode: z.string().trim().min(1).max(20),
+  subjectName: z.string().trim().min(1).max(100),
+  marksTotal: z.number().positive().max(1000).optional(),
+  marks: z
+    .array(
+      z.object({
+        studentId: z.string().uuid(),
+        marksObtained: z.number().nonnegative().max(1000).nullable(),
+        comments: z.string().trim().max(500).optional(),
+      }),
+    )
+    .min(1)
+    .max(200),
+  syncSource: z.enum(['web', 'mobile_online', 'mobile_offline']).optional(),
+})
+
+export const publishResultsSchema = z.object({
+  academicYear,
+  termNumber,
+  classId: z.string().trim().max(50).optional(),
+})
+
+export const listResultsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(200).default(50),
+  classId: z.string().trim().max(50).optional(),
+  studentId: z.string().uuid().optional(),
+  academicYear: academicYear.optional(),
+  termNumber: termNumber.optional(),
+  subjectCode: z.string().trim().max(20).optional(),
+})
+
+export type CreateFeeStructureInput = z.infer<typeof createFeeStructureSchema>
+export type SubmitPaymentInput = z.infer<typeof submitPaymentSchema>
+export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>
+export type EnterMarksInput = z.infer<typeof enterMarksSchema>

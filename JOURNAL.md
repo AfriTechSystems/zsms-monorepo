@@ -4,6 +4,53 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-15 - Phase 3: background jobs and communications
+
+Branch `feature/phase-3-jobs-communications`, cut before any work this time. **Migrations `0082`-`0089` applied. Communications suite 45/45, gate harness 28/28.**
+
+### The same default-privilege bug, a third time - and finally fixed as a class
+
+`0019` found `authenticated` holding DELETE on every Phase 1 table. `0076` found it holding UPDATE on `payments`. This phase found it holding **INSERT and UPDATE on `message_log` and `school_message_quotas`** - which would have allowed a fabricated delivery record (the artefact a school would use to claim a parent was warned) and a school resetting `messages_used` to zero to send without limit.
+
+Three times I granted what a table needed and assumed that was the whole story. **`GRANT` is not a whitelist**: Supabase's defaults already give `authenticated` and `anon` `ALL` on anything new in `public`.
+
+`0089` stops the class rather than the instance - `ALTER DEFAULT PRIVILEGES` so new objects arrive with nothing granted, plus an inline verification that fails at apply time. Asserted: **a table created after `0089` inherits no end-user privileges at all.**
+
+**And its verification immediately caught something I did not know about.** The two arrears *views* carried INSERT and UPDATE. `fee_record_status` is a simple view over `fee_records`, which makes it **auto-updatable** - a write through the view reaches the table. `security_invoker` meant RLS still applied, so nothing was exploitable, but it was an entire write path nobody designed. My first sweep missed it because it joined `pg_tables`, which excludes views. A narrow query created the gap; a broad assertion caught it.
+
+### The abstraction was only half-built
+
+The queue abstraction covered *producing* jobs. BULLMQ.md's own worker example imports `bullmq` directly, so **consuming was never behind it** - switching providers would have been configuration for producers and a refactor for consumers.
+
+`createWorker()` now lives in `@zsms/queue`, and `apps/workers` has no `bullmq` or `ioredis` dependency at all. The abstraction also states the asymmetry plainly rather than hiding it: BullMQ workers *pull*; QStash *pushes* over HTTP and has no worker process, so `createWorker()` throws under QStash with an explanation. That is the same trade ADR-035 already records, seen from the consuming side.
+
+Verified by grep: no `bullmq`/`ioredis` import outside `packages/queue`, no provider SDK or endpoint outside `packages/notifications/src/providers`.
+
+### What the gate actually proves - and what it does not
+
+28/28 on the harness, running the **real** handler, the **real** pdf-lib renderer, and the **real** fallback chain across five scenarios: happy path, WhatsApp failure falling through to email, quota exhaustion, total delivery failure, and a student with no linked guardian.
+
+**Not proven, and it matters:**
+- **BullMQ-to-Redis transport.** No Redis on this machine. The handler is invoked directly; `worker.ts` is a thin adapter over exactly that call, but "thin" is an assertion until Redis exists.
+- **Real provider delivery.** No Meta, Resend, or Twilio credentials, so channels run through the mock provider. This is also correct for `zsms-dev`, whose fixtures carry real-shaped phone numbers.
+- **The handler's database adapter.** Deliberately unimplemented - see below.
+
+### Open question I refused to answer alone
+
+`CONVENTIONS.md` prohibition 1: *"the service role key is never used outside an Edge Function."* A worker is not an Edge Function, yet it must read a payment, its student, and the guardian - and holds no end-user JWT, because nobody has a session when a cron fires at 08:00.
+
+`createWorkerDeps()` throws, with the three options written out (Edge Functions for all DB work / amend the prohibition to cover Railway workers / a dedicated Postgres role). The rule exists to keep the key out of client-reachable code, so amending it is probably the intent - but a documented prohibition should be amended deliberately, not reinterpreted by whoever happens to write the worker.
+
+### Everything dynamic
+
+Quota ceilings come from `afritech.subscription_tiers`, which required creating the first table in a schema that had been empty since `0002` - the pricing tables were specified in the void `0061`-`0065` block. Message wording lives in `notification_templates` with school override and platform fallback; 13 platform defaults seeded. No template string exists in application code, because a wording change is the most common request a school makes and it must not be a deployment.
+
+### Not built
+
+API routes for announcements and message history, the fee-reminder and scheduled-announcement cron handlers, and report-card bulk generation. The renderers exist for all three document types; what is missing is the routes and the cron wiring.
+
+---
+
 ## 2026-08-15 — Pre-Phase-3 documentation reconciliation
 
 Documentation only. No schema or code changes.

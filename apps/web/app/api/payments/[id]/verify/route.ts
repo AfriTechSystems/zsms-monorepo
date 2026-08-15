@@ -65,6 +65,37 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
     }
 
     const row = Array.isArray(data) ? data[0] : data
+
+    // A verified payment triggers the receipt and the parent notification.
+    // Enqueued, not awaited: rendering a PDF and calling Meta must not sit
+    // inside the request an accountant is waiting on, and a provider outage
+    // must not fail a verification that has already been recorded.
+    //
+    // The payload carries the payment ID and nothing else — the worker fetches
+    // the amount, the phone number, and the guardian by ID at processing time.
+    if (row?.status === 'verified') {
+      try {
+        const { getQueue } = await import('@zsms/queue')
+        await getQueue().enqueue(
+          'generate-receipt',
+          { paymentId: id },
+          {
+            priority: 1, // HIGH — a parent is waiting on confirmation.
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 2000 },
+            // Same payment verified twice must not produce two receipts.
+            deduplicationId: `receipt:${id}`,
+          },
+        )
+      } catch (err) {
+        // The verification stands regardless. Losing the receipt job is
+        // recoverable — a reconciliation sweep can re-enqueue it — whereas
+        // failing the response would leave the accountant unsure whether the
+        // money was recorded at all.
+        console.error('[api] failed to enqueue receipt for payment', id, err)
+      }
+    }
+
     return ok({
       id: row?.id,
       status: row?.status,

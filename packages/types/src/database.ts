@@ -14,6 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          id: string
+          read_at: string
+          reader_type: string
+          reader_user_id: string
+          school_id: string | null
+        }
+        Insert: {
+          announcement_id: string
+          id?: string
+          read_at?: string
+          reader_type: string
+          reader_user_id: string
+          school_id?: string | null
+        }
+        Update: {
+          announcement_id?: string
+          id?: string
+          read_at?: string
+          reader_type?: string
+          reader_user_id?: string
+          school_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_reads_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          id: string
+          importance: string
+          scheduled_at: string | null
+          school_id: string | null
+          sent_at: string | null
+          status: string
+          target_ids: string[]
+          target_type: string
+          title: string
+          updated_at: string
+          whatsapp_jobs_queued: number
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          id?: string
+          importance?: string
+          scheduled_at?: string | null
+          school_id?: string | null
+          sent_at?: string | null
+          status?: string
+          target_ids?: string[]
+          target_type: string
+          title: string
+          updated_at?: string
+          whatsapp_jobs_queued?: number
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          importance?: string
+          scheduled_at?: string | null
+          school_id?: string | null
+          sent_at?: string | null
+          status?: string
+          target_ids?: string[]
+          target_type?: string
+          title?: string
+          updated_at?: string
+          whatsapp_jobs_queued?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           academic_year: string
@@ -419,6 +520,291 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fee_structures_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generated_documents: {
+        Row: {
+          academic_year: string | null
+          byte_size: number | null
+          created_at: string
+          doc_type: string
+          failure_reason: string | null
+          generated_by: string | null
+          id: string
+          payment_id: string | null
+          school_id: string
+          status: string
+          storage_path: string | null
+          student_id: string | null
+          term_number: number | null
+          updated_at: string
+        }
+        Insert: {
+          academic_year?: string | null
+          byte_size?: number | null
+          created_at?: string
+          doc_type: string
+          failure_reason?: string | null
+          generated_by?: string | null
+          id?: string
+          payment_id?: string | null
+          school_id: string
+          status?: string
+          storage_path?: string | null
+          student_id?: string | null
+          term_number?: number | null
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string | null
+          byte_size?: number | null
+          created_at?: string
+          doc_type?: string
+          failure_reason?: string | null
+          generated_by?: string | null
+          id?: string
+          payment_id?: string | null
+          school_id?: string
+          status?: string
+          storage_path?: string | null
+          student_id?: string | null
+          term_number?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_documents_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_documents_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_documents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_runs: {
+        Row: {
+          attempts: number
+          created_at: string
+          finished_at: string | null
+          id: string
+          job_type: string
+          last_error: string | null
+          queue_job_id: string | null
+          queued_at: string
+          reference_id: string | null
+          reference_type: string | null
+          school_id: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          job_type: string
+          last_error?: string | null
+          queue_job_id?: string | null
+          queued_at?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          school_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          job_type?: string
+          last_error?: string | null
+          queue_job_id?: string | null
+          queued_at?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          school_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_runs_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_log: {
+        Row: {
+          channel: string
+          consumed_quota: boolean
+          created_at: string
+          delivered_at: string | null
+          failed_at: string | null
+          failure_reason: string | null
+          fallback_of_id: string | null
+          id: string
+          is_fallback: boolean
+          message_body: string | null
+          provider_message_id: string | null
+          read_at: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          recipient_user_id: string | null
+          retry_count: number
+          school_id: string | null
+          sent_at: string | null
+          status: string
+          student_id: string | null
+          template_key: string
+          variables: Json | null
+        }
+        Insert: {
+          channel: string
+          consumed_quota?: boolean
+          created_at?: string
+          delivered_at?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          fallback_of_id?: string | null
+          id?: string
+          is_fallback?: boolean
+          message_body?: string | null
+          provider_message_id?: string | null
+          read_at?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          recipient_user_id?: string | null
+          retry_count?: number
+          school_id?: string | null
+          sent_at?: string | null
+          status?: string
+          student_id?: string | null
+          template_key: string
+          variables?: Json | null
+        }
+        Update: {
+          channel?: string
+          consumed_quota?: boolean
+          created_at?: string
+          delivered_at?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          fallback_of_id?: string | null
+          id?: string
+          is_fallback?: boolean
+          message_body?: string | null
+          provider_message_id?: string | null
+          read_at?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          recipient_user_id?: string | null
+          retry_count?: number
+          school_id?: string | null
+          sent_at?: string | null
+          status?: string
+          student_id?: string | null
+          template_key?: string
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_log_fallback_of_id_fkey"
+            columns: ["fallback_of_id"]
+            isOneToOne: false
+            referencedRelation: "message_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_templates: {
+        Row: {
+          body: string
+          channel: string
+          created_at: string
+          id: string
+          is_active: boolean
+          language_code: string
+          meta_template_name: string | null
+          school_id: string | null
+          subject: string | null
+          template_key: string
+          updated_at: string
+          updated_by: string | null
+          variables: string[]
+        }
+        Insert: {
+          body: string
+          channel: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          language_code?: string
+          meta_template_name?: string | null
+          school_id?: string | null
+          subject?: string | null
+          template_key: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: string[]
+        }
+        Update: {
+          body?: string
+          channel?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          language_code?: string
+          meta_template_name?: string | null
+          school_id?: string | null
+          subject?: string | null
+          template_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_templates_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -926,6 +1312,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "school_grading_scales_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_message_quotas: {
+        Row: {
+          alert_80_sent_at: string | null
+          billing_period: string
+          created_at: string
+          id: string
+          last_updated_at: string
+          messages_used: number
+          overage_credits: number
+          quota_limit: number | null
+          school_id: string
+        }
+        Insert: {
+          alert_80_sent_at?: string | null
+          billing_period: string
+          created_at?: string
+          id?: string
+          last_updated_at?: string
+          messages_used?: number
+          overage_credits?: number
+          quota_limit?: number | null
+          school_id: string
+        }
+        Update: {
+          alert_80_sent_at?: string | null
+          billing_period?: string
+          created_at?: string
+          id?: string
+          last_updated_at?: string
+          messages_used?: number
+          overage_credits?: number
+          quota_limit?: number | null
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_message_quotas_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -1616,6 +2046,31 @@ export type Database = {
           out_receipt_number: string
         }[]
       }
+      complete_generated_document: {
+        Args: {
+          p_byte_size?: number
+          p_document_id: string
+          p_error?: string
+          p_status: string
+          p_storage_path?: string
+        }
+        Returns: undefined
+      }
+      complete_job_run: {
+        Args: { p_error?: string; p_job_run_id: string; p_status: string }
+        Returns: undefined
+      }
+      consume_message_quota: {
+        Args: { p_channel: string; p_count?: number; p_school_id: string }
+        Returns: {
+          out_allowed: boolean
+          out_crossed_80: boolean
+          out_messages_used: number
+          out_overage_credits: number
+          out_quota_limit: number
+          out_reason: string
+        }[]
+      }
       current_school_uuid: { Args: never; Returns: string }
       fee_statement: {
         Args: { p_from?: string; p_student_id: string; p_to?: string }
@@ -1674,6 +2129,60 @@ export type Database = {
           p_term_number: number
         }
         Returns: number
+      }
+      record_generated_document: {
+        Args: {
+          p_academic_year?: string
+          p_doc_type: string
+          p_generated_by?: string
+          p_payment_id?: string
+          p_school_id: string
+          p_student_id?: string
+          p_term_number?: number
+        }
+        Returns: string
+      }
+      record_job_run: {
+        Args: {
+          p_job_type: string
+          p_queue_job_id?: string
+          p_reference_id?: string
+          p_reference_type?: string
+          p_school_id: string
+        }
+        Returns: string
+      }
+      record_message_dispatch: {
+        Args: {
+          p_channel: string
+          p_consumed_quota?: boolean
+          p_fallback_of?: string
+          p_is_fallback?: boolean
+          p_recipient_email?: string
+          p_recipient_phone?: string
+          p_recipient_user?: string
+          p_school_id: string
+          p_status?: string
+          p_student_id?: string
+          p_template_key: string
+          p_variables?: Json
+        }
+        Returns: string
+      }
+      resolve_notification_template: {
+        Args: {
+          p_channel: string
+          p_language?: string
+          p_school_id: string
+          p_template_key: string
+        }
+        Returns: {
+          body: string
+          is_school_override: boolean
+          meta_template_name: string
+          subject: string
+          template_id: string
+        }[]
       }
       revise_fee_records: {
         Args: {

@@ -63,3 +63,11 @@ export {
   type EnqueueResult,
   type QueueProvider,
 } from './types'
+
+export { createWorker } from './worker'
+export type {
+  JobWorker,
+  JobHandler,
+  JobContext,
+  WorkerOptions,
+} from './worker'

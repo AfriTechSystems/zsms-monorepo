@@ -224,6 +224,61 @@ export type Database = {
           },
         ]
       }
+      fee_record_revisions: {
+        Row: {
+          fee_record_id: string
+          id: string
+          new_amount: number
+          old_amount: number
+          reason: string
+          revised_at: string
+          revised_by: string
+          school_id: string
+        }
+        Insert: {
+          fee_record_id: string
+          id?: string
+          new_amount: number
+          old_amount: number
+          reason: string
+          revised_at?: string
+          revised_by: string
+          school_id: string
+        }
+        Update: {
+          fee_record_id?: string
+          id?: string
+          new_amount?: number
+          old_amount?: number
+          reason?: string
+          revised_at?: string
+          revised_by?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_record_revisions_fee_record_id_fkey"
+            columns: ["fee_record_id"]
+            isOneToOne: false
+            referencedRelation: "fee_record_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_record_revisions_fee_record_id_fkey"
+            columns: ["fee_record_id"]
+            isOneToOne: false
+            referencedRelation: "fee_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_record_revisions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fee_records: {
         Row: {
           academic_year: string
@@ -605,6 +660,13 @@ export type Database = {
           webhook_verified?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_fee_record_id_fkey"
+            columns: ["fee_record_id"]
+            isOneToOne: false
+            referencedRelation: "fee_record_status"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_fee_record_id_fkey"
             columns: ["fee_record_id"]
@@ -1429,10 +1491,144 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      fee_record_status: {
+        Row: {
+          academic_year: string | null
+          amount_due: number | null
+          amount_paid: number | null
+          currency_code: string | null
+          days_overdue: number | null
+          discount_amount: number | null
+          due_date: string | null
+          fee_label: string | null
+          id: string | null
+          is_overdue: boolean | null
+          outstanding: number | null
+          school_id: string | null
+          status: string | null
+          student_id: string | null
+          term_number: number | null
+        }
+        Insert: {
+          academic_year?: string | null
+          amount_due?: number | null
+          amount_paid?: number | null
+          currency_code?: string | null
+          days_overdue?: never
+          discount_amount?: number | null
+          due_date?: string | null
+          fee_label?: string | null
+          id?: string | null
+          is_overdue?: never
+          outstanding?: never
+          school_id?: string | null
+          status?: string | null
+          student_id?: string | null
+          term_number?: number | null
+        }
+        Update: {
+          academic_year?: string | null
+          amount_due?: number | null
+          amount_paid?: number | null
+          currency_code?: string | null
+          days_overdue?: never
+          discount_amount?: number | null
+          due_date?: string | null
+          fee_label?: string | null
+          id?: string | null
+          is_overdue?: never
+          outstanding?: never
+          school_id?: string | null
+          status?: string | null
+          student_id?: string | null
+          term_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_records_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_records_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_fee_balance: {
+        Row: {
+          arrears_amount: number | null
+          currency_code: string | null
+          days_overdue: number | null
+          first_name: string | null
+          is_overdue: boolean | null
+          last_name: string | null
+          oldest_unpaid_due_date: string | null
+          outstanding: number | null
+          records_outstanding: number | null
+          records_overdue: number | null
+          records_total: number | null
+          school_id: string | null
+          student_code: string | null
+          student_id: string | null
+          student_status: string | null
+          total_discount: number | null
+          total_due: number | null
+          total_paid: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_records_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_records_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      allocate_payment: {
+        Args: {
+          p_allocations?: Json
+          p_amount: number
+          p_notes?: string
+          p_payment_method: string
+          p_proof_url?: string
+          p_student_id: string
+        }
+        Returns: {
+          out_amount: number
+          out_fee_record_id: string
+          out_payment_id: string
+          out_receipt_number: string
+        }[]
+      }
       current_school_uuid: { Args: never; Returns: string }
+      fee_statement: {
+        Args: { p_from?: string; p_student_id: string; p_to?: string }
+        Returns: {
+          credit: number
+          debit: number
+          description: string
+          entry_date: string
+          entry_type: string
+          reference: string
+          running_balance: number
+        }[]
+      }
       generate_fee_records: {
         Args: {
           p_academic_year: string
@@ -1479,9 +1675,34 @@ export type Database = {
         }
         Returns: number
       }
+      revise_fee_records: {
+        Args: {
+          p_academic_year: string
+          p_fee_label: string
+          p_new_amount: number
+          p_reason: string
+          p_term_number: number
+        }
+        Returns: {
+          revised_count: number
+          skipped_count: number
+        }[]
+      }
       student_in_current_school: {
         Args: { p_student_id: string }
         Returns: boolean
+      }
+      suggest_payment_allocation: {
+        Args: { p_amount: number; p_student_id: string }
+        Returns: {
+          academic_year: string
+          due_date: string
+          fee_label: string
+          fee_record_id: string
+          outstanding: number
+          suggested: number
+          term_number: number
+        }[]
       }
       teacher_reaches_class: { Args: { p_class_id: string }; Returns: boolean }
       teacher_teaches_subject: {

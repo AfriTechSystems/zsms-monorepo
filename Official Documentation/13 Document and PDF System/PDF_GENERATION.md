@@ -176,6 +176,8 @@ interface FeeStatementProps {
 
 The fee statement shows a running balance — each row is either a fee charged (debit) or a payment made (credit) with the running outstanding balance.
 
+**Source: `public.fee_statement()`** (ADR-038). The generator must not recompute the balance itself — the function already returns `running_balance` per row, deterministically ordered by due date. The first row is a **Balance brought forward** entry whenever the selected period has prior activity, which is what makes the statement read like a bursar's ledger even though arrears are derived rather than stored.
+
 ---
 
 ### 4. Transfer Letter Component

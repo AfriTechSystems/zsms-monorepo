@@ -182,6 +182,28 @@ Revokes the inherited `UPDATE` on `public.payments`.
 
 ---
 
+**`0077_create_fee_balance_views.sql`** — ✅ **APPLIED to `zsms-dev` 2026-08-15**
+Derived arrears (ADR-038).
+- Creates: `public.fee_record_status`, `public.student_fee_balance` (both `security_invoker = true`), `public.fee_statement()`
+- Spans every year and term, and does **not** filter on `students.status` — a graduated or transferred student keeps a visible balance
+- **Computes and exposes only. Nothing gates on these.**
+
+**`0078_create_payment_allocation.sql`** — ✅ **APPLIED 2026-08-15**
+- Creates: `suggest_payment_allocation()`, `allocate_payment()` — oldest-first by default, bursar-overridable
+
+**`0079_create_fee_revision.sql`** — ✅ **APPLIED 2026-08-15**
+- Creates: `public.fee_record_revisions`, `revise_fee_records()`
+- Closes the gap `generate_fee_records()`'s idempotency left: an already-issued term fee could not be corrected
+- Refuses to drop a fee below verified payments; audits every change
+
+**`0080_fix_allocate_payment_ambiguity.sql`** — ✅ **APPLIED 2026-08-15**
+- `RETURNS TABLE` columns became PL/pgSQL variables that collided with the internal temp table's, so `allocate_payment()` aborted on every call. OUT columns prefixed `out_`.
+
+**`0081_fix_fee_statement_ordering.sql`** — ✅ **APPLIED 2026-08-15**
+- `fee_statement()` dated charges by `created_at`, so a term's records shared a timestamp and the closing balance was **non-deterministic**. Charges now date by `due_date` and order on a complete key.
+
+---
+
 ### Core Schemas
 
 **`0002_create_schemas.sql`**
@@ -448,9 +470,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0077`** — available for the next migration.
+**`0082`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0076` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0081` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -679,7 +701,7 @@ Creates AfriTech financial tracking and nightly metrics cache tables.
 Creates all indexes for tables added in migrations 0036-0054.
 - Indexes for: `timetable_slots`, `announcements`, `announcement_reads`, `parent_push_tokens`, `alumni_profiles`, `lenders`, `school_integrations`, `integration_log`, `afritech.school_feature_overrides`, `afritech.loan_commissions`, `afritech.platform_metrics`
 - Related: `docs/api/INDEXES.md`
-**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0077`.**
+**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0082`.**
 
 ---
 
@@ -991,4 +1013,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 
 ---
 
-**NEXT AVAILABLE: `0077`** — see *Next Available Sequence Number* above, which is authoritative.
+**NEXT AVAILABLE: `0082`** — see *Next Available Sequence Number* above, which is authoritative.

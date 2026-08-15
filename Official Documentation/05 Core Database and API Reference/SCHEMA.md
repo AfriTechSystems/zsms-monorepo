@@ -221,6 +221,36 @@ afritech schema       — AfriTech internal team tables
 
 ---
 
+### `class_subjects`
+**What it is:** Which subjects are taught to which class in an academic year. The curriculum half of the teaching-assignment model (ADR-037).
+
+**Key columns:** `school_id`, `class_id`, `subject_id` (FK to `school_subjects`), `academic_year`, `is_active`.
+
+**Relates to:** `schools`, `school_subjects`, `teacher_assignments`.
+
+---
+
+### `teacher_assignments`
+**What it is:** What a teacher teaches, at one of two scopes. Replaces the never-defined `class_enrolments` and supersedes `staff_assignments`. **This is a security table** — it determines which students a teacher may read.
+
+- `scope = 'class'` — the teacher owns the whole class (`class_id` set, `subject_id` NULL). The primary-school and form-teacher case.
+- `scope = 'subject'` — the teacher teaches one subject to one class (both set). The secondary-school case.
+
+A teacher may hold any number of rows of either scope, including both at once. Because both scopes carry `class_id`, RLS resolves teacher reach with one predicate — `teacher_reaches_class()` — and never branches on school type.
+
+**Key columns:** `school_id`, `teacher_user_id`, `scope`, `class_id`, `subject_id`, `academic_year`, `term_number`, `is_active`.
+
+**Relates to:** `schools`, `school_subjects`, `students` (via `class_id`), `staff_members`.
+
+**Note:** a `CHECK` constraint keeps `scope` and `subject_id` in agreement. Only the owner and principal may write this table — a teacher who could write it could grant themselves any class's students.
+
+---
+
+### `staff_assignments` (Superseded)
+**Superseded by `teacher_assignments`** (ADR-037) and no longer used for authorisation. `is_class_teacher = TRUE` maps to `scope = 'class'`; a class/subject pairing maps to `scope = 'subject'`. Retained pending an explicit drop migration — do not add new references.
+
+---
+
 ### `staff_requests`
 **What it is:** Pending self-registration requests from staff waiting for school admin approval. These users have Clerk accounts but are not yet Clerk Organisation members.
 

@@ -129,6 +129,26 @@ Enables required extensions and creates the seven PostgreSQL helper functions th
 
 ---
 
+**`0019_revoke_delete_privileges.sql`** — ✅ **APPLIED to `zsms-dev` 2026-08-15**
+Removes the `DELETE`/`TRUNCATE` privileges Supabase's default grants hand to `authenticated` on every new `public` table.
+- Found by the pgTAP isolation suite, not by review — `0003`–`0018` revoked those for `anon` but only *added* grants for `authenticated`, which does not remove what it already held
+- Policies written `FOR ALL` cover DELETE, so on those paths the privilege was live: a super admin could hard-delete a student, contradicting prohibition 8
+- Also sets `ALTER DEFAULT PRIVILEGES` so later tables inherit the correction, and verifies itself inline — raises at apply time if any grant survives
+
+**`0020_create_teaching_assignment_tables.sql`** — ✅ **APPLIED to `zsms-dev` 2026-08-15**
+The scope-based teaching-assignment model (ADR-037).
+- Creates: `public.class_subjects`, `public.teacher_assignments`
+- Creates: `teacher_reaches_class()` — the single `SECURITY DEFINER` predicate behind all teacher scoping
+- Replaces the never-defined `class_enrolments` referenced by four documents
+- Related: `01 Foundation Layer/RLS.md`, `01 Foundation Layer/DECISIONS.md` — ADR-037
+
+**`0021_update_teacher_student_policy.sql`** — ✅ **APPLIED to `zsms-dev` 2026-08-15**
+Repoints `teacher_read_assigned_students` at `teacher_reaches_class()`.
+- Drops `teacher_assigned_to_class()`, the `0016` interim helper — two predicates answering "which students may this teacher see" is how the wrong one ends up in a future policy
+- Marks `staff_assignments` superseded via `COMMENT`; the table is retained, not dropped
+
+---
+
 ### Core Schemas
 
 **`0002_create_schemas.sql`**
@@ -186,6 +206,26 @@ Creates the onboarding progress tracking table.
 
 ### Student and Parent Tables
 
+> **ORDERING CORRECTION (2026-08-14) — `0014`–`0018` differ from the original plan.**
+>
+> The sequence below originally read: `0014` student RLS · `0015` staff tables · `0016` staff RLS · `0017` permission tables · `0018` permission RLS.
+>
+> That order cannot execute. The student policies (`management_write_students`, `management_update_students`) and the staff policy (`management_write_assignments`) all call `has_permission_grant()`, which reads `public.staff_permission_grants` — created at `0017`. A policy evaluated before its table exists raises `relation does not exist`, so every query against `students` would error rather than filter.
+>
+> The student policies also resolve a teacher's classes through `public.staff_assignments`, created at `0015`. The `SECURITY DEFINER` helper encoding that lookup is `LANGUAGE SQL`, whose body is validated at `CREATE` time — so the staff tables must precede the student policies too.
+>
+> **Corrected order, as implemented:**
+>
+> | Version | Contents |
+> |---|---|
+> | `0014` | Permission tables — `school_permissions`, `staff_permission_grants` (moved up from `0017`) |
+> | `0015` | Staff tables — `staff_members`, `staff_assignments`, `staff_requests` |
+> | `0016` | Student, parent, and link RLS |
+> | `0017` | Staff RLS |
+> | `0018` | Permission RLS |
+>
+> `0014` and `0015` enable RLS on their tables immediately and defer only the policies. A table with RLS enabled and no policies denies everything, so each gap fails closed rather than leaving the permission-grant table readable.
+
 **`0011_create_students_table.sql`**
 Creates the central student entity table.
 - Creates: `public.students`
@@ -238,20 +278,28 @@ Applies RLS policies to permission tables.
 
 ### Fee and Financial Tables
 
-**`0019_create_fee_tables.sql`**
+> **RENUMBERED (2026-08-15) — these were `0019`–`0021`.**
+>
+> Phase 1 consumed `0019`, `0020`, and `0021` for the DELETE-privilege revocation and the ADR-037 teaching-assignment model. Those three are **applied to `zsms-dev`**, and an applied migration cannot be renumbered — its version is recorded in `supabase_migrations.schema_migrations` and is the identity `supabase db push` reconciles against.
+>
+> The planned-but-unwritten migrations below therefore move to the end of the sequence. Nothing about their content changes; only their version does.
+>
+> **This collision was avoidable.** Rule 3 says to read *Next Available Sequence Number* before naming a file. That pointer read `0066` at the time — correct, because `0022`–`0065` were already claimed by plan — and it was not consulted. Read it, not the last number on disk.
+
+**`0066_create_fee_tables.sql`** *(was `0019`)*
 Creates all fee-related tables.
 - Creates: `public.fee_structures`, `public.fee_records`, `public.payments`, `public.payment_gateways`
-- Related: `docs/DATABASE.md` — fee tables
+- Related: `01 Foundation Layer/DATABASE.md` — fee tables
 
-**`0020_create_fee_rls.sql`**
+**`0067_create_fee_rls.sql`** *(was `0020`)*
 Applies RLS policies to all fee and payment tables.
 - Creates: RLS policies for fee tables
-- Related: `docs/RLS.md` — fee table policies
+- Related: `01 Foundation Layer/RLS.md` — fee table policies
 
-**`0021_create_message_quota_table.sql`**
+**`0068_create_message_quota_table.sql`** *(was `0021`)*
 Creates the WhatsApp message quota tracking table.
 - Creates: `public.school_message_quotas`
-- Related: `docs/infra/META_API.md`, `docs/modules/communication/WHATSAPP.md`
+- Related: `03 Infrastructure Services/META_API.md`, `12 Communication/WHATSAPP.md`
 
 ---
 
@@ -367,9 +415,11 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0066`** — available for the next migration.
+**`0069`** — available for the next migration.
 
-When creating a new migration, use `0066` and update this document with the new entry before committing.
+`0002`–`0021` are written and applied. `0022`–`0065` are specified in this document but not yet written, and their numbers are **claimed** — do not reuse them. `0066`–`0068` are the renumbered fee and message-quota migrations.
+
+When creating a new migration, use `0069` and update this document with the new entry before committing. Read this pointer rather than the highest number in `supabase/migrations/` — most of the sequence is planned here before it exists on disk, which is exactly how the `0019`–`0021` collision happened.
 
 ---
 
@@ -451,6 +501,12 @@ This section is updated each time a migration reaches production.
 | 2026-08-14 | Pinned the Supabase CLI as a root `devDependency`; added `db:push`, `db:list`, `db:diff` scripts | The existing `db:types` / `db:test` scripts called a bare `supabase` that was not installed anywhere and would have failed on first use |
 | 2026-08-14 | Documented the version **ordering** hazard | Timestamp versions sort after every four-digit version, so one stray timestamp silently reorders the whole sequence |
 | 2026-08-14 | Corrected placeholder project refs and the generated-types path in *Migration Application Commands* | `zsms-dev-ref` was a placeholder; the types path omitted `src/` and disagreed with `package.json` |
+| 2026-08-15 | **Migrations `0002`–`0018` written and APPLIED to `zsms-dev`** | Phase 1 core domain — schools, students, staff, and RLS for all of them |
+| 2026-08-15 | Corrected the `0014`–`0018` ordering | The declared order evaluated policies calling `has_permission_grant()` before the table it reads existed |
+| 2026-08-15 | **Added `0019` — revoke inherited DELETE/TRUNCATE** | Caught by the isolation suite: Supabase's default grants left `authenticated` holding DELETE, live on every `FOR ALL` policy path |
+| 2026-08-15 | **Added `0020`/`0021` — scope-based teaching assignments (ADR-037)** | Closes the `class_enrolments` gap at its root; supports primary, secondary, and mixed schools without branching on school type |
+| 2026-08-15 | **Renumbered the planned fee and message-quota migrations `0019`–`0021` → `0066`–`0068`** | Phase 1 consumed those numbers and its migrations are applied; an applied version cannot move, because it is the identity `supabase db push` reconciles against. Next available is `0069`. |
+| 2026-08-15 | Reconciled the three conflicting *next available* pointers | The document carried `0022`, `0056`, and `0066` in different sections; the pointer under *Next Available Sequence Number* is now stated as authoritative |
 
 ---
 
@@ -577,8 +633,7 @@ Creates AfriTech financial tracking and nightly metrics cache tables.
 Creates all indexes for tables added in migrations 0036-0054.
 - Indexes for: `timetable_slots`, `announcements`, `announcement_reads`, `parent_push_tokens`, `alumni_profiles`, `lenders`, `school_integrations`, `integration_log`, `afritech.school_feature_overrides`, `afritech.loan_commissions`, `afritech.platform_metrics`
 - Related: `docs/api/INDEXES.md`
-
-**NEXT AVAILABLE: `0056`**
+**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0069`.**
 
 ---
 
@@ -890,4 +945,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 
 ---
 
-**NEXT AVAILABLE: `0066`**
+**NEXT AVAILABLE: `0069`** — see *Next Available Sequence Number* above, which is authoritative.

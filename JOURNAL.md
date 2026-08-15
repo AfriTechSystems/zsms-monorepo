@@ -4,6 +4,130 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-15 — Phase 1: core domain backend (schools, students, staff)
+
+Branch `feature/phase-1-core-domain`, cut from `integration` at `8ffbddb`.
+
+**Status: APPLIED to `zsms-dev` and verified. Isolation suite passes 72/72. Merged to `integration`.**
+
+### The teaching-assignment model — ADR-037 (migrations `0020`, `0021`)
+
+The `class_enrolments` gap was closed at its root rather than worked around. `class_subjects` records which subjects a class is taught; `teacher_assignments` records what a teacher teaches, discriminated by a `scope` field:
+
+| scope | Shape | Models |
+|---|---|---|
+| `class` | `class_id` set, `subject_id` NULL | primary school, form teacher |
+| `subject` | both set | secondary school subject teacher |
+
+A teacher may hold any number of rows of either scope, including both. **Both scopes carry `class_id`** — that is the load-bearing detail, because it lets `teacher_reaches_class()` ignore `scope` entirely and therefore never branch on school type. The shape of a school is data, not a code path.
+
+The scope/subject `CHECK` constraint is a security control, not tidiness: a `scope='subject'` row with a NULL `subject_id` would read to the predicate as reaching the *whole* class, silently widening that teacher.
+
+Write access is owner and principal only. Teacher reach is derived from this table, so a teacher who could insert their own row could grant themselves any class's students — the suite asserts that directly.
+
+`teacher_assigned_to_class()`, the `0016` interim helper, is **dropped** rather than left in place. Two predicates answering "which students may this teacher see" is exactly how the wrong one ends up in a future policy. `staff_assignments` is marked superseded via `COMMENT` and retained — dropping is irreversible and wants explicit approval.
+
+**Twelve new assertions**, covering both scopes, the mixed case, the two constraint violations, self-assignment, and the one that matters: *a subject teacher cannot see students in a class they do not teach*. Suite is now 72, all passing.
+
+### I collided with reserved migration numbers
+
+`0019`, `0020`, and `0021` were **already claimed** by the plan — `create_fee_tables`, `create_fee_rls`, `create_message_quota_table`. I named files by looking at the highest number on disk instead of reading *Next Available Sequence Number*, which said `0066`.
+
+Mine are applied, and an applied version cannot be renumbered — it is the identity `supabase db push` reconciles against. So the *planned* migrations moved instead: fees and message quota are now `0066`–`0068`, next available `0069`.
+
+The document also carried **three conflicting "next available" pointers** (`0022`, `0056`, `0066`) in different sections. Reconciled, with the one near the top declared authoritative.
+
+**Rule 3 exists for exactly this and I skipped it.** Most of the sequence is planned in the document long before it exists on disk, so the filesystem is never the source of truth for the next number.
+
+### The isolation suite caught a real defect on its first run
+
+This is the entry that matters. The first run was **53/55**, and the two failures were the same root cause:
+
+```
+not ok 3  - authenticated holds no DELETE privilege on students   (have 1, want 0)
+not ok 27 - owner A cannot hard-delete even their OWN student     (caught: no exception)
+```
+
+**Supabase's default privileges grant `ALL` on every new `public` table to `authenticated`.** Migrations `0003`–`0018` revoked that for `anon` but only *added* `SELECT, INSERT, UPDATE` for `authenticated` — which does not remove the `DELETE` it already held.
+
+No data was lost: `students` has no `DELETE` policy, so RLS filtered the delete to zero rows, and a later assertion confirmed the row survived. But the guarantee was resting on RLS alone, and that was thinner than it looked — **policies written `FOR ALL` cover DELETE too.** `afritech_admin_all_students`, `management_write_staff`, and `school_management_links` are all `FOR ALL`, so on those paths the privilege was live. An AfriTech super admin could have hard-deleted a student, which prohibition 8 says must be impossible for anyone.
+
+Fixed by **migration `0019`**, which revokes `DELETE, TRUNCATE` from `authenticated` and `anon` across all fifteen tables, sets `ALTER DEFAULT PRIVILEGES` so future tables inherit the correction, and verifies itself inline — the migration raises at apply time if any grant survives. Four assertions were added to the suite (now **60**) covering the `FOR ALL` paths and the super admin specifically.
+
+**The lesson is the one the brief was built around.** Every "can School A read its own data" test passed on the broken schema. Only the assertion that *actively attempted a forbidden delete* found it. Testing what users cannot do is what located a defect that review had not.
+
+### Two further defects found while running
+
+- **Data-modifying CTEs are illegal as function arguments.** The suite used `is((WITH x AS (UPDATE ...) SELECT count(*) FROM x), 0, ...)`, which PostgreSQL rejects with *WITH clause containing a data-modifying statement must be at the top level*. Replaced with a `SECURITY INVOKER` `rows_affected()` helper — invoker rights are essential, so the write executes as the role under test.
+- **One assertion tested the wrong failure mode.** "Owner A cannot reassign their own student into School B" expected zero rows affected. It does not: `USING` passes because the row *is* visible to that caller, and `WITH CHECK` rejects the post-update row, raising `42501`. Changed to `throws_ok`.
+
+### Applied state (verified by query, not assumed)
+
+| Check | Result |
+|---|---|
+| `public` tables | 17 |
+| Tables without RLS | **0** |
+| Tables without `FORCE` | **0** |
+| Policies | 64 |
+| `DELETE`/`TRUNCATE` granted to end-user roles | **0** |
+| Migrations applied | 21 (`0001`–`0021`) |
+| Non-four-digit versions | **0** |
+| Stale `teacher_assigned_to_class()` | **0** — dropped in `0021` |
+| Leftover test fixtures | 0 (suite cleans up after itself) |
+| pgTAP isolation suite | **72 / 72** |
+
+`turbo type-check` 8/8 · `turbo build` clean · types regenerated from the live schema.
+
+### On the CLI
+
+The user reported login *and* link succeeded; the CLI reported neither. Both were half true: **login had succeeded** — the token lives in the Windows Credential Manager, not `~/.supabase/access-token`, which is why the file check said otherwise — but **link had not** (`"linked": false` from the API). Diagnosed with `supabase projects list`, which returned the project list *and* `linked: false` in one response. Worth remembering: on Windows, the absence of the token file proves nothing.
+
+### Migrations 0002–0018
+
+Schemas · schools · school config tables (`academic_config`, `grade_levels`, `subjects`, `grading_scales`, `reference_subjects_zm`, `onboarding_checklists`) · students · parents · `student_parent_links` · permission tables · staff tables · RLS for all of it.
+
+Written contiguously rather than only the three tables named in the brief. Leaving `0005`–`0010` as gaps would have meant filling them later with versions that sort *before* the applied maximum, which `supabase db push` skips without `--include-all` — the exact hazard the versioning procedure written yesterday exists to prevent.
+
+### Three specification defects found by implementing against the docs
+
+| Defect | Resolution |
+|---|---|
+| **Migration order is impossible.** `MIGRATIONS.md` put the permission tables at `0017`, *after* the student RLS (`0014`) and staff RLS (`0016`) whose policies call `has_permission_grant()` — which reads `staff_permission_grants`. A policy evaluated before its table exists raises `relation does not exist`, so every `students` query would error rather than filter. | Permission tables → `0014`, staff tables → `0015`, student RLS → `0016`. Corrected order recorded in `MIGRATIONS.md`. |
+| **Policy recursion.** `RLS.md` writes three policies as cross-table subqueries: `students` reads `student_parent_links`, whose policy reads `students`. Literally applied, PostgreSQL aborts with *infinite recursion detected in policy*. | Predicates unchanged, relocated into four `SECURITY DEFINER` lookups (`is_linked_parent_of`, `student_in_current_school`, `parent_has_student_in_current_school`, `teacher_assigned_to_class`) which do not re-trigger RLS on the inner table. |
+| **`class_enrolments` did not exist.** `RLS.md` resolves a teacher's students through it. It has no DDL in `DATABASE.md`, no entry in `SCHEMA.md`'s 58-table inventory, and no migration — yet four documents reference it (`RLS.md`, `ASSIGNMENTS.md`, `POWERSYNC.md`, `OFFLINE_SYNC.md`). | `teacher_read_assigned_students` resolves through `students.class_id`, which *is* defined and `NOT NULL`. **RESOLVED** by ADR-037 — see the teaching-assignment section above. `class_subjects` and `teacher_assignments` replace it. |
+
+### Two hardening choices beyond the spec
+
+- **`FORCE ROW LEVEL SECURITY` on every table**, not just `ENABLE`. Without it the table owner bypasses every policy — and the isolation suite would then pass against a boundary that does not hold for the owning role.
+- **RLS enabled at table-creation time, policies deferred.** `0014` and `0015` enable RLS immediately and add policies in `0017`/`0018`. A table with RLS on and no policies denies everything, so the gap fails closed. The alternative would leave `staff_permission_grants` — the table deciding who may exceed their role — readable by every authenticated user for the length of the gap.
+
+### API routes
+
+`/api/schools` (GET, PATCH) · `/api/students` (GET, POST) · `/api/students/[id]` (GET, PATCH, DELETE→soft) · `/api/staff` (GET, POST). Zod validation, documented `{ data, meta? }` / `{ error, code, details? }` envelopes.
+
+Two decisions worth keeping:
+
+- **`school_id` is always derived from the JWT, never read from a request body.** A client that can name its own tenant turns `WITH CHECK` into the only thing standing between it and another school's data.
+- **Cross-tenant reads return `404`, not `403`.** A 403 confirms the record exists somewhere, which is itself a cross-tenant disclosure. RLS makes the row invisible rather than forbidden, and the routes preserve that.
+
+The service role key appears nowhere: `createServiceClient()` deliberately does not exist, because a Next.js API route is not an Edge Function (prohibition 1).
+
+### pgTAP isolation suite — 60 assertions
+
+`supabase/tests/rls/tenant_isolation_test.sql`. Adversarial by construction: the majority of assertions have School A actively attempt to read, update, insert into, reassign, or delete School B's records and assert refusal. Covers owner, teacher, parent, student, super admin, and `anon`, in both directions between the two schools.
+
+The subtle ones worth noting: reassigning one's *own* student into another school (the `USING` clause passes because the row is currently visible, so only `WITH CHECK` stops it); a `students:write` grant at School A not conferring write at School B; a teacher blocked from an unassigned class *within their own school*; and a cross-school aggregate returning only the caller's count. Section 6 asserts the AfriTech super admin *does* cross tenants — without it, a blanket-deny bug would make every other assertion pass for the wrong reason.
+
+### Verified so far
+
+`turbo type-check` 8/8 including the new routes. Nothing else can be verified until the migrations are applied.
+
+### Known limitation
+
+`nextStudentId()` computes the sequence as `count + 1`, so two concurrent enrolments at one school can collide. The `UNIQUE` constraint turns that into a 409 rather than a duplicate, so it is safe but not graceful. `STUDENT_ID.md` assigns generation to an Edge Function; moving it there with a per-school sequence removes the race.
+
+---
+
 ## 2026-08-14 — Pre-Phase-1 cleanup: security bump, migration procedure, permission policy
 
 Three cleanups before Phase 1, plus a persistent permission configuration.
@@ -65,13 +189,20 @@ Verified after the fix: `turbo type-check` 8/8, `turbo build` clean and stable a
 
 `sharp` is the one that matters: ZSMS will serve student photos and school logos. **Resolve it before any user-uploaded image is served through `next/image`.**
 
-### 2. Branch protection — **not done, needs the user**
+### 2. Branch protection — **DEFERRED, not skipped**
 
-`gh` is not installed on this machine (neither on the Windows PATH nor in Git Bash), and no GitHub token is configured, so the API route was unavailable. Exact click-through settings were handed to the user instead. **`main` is still unprotected.**
+**Blocked by GitHub plan, not by configuration.** Rulesets and branch protection are not enforced on a **free private organisation repository**. The rules can be created, but GitHub does not apply them, so a direct push to `main` still succeeds. The user set protection on `main` manually; it will not take effect until the org moves to **GitHub Team**.
 
-Caveat worth remembering: with a single maintainer, setting *Require approvals ≥ 1* makes `main` unmergeable, since GitHub forbids approving your own PR. Start at 0 approvals, raise it when a second reviewer exists.
+**Until then, ADR-011's workflow rests on PR discipline, not platform enforcement.** Treat `feature/* → integration → main` as a convention that nothing prevents you from violating. Do not assume a failed push means the rule worked.
 
-Required status checks were deliberately left unconfigured — there is no CI yet (the Layer 7 gap). They should be added the moment `CI_CD.md` lands.
+Re-attempt when the org upgrades to Team. Two settings to get right at that point:
+
+- **Required approvals: 0**, not 1, while there is a single maintainer — GitHub forbids approving your own PR, so 1 makes `main` unmergeable.
+- **Leave "Do not allow bypassing" off** until the workflow is proven; with 0 reviewers it can lock the owner out of the default branch.
+
+Required status checks were deliberately left unconfigured — there is no CI yet (the Layer 7 gap). They should be added the moment `CI_CD.md` lands. **That is what actually makes prohibition 4 — no table without an RLS policy — enforceable rather than aspirational.**
+
+`gh` is also not installed on this machine (neither Windows PATH nor Git Bash) and no token is configured, so any future attempt needs `winget install GitHub.cli` and `gh auth login` first.
 
 ### 3. Migration versioning convention — established
 
@@ -251,9 +382,12 @@ Two scaffold defects found and fixed during verification:
 
 ### Blocking before Phase 1
 
-- **Branch protection on `main` is not yet enabled** — needs the user to apply it in the GitHub UI, or `gh` installed so it can be set by API. Until then ADR-011's workflow rests on discipline, not enforcement. **This is the only item still blocking.**
+Nothing blocking. Both prior blockers are closed:
 
-Resolved: the Next.js version decision (upgraded to 15.5.23 per ADR-036; all 21 advisories cleared).
+- **Next.js version decision** — resolved; upgraded to 15.5.23 per ADR-036, all 21 advisories cleared.
+- **Branch protection** — **deferred, not skipped.** Not enforceable on a free private org repo; revisit at GitHub Team. Until then the ADR-011 workflow is convention only, with nothing preventing a direct push to `main`.
+
+`integration` fast-forwarded to `main` at `8ffbddb`, so Phase 1 feature branches start from the security fix rather than from vulnerable Next 14.
 
 ### Open items carried forward
 

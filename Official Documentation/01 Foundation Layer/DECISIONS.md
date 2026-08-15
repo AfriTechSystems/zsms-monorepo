@@ -404,3 +404,32 @@ The fix declares `react` and `react-dom` at `19.2.8` in the **root** `package.js
 
 **Alternatives considered:** Remaining on `14.2.35` and accepting the open advisories (rejected — the exposure is permanent, since no fix will ever be backported, and the affected classes are exactly those that breach tenant isolation); jumping to Next.js 16.3.x (rejected for now — no additional security benefit over 15.5.23, at higher migration cost).
 **Consequences:** `ARCHITECTURE.md`, `THIRTEEN_LAYER_COMPLIANCE.md`, and `CLAUDE.md` are updated to state Next.js 15. Phase 1 work must follow Next.js 15 conventions — most importantly that `cookies()`, `headers()`, `draftMode()`, `params`, and `searchParams` are **asynchronous** and must be awaited, and that `fetch` and `GET` route handlers are **no longer cached by default**. The Phase 0 scaffold used none of these APIs, so the upgrade required no code changes. The exact patch version stays pinned; `npm audit` is checked against `next` at every phase boundary.
+
+---
+
+## ADR-037 — Scope-Based Teaching Assignment Model
+
+**Status:** Confirmed — replaces the undefined `class_enrolments` and supersedes `staff_assignments`
+**Decision:** **A teacher's relationship to students is expressed by `public.teacher_assignments`, a single table carrying a `scope` field with two values — `'class'` and `'subject'` — where every row carries `class_id` regardless of scope.** `public.class_subjects` records which subjects a class is taught. RLS resolves teacher reach through one `SECURITY DEFINER` predicate, `teacher_reaches_class()`, which returns TRUE for an assignment at either scope.
+
+**Reason:**
+
+Four documents — `RLS.md`, `ASSIGNMENTS.md`, `POWERSYNC.md`, `OFFLINE_SYNC.md` — resolved a teacher's students through `public.class_enrolments`. That table had no `CREATE TABLE` in `DATABASE.md`, no entry in `SCHEMA.md`'s inventory, and no migration in `MIGRATIONS.md`. It was a reference with nothing behind it.
+
+The obvious repair — match `students.class_id` directly — is correct for a primary school, where one teacher owns one class, and wrong for a secondary school, where a subject teacher reaches many classes and a class is reached by many teachers. Zambia's private schools include both, and the 2023 reform leaves many mid-transition (`ZM.md`), so a school may be both at once across different grade bands.
+
+**Why `scope`, rather than two tables or a school-type flag:**
+
+- **A school-type flag would be a branch in security code.** `IF school.type = 'primary' THEN ... ELSE ...` inside an RLS predicate means two code paths, one of which is exercised far less often, both of which must stay correct. The shape of a school is data; it should not be a code path.
+- **Two tables — `class_teachers` and `subject_teachers` — would need a UNION in every policy** and would make "does this teacher reach this student" two lookups that can disagree. One table with a discriminator keeps the predicate a single `EXISTS`.
+- **Both scopes carrying `class_id` is the load-bearing detail.** It is what allows `teacher_reaches_class()` to ignore `scope` entirely. Adding a third scope later — a head of department reaching a whole grade, say — changes the helper only if that scope does not resolve to a set of classes.
+
+**Constraint, not convention.** `teacher_assignment_scope_shape` enforces that `scope='class'` carries no subject and `scope='subject'` carries one. This is a security control: a `scope='subject'` row with a NULL `subject_id` would read to the predicate as an assignment reaching the entire class, silently widening that teacher.
+
+**Write access is owner and principal only.** Teacher reach is derived from this table, so a teacher able to insert their own row could grant themselves any class's students. The pgTAP suite asserts this directly.
+
+**`students.class_id` is unchanged** and remains the student's home or registration class. Nothing about enrolment moves into these tables.
+
+**Alternatives considered:** defining `class_enrolments` as originally referenced (rejected — a student-to-class join table duplicates `students.class_id` and creates two answers to which class a student is in); a `teacher_class_subjects` table with a nullable `subject_id` and no `scope` field (rejected — the nullable column becomes the discriminator implicitly, with nothing preventing a row that means neither thing clearly); keeping `staff_assignments` and adding `is_class_teacher` semantics to RLS (rejected — `is_class_teacher` is an attribute of an assignment, not a scope, and a row with `is_class_teacher = TRUE` still names a single subject).
+
+**Consequences:** `teacher_read_assigned_students` is repointed at `teacher_reaches_class()` in migration `0021`, and `teacher_assigned_to_class()` — the interim helper from `0016` — is dropped so that only one predicate answers this question. `staff_assignments` is marked superseded and retained; it should be dropped in a dedicated migration once `ASSIGNMENTS.md` and the timetable module reference `teacher_assignments` only. The timetable, marks, and attendance modules in Phase 2 build on `teacher_assignments` and `class_subjects` rather than inventing their own scoping. The pgTAP isolation suite covers both scopes, the mixed case, and — the assertion that matters — that a subject teacher cannot see students in a class they do not teach.

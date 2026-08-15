@@ -16,9 +16,11 @@
     "@zsms/storage": "*",
     "@zsms/types": "*",
     "@zsms/utils": "*",
+    "@supabase/supabase-js": "^2.47.10",
     "next": "15.5.23",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

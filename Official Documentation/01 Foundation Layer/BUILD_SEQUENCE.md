@@ -141,6 +141,21 @@ WhatsApp (`WHATSAPP.md`, `META_API.md`, `TEMPLATES.md`), SMS fallback (`SMS.md`)
 - Announcement read tracking records one row per user per announcement.
 - Parent opt-out is honoured across every channel.
 
+
+### AI-Assisted Capture (Phase 4/5 — planned, ADR-039)
+
+Teachers photograph paper mark sheets, registers, enrolment lists, and payment proofs; a queued vision-extraction job pre-fills a verification screen; only teacher-approved data is written, through the existing RLS-gated APIs. Full design in `18 AI Module/AI_CAPTURE.md`.
+
+Sequenced here rather than earlier because it depends on **BullMQ workers** (Phase 3) and on **marks and attendance being settled** (Phase 2), and it is not on the launch path.
+
+**E2E gate when built:**
+- A photographed mark sheet for a known class produces a draft with per-cell confidence, and **writes nothing** until approved.
+- A handwritten name that does not match the class roster is reported unmatched — never assigned to the nearest candidate, never resolved by widening the search to the whole school.
+- Approved data is written under the **approving teacher's** credentials and teaching scope, and is refused when they no longer reach the class.
+- Re-approving a re-photographed sheet upserts rather than duplicating.
+- A failed extraction consumes **no credit**.
+- Every trial limit, credit price, and per-capture rate is read from configuration, with none hardcoded.
+
 ---
 
 ## Phase 5 — Platform, Admin, and Integrations

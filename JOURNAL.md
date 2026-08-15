@@ -4,6 +4,36 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-15 — AI-assisted capture design; pre-Phase-3 readiness
+
+Branch `feature/fee-arrears-model` (continued). **Design and documentation only — no capture code built.**
+
+### AI-assisted capture recorded as a planned Phase 4/5 module
+
+`18 AI Module/AI_CAPTURE.md` + **ADR-039**, registered in `BUILD_SEQUENCE.md`, `AI_OVERVIEW.md` (as System 5), and `DYNAMIC_CONFIG.md`.
+
+The design point that matters most: **context-anchored matching is why this is feasible at all.** Handwriting against an open vocabulary is unreliable; handwriting against a known roster of ~30 names is a constrained match. Extraction always runs inside a class the teacher already occupies, matched only against that class's roster via `teacher_reaches_class()`. **The roster is never widened to the whole school to find a match** — that is exactly how a mark lands on a same-named child in another grade, and it is also a privacy control, since the roster leaves the system inside the prompt.
+
+Everything else follows from assist-not-autopilot: no confidence threshold permits a direct write; unmatched names are surfaced, never guessed; the approving teacher is the author.
+
+**Compatibility with the Phase 2 schema was assessed, not assumed.** No change is required now. The domain tables never receive drafts, and their existing unique keys already make repeated approval idempotent. Two changes land with the module: an added `sync_source` value, and an optional `source_capture_id` for provenance that cannot be backfilled.
+
+Credit pricing is fully dynamic — trial allowance, per-capture rates by type, pack prices, individual-purchase toggle, and the match confidence floor. Balance derives from an append-only ledger rather than a mutable column, for the same reason as ADR-038's arrears.
+
+### A test gap I had reported as covered
+
+In the arrears gate report I listed *"`revise_fee_records()` refuses to drop below verified payments"* under what was implemented, in a way that implied test coverage. **It was implemented but untested** — only the missing-reason branch had an assertion. Tested now and passing, along with atomicity of the refusal and the transferred-student flag. Arrears suite is 38 assertions.
+
+The lesson is narrow and worth keeping: a guard written in a migration and described in a report is not a guard that has been exercised.
+
+### Config-driven audit findings (reported, not fixed)
+
+Grading scales and class structures are genuinely config-driven — `school_grading_scales.grade_bands` is JSONB, `exam_results.grade_letter`/`grade_points` are free text and integer, class identifiers are free-form. But several **CHECK constraints encode Zambia/Cambridge assumptions in the schema**, which contradicts ADR-031's dynamic-config principle. Full list in the readiness report; the significant ones are `curriculum_type`, `grading_system`, and `examination_type`, all of which would need a migration to admit another country's system.
+
+Separately: `exam_results` records `grade_letter` but **not which grading scale produced it**, so a scale revised mid-year makes historical grades unexplainable — the same versioning problem `score_config` already solves for loans.
+
+---
+
 ## 2026-08-15 — Fee arrears model (pre-Phase 3)
 
 Branch `feature/fee-arrears-model`. **Migrations `0077`–`0081` applied. Arrears suite 33/33.**

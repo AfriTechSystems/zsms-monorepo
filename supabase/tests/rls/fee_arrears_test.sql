@@ -20,7 +20,7 @@
 
 BEGIN;
 
-SELECT plan(33);
+SELECT plan(38);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures — two schools, two families at school A, debt spanning two years
@@ -364,6 +364,62 @@ SELECT throws_ok(
   '23514',
   NULL,
   'ATTACK a revision without a reason is refused'
+);
+
+-- ---------------------------------------------------------------------------
+-- The money-integrity guard.
+--
+-- This was implemented in 0079 but had NO test until it was added here — the
+-- suite covered only the missing-reason branch. Cutting a fee below what has
+-- already been verified as paid would manufacture a credit the school never
+-- agreed to, and on a settled record would silently reopen it.
+-- ---------------------------------------------------------------------------
+
+-- Alice's 2026 T3 record: give it a verified payment of 900 against 1000.
+INSERT INTO public.payments
+  (school_id, fee_record_id, student_id, recorded_by_user_id, amount,
+   payment_method, status, verified_by, verified_at)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', 'ffffffff-0000-0000-0000-000000000001',
+   'aaaaaaaa-0000-0000-0000-000000000001', 'user_acct_a', 900.00,
+   'cash', 'verified', 'user_acct_a', NOW());
+
+SELECT throws_ok(
+  $$SELECT public.revise_fee_records('2026', 3, 'Tuition Fee', 500.00,
+      'Attempt to cut the fee below what has been paid')$$,
+  '23514',
+  NULL,
+  'GUARD revise_fee_records REFUSES to drop a fee below verified payments'
+);
+
+SELECT is(
+  (SELECT amount_due FROM public.fee_records
+   WHERE id = 'ffffffff-0000-0000-0000-000000000001'),
+  1000.00::NUMERIC(12,2),
+  'GUARD the amount is unchanged after the refusal'
+);
+
+-- The refusal is checked before any write, so a batch spanning several students
+-- is refused whole rather than applied to the ones that happened to qualify.
+SELECT is(
+  (SELECT count(*)::INT FROM public.fee_record_revisions
+   WHERE fee_record_id = 'ffffffff-0000-0000-0000-000000000001'),
+  0,
+  'GUARD the refusal is atomic — no audit row is written for a refused revision'
+);
+
+SELECT is(
+  (SELECT revised_count FROM public.revise_fee_records(
+     '2026', 3, 'Tuition Fee', 950.00, 'Board approved reduction, above amount paid')),
+  2,
+  'GUARD a revision at or above the paid amount is allowed'
+);
+
+SELECT is(
+  (SELECT status FROM public.fee_records
+   WHERE id = 'ffffffff-0000-0000-0000-000000000001'),
+  'partial',
+  'GUARD status is re-derived after revision — 900 paid of 950 is partial'
 );
 
 RESET ROLE;

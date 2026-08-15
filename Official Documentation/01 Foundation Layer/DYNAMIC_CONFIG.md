@@ -99,6 +99,24 @@ Every row below is a parameter that must be database-backed. The **Owner** colum
 | AI interaction daily rate limit | `afritech.platform_settings` | `super_admin` | 100/school/day | Cost control on System 2 |
 | RAG similarity threshold | `afritech.platform_settings` | `super_admin` | 0.70 | See ADR-028 — raise, never lower |
 
+#### AI-Assisted Capture credits (planned — ADR-039, `AI_CAPTURE.md`)
+
+Not yet implemented. Recorded here so the module is built against configuration from the first commit rather than retrofitted. Each capture is a real vision-API call, so **every value below is a commercial lever that must be changeable without a deployment.**
+
+| Parameter | Storage | Owner | Default | Notes |
+|---|---|---|---|---|
+| Capture free-trial allowance | `afritech.platform_settings` | `super_admin` | TBD after pilot | Per school and per individual account. Lets anyone evaluate before paying |
+| Credit cost per capture — marks | `afritech.platform_settings` | `super_admin` | TBD | A dense mark sheet costs more to process than a payment slip |
+| Credit cost per capture — attendance | `afritech.platform_settings` | `super_admin` | TBD | |
+| Credit cost per capture — student import | `afritech.platform_settings` | `super_admin` | TBD | |
+| Credit cost per capture — payment proof | `afritech.platform_settings` | `super_admin` | TBD | Cheapest — few fields |
+| Credit pack prices (ZMW / USD) | `afritech.platform_products` | `super_admin` | TBD | School and individual purchase |
+| Individual purchase enabled | `afritech.feature_flags` | `super_admin` | TBD | Lets a teacher buy their own credits independently of their school |
+| Per-capture-type enablement | `afritech.school_feature_overrides` | `super_admin` | — | A school may buy all capture types or a subset |
+| Match confidence floor | `afritech.platform_settings` | `super_admin` | Start conservative | Below this, a name is reported unmatched rather than assigned. Raise, never lower — see ADR-039 |
+
+**Pricing must not be fixed before a pilot against real Zambian mark sheets.** The credit price depends on the retry rate, which is unknown until measured on genuine paper.
+
 ### Platform Operations
 
 | Parameter | Storage | Owner | Default | Notes |

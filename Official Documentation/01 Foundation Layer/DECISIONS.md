@@ -464,3 +464,30 @@ Before this decision, fee records existed per term with no cumulative view. Prio
 **Alternatives considered:** materialised brought-forward rows (rejected — double-counting, as above); a stored `balance` column on `students` (rejected — a denormalised money total that must be kept in step with every payment, discount, and revision is a drift bug waiting to happen, and the trigger surface would be large); adding `overdue` to the `status` enum (rejected — conflates progress with time); auto-allocating lump sums oldest-first with no override (rejected — removes a decision that is legitimately the bursar's).
 
 **Consequences:** `GLOSSARY.md`, `PDF_GENERATION.md`, and `CHATBOT.md` now describe something the schema can produce. Phase 3 fee reminders read `arrears_amount` and `days_overdue` rather than recomputing them. Any future arrears gating is a separate, school-configurable feature and must not be added to these views or functions.
+
+---
+
+## ADR-039 — AI-Assisted Capture as a Planned Phase 4/5 Module
+
+**Status:** Planned — design recorded, **not built**
+**Decision:** **Teachers will be able to photograph paper mark sheets, registers, enrolment lists, and payment proofs; a queued vision-extraction job pre-fills a verification screen; and only teacher-approved data is written, through the existing RLS-gated APIs.** The module is credit-priced, with every limit and rate in dynamic configuration. Full design in `18 AI Module/AI_CAPTURE.md`.
+
+**Reason:**
+
+Zambian teachers mark on paper. Transcription into ZSMS is the slowest and most error-prone part of the workflow, and it is the single largest barrier to the data completeness that gates the analytics and assistant features (`AI_OVERVIEW.md` — systems 1 and 2 unlock at ≥70% completeness). Removing the typing without removing the teacher is the highest-leverage AI application in the product.
+
+**Assist, never autopilot.** Every extracted value is a draft. There is no confidence level, setting, or role that permits a direct write — the module inherits ADR-034's approval gate exactly. A mark written to the wrong student surfaces weeks later via a parent, after the report card has issued; the asymmetry between the cost of a wrong write and the cost of a second look is not close.
+
+**Context-anchored matching is the reason this is feasible.** Handwriting recognition against an open vocabulary is unreliable; recognition against a known roster of about thirty names is a constrained match. Extraction always runs inside a context the teacher already occupies — this class, this term, this subject — and matches only against that class's roster, resolved through `teacher_reaches_class()` (ADR-037). **The roster is never widened to the whole school to find a match**, because that is precisely how a mark lands on a same-named child in another grade. It is also a privacy control: the roster leaves the system in the prompt, so it must be the minimum set.
+
+**Credit-priced, because the cost is per use.** Each capture is a vision-API call. Metering it inside a flat subscription tier would either subsidise heavy users or cap the feature below usefulness. Trial allowance, school purchase, individual purchase, and per-capture rates are all `afritech` configuration per ADR-031 — hardcoding any of them would make a pricing correction a release.
+
+**Individual purchase is deliberate.** A teacher at a school that has not bought capture, and a standalone Teacher Hub user with no school at all, both need a path that does not depend on an institutional budget.
+
+**Balance is derived from an append-only ledger**, not stored as a mutable column — the same reasoning as ADR-038's derived arrears.
+
+**Compatibility confirmed, not assumed.** The Phase 2 marks and attendance schema was assessed against this flow. Drafts never enter domain tables; the existing unique keys already make repeated approval idempotent; `entered_by_user_id` correctly names the approving teacher rather than the model; and the payments verification workflow is already the right shape for payment-proof capture. **No schema change is required now.** Two changes land with the module: an added `sync_source` value, and an optional `source_capture_id` for provenance that cannot be backfilled.
+
+**Alternatives considered:** direct write above a confidence threshold (rejected — creates a class of error nobody reviews, and the threshold would inevitably be tuned down under time pressure); matching against the full student body (rejected — the accuracy gain is illusory and the failure mode is cross-grade misattribution); bundling capture into a subscription tier (rejected — transfers all volume risk to AfriTech and caps a metered feature at a flat price); building it in Phase 3 (rejected — it depends on BullMQ workers and on marks/attendance being settled, and it is not on the launch path).
+
+**Consequences:** `DYNAMIC_CONFIG.md` gains the capture-credit keys. `BUILD_SEQUENCE.md` lists the module in Phase 4/5. `PRICING.md` gains a usage-based revenue line alongside subscription tiers, and `COST_MANAGEMENT.md` must track cost-per-capture as a first-class metric once live — the credit price has to clear the vision-API cost with headroom for a provider price change. A pilot against real Zambian mark sheets is required before pricing is fixed, since the credit price depends on the retry rate.

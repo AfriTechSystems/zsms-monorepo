@@ -8,7 +8,49 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 Branch `feature/phase-1-core-domain`, cut from `integration` at `8ffbddb`.
 
-**Status: written, committed, NOT YET APPLIED.** The Supabase CLI has no credentials on this machine — no access token, no `SUPABASE_*` env vars, no `~/.supabase/access-token`. Applying is blocked on `supabase login` + `supabase link`, both of which need the user.
+**Status: APPLIED to `zsms-dev` and verified. Isolation suite passes 60/60.**
+
+### The isolation suite caught a real defect on its first run
+
+This is the entry that matters. The first run was **53/55**, and the two failures were the same root cause:
+
+```
+not ok 3  - authenticated holds no DELETE privilege on students   (have 1, want 0)
+not ok 27 - owner A cannot hard-delete even their OWN student     (caught: no exception)
+```
+
+**Supabase's default privileges grant `ALL` on every new `public` table to `authenticated`.** Migrations `0003`–`0018` revoked that for `anon` but only *added* `SELECT, INSERT, UPDATE` for `authenticated` — which does not remove the `DELETE` it already held.
+
+No data was lost: `students` has no `DELETE` policy, so RLS filtered the delete to zero rows, and a later assertion confirmed the row survived. But the guarantee was resting on RLS alone, and that was thinner than it looked — **policies written `FOR ALL` cover DELETE too.** `afritech_admin_all_students`, `management_write_staff`, and `school_management_links` are all `FOR ALL`, so on those paths the privilege was live. An AfriTech super admin could have hard-deleted a student, which prohibition 8 says must be impossible for anyone.
+
+Fixed by **migration `0019`**, which revokes `DELETE, TRUNCATE` from `authenticated` and `anon` across all fifteen tables, sets `ALTER DEFAULT PRIVILEGES` so future tables inherit the correction, and verifies itself inline — the migration raises at apply time if any grant survives. Four assertions were added to the suite (now **60**) covering the `FOR ALL` paths and the super admin specifically.
+
+**The lesson is the one the brief was built around.** Every "can School A read its own data" test passed on the broken schema. Only the assertion that *actively attempted a forbidden delete* found it. Testing what users cannot do is what located a defect that review had not.
+
+### Two further defects found while running
+
+- **Data-modifying CTEs are illegal as function arguments.** The suite used `is((WITH x AS (UPDATE ...) SELECT count(*) FROM x), 0, ...)`, which PostgreSQL rejects with *WITH clause containing a data-modifying statement must be at the top level*. Replaced with a `SECURITY INVOKER` `rows_affected()` helper — invoker rights are essential, so the write executes as the role under test.
+- **One assertion tested the wrong failure mode.** "Owner A cannot reassign their own student into School B" expected zero rows affected. It does not: `USING` passes because the row *is* visible to that caller, and `WITH CHECK` rejects the post-update row, raising `42501`. Changed to `throws_ok`.
+
+### Applied state (verified by query, not assumed)
+
+| Check | Result |
+|---|---|
+| `public` tables | 15 |
+| RLS enabled | 15 / 15 |
+| RLS **forced** | 15 / 15 |
+| Tables without RLS | **0** |
+| Policies | 57 |
+| `DELETE`/`TRUNCATE` granted to end-user roles | **0** |
+| Migrations applied | 19 |
+| Non-four-digit versions | **0** |
+| Leftover test fixtures | 0 (suite cleans up after itself) |
+
+`turbo type-check` 8/8 · `turbo build` clean · types regenerated from the live schema (986 lines, 17 row types).
+
+### On the CLI
+
+The user reported login *and* link succeeded; the CLI reported neither. Both were half true: **login had succeeded** — the token lives in the Windows Credential Manager, not `~/.supabase/access-token`, which is why the file check said otherwise — but **link had not** (`"linked": false` from the API). Diagnosed with `supabase projects list`, which returned the project list *and* `linked: false` in one response. Worth remembering: on Windows, the absence of the token file proves nothing.
 
 ### Migrations 0002–0018
 
@@ -40,7 +82,7 @@ Two decisions worth keeping:
 
 The service role key appears nowhere: `createServiceClient()` deliberately does not exist, because a Next.js API route is not an Edge Function (prohibition 1).
 
-### pgTAP isolation suite — 46 assertions
+### pgTAP isolation suite — 60 assertions
 
 `supabase/tests/rls/tenant_isolation_test.sql`. Adversarial by construction: the majority of assertions have School A actively attempt to read, update, insert into, reassign, or delete School B's records and assert refusal. Covers owner, teacher, parent, student, super admin, and `anon`, in both directions between the two schools.
 

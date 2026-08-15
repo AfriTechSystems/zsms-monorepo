@@ -22,7 +22,10 @@
 
 BEGIN;
 
-SELECT plan(46);
+-- An explicit plan, not no_plan(): if a section stops executing, the count
+-- mismatch fails the run. A security suite that silently runs fewer assertions
+-- than intended is worse than one that fails loudly.
+SELECT plan(60);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures. Seeded as the superuser, which bypasses RLS — this is setup, not
@@ -87,6 +90,23 @@ CREATE OR REPLACE FUNCTION pg_temp.act_as(p_claims JSONB)
 RETURNS VOID LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM set_config('request.jwt.claims', p_claims::TEXT, TRUE);
+END;
+$$;
+
+-- Runs a write and returns the number of rows it affected.
+--
+-- Needed because PostgreSQL rejects a data-modifying CTE anywhere but the top
+-- level, so `is((WITH x AS (UPDATE ...) SELECT count(*) FROM x), 0, ...)` is a
+-- syntax error rather than a test. SECURITY INVOKER is essential: the statement
+-- must execute as the role under test, so RLS applies exactly as it would to
+-- that user's own query.
+CREATE OR REPLACE FUNCTION pg_temp.rows_affected(p_sql TEXT)
+RETURNS INT LANGUAGE plpgsql AS $$
+DECLARE n INT;
+BEGIN
+  EXECUTE p_sql;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
 END;
 $$;
 
@@ -249,41 +269,29 @@ SELECT is(
 -- --- WRITE attacks ----------------------------------------------------------
 
 SELECT is(
-  (WITH attempted AS (
-     UPDATE public.students SET last_name = 'Hijacked'
-     WHERE id = 'bbbbbbbb-0000-0000-0000-000000000001'
-     RETURNING 1)
-   SELECT count(*)::INT FROM attempted),
+  pg_temp.rows_affected($$UPDATE public.students SET last_name = 'Hijacked'
+     WHERE id = 'bbbbbbbb-0000-0000-0000-000000000001'$$),
   0,
   'ATTACK owner A UPDATE of a school B student affects 0 rows'
 );
 
 SELECT is(
-  (WITH attempted AS (
-     UPDATE public.students SET is_deleted = TRUE
-     WHERE school_id = '22222222-2222-2222-2222-222222222222'
-     RETURNING 1)
-   SELECT count(*)::INT FROM attempted),
+  pg_temp.rows_affected($$UPDATE public.students SET is_deleted = TRUE
+     WHERE school_id = '22222222-2222-2222-2222-222222222222'$$),
   0,
   'ATTACK owner A cannot soft-delete school B students'
 );
 
 SELECT is(
-  (WITH attempted AS (
-     UPDATE public.schools SET name = 'Seized'
-     WHERE clerk_org_id = 'org_school_b'
-     RETURNING 1)
-   SELECT count(*)::INT FROM attempted),
+  pg_temp.rows_affected($$UPDATE public.schools SET name = 'Seized'
+     WHERE clerk_org_id = 'org_school_b'$$),
   0,
   'ATTACK owner A cannot rename school B'
 );
 
 SELECT is(
-  (WITH attempted AS (
-     UPDATE public.staff_members SET is_active = FALSE
-     WHERE school_id = '22222222-2222-2222-2222-222222222222'
-     RETURNING 1)
-   SELECT count(*)::INT FROM attempted),
+  pg_temp.rows_affected($$UPDATE public.staff_members SET is_active = FALSE
+     WHERE school_id = '22222222-2222-2222-2222-222222222222'$$),
   0,
   'ATTACK owner A cannot deactivate school B staff'
 );
@@ -337,19 +345,19 @@ SELECT throws_ok(
   'ATTACK owner A cannot hard-delete even their OWN student (prohibition 8)'
 );
 
--- Moving one's own record into another tenant is the subtlest write attack:
--- the USING clause passes because the row is currently visible.
-SELECT is(
-  (WITH attempted AS (
-     UPDATE public.students
-     SET school_id = '22222222-2222-2222-2222-222222222222'
-     WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'
-     RETURNING 1)
-   SELECT count(*)::INT FROM attempted),
-  0,
+-- Moving one's own record into another tenant is the subtlest write attack, and
+-- it fails differently from the others. USING passes — the row IS visible to
+-- this caller — so the statement is not filtered to zero rows. It is WITH CHECK
+-- that rejects the post-update row, and that raises 42501. An `is(..., 0)`
+-- assertion here would be testing for the wrong failure mode entirely.
+SELECT throws_ok(
+  $$UPDATE public.students
+      SET school_id = '22222222-2222-2222-2222-222222222222'
+      WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'$$,
+  '42501',
+  NULL,
   'ATTACK owner A cannot reassign their own student INTO school B'
-)
-;
+);
 
 -- Confirm the row really did not move.
 RESET ROLE;
@@ -383,11 +391,8 @@ SELECT is(
 );
 
 SELECT is(
-  (WITH attempted AS (
-     UPDATE public.students SET last_name = 'Hijacked'
-     WHERE school_id = '11111111-1111-1111-1111-111111111111'
-     RETURNING 1)
-   SELECT count(*)::INT FROM attempted),
+  pg_temp.rows_affected($$UPDATE public.students SET last_name = 'Hijacked'
+     WHERE school_id = '11111111-1111-1111-1111-111111111111'$$),
   0,
   'ATTACK owner B cannot modify school A students'
 );
@@ -498,11 +503,8 @@ SELECT is(
 );
 
 SELECT is(
-  (WITH attempted AS (
-     UPDATE public.students SET last_name = 'Changed'
-     WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'
-     RETURNING 1)
-   SELECT count(*)::INT FROM attempted),
+  pg_temp.rows_affected($$UPDATE public.students SET last_name = 'Changed'
+     WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'$$),
   0,
   'ATTACK parent A has read access to their child but CANNOT modify the record'
 );
@@ -563,6 +565,62 @@ SELECT throws_ok(
   'ATTACK anon cannot read students at all — privilege denied before RLS is consulted'
 );
 RESET ROLE;
+
+-- ===========================================================================
+-- SECTION 8 — hard deletes are structurally impossible
+--
+-- Added after the first run of this suite caught the gap. Supabase's default
+-- privileges grant ALL on new public tables to `authenticated`; migrations
+-- 0003–0018 added SELECT/INSERT/UPDATE without revoking the inherited DELETE.
+-- RLS still blocked it on `students` (no DELETE policy), but policies written
+-- FOR ALL — afritech_admin_all_students, management_write_staff,
+-- school_management_links — do cover DELETE, so on those paths the privilege
+-- was live. Migration 0019 removes it; these assertions keep it removed.
+-- ===========================================================================
+
+SELECT is(
+  (SELECT count(*)::INT FROM information_schema.role_table_grants
+   WHERE table_schema = 'public'
+     AND grantee IN ('authenticated', 'anon')
+     AND privilege_type IN ('DELETE', 'TRUNCATE')),
+  0,
+  'no DELETE or TRUNCATE privilege exists anywhere in public for end-user roles'
+);
+
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.act_as(pg_temp.owner_a());
+
+SELECT throws_ok(
+  $$DELETE FROM public.staff_members WHERE id = 'aaaaaaaa-1111-0000-0000-000000000001'$$,
+  '42501', NULL,
+  'ATTACK owner A cannot hard-delete staff through the FOR ALL policy'
+);
+
+SELECT throws_ok(
+  $$DELETE FROM public.student_parent_links WHERE parent_user_id = 'user_parent_a'$$,
+  '42501', NULL,
+  'ATTACK owner A cannot hard-delete parent links through the FOR ALL policy'
+);
+
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.act_as(pg_temp.afritech_admin());
+
+-- The strongest role in the system is still bound by prohibition 8.
+SELECT throws_ok(
+  $$DELETE FROM public.students WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'$$,
+  '42501', NULL,
+  'ATTACK even the AfriTech super admin cannot hard-delete a student'
+);
+
+RESET ROLE;
+
+SELECT is(
+  (SELECT count(*)::INT FROM public.students
+   WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'),
+  1,
+  'VERIFY the student row survived every delete attempt in this suite'
+);
 
 SELECT * FROM finish();
 

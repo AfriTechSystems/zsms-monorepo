@@ -25,7 +25,11 @@ The scope/subject `CHECK` constraint is a security control, not tidiness: a `sco
 
 Write access is owner and principal only. Teacher reach is derived from this table, so a teacher who could insert their own row could grant themselves any class's students — the suite asserts that directly.
 
-`teacher_assigned_to_class()`, the `0016` interim helper, is **dropped** rather than left in place. Two predicates answering "which students may this teacher see" is exactly how the wrong one ends up in a future policy. `staff_assignments` is marked superseded via `COMMENT` and retained — dropping is irreversible and wants explicit approval.
+`teacher_assigned_to_class()`, the `0016` interim helper, is **dropped** rather than left in place. Two predicates answering "which students may this teacher see" is exactly how the wrong one ends up in a future policy.
+
+**`staff_assignments` dropped in `0069`** (2026-08-15), on explicit approval. Verified dead first: 0 rows, 0 inbound FKs, 0 functions, 0 views, no application references. The migration re-checks the row count at apply time and refuses if non-empty — "it was empty when I checked" is not "it is empty now" — and uses `RESTRICT`, not `CASCADE`, so a surviving dependency fails loudly instead of being silently removed too.
+
+Removing it surfaced four **Phase 2** policies in `RLS.md` — two on `attendance_records`, two on `exam_results` — still resolving teachers through the dropped table. Repointed at `teacher_reaches_class()` and a newly specified `teacher_teaches_subject(class_id, subject_code)`, which lands with the exam-results migration. Left unfixed, those would have been written against a table that no longer exists.
 
 **Twelve new assertions**, covering both scopes, the mixed case, the two constraint violations, self-assignment, and the one that matters: *a subject teacher cannot see students in a class they do not teach*. Suite is now 72, all passing.
 

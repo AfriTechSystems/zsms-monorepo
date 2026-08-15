@@ -208,16 +208,7 @@ afritech schema       — AfriTech internal team tables
 
 **Key columns:** `school_id`, `clerk_user_id`, `first_name`, `last_name`, `phone_e164`, `email`, `department`, `employment_type`, `is_active`.
 
-**Relates to:** `schools`, `staff_assignments`.
-
----
-
-### `staff_assignments`
-**What it is:** Links teachers to their assigned classes and subjects. Drives RLS policies that scope teachers to their own classes. One row per class-subject combination per teacher.
-
-**Key columns:** `school_id`, `staff_user_id`, `class_id`, `subject_code`, `is_class_teacher`, `academic_year`, `term_number`.
-
-**Relates to:** `schools`, `staff_members`.
+**Relates to:** `schools`, `teacher_assignments`.
 
 ---
 
@@ -246,8 +237,8 @@ A teacher may hold any number of rows of either scope, including both at once. B
 
 ---
 
-### `staff_assignments` (Superseded)
-**Superseded by `teacher_assignments`** (ADR-037) and no longer used for authorisation. `is_class_teacher = TRUE` maps to `scope = 'class'`; a class/subject pairing maps to `scope = 'subject'`. Retained pending an explicit drop migration — do not add new references.
+### `staff_assignments` (Removed)
+**Removed in migration `0069`.** Superseded by `teacher_assignments` (ADR-037): `is_class_teacher = TRUE` maps to `scope = 'class'`, and a class/subject pairing maps to `scope = 'subject'`. Listed here only so that references to it in older documents resolve to an explanation rather than a missing table.
 
 ---
 

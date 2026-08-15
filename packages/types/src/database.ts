@@ -510,50 +510,6 @@ export type Database = {
         }
         Relationships: []
       }
-      staff_assignments: {
-        Row: {
-          academic_year: string
-          class_id: string
-          created_at: string
-          id: string
-          is_class_teacher: boolean
-          school_id: string
-          staff_user_id: string
-          subject_code: string
-          term_number: number | null
-        }
-        Insert: {
-          academic_year: string
-          class_id: string
-          created_at?: string
-          id?: string
-          is_class_teacher?: boolean
-          school_id: string
-          staff_user_id: string
-          subject_code: string
-          term_number?: number | null
-        }
-        Update: {
-          academic_year?: string
-          class_id?: string
-          created_at?: string
-          id?: string
-          is_class_teacher?: boolean
-          school_id?: string
-          staff_user_id?: string
-          subject_code?: string
-          term_number?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "staff_assignments_school_id_fkey"
-            columns: ["school_id"]
-            isOneToOne: false
-            referencedRelation: "schools"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       staff_members: {
         Row: {
           clerk_user_id: string

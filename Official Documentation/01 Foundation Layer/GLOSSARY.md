@@ -130,6 +130,8 @@ A per-student record of a specific fee obligation for a term. Generated from fee
 **Fee Statement**
 A PDF document showing all fees charged and payments made for a student for a selected period, with a running balance. Generated on demand by accountants or parents.
 
+**Implemented by `public.fee_statement(student_id, from, to)`** (ADR-038). Rows are debits (charges), credits (payments and discounts), and a computed opening **Balance brought forward** for any activity before the window. Only *verified* payments appear — a pending submission is not yet money. The cumulative position is `public.student_fee_balance`.
+
 **Fee Structure**
 The template defining what fees are charged for a specific grade level and term (e.g. Grade 9, Term 2 — Tuition K2,500, Activity K300). Used to generate fee records for all students in a grade.
 

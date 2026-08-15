@@ -4,6 +4,49 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-15 — Fee arrears model (pre-Phase 3)
+
+Branch `feature/fee-arrears-model`. **Migrations `0077`–`0081` applied. Arrears suite 33/33.**
+
+### What the investigation found
+
+Asked whether unpaid balances carry forward, the honest answer from the schema was: **the rows persisted, but there was no arrears model.** Prior-term records were never deleted, so debt did not reset — but there was no linkage between terms, no cumulative balance, no overdue signal, and no endpoint answering *"what does this student owe?"*. Verified against the catalog: **0 balance views, 0 arrears columns, no `balance` column on `students`.**
+
+Worse, three documents already promised what the schema could not produce — `GLOSSARY.md` and `PDF_GENERATION.md` describe a fee statement *"with a running balance"*, and `CHATBOT.md` has a `FEES — View outstanding balance` command. All three now reference the implementation.
+
+A second gap surfaced in the same investigation: revising an **already-generated** term silently did nothing. `generate_fee_records()`'s `ON CONFLICT DO NOTHING` protects against double-billing, but it also blocked correcting a mis-keyed fee — returning `created: 0` with no error and no alternative path.
+
+### The model (ADR-038)
+
+**Derived, not materialised.** `fee_records` stays the single source of truth. Writing a *"Balance brought forward"* row into each new term reads like a bursar's ledger but double-counts while the original record exists. The brought-forward line is emitted by `fee_statement()` at render time instead — **one truth in the data, ledger-style on the page.**
+
+**`security_invoker = true` is load-bearing.** A view runs with its *owner's* privileges by default, which would have bypassed RLS on `fee_records` and shown every parent every family's balance. The suite attacks that specific failure from parent, cross-family, and cross-tenant angles.
+
+**Overdue is a separate axis from payment progress.** `status` means how much has been paid; `is_overdue` / `days_overdue` / `arrears_amount` derive from `due_date`. A record can be `partial` and overdue, or `partial` and not yet due — collapsing them into one enum would destroy that and break the balance trigger.
+
+**Carry-forward spans years and survives status changes.** No year filter, and no filter on `students.status` — a graduated student owing 800 still shows it, because schools withhold certificates until cleared. Asserted directly.
+
+**The model never gates.** Nothing refuses a result, certificate, or re-registration because a balance is outstanding. Arrears commonly *do* gate those things in Zambia, which is exactly why it must be a per-school setting, off by default, rather than schema behaviour — a school that does not withhold results must not inherit the behaviour of one that does. The suite asserts publishing succeeds while a student is in arrears, so a future gate cannot be added silently.
+
+### Two real defects the suite caught
+
+- **`allocate_payment()` was completely broken.** `RETURNS TABLE` columns become PL/pgSQL variables, and `amount` / `fee_record_id` collided with the internal temp table's columns — `42702 column reference "amount" is ambiguous` aborted every call. Fixed in `0080` by prefixing the OUT columns.
+- **`fee_statement()` was non-deterministic.** Charges were dated by `created_at`, but generation writes a whole term in one statement, so every charge shared a timestamp and the running balance had no defined order. **The same statement closed at 1000 or 2200 depending on planner order.** A financial document that reads differently each time is not a financial document. Fixed in `0081`: charges date by `due_date`, and the window function and final `ORDER BY` use one complete key. The suite now runs the same call eight times and asserts a single distinct closing balance.
+
+That second one also explains the windowed-statement failure — with charges dated at generation time, nothing fell before a five-day window, so no brought-forward line appeared even though a term due forty days earlier was plainly outstanding.
+
+### Verified
+
+Arrears suite 33/33 · Phase 2 suite 45/45 · Phase 1 suite 72/72 · `turbo type-check` 8/8 · types regenerated · fixtures cleaned up.
+
+### Not built, deliberately
+
+- **Arrears gating** — per-school, admin-configurable, off by default. Reads these columns when it lands.
+- **Loan linkage** — `records_overdue`, `days_overdue`, `paid_at`, and `due_date` are the raw material `BEHAVIOUR_SCORE.md` would need. Not coupled, not precluded.
+- **API routes for the balance/statement** — the views and functions exist and are RLS-safe; surfacing them is UI work.
+
+---
+
 ## 2026-08-15 — Phase 2: fees, attendance, and results
 
 Branch `feature/phase-2-fees-attendance-results`. **Migrations `0070`–`0076` applied to `zsms-dev`. Phase 2 suite passes 45/45; Phase 1 suite still 72/72.**

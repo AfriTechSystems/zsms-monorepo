@@ -433,3 +433,34 @@ The obvious repair — match `students.class_id` directly — is correct for a p
 **Alternatives considered:** defining `class_enrolments` as originally referenced (rejected — a student-to-class join table duplicates `students.class_id` and creates two answers to which class a student is in); a `teacher_class_subjects` table with a nullable `subject_id` and no `scope` field (rejected — the nullable column becomes the discriminator implicitly, with nothing preventing a row that means neither thing clearly); keeping `staff_assignments` and adding `is_class_teacher` semantics to RLS (rejected — `is_class_teacher` is an attribute of an assignment, not a scope, and a row with `is_class_teacher = TRUE` still names a single subject).
 
 **Consequences:** `teacher_read_assigned_students` is repointed at `teacher_reaches_class()` in migration `0021`, and `teacher_assigned_to_class()` — the interim helper from `0016` — is dropped so that only one predicate answers this question. `staff_assignments` is marked superseded and retained; it should be dropped in a dedicated migration once `ASSIGNMENTS.md` and the timetable module reference `teacher_assignments` only. The timetable, marks, and attendance modules in Phase 2 build on `teacher_assignments` and `class_subjects` rather than inventing their own scoping. The pgTAP isolation suite covers both scopes, the mixed case, and — the assertion that matters — that a subject teacher cannot see students in a class they do not teach.
+
+---
+
+## ADR-038 — Derived Arrears, Never Enforced
+
+**Status:** Confirmed
+**Decision:** **Outstanding fee balances are DERIVED from `public.fee_records`, never materialised as carry-forward rows, and the model computes and exposes only — it never gates any action.** `student_fee_balance` and `fee_record_status` are `security_invoker` views; `fee_statement()` renders a ledger with a computed *"Balance brought forward"* opening line.
+
+**Reason:**
+
+Before this decision, fee records existed per term with no cumulative view. Prior-term rows persisted, so debt did not reset — but there was no arrears concept at all: no linkage between terms, no running balance, no overdue signal, and no endpoint answering *"what does this student owe?"*. `GLOSSARY.md`, `PDF_GENERATION.md`, and `CHATBOT.md` all already promised a running balance the schema could not produce.
+
+**Derived, not brought-forward rows.** Writing a *"Balance brought forward"* line into each new term is how a bursar's ledger reads, and it was the tempting design. It double-counts the moment the original record still exists, and reconciling that requires settlement logic that can itself drift — two rows now claim the same debt, and any bug makes a family's balance wrong in a way nobody can reconstruct. `fee_records` stays the single source of truth; the brought-forward line is emitted by `fee_statement()` at render time. **One truth in the data, ledger-style on the page.**
+
+**`security_invoker` is load-bearing.** A PostgreSQL view runs with its *owner's* privileges by default, which would bypass RLS on `fee_records` entirely and show every parent every family's balance. Every view here sets `security_invoker = true`, and the isolation suite attacks that specific failure.
+
+**Overdue is a separate axis from payment progress.** `status` means how much has been paid; `is_overdue` / `days_overdue` / `arrears_amount` are derived from `due_date`. Adding `overdue` to the status enum would conflate the two and break the balance trigger's state machine — a record can be `partial` and overdue, or `partial` and not yet due, and both are meaningful.
+
+**Carry-forward spans terms AND academic years, and survives status changes.** Zambian school debt does not wipe at a year boundary, so `student_fee_balance` has no year filter. It also does not filter on `students.status`: a transferred, graduated, or alumni student keeps a visible balance, because schools withhold transfer letters and certificates until it is cleared. Hiding the balance when the status changed would make the debt disappear from exactly the screens that need it.
+
+**THE MODEL NEVER ENFORCES.** Nothing here refuses a result, a certificate, a transfer letter, or a re-registration because a balance is outstanding. In Zambia arrears commonly *do* gate those things — which is precisely why it must be a **per-school setting, admin-configurable and OFF by default**, rather than behaviour welded into the schema. A school that does not withhold results must not inherit the behaviour of one that does. That setting is not built here; when it is, it reads these columns and decides. The suite asserts that publishing results succeeds while a student is in arrears, so a future gate cannot be added silently.
+
+**Allocation is oldest-first by default and overridable.** `payments.fee_record_id` names one record, so a lump sum — the normal shape of mobile money, a bank transfer, or cash at the office — had no representation. `suggest_payment_allocation()` proposes an oldest-first split for one-tap acceptance; `allocate_payment()` accepts an explicit override. **The override is not a convenience.** Clearing the current term so a child can sit an exam while an older disputed amount stays open is a legitimate bursar instruction, and a system that silently swallowed that payment into the disputed debt would be wrong.
+
+**Revision is a distinct act.** `generate_fee_records()` is idempotent by `ON CONFLICT DO NOTHING`, which prevents double-billing but also silently blocked correcting a mis-keyed fee on an already-generated term. `revise_fee_records()` is the explicit path: it refuses to drop a fee below what has already been verified as paid, audits every change to `fee_record_revisions`, and re-derives status.
+
+**Loan linkage is enabled, not built.** `records_overdue`, `days_overdue`, `payments.paid_at`, and `fee_records.due_date` are the raw material a fee-payment reliability signal would need (`BEHAVIOUR_SCORE.md`). No loan coupling is created here; it is simply not precluded.
+
+**Alternatives considered:** materialised brought-forward rows (rejected — double-counting, as above); a stored `balance` column on `students` (rejected — a denormalised money total that must be kept in step with every payment, discount, and revision is a drift bug waiting to happen, and the trigger surface would be large); adding `overdue` to the `status` enum (rejected — conflates progress with time); auto-allocating lump sums oldest-first with no override (rejected — removes a decision that is legitimately the bursar's).
+
+**Consequences:** `GLOSSARY.md`, `PDF_GENERATION.md`, and `CHATBOT.md` now describe something the schema can produce. Phase 3 fee reminders read `arrears_amount` and `days_overdue` rather than recomputing them. Any future arrears gating is a separate, school-configurable feature and must not be added to these views or functions.

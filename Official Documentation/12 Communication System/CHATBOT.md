@@ -173,7 +173,7 @@ Subject to approval. Terms apply.
 
 Text a command to get started:
 
-FEES      — View outstanding balance
+FEES      — View outstanding balance (reads public.student_fee_balance: outstanding, arrears_amount, days_overdue — ADR-038)
 RESULTS   — See latest exam results
 ATTENDANCE — Check attendance
 RECEIPT   — Download payment receipt

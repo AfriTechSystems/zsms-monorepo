@@ -21,7 +21,8 @@
     "db:list": "supabase migration list",
     "db:diff": "supabase db diff --linked",
     "db:types": "supabase gen types typescript --linked > packages/types/src/database.ts",
-    "db:test": "supabase test db"
+    "db:test": "node scripts/check-test-plans.mjs && supabase test db",
+    "db:test:plans": "node scripts/check-test-plans.mjs"
   },
   "//react": "Declared at the root ONLY to control npm hoisting, not because the root builds anything. apps/web needs React 19 (Next 15 App Router); apps/mobile needs exactly 18.3.1 (React Native 0.76). Two majors must coexist, so which one wins the root slot matters: `styled-jsx` is a transitive dependency of `next` that npm hoists to the root while `next` itself stays nested in apps/web. It then resolves `react` from the root. If the root holds 18.3.1, prerendering _document/_error loads a second React instance and fails with `Cannot read properties of null (reading 'useContext')`. Pinning 19 here puts web and Clerk on one instance and nests Expo's 18.3.1 under apps/mobile. Revisit when React Native supports React 19 — then the whole repo can share one version and this can go.",
   "devDependencies": {

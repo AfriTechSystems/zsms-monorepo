@@ -95,6 +95,78 @@ The same anchoring applies to every capture type: attendance is anchored to a cl
 
 ---
 
+## Input — what a teacher can actually hand the system
+
+### Multiple images per capture
+
+A mark sheet routinely runs to two or three sheets of paper, and a class register for a term spans many. **A capture is a set of images, not one image.** All of them extract into a single draft and a single verification screen.
+
+This is a correctness requirement, not convenience. Verifying page 2 separately from page 1 means the reviewer never sees the class as a whole, and a student who appears on neither page — the most likely extraction failure — is invisible in both screens. One roster, one reconciliation.
+
+Ordering is the teacher's, not the model's: pages are presented in upload order and re-orderable before extraction, because a mark sheet's row order is often the only thing identifying which continuation row belongs to whom.
+
+### Camera and file upload, mobile first
+
+Both paths exist and produce the same capture:
+
+- **Live camera** — the common case. A teacher photographs the sheet at their desk. The capture screen is designed for a phone held one-handed over a page.
+- **File upload** — a sheet already scanned to the school office computer, or photographed earlier and sitting in the gallery.
+
+Mobile-first is a design constraint rather than a preference: the teachers this feature exists for are holding a phone, not sitting at a laptop, and a desktop-first flow would be used by the wrong half of the audience.
+
+### Supported formats
+
+| Format | Path | Notes |
+|---|---|---|
+| JPG, PNG | Vision extraction | The common case |
+| **HEIC** | Vision extraction | iPhone default. Converted server-side before extraction — rejecting HEIC would reject every unconverted iPhone photo |
+| Scanned PDF | Vision extraction | Rendered per page, then treated as multiple images |
+| **Excel (.xlsx), CSV** | **Direct structured import — NO vision** | Bypasses extraction entirely |
+
+**Excel and CSV do not go near the vision model.** The data is already structured, so extraction would add cost, latency, and a new failure mode to a file that can simply be parsed. Column mapping is still confirmed by the teacher, and roster matching still applies to the name column — but the confidence model does not: a parsed cell is not a guess.
+
+**Credit implication:** a spreadsheet import consumes no vision call and should therefore be **free or near-free**. Charging a vision-priced credit for a CSV parse would be charging for a cost not incurred. This is a per-capture-type rate in configuration, so it is set rather than coded.
+
+### Image pre-processing, before extraction
+
+Phone photographs of paper are skewed, shadowed, and rotated. Pre-processing runs server-side before the image reaches the model:
+
+- **Auto-rotate** — from EXIF orientation and detected text baseline
+- **Deskew** — correct the perspective of a page photographed at an angle
+- **Crop** — detect the sheet edges and discard the desk around it
+- **Contrast enhancement** — recover faint pencil and photocopied grid lines
+
+This is the cheapest accuracy available. A deskewed, cropped, contrast-corrected image raises extraction quality *and* lowers cost, because a tighter crop is fewer tokens.
+
+**Pre-processing never alters values, only legibility.** It runs before extraction and its output is what the model sees — but the teacher verifies against the *original* image, so a pre-processing artefact cannot silently become a mark.
+
+### Offline capture
+
+Consistent with the offline-first teacher principle (`OFFLINE_SYNC.md`): **photograph now, queue locally, extract when connection returns.**
+
+A teacher in a classroom with no signal takes the photographs, and the capture sits on the device. On reconnection it uploads, extracts, and notifies the teacher that a draft is ready to verify. Nothing about the verification step changes.
+
+Two rules follow:
+
+- **A credit is reserved at queue time and charged on successful extraction.** Reserving prevents a teacher queueing twenty captures against a balance of two and discovering the shortfall a day later; charging on success preserves the rule that a failed extraction costs nothing.
+- **The roster is captured with the queued image.** Class membership may change between photographing and extracting, and matching must run against the roster as it was when the register was taken — not as it is when the phone finds signal.
+
+---
+
+## Verification UX — where the accuracy actually lands
+
+Extraction quality is only half the feature. A draft that is tedious to check will be approved without being read, and at that point the system has automated the error rather than the typing.
+
+- **Processing progress.** Extraction takes seconds to tens of seconds across several pages. The screen shows per-page progress, not an indeterminate spinner — a teacher who cannot tell whether it has stalled will retake the photograph and pay twice.
+- **Per-cell confidence highlighting.** Green (high), amber (uncertain), red (unmatched or unreadable). The colour directs the reviewer's attention to the cells least likely to be right, which is the entire economic argument for reviewing rather than retyping.
+- **Tap-to-correct.** Any cell is editable in place, without leaving the verification screen or re-entering the row.
+- **Partial save.** A half-verified capture persists. A teacher interrupted mid-review — which is normal — must not lose the corrections already made. The draft stays a draft; partial save is not partial approval.
+- **Retake per image.** One unreadable page in a set of four does not invalidate the other three: that page is retaken and re-extracted while the verified pages hold.
+
+**Retaking a single page charges for a single page**, not the whole capture — again a configured per-type rate, and again the principle that a teacher pays for work the system actually performed.
+
+---
+
 ## Principle 3 — Applies to four capture types
 
 | Capture type | Anchored to | Draft target | Approved write path |
@@ -127,6 +199,22 @@ Fee-payment proof is the closest fit to what already exists: `payments.proof_of_
 2. **Provenance is optional but easier to add early.** If it must be possible to ask *"which capture produced this mark?"*, a nullable `source_capture_id` on `exam_results` and `attendance_records` answers it. It cannot be backfilled for rows written before it exists — so if provenance matters for audit or for measuring extraction quality against corrections, add the column with the module and accept that pre-module rows have none.
 
 **Nothing about the current schema precludes the flow.** The one property that would have been fatal — domain tables accepting unverified writes — is already prevented by RLS.
+
+### The richer input model changes nothing in Phase 2 either
+
+Re-checked against the applied schema after adding multi-image, multi-format, pre-processing, offline queueing, and partial-save:
+
+| Capability | Phase 2 schema impact |
+|---|---|
+| Multiple images per capture | **None.** Images belong to `capture_jobs`, a Phase 4/5 table. `exam_results` and `attendance_records` receive only approved values |
+| Camera vs upload | **None.** Both produce the same capture record |
+| HEIC / PDF / Excel / CSV | **None.** Format handling ends before approval; the write path is identical |
+| Pre-processing | **None.** Alters the image sent to the model, never a stored value |
+| Progress, confidence, tap-to-correct | **None.** All draft-side state, in `capture_jobs.extraction` |
+| **Partial save** | **None** — and this is the one worth stating plainly. A partly verified capture persists **in the capture staging table, never as a partial write to `exam_results` or `attendance_records`.** Half-approved marks must not exist in the domain tables |
+| Offline queueing | **None.** Only the timing of extraction changes; approval still travels the normal RLS-gated API |
+
+The two changes noted earlier — an added `sync_source` value and an optional `source_capture_id` — remain the only ones, and both still land with the module rather than now.
 
 ---
 
@@ -191,6 +279,12 @@ public.capture_jobs (
 
 **Balance is derived from the ledger, not stored as a mutable column** — the same reasoning as ADR-038's derived arrears. A cached balance must be kept in step with every consumption, top-up, and refund, and the first bug makes someone's credits wrong in a way nobody can reconstruct. If read performance ever demands it, add a materialised cache with the ledger still authoritative.
 
+**Reservation, for offline and multi-page captures.** A queued offline capture reserves credits at queue time and consumes them on successful extraction; an abandoned or failed capture releases the reservation. The ledger therefore carries `reason` values of `reserve` and `release` alongside `capture` and `topup`, and a balance is `SUM(delta)` over settled rows minus outstanding reservations. This is the one place the richer input model changes the ledger shape sketched above — everything else is per-capture rates, which are configuration.
+
+**Per-page, not per-capture, where a capture is multi-page.** A four-page mark sheet costs four page-units at the configured rate; retaking one page costs one. Charging a flat per-capture rate would either overcharge a single-page register or undercharge a term's worth of pages.
+
+**Spreadsheet import consumes no vision call**, so its rate is set independently — free or near-free — rather than inheriting a vision-priced default.
+
 **Charging happens on successful extraction, not on upload.** A failed extraction, an unreadable photograph, or a job that errors must not consume a credit — a teacher who photographs a page in bad light and gets nothing back has not received the service.
 
 ### Revenue-tier implication
@@ -215,6 +309,12 @@ This introduces **usage-based revenue alongside the existing subscription tiers*
 8. Credits are consumed on successful extraction only.
 9. Every price, limit, and rate is dynamic configuration.
 10. A teacher may capture only into classes they reach under ADR-037.
+11. A capture may contain several images; they extract into one draft and one verification screen.
+12. Spreadsheet imports bypass vision entirely and are rated separately.
+13. Pre-processing may alter legibility, never values; the teacher verifies against the original image.
+14. A partly verified capture persists as a draft and never as a partial write to a domain table.
+15. Offline captures reserve credits at queue time and consume them on successful extraction.
+16. The roster is captured with the queued image, so matching runs against class membership as it was when the paper was filled in.
 
 ---
 
@@ -230,6 +330,13 @@ This introduces **usage-based revenue alongside the existing subscription tiers*
 | Marks already published for that term | Write refused by the existing policy. Capture cannot reopen published results |
 | Credit balance insufficient | Capture refused **before** the API call, with the shortfall stated |
 | Teacher loses the class between capture and approval | Approval fails the teaching-scope check, as a manual entry would |
+| One page of four is unreadable | That page alone is retaken and re-extracted; verified pages hold. One page-unit charged |
+| HEIC upload | Converted server-side before extraction. Rejecting it would reject every unconverted iPhone photo |
+| Pre-processing produces a worse image | Teacher verifies against the ORIGINAL, so the artefact is visible rather than silently authoritative |
+| Offline capture queued, then the class roster changes | Matching uses the roster captured alongside the image, not the roster at extraction time |
+| Offline queue exceeds the credit balance | Reservation fails at queue time with the shortfall stated — not a day later when signal returns |
+| Verification interrupted midway | Partial save persists corrections. Still a draft; partial save is never partial approval |
+| CSV column headings unrecognised | Teacher maps columns before import. No guessing, and no vision fallback |
 
 ---
 
@@ -270,3 +377,7 @@ This introduces **usage-based revenue alongside the existing subscription tiers*
 |---|---|---|
 | 2026-08-15 | Initial design. Not built | Recorded before Phase 3 so the Phase 2 schema does not foreclose it (ADR-039) |
 | 2026-08-15 | Confirmed Phase 2 marks/attendance schema is compatible; two non-blocking changes noted | Draft-then-verify needs no domain-table change; `sync_source` and optional provenance land with the module |
+| 2026-08-15 | Added multi-image captures, camera and upload, HEIC/PDF/Excel/CSV, pre-processing, verification UX, and offline capture | Phone photographs of paper are the real input; the spec described an idealised one |
+| 2026-08-15 | Spreadsheet import bypasses vision and is rated separately | Parsing structured data through a vision model adds cost, latency, and a failure mode for no gain |
+| 2026-08-15 | Credit ledger gains `reserve`/`release`; rating is per page | Offline queueing needs reservation, and a four-page sheet is four units of work |
+| 2026-08-15 | Re-confirmed no Phase 2 schema change | Partial save persists in capture staging, never as a partial write to a domain table |

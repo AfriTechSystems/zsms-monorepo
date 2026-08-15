@@ -2,7 +2,7 @@
 
 ## What this repository currently is
 
-**Phases 0–2 complete, plus the fee arrears model. Phase 3 not started.**
+**Phases 0–3 complete, plus the fee arrears model. Phase 4 not started.**
 
 ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development, so the docs still specify more than exists.
 
@@ -11,16 +11,20 @@ The tree is:
 | Path | State |
 |---|---|
 | `Official Documentation/` | 119 markdown files across 18 numbered folders — the specification |
-| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **12 API routes**, no UI beyond `/` |
+| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **15 API routes**, no UI beyond `/` |
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
-| `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config` — abstractions wired, `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0081` applied to `zsms-dev`** (29 migrations) |
-| `supabase/tests/rls/` | **3 pgTAP suites, 155 assertions** — tenant isolation (72), fees/attendance/results (45), fee arrears (38) |
+| `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
+| `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents` — `types/database.ts` generated from the live schema |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0091` applied to `zsms-dev`** (44 migrations) |
+| `supabase/tests/rls/` | **5 pgTAP suites, 225 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26). `npm run db:test` checks every `plan(N)` against the real assertion count first |
+| `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/`, `seed/` | Empty — no Edge Functions yet |
 
-**What exists is a backend, not a product.** 23 `public` tables with RLS enabled *and* forced on every one, 97 policies, and the API routes below. **There is no user interface** — no dashboard, no parent portal, no mobile screens. No Edge Functions, no queue workers, no WhatsApp, no PDFs.
+**What exists is a backend, not a product.** 31 `public` tables with RLS enabled *and* forced on every one, 124 policies, two `security_invoker` views, and the API routes below. **There is still no user interface** — no dashboard, no parent portal, no mobile screens.
 
-**API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish`
+**API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages`
+
+**Phase 3 caveat — the logic is proven, the delivery is not.** Communications and PDF generation are verified against the real handlers, the real renderer, and the real fallback chain, but **no job has round-tripped through Redis and no message has left this machine.** There is no Redis locally and no Meta/Resend/Twilio credentials, so every channel runs through the mock provider. Live BullMQ→Redis transport and real delivery are **Phase 6, with credentials.** Do not build on the assumption that either has been exercised.
 
 **Read `JOURNAL.md` first.** It records what each session actually did, the defects found, and what was deliberately deferred — including several cases where a documented claim turned out not to match the schema.
 
@@ -45,7 +49,7 @@ Docs are grouped by domain in numbered folders:
 
 **Cross-reference paths inside the docs are wrong.** Every file references siblings as `docs/ARCHITECTURE.md`, `docs/modules/fees/PAYMENTS.md`, etc. That layout does not exist. Resolve by filename against the folder map above.
 
-Start any substantive task by reading `01 Foundation Layer/CONVENTIONS.md` and `01 Foundation Layer/DECISIONS.md`. `DECISIONS.md` holds 29 ADRs — check it before proposing an architectural change, so settled decisions are not relitigated.
+Start any substantive task by reading `01 Foundation Layer/CONVENTIONS.md` and `01 Foundation Layer/DECISIONS.md`. `DECISIONS.md` holds 42 ADRs — check it before proposing an architectural change, so settled decisions are not relitigated.
 
 ---
 
@@ -56,7 +60,7 @@ Modular monolith (explicitly **not** microservices), Turborepo monorepo.
 - **Clients** — Next.js 15 App Router (`apps/web`, pinned `15.5.23` per ADR-036), React Native/Expo (`apps/mobile`)
 - **API** — Next.js API routes + Supabase Edge Functions (Deno), rate-limited via Upstash Redis
 - **Data** — Supabase PostgreSQL, Upstash Redis, Cloudflare R2 (two buckets: public + private), Railway Postgres hot standby
-- **Async** — Upstash QStash; `03 Infrastructure Services/BULLMQ.md` defines a queue abstraction so BullMQ can replace it in Phase 2
+- **Async** — **BullMQ over Redis is the default** (ADR-035), QStash the fallback; both sides of the abstraction live in `packages/queue` (`enqueue()` and `createWorker()`). Nothing outside that package imports `bullmq` or `ioredis`
 - **Offline** — PowerSync syncs teacher mobile ↔ Supabase (last-write-wins, server authority)
 - **Auth** — Clerk, email OTP only (SMS OTP disabled), wrapped by `packages/auth-provider` so Keycloak can be swapped in for self-hosted deployments. No other package imports Clerk directly.
 
@@ -73,7 +77,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, schema empty |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 44 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -115,7 +119,7 @@ From `01 Foundation Layer/CONVENTIONS.md` — that file is authoritative; this i
 | DB tables | snake_case, plural · columns snake_case |
 | Indexes | `idx_[table]_[columns]` · triggers `[action]_[description]_on_[table]` |
 | RLS policies | `[role_or_scope]_[action]_[table]` |
-| Migrations | `NNNN_description.sql`, four-digit zero-padded (0001–0061 already specified) |
+| Migrations | `NNNN_description.sql`, four-digit zero-padded. Numbers are assigned when a migration is written, never reserved |
 | Docs | UPPER_SNAKE_CASE `.md` |
 | Branches | `type/description` — `feature/`, `fix/`, `docs/`, `chore/`, `db/`, `rls/` |
 | Commits | `type: description` — `feat`, `fix`, `db`, `rls`, `docs`, `chore`, `test`, `refactor`, `style` |
@@ -124,7 +128,7 @@ From `01 Foundation Layer/CONVENTIONS.md` — that file is authoritative; this i
 
 **Never do these** (verbatim from CONVENTIONS.md):
 
-1. The Supabase service role key is never used outside an Edge Function.
+1. The Supabase service role key is never used outside a **trusted server-side context** — an Edge Function, or a Railway background worker (amended; ADR-042). Never in client-reachable code. A worker's connection bypasses RLS, so all of its data access goes through the `worker_*` functions (0090/0091): **`.from(` anywhere in `apps/workers` is a defect.**
 2. Real credentials, API keys, or secrets are never committed.
 3. Database types are never manually defined — always generated via `supabase gen types typescript`.
 4. New tables are never created without a corresponding RLS policy.
@@ -143,7 +147,7 @@ From `01 Foundation Layer/CONVENTIONS.md` — that file is authoritative; this i
 
 ## Known documentation inconsistencies
 
-The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 41 ADRs.
+The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 42 ADRs.
 
 **A pattern worth knowing before you trust any doc:** repeatedly, a document has described something the schema could not do. `class_enrolments` was referenced by four documents and defined by none. `GLOSSARY.md` promised a fee statement with a running balance that nothing could produce. `DATABASE.md`'s `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, not by reading it. **Verify against the applied schema before building on a documented claim.**
 

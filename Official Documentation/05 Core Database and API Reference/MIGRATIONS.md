@@ -215,6 +215,30 @@ Derived arrears (ADR-038).
 
 ---
 
+**`0090`** - APPLIED to `zsms-dev` 2026-08-15 (Phase 3)
+- `0090_create_worker_access_functions.sql` — the read surface for Railway background workers, under ADR-042.
+
+  Seven `SECURITY DEFINER` functions: `worker_payment_context()`, `worker_due_fee_reminders()`, `worker_mark_reminder_sent()`, `worker_claim_scheduled_announcements()`, `worker_announcement_recipients()`, `worker_complete_announcement()`, `worker_report_card_batch()`. Each is `REVOKE ALL ... FROM PUBLIC, authenticated, anon` and `GRANT EXECUTE ... TO service_role`.
+
+  **Why these exist at all.** ADR-042 permits a worker to hold the service role key, so its connection bypasses RLS entirely. Rather than let the worker issue arbitrary table queries against an unpoliced connection, every read it needs is expressed as a function that anchors its own joins to one school internally. `worker_announcement_recipients()` deliberately takes no `school_id` argument — recipients derive from the announcement's own school, which makes cross-school fan-out unexpressible rather than merely unauthorised.
+
+  `worker_claim_scheduled_announcements()` uses `FOR UPDATE SKIP LOCKED`, so two cron runners cannot claim the same announcement and send it twice.
+
+---
+
+**`0091`** - APPLIED to `zsms-dev` 2026-08-15 (Phase 3)
+- `0091_close_worker_direct_table_access.sql` — `worker_update_dispatch()` and `worker_school_branding()`.
+
+  `0090` built the worker's read surface, but three statements in `apps/workers/src` still went straight at tables: an UPDATE of `message_log` by id, and two reads of `schools`. None was exploitable — every id came from a `worker_*` call earlier in the same chain — but the `message_log` UPDATE was an **unanchored write on a connection that bypasses RLS**, which is the exact statement ADR-042 exists to make unavailable.
+
+  Kept absolute rather than qualified: `.from(` appearing anywhere in `apps/workers` is now a defect, with no exceptions to weigh. A rule reading "no direct table access except reads of `schools` by primary key" would need re-litigating by every reviewer and would not have covered the write.
+
+  `worker_update_dispatch()` sets the terminal timestamps from the status internally, so a worker cannot stamp `delivered_at` on a message the provider refused. It deliberately carries **no status whitelist** — `message_log` already has a CHECK listing the nine valid statuses, and a second copy would be one more thing to keep in step (the first draft of the function already omitted four of them).
+
+  Covered by `supabase/tests/rls/worker_boundary_test.sql` (26 assertions, both migrations).
+
+---
+
 ### Core Schemas
 
 **`0002_create_schemas.sql`**
@@ -481,9 +505,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0090`** — available for the next migration.
+**`0092`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0089` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0091` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -586,6 +610,9 @@ This section is updated each time a migration reaches production.
 | 2026-08-15 | **Declared `0022`–`0068` void as numbers** | They sort below the applied high-water mark, so `db push` would skip them. Numbers are now assigned when a migration is written, never reserved in advance. |
 | 2026-08-15 | Corrected the `payments` DDL in `DATABASE.md` | It omitted the verification columns that `SCHEMA.md` and the 2026-04-26 CHANGELOG specify |
 | 2026-08-15 | Reconciled the three conflicting *next available* pointers | The document carried `0022`, `0056`, and `0066` in different sections; the pointer under *Next Available Sequence Number* is now stated as authoritative |
+| 2026-08-15 | **Added `0082`–`0089` — Phase 3 communications, quotas, documents, and job records** | Plus `0088`/`0089`, the two defects the suite caught: an ambiguous column that made quota enforcement fail on every call, and the default-privilege class fix |
+| 2026-08-15 | **Added `0090` — worker access functions (ADR-042)** | A worker holding the service role key bypasses RLS, so its entire read surface is expressed as school-anchored `SECURITY DEFINER` functions granted to `service_role` alone. |
+| 2026-08-15 | **Added `0091` — closed the last three direct table statements in `apps/workers`** | One was an unanchored UPDATE of `message_log` on an unpoliced connection. Not exploitable, but the exact shape ADR-042 forbids; the rule is now absolute and greppable. Next available advances to `0092`. |
 
 ---
 
@@ -712,7 +739,7 @@ Creates AfriTech financial tracking and nightly metrics cache tables.
 Creates all indexes for tables added in migrations 0036-0054.
 - Indexes for: `timetable_slots`, `announcements`, `announcement_reads`, `parent_push_tokens`, `alumni_profiles`, `lenders`, `school_integrations`, `integration_log`, `afritech.school_feature_overrides`, `afritech.loan_commissions`, `afritech.platform_metrics`
 - Related: `docs/api/INDEXES.md`
-**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0090`.**
+**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0092`.**
 
 ---
 
@@ -1024,4 +1051,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 
 ---
 
-**NEXT AVAILABLE: `0090`** — see *Next Available Sequence Number* above, which is authoritative.
+**NEXT AVAILABLE: `0092`** — see *Next Available Sequence Number* above, which is authoritative.

@@ -2,75 +2,263 @@
  * ZSMS background workers — process entry point.
  *
  * Spec: `Official Documentation/03 Infrastructure Services/BULLMQ.md`
- * Decision: ADR-035 — BullMQ default, QStash swappable fallback.
+ * Decision: ADR-035 (BullMQ default, QStash fallback), ADR-042 (service role
+ *           permitted in a Railway worker).
  *
- * This file does not import `bullmq`. Worker creation goes through
- * `createWorker()` in `@zsms/queue`, so the provider is a configuration choice
- * on the consuming side exactly as it already was on the producing side.
+ * This file imports no provider SDK. Worker creation goes through
+ * `createWorker()` in `@zsms/queue`, so the queue provider is a configuration
+ * choice on the consuming side exactly as it already was on the producing side.
  *
- * Everything of consequence lives in `./handlers`, which are plain async
- * functions taking IDs. That is what lets them be exercised without Redis.
- *
- * ---------------------------------------------------------------------------
- * OPEN QUESTION — DATABASE ACCESS FROM WORKERS. Flagged, not decided.
- * ---------------------------------------------------------------------------
- * CONVENTIONS.md prohibition 1: "The Supabase service role key is never used
- * outside an Edge Function." A worker is not an Edge Function, yet it must read
- * a payment, its student, and the guardian to send a receipt — and it holds no
- * end-user JWT, because nobody has a session when a cron fires at 08:00.
- *
- * Three ways out, none chosen here:
- *   (a) Workers call Edge Functions for all database work. Honours the rule
- *       literally; adds a hop and a second home for every query.
- *   (b) Amend prohibition 1 to name Railway workers as an equally trusted
- *       server-side context. Probably the intent — the rule exists to keep the
- *       key out of client-reachable code — but a documented rule should be
- *       amended deliberately, not reinterpreted by whoever writes the worker.
- *   (c) A dedicated Postgres role for workers with narrow grants. Most precise,
- *       most work.
- *
- * `createWorkerDeps()` therefore throws. The handlers are complete and tested;
- * only the credential path is deliberately absent.
+ * Everything of consequence lives in `./handlers` — plain async functions taking
+ * IDs. That is what lets them be exercised without Redis, which is how the gate
+ * harness runs.
  */
 
 import { createWorker } from '@zsms/queue'
-import { handlePaymentVerified, type PaymentVerifiedDeps } from './handlers/payment-verified'
+import { createWorkerDeps, workerDb } from './db'
+import { handlePaymentVerified } from './handlers/payment-verified'
+import { handleFeeReminders, type DueReminder } from './handlers/fee-reminders'
+import {
+  handleScheduledAnnouncements,
+  type AnnouncementRecipient,
+  type ClaimedAnnouncement,
+} from './handlers/scheduled-announcements'
+import { handleReportCardBatch, type BatchStudent } from './handlers/report-card-batch'
+import type { SchoolBranding } from '@zsms/documents'
 
-/**
- * Not implemented. See the note above — guessing here would either violate
- * prohibition 1 or bake in an architecture nobody agreed to.
- */
-function createWorkerDeps(): PaymentVerifiedDeps {
-  throw new Error(
-    'Worker database access is undecided — see the note in worker.ts. Resolve prohibition 1 ' +
-      'for workers before running this against an environment holding data.',
-  )
+// ---------------------------------------------------------------------------
+// Cron dependency adapters
+//
+// Each reads through a `worker_*` function from migration 0090. Those functions
+// anchor every join to a single school internally, which is where the tenant
+// boundary lives now that the connection bypasses RLS (ADR-042).
+//
+// Do not replace one of these with a direct table query.
+// ---------------------------------------------------------------------------
+
+function feeReminderDeps() {
+  const db = workerDb()
+  const { dispatch } = createWorkerDeps()
+
+  return {
+    async loadDueReminders(input: {
+      schoolId?: string
+      minDaysOverdue: number
+      cooldownDays: number
+      limit: number
+    }): Promise<DueReminder[]> {
+      const { data, error } = await db.rpc('worker_due_fee_reminders', {
+        p_school_id: input.schoolId ?? null,
+        p_min_days_overdue: input.minDaysOverdue,
+        p_cooldown_days: input.cooldownDays,
+        p_limit: input.limit,
+      })
+      if (error) throw new Error(`Loading due reminders failed: ${error.message}`)
+
+      return (data ?? []).map((r: Record<string, unknown>) => ({
+        schoolId: r['out_school_id'] as string,
+        schoolName: r['out_school_name'] as string,
+        studentId: r['out_student_id'] as string,
+        studentName: r['out_student_name'] as string,
+        feeRecordId: r['out_fee_record_id'] as string,
+        parentUserId: (r['out_parent_user_id'] as string) ?? null,
+        parentName: r['out_parent_name'] as string,
+        parentPhone: (r['out_parent_phone'] as string) ?? null,
+        parentEmail: (r['out_parent_email'] as string) ?? null,
+        currency: r['out_currency'] as string,
+        arrearsAmount: r['out_arrears_amount'] as string,
+        daysOverdue: r['out_days_overdue'] as number,
+      }))
+    },
+
+    async markReminderSent(feeRecordId: string): Promise<void> {
+      const { error } = await db.rpc('worker_mark_reminder_sent', { p_fee_record_id: feeRecordId })
+      if (error) throw new Error(`Marking reminder sent failed: ${error.message}`)
+    },
+
+    dispatch,
+  }
 }
 
+function announcementDeps() {
+  const db = workerDb()
+  const { dispatch } = createWorkerDeps()
+
+  return {
+    async claimDue(limit: number): Promise<ClaimedAnnouncement[]> {
+      const { data, error } = await db.rpc('worker_claim_scheduled_announcements', {
+        p_limit: limit,
+      })
+      if (error) throw new Error(`Claiming announcements failed: ${error.message}`)
+
+      return (data ?? []).map((r: Record<string, unknown>) => ({
+        announcementId: r['out_announcement_id'] as string,
+        schoolId: r['out_school_id'] as string,
+        title: r['out_title'] as string,
+        body: r['out_body'] as string,
+        targetType: r['out_target_type'] as string,
+      }))
+    },
+
+    async loadRecipients(announcementId: string): Promise<AnnouncementRecipient[]> {
+      // Note there is no schoolId parameter. Recipients are derived from the
+      // announcement's own school, so a caller cannot pair one school's
+      // announcement with another's parents.
+      const { data, error } = await db.rpc('worker_announcement_recipients', {
+        p_announcement_id: announcementId,
+        p_limit: 2000,
+      })
+      if (error) throw new Error(`Loading recipients failed: ${error.message}`)
+
+      return (data ?? []).map((r: Record<string, unknown>) => ({
+        userId: (r['out_user_id'] as string) ?? null,
+        name: r['out_name'] as string,
+        phone: (r['out_phone'] as string) ?? null,
+        email: (r['out_email'] as string) ?? null,
+        studentId: (r['out_student_id'] as string) ?? null,
+      }))
+    },
+
+    async schoolName(schoolId: string): Promise<string> {
+      const { data } = await db.rpc('worker_school_branding', { p_school_id: schoolId })
+      return (data as { name?: string } | null)?.name ?? 'Your school'
+    },
+
+    async complete(input: { announcementId: string; status: string; jobsQueued: number }) {
+      const { error } = await db.rpc('worker_complete_announcement', {
+        p_announcement_id: input.announcementId,
+        p_status: input.status,
+        p_jobs_queued: input.jobsQueued,
+      })
+      if (error) throw new Error(`Completing announcement failed: ${error.message}`)
+    },
+
+    dispatch,
+  }
+}
+
+function reportCardDeps() {
+  const db = workerDb()
+  const base = createWorkerDeps()
+
+  return {
+    async loadBranding(schoolId: string): Promise<SchoolBranding> {
+      const { data } = await db.rpc('worker_school_branding', { p_school_id: schoolId })
+      const b = data as {
+        name?: string
+        schoolCode?: string
+        address?: string | null
+      } | null
+      return {
+        name: b?.name ?? 'School',
+        schoolCode: b?.schoolCode ?? 'UNKNOWN',
+        address: b?.address ?? undefined,
+      }
+    },
+
+    async loadBatch(input: {
+      schoolId: string
+      academicYear: string
+      termNumber: number
+      classId?: string
+    }): Promise<BatchStudent[]> {
+      const { data, error } = await db.rpc('worker_report_card_batch', {
+        p_school_id: input.schoolId,
+        p_academic_year: input.academicYear,
+        p_term_number: input.termNumber,
+        p_class_id: input.classId ?? null,
+      })
+      if (error) throw new Error(`Loading report card batch failed: ${error.message}`)
+
+      return (data ?? []).map((r: Record<string, unknown>) => ({
+        studentId: r['out_student_id'] as string,
+        studentName: r['out_student_name'] as string,
+        studentCode: r['out_student_code'] as string,
+        classId: r['out_class_id'] as string,
+        subjects: (r['out_subjects'] as BatchStudent['subjects']) ?? [],
+      }))
+    },
+
+    async recordDocument(input: {
+      schoolId: string
+      studentId: string
+      academicYear: string
+      termNumber: number
+    }) {
+      const { data, error } = await db.rpc('record_generated_document', {
+        p_school_id: input.schoolId,
+        p_doc_type: 'report_card',
+        p_student_id: input.studentId,
+        p_payment_id: null,
+        p_academic_year: input.academicYear,
+        p_term_number: input.termNumber,
+        p_generated_by: null,
+      })
+      if (error) throw new Error(`Recording report card failed: ${error.message}`)
+      return data as string
+    },
+
+    completeDocument: base.completeDocument,
+    storeDocument: base.storeDocument,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Workers
+// ---------------------------------------------------------------------------
+
 export async function startWorkers(): Promise<void> {
-  // Receipts are user-facing: a parent is waiting on the confirmation of money
-  // they just handed over. SCALING.md requires this not to queue behind a
-  // 400-student report card run, which is why it has its own worker and its
-  // own concurrency rather than sharing a general one.
+  // Receipts are user-facing: a parent is waiting on confirmation of money they
+  // just handed over. SCALING.md requires this not to queue behind a
+  // 400-student report card run, which is why it has its own worker.
   await createWorker<{ paymentId: string }, unknown>(
     'generate-receipt',
     async ({ payload }) => {
       if (!payload?.paymentId) {
-        // Malformed jobs are not retryable. Failing immediately sends this to
-        // the dead letter queue for inspection instead of looping.
+        // Malformed jobs are not retryable — straight to the dead letter queue.
         throw new Error('generate-receipt job has no paymentId')
       }
       return handlePaymentVerified(payload.paymentId, createWorkerDeps())
     },
     {
       concurrency: 10,
-      // Meta's WhatsApp API ceiling. Applied at the worker rather than in the
-      // provider so a burst queues instead of being rejected downstream.
+      // Meta's WhatsApp ceiling, applied at the worker so a burst queues rather
+      // than being rejected downstream.
       limiter: { max: 100, duration: 1000 },
     },
   )
 
-  console.log('ZSMS workers started.')
+  await createWorker<{ schoolId?: string }, unknown>(
+    'send-fee-reminders',
+    async ({ payload }) =>
+      handleFeeReminders(feeReminderDeps(), payload?.schoolId ? { schoolId: payload.schoolId } : {}),
+    // BULK. A reminder run touching every school must never starve a receipt.
+    { concurrency: 2 },
+  )
+
+  await createWorker<Record<string, never>, unknown>(
+    'check-scheduled-announcements',
+    async () => handleScheduledAnnouncements(announcementDeps()),
+    // Concurrency 1: the claim is atomic, but a single runner keeps ordering
+    // predictable and there is no throughput reason for more.
+    { concurrency: 1 },
+  )
+
+  await createWorker<
+    { schoolId: string; academicYear: string; termNumber: number; classId?: string },
+    unknown
+  >(
+    'generate-report-card',
+    async ({ payload }) => {
+      if (!payload?.schoolId || !payload.academicYear || !payload.termNumber) {
+        throw new Error('generate-report-card job is missing schoolId, academicYear, or termNumber')
+      }
+      return handleReportCardBatch(payload, reportCardDeps())
+    },
+    { concurrency: 2 },
+  )
+
+  console.log('ZSMS workers started: generate-receipt, send-fee-reminders, check-scheduled-announcements, generate-report-card')
 }
 
 if (process.env['NODE_ENV'] !== 'test') {

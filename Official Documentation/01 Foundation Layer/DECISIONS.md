@@ -548,3 +548,33 @@ Also: **`reference_subjects_zm` bakes the country into the table name** even tho
 **Why it is not fixed in this pass.** It changes the marks-entry write path and needs a decision on whether published results are ever recomputed — a product question, not a schema one. It is recorded here so it is not rediscovered when a parent disputes a grade.
 
 **Consequences:** Flagged in `CLAUDE.md` as an open data-integrity item. Should be scheduled before the first cohort's results are treated as a permanent record — realistically before Phase 6 pilot, and certainly before any school completes a full academic year in ZSMS.
+
+---
+
+## ADR-042 — The Service Role Key in Railway Workers
+
+**Status:** Confirmed — amends `CONVENTIONS.md` prohibition 1
+**Decision:** **The Supabase service role key may be used inside a trusted server-side context: an Edge Function, or a Railway background worker.** It remains forbidden in `apps/web`, `apps/mobile`, any client bundle, and any code path an end-user request can reach.
+
+**Reason:**
+
+Prohibition 1 originally read *"never used outside an Edge Function."* Phase 3 made that unimplementable. A worker must read a payment, its student, and the guardian in order to send a receipt, and it holds no end-user JWT — nobody has a session when a cron fires at 08:00 to send fee reminders. The rule as written left three options, none good: route every database read through an Edge Function, invent a second credential system, or quietly ignore the rule.
+
+**The rule's intent was never "Edge Functions are special."** It was to keep the key out of code a user can reach. Edge Functions were simply the only trusted server-side context that existed when it was written. A Railway worker is not client-reachable, is not bundled, and is not addressable by a user — it pulls jobs from Redis. On the property the rule actually protects, the two are equivalent.
+
+**Conditions a worker must satisfy to hold the key:**
+
+1. **It runs on Railway or an equivalent private compute service** — never in `apps/web`, never in a client bundle, never behind a public HTTP route.
+2. **Its data access goes through purpose-built `SECURITY DEFINER` functions**, not ad-hoc queries. `worker_payment_context()`, `worker_due_fee_reminders()`, and their siblings each scope every join to one school internally, so tenancy is a property of the function rather than of whoever writes the worker next.
+3. **Those functions are tested adversarially**, exactly as RLS policies are. A worker bypasses RLS by design, so the tenant boundary has to be asserted somewhere else — the pgTAP suite asserts that `worker_payment_context()` never returns a student or guardian from a different school than the payment.
+4. **The key is never logged, never returned in a response, and never placed in a job payload.** Job payloads carry IDs only, which is already the rule.
+
+**The trade this accepts.** A worker with the service role bypasses RLS, so the isolation guarantee that Phases 1–3 rest on does not protect it. That is a real reduction in defence in depth and the reason for conditions 2 and 3: the boundary moves from "RLS enforces it" to "these named functions enforce it, and tests prove they do." Any worker query written outside those functions loses the guarantee silently, which is why ad-hoc queries are prohibited rather than discouraged.
+
+**Alternatives considered:** workers calling Edge Functions for every database operation (rejected — honours the letter of the rule while adding a network hop per read and a second home for every query, and the Edge Function would hold the same key anyway); a dedicated Postgres role with narrow grants (not rejected on merit — it is strictly more precise, and remains the better long-term answer, but it requires designing a grant matrix per job type and Phase 3 needs a decision now; ADR-042 should be revisited if worker surface grows); leaving prohibition 1 unamended and shipping workers that violate it (rejected — a documented rule that everyone ignores is worse than no rule).
+
+**Consequences:** `CONVENTIONS.md` prohibition 1 is amended with a pointer here. `createWorkerDeps()` is implemented against the service role. All worker database access is funnelled through the `worker_*` functions in migrations `0090` and `0091`. `supabase/tests/rls/worker_boundary_test.sql` holds the tenant-correctness assertions for those functions (26). If a future worker needs data no `worker_*` function exposes, the answer is a new function with its own test — not a direct query.
+
+**Condition 2 is absolute, and enforcing it took a second migration.** `0090` created the read surface, but three statements in `apps/workers/src` still went at tables directly: an UPDATE of `message_log` by id and two reads of `schools`. None was exploitable — every id came from a `worker_*` call earlier in the same chain — but the UPDATE was an unanchored write on an unpoliced connection, which is precisely what this ADR exists to prevent. `0091` added `worker_update_dispatch()` and `worker_school_branding()` and removed all three.
+
+The rule is stated with no exceptions on purpose: **`.from(` anywhere in `apps/workers` is a defect.** A qualified version — "except reads of `schools` by primary key" — requires judgement from every future reviewer, and would not have caught the write that actually mattered. A rule that can be checked by grep is worth more than a rule that is merely more precise.

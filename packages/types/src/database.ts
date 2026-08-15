@@ -2256,6 +2256,87 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      worker_announcement_recipients: {
+        Args: { p_announcement_id: string; p_limit?: number }
+        Returns: {
+          out_email: string
+          out_name: string
+          out_phone: string
+          out_student_id: string
+          out_user_id: string
+        }[]
+      }
+      worker_claim_scheduled_announcements: {
+        Args: { p_limit?: number }
+        Returns: {
+          out_announcement_id: string
+          out_body: string
+          out_school_id: string
+          out_target_ids: string[]
+          out_target_type: string
+          out_title: string
+        }[]
+      }
+      worker_complete_announcement: {
+        Args: {
+          p_announcement_id: string
+          p_jobs_queued?: number
+          p_status: string
+        }
+        Returns: undefined
+      }
+      worker_due_fee_reminders: {
+        Args: {
+          p_cooldown_days?: number
+          p_limit?: number
+          p_min_days_overdue?: number
+          p_school_id?: string
+        }
+        Returns: {
+          out_arrears_amount: string
+          out_currency: string
+          out_days_overdue: number
+          out_fee_record_id: string
+          out_parent_email: string
+          out_parent_name: string
+          out_parent_phone: string
+          out_parent_user_id: string
+          out_school_id: string
+          out_school_name: string
+          out_student_id: string
+          out_student_name: string
+        }[]
+      }
+      worker_mark_reminder_sent: {
+        Args: { p_fee_record_id: string }
+        Returns: undefined
+      }
+      worker_payment_context: { Args: { p_payment_id: string }; Returns: Json }
+      worker_report_card_batch: {
+        Args: {
+          p_academic_year: string
+          p_class_id?: string
+          p_school_id: string
+          p_term_number: number
+        }
+        Returns: {
+          out_class_id: string
+          out_student_code: string
+          out_student_id: string
+          out_student_name: string
+          out_subjects: Json
+        }[]
+      }
+      worker_school_branding: { Args: { p_school_id: string }; Returns: Json }
+      worker_update_dispatch: {
+        Args: {
+          p_failure_reason?: string
+          p_message_log_id: string
+          p_provider_message_id?: string
+          p_status: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

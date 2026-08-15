@@ -13,7 +13,9 @@
     "@zsms/documents": "*",
     "@zsms/notifications": "*",
     "@zsms/queue": "*",
-    "@zsms/types": "*"
+    "@zsms/types": "*",
+    "@supabase/supabase-js": "^2.47.10",
+    "@zsms/storage": "*"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

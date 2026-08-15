@@ -261,3 +261,48 @@ export type CreateFeeStructureInput = z.infer<typeof createFeeStructureSchema>
 export type SubmitPaymentInput = z.infer<typeof submitPaymentSchema>
 export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>
 export type EnterMarksInput = z.infer<typeof enterMarksSchema>
+
+// ---------------------------------------------------------------------------
+// Phase 3 — announcements and message history
+// ---------------------------------------------------------------------------
+
+export const createAnnouncementSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    body: z.string().trim().min(1).max(5000),
+    importance: z.enum(['regular', 'important']).optional(),
+    targetType: z.enum(['all_parents', 'all_students', 'all_staff', 'grade', 'class']),
+    // 'platform' is absent on purpose: a platform announcement is AfriTech's,
+    // and the CHECK constraint requires school_id NULL, which this route never
+    // sets.
+    targetIds: z.array(z.string().trim().min(1).max(50)).max(200).optional(),
+    scheduledAt: z.string().datetime().optional(),
+    // status is NOT accepted. A client naming its own status could mark an
+    // announcement 'sent' without it ever being dispatched.
+  })
+  .refine(
+    (v) => !['grade', 'class'].includes(v.targetType) || (v.targetIds?.length ?? 0) > 0,
+    { message: 'targetIds is required when targeting a grade or a class' },
+  )
+
+export const listAnnouncementsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(25),
+  status: z.enum(['draft', 'scheduled', 'sending', 'sent', 'failed', 'cancelled']).optional(),
+})
+
+export const listMessagesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(25),
+  channel: z.enum(['whatsapp', 'sms', 'email', 'push', 'in_app']).optional(),
+  status: z
+    .enum([
+      'queued', 'sent', 'delivered', 'read', 'failed',
+      'fallback_sent', 'quota_exceeded', 'opted_out', 'bounced',
+    ])
+    .optional(),
+  studentId: z.string().uuid().optional(),
+  templateKey: z.string().trim().max(100).optional(),
+})
+
+export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>

@@ -4,6 +4,71 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-15 — Phase 3 completion: worker boundary, crons, routes, AI capture design
+
+Branch `feature/phase-3-completion`, cut first. **Migrations `0090` and `0091` applied. New `worker_boundary_test.sql` 26/26; suites now 225 assertions across five files.** Phase 3 closes the three things the previous entry listed as unfinished.
+
+### The prohibition, amended rather than reinterpreted
+
+The previous session stopped at prohibition 1 — *"the service role key is never used outside an Edge Function"* — and refused to decide alone. Decision taken: **amend it.** The rule's intent is keeping the key out of client-reachable code, and a Railway worker is no more client-reachable than an Edge Function. CONVENTIONS.md now reads "outside a **trusted server-side context** — an Edge Function, or a Railway background worker," and **ADR-042** records the reasoning with four conditions a worker must satisfy.
+
+The amendment costs something, and it is worth naming: **the worker's connection bypasses every RLS policy the other four suites verify.** So the tenant boundary had to be rebuilt somewhere else rather than merely surrendered.
+
+`0090` is that somewhere. Seven `SECURITY DEFINER` functions, each anchoring its joins to one school internally, granted to `service_role` and revoked from everyone else.
+
+### The banner said one thing and the code did another
+
+I wrote a warning banner into `db.ts` — *"do not add a direct table query"* — and a journal line claiming the worker never issues one. Then I grepped `apps/workers` for `.from(` before committing, and found **three**: an UPDATE of `message_log` by id, and two reads of `schools`.
+
+None was exploitable. Every id came from a `worker_*` call earlier in the same chain, so no attacker-controlled value ever reached them. But the `message_log` UPDATE is **an unanchored write on a connection with no policies**, which is the exact statement ADR-042 exists to make unavailable. It survived because I wrote the read surface first and the writes felt like plumbing.
+
+The tempting fix was to soften the claim — "no direct queries except `schools` by primary key." I took the other one. `0091` adds `worker_update_dispatch()` and `worker_school_branding()` and removes all three, so the rule stays absolute: **`.from(` anywhere in `apps/workers` is a defect**, greppable, with no exceptions for a reviewer to weigh. The qualified version would not have covered the write in any case, which is the argument against it.
+
+`worker_update_dispatch()` sets the terminal timestamps from the status itself, so a worker cannot stamp `delivered_at` on a message the provider refused. It carries no status whitelist — `message_log` already has a CHECK with nine values, and my first draft of the whitelist had already omitted four of them. One list.
+
+The design choice I am most confident in: **`worker_announcement_recipients()` takes no `school_id` argument.** Recipients derive from the announcement's own school. "Send school A's announcement to school B's parents" is not blocked by a check — it cannot be expressed.
+
+### Testing the place where RLS was switched off
+
+`worker_boundary_test.sql` (26 assertions) applies the same adversarial standard to the functions that `tenant_isolation_test.sql` applies to the policies, because the guarantee moved and a guarantee is only as good as its test.
+
+The fixture is built to be hostile: **both schools have a student with the same name, in the same grade, with the same class id.** A join that loses its school anchor returns the wrong parent, and nothing in the data would reveal it. Asserted that `worker_payment_context()` returns school A's student and school A's guardian, and specifically **never the other school's phone number** — a receipt for one family's money reaching another family is the failure this exists to prevent.
+
+Also asserted: an unknown payment id returns `NULL` rather than a shell object a handler would dispatch against; the reminder cooldown suppresses repeats; and **a school owner — the highest-privileged end-user role — calling `worker_payment_context()` is refused 42501 by the executor**, not merely absent from the grant catalogue.
+
+**Bulk quota is all-or-nothing.** The existing suite drove the ceiling one message at a time; a 300-recipient fan-out asks for 300 units in one call. Verified that a bulk send exceeding the remaining allowance is refused **and consumes nothing** — a partial burn would bill a school for messages nobody received and leave the worker unable to tell which recipients were covered. The 80% warning fires on the crossing call and not again.
+
+Cross-tenant message-history isolation needed nothing new: `communications_test.sql` Section C already asserts it from three directions — an owner against another school's log, a parent against another parent's messages, and a school B parent against school A entirely.
+
+### A test suite that could not have passed
+
+Setting the plan on the new file by hand, I miscounted, so I wrote a script to count instead. It flagged a **pre-existing** mismatch: `fees_attendance_results_test.sql` has 44 assertions under `plan(45)`, and has since it was committed. Under `pg_prove` that file **fails**.
+
+I reported it as "45/45 passing" at the Phase 2 gate. That number came from running the suite through the Supabase MCP, which executes statements one at a time and never evaluates the plan — so the adapted run and the committed file were not the same thing, and the difference was invisible in exactly the direction that flatters the report. **Corrected: the Phase 2 suite is 44 assertions, all passing.**
+
+A wrong plan is worse than no plan, because it is how a suite silently loses coverage: delete an assertion and the count meant to notice has to be edited by hand. `npm run db:test` now runs `scripts/check-test-plans.mjs` first, which fails if any `plan(N)` disagrees with the assertions in the file. It needs no database and no Docker, so it runs on this machine today and will run in CI when CI exists.
+
+### Built out
+
+Three cron handlers (fee reminders reading the derived arrears fields, scheduled-announcement claim via `FOR UPDATE SKIP LOCKED` so two runners cannot double-send, report-card batch), three API routes (`announcements`, `announcements/[id]/read`, `messages`), and `worker.ts` registering four workers. Receipts get their own worker at concurrency 10 with a 100/1000ms limiter: a parent waiting on confirmation of money they just handed over must not queue behind a 400-student report card run.
+
+`message_log` is read-only over the API by design — the log is written only by the worker, through a function.
+
+### Still not proven, and Phase 6 is when it will be
+
+Stated plainly because the gate report could be read as claiming more than it does:
+
+- **Live BullMQ→Redis transport is unverified.** No Redis on this machine. Handlers are invoked directly and `worker.ts` is a thin adapter over exactly that call — but "thin" remains an assertion until a job actually round-trips through Redis.
+- **Real WhatsApp, email, and SMS delivery is unverified.** No Meta, Resend, or Twilio credentials; every channel runs through the mock provider. Correct for `zsms-dev`, whose fixtures carry real-shaped numbers that must never be dialled.
+
+**The logic is proven; the delivery is not.** Both are Phase 6 items, verified when credentials and Redis exist. Nothing in Phases 4–5 should be built on the assumption that a message has ever left this machine.
+
+### AI capture design enriched
+
+`AI_CAPTURE.md` is now 383 lines — multi-image capture, camera and upload, HEIC/PDF/spreadsheet handling where Excel and CSV bypass vision entirely, pre-processing, confidence-highlighted verification UX, and offline capture that reserves credit at queue time. Design only, Phase 4/5. Confirmed against the applied schema: **no Phase 2 table changes**, because a partial save persists in capture staging and never as a partial write to a domain table.
+
+---
+
 ## 2026-08-15 - Phase 3: background jobs and communications
 
 Branch `feature/phase-3-jobs-communications`, cut before any work this time. **Migrations `0082`-`0089` applied. Communications suite 45/45, gate harness 28/28.**

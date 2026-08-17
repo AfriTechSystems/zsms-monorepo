@@ -91,3 +91,6 @@ ZSMS_Master_Tracker.*
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx
+
+# Scratch space for adapted test runs and rendered-output checks. Never committed.
+.scratch/

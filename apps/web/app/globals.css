@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * The custom properties themselves are NOT written here.
+ *
+ * They are emitted server-side by `<ThemeStyle />` from the resolved school
+ * theme, so a school's colours arrive in the first HTML response. Writing
+ * defaults here as well would mean maintaining the palette in two places, and
+ * would produce a flash of ZSMS blue before a school's own blue applied.
+ *
+ * `@zsms/design-tokens` is the only definition. This file styles the primitives
+ * that consume it.
+ */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Anchors the rem scale to the token sizes rather than browser default. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* Contextual alternates and kerning — Inter's defaults are good, this just
+       makes them explicit so a future font swap does not silently change
+       metrics in dense tables. */
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'calt';
+  }
+
+  /*
+   * Focus. A single visible indicator on every interactive element, applied
+   * once here rather than per component.
+   *
+   * `:focus-visible` rather than `:focus` so a mouse click on a button does not
+   * leave a ring behind, while keyboard and assistive-technology navigation
+   * always shows one. Removing the outline without this distinction is the most
+   * common accessibility regression in a component library.
+   */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /*
+   * Every figure in this product is money, a mark, or a count. Proportional
+   * digits make a column of them ragged and materially slower to scan, so
+   * tabular figures are the default and prose opts out rather than in.
+   */
+  table,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Respect a stated preference for reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /*
+   * Skip link. Present on every page, visible only once focused.
+   *
+   * Without it, a keyboard user lands on a school portal and tabs through the
+   * entire navigation before reaching the fees table they came for — on every
+   * single page load.
+   */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50
+           focus:rounded-md focus:bg-primary focus:px-4 focus:py-2
+           focus:text-primary-foreground focus:shadow-lg;
+  }
+}

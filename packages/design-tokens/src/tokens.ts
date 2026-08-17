@@ -1,0 +1,350 @@
+/**
+ * ZSMS design tokens — the single source of truth.
+ *
+ * Consumed by three surfaces that must not drift apart:
+ *
+ *   - `apps/web`          → CSS custom properties, then Tailwind
+ *   - `@zsms/documents`   → PDF receipts, statements, report cards
+ *   - `@zsms/notifications` → transactional email
+ *
+ * A parent who receives a receipt PDF, opens the email it came in, and then logs
+ * into the portal is looking at one school three times. If the header navy in
+ * the PDF is a different navy, the product looks assembled rather than designed.
+ * Hence one definition, imported everywhere, never a hex typed into a component.
+ *
+ * Scale note: `spacing` and `radius` are plain numbers in px. Tailwind's own
+ * scale is used for layout; these exist for the PDF renderer, which has no
+ * Tailwind and would otherwise grow its own magic numbers.
+ */
+
+import { deriveDarkScale, deriveScale, type ColorScale } from './scale'
+
+// ---------------------------------------------------------------------------
+// Brand — the colours as given, before any derivation
+// ---------------------------------------------------------------------------
+
+/**
+ * The ZSMS brand hexes exactly as specified from the logo.
+ *
+ * These are the *inputs*. Nothing renders text directly from them — see
+ * `scale.ts` for why. Kept separate so the brand definition stays legible and
+ * an audit can compare it against the logo without reading derivation code.
+ */
+export const BRAND = {
+  navy: '#2B3A55',
+  blue: '#3A8DDE',
+  green: '#4A9B4F',
+  amber: '#F5A623',
+  coral: '#E15A44',
+  teal: '#1BA0B0',
+} as const
+
+/**
+ * Neutrals. Warm-tinted rather than pure grey — a hint of the navy hue runs
+ * through them, which is what keeps a white-dominant UI feeling warm instead of
+ * clinical. Pure `#808080` greys next to a navy header read as two unrelated
+ * palettes.
+ */
+export const NEUTRAL = {
+  0: '#FFFFFF',
+  25: '#FCFCFD',
+  50: '#F7F8FA',
+  100: '#EFF1F5',
+  200: '#E1E5EC',
+  300: '#CBD2DD',
+  400: '#9AA4B6',
+  500: '#6B7688',
+  600: '#4E5768',
+  700: '#3A4254',
+  800: '#252C3B',
+  900: '#151A24',
+} as const
+
+// ---------------------------------------------------------------------------
+// Typography
+// ---------------------------------------------------------------------------
+
+/**
+ * Inter throughout, per the brand direction: one family for headings, body, and
+ * data tables.
+ *
+ * `tabular-nums` is not decoration. A fees table where 1,200.00 and 990.00 do
+ * not align on the decimal is materially harder to scan, and a bursar scans
+ * hundreds of rows. Every numeric cell and every money figure opts in.
+ */
+export const TYPOGRAPHY = {
+  fontFamily: {
+    sans: "'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    // The PDF renderer embeds real font files; this names them for that path.
+    pdf: 'Inter',
+  },
+  /** px, paired with its line-height. */
+  size: {
+    xs: { size: 12, lineHeight: 16 },
+    sm: { size: 13, lineHeight: 20 },
+    base: { size: 15, lineHeight: 24 },
+    lg: { size: 17, lineHeight: 26 },
+    xl: { size: 20, lineHeight: 28 },
+    '2xl': { size: 24, lineHeight: 32 },
+    '3xl': { size: 30, lineHeight: 38 },
+    '4xl': { size: 36, lineHeight: 44 },
+  },
+  weight: {
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    bold: 700,
+  },
+  /** Tightened on display sizes only; body text keeps default tracking. */
+  letterSpacing: {
+    tight: '-0.02em',
+    normal: '0',
+    wide: '0.02em',
+  },
+} as const
+
+// ---------------------------------------------------------------------------
+// Spacing, radius, elevation
+// ---------------------------------------------------------------------------
+
+/** 4px base. Every gap in the product is a multiple of it. */
+export const SPACING = {
+  0: 0,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  8: 32,
+  10: 40,
+  12: 48,
+  16: 64,
+  20: 80,
+} as const
+
+export const RADIUS = {
+  none: 0,
+  sm: 4,
+  md: 6,
+  lg: 8,
+  xl: 12,
+  full: 9999,
+} as const
+
+/**
+ * Shadows are deliberately restrained. A school system is read all day; heavy
+ * elevation on every card produces visual noise that costs attention without
+ * adding information. Cards use a border by default and reserve shadow for
+ * things that genuinely float — menus, dialogs, toasts.
+ */
+export const SHADOW = {
+  none: 'none',
+  sm: '0 1px 2px 0 rgb(21 26 36 / 0.05)',
+  md: '0 2px 8px -1px rgb(21 26 36 / 0.08), 0 1px 3px -1px rgb(21 26 36 / 0.06)',
+  lg: '0 8px 24px -4px rgb(21 26 36 / 0.12), 0 2px 6px -2px rgb(21 26 36 / 0.06)',
+  focus: `0 0 0 3px ${BRAND.blue}40`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Semantic roles
+// ---------------------------------------------------------------------------
+
+/**
+ * The colour hierarchy, stated as a type.
+ *
+ * The brief is explicit that these are not equal-weight colours: navy and white
+ * do the work, blue is the *single* primary action colour, and the rest are
+ * semantic only. Modelling that here means a component asks for `danger` or
+ * `primary` and cannot ask for "the coral one" to decorate something.
+ */
+export interface SemanticColors {
+  /** Navy. Headers, primary text, navigation. The anchor. */
+  anchor: ColorScale
+  /** Blue. THE action colour — buttons, links, active states. Nothing else. */
+  primary: ColorScale
+  /** Green. Paid, positive balance, present. */
+  success: ColorScale
+  /** Amber. Due soon, pending, partial. Never carries white text — see below. */
+  warning: ColorScale
+  /** Coral-red. Overdue, arrears, errors, destructive actions. */
+  danger: ColorScale
+  /** Teal. Used sparingly — secondary charts, informational accents. */
+  accent: ColorScale
+}
+
+export interface SurfaceColors {
+  /** The page itself. White dominant. */
+  background: string
+  /** Cards, panels, table headers. */
+  surface: string
+  /** A recessed area — table zebra striping, disabled fields. */
+  surfaceSunken: string
+  /**
+   * Decorative dividers — card edges, table rules, separators.
+   *
+   * Deliberately low contrast and **not** subject to WCAG 1.4.11, which governs
+   * the boundary of *active controls*, not ornamental lines. Forcing 3:1 here
+   * would box every card in hard grey and make a dense fees table harder to
+   * read, not easier.
+   */
+  border: string
+  /**
+   * The boundary of an interactive control — input, select, checkbox.
+   *
+   * This one **is** governed by 1.4.11 and must clear 3:1 against the surface
+   * behind it. A form field whose edge is invisible is the classic failure, and
+   * it lands hardest on the users this product is built for: staff entering
+   * hundreds of rows on cheap screens in bright rooms.
+   */
+  borderStrong: string
+  text: string
+  textMuted: string
+  textSubtle: string
+  /**
+   * Text on a filled primary/danger button.
+   *
+   * In dark mode the button fill is *lightened* to clear AA, so its label turns
+   * dark. This is why it cannot be assumed to be white.
+   */
+  textOnFill: string
+  /**
+   * Text on the anchor-coloured header and side navigation.
+   *
+   * Separate from `textOnFill` because the two diverge in dark mode: buttons get
+   * lighter and take dark labels, while the header stays deep navy and keeps
+   * light ones. Collapsing them put near-black text on the dark header at
+   * 1.53:1 — caught by `auditTheme`, which is what it is for.
+   */
+  textOnAnchor: string
+  /**
+   * The keyboard focus indicator.
+   *
+   * Cannot simply be the brand colour. A school whose primary is a deep forest
+   * green gets a ring measuring 2.82:1 against the dark-mode background —
+   * invisible, which for a keyboard user means losing their place entirely.
+   * So the ring resolves per mode to the step that clears 1.4.11 against the
+   * surface it is drawn on.
+   */
+  focusRing: string
+}
+
+export interface ThemeTokens {
+  colors: SemanticColors
+  surface: SurfaceColors
+  mode: 'light' | 'dark'
+}
+
+/**
+ * Amber carries dark text, always.
+ *
+ * At 2.03:1 against white, amber fails even the 3:1 non-text bar, so it can
+ * never be a solid fill behind white letters. Its role is a tint background with
+ * navy text — which measures ~10:1 and reads clearly. This constant exists so
+ * the rule is enforced in one place rather than remembered per component.
+ */
+export const AMBER_REQUIRES_DARK_TEXT = true
+
+// ---------------------------------------------------------------------------
+// The default ZSMS theme
+// ---------------------------------------------------------------------------
+
+export function buildLightTheme(brand: {
+  navy: string
+  blue: string
+  green: string
+  amber: string
+  coral: string
+  teal: string
+}): ThemeTokens {
+  const primary = deriveScale(brand.blue)
+
+  return {
+    mode: 'light',
+    colors: {
+      anchor: deriveScale(brand.navy),
+      primary,
+      success: deriveScale(brand.green),
+      warning: deriveScale(brand.amber),
+      danger: deriveScale(brand.coral),
+      accent: deriveScale(brand.teal),
+    },
+    surface: {
+      background: NEUTRAL[0],
+      surface: NEUTRAL[0],
+      surfaceSunken: NEUTRAL[50],
+      border: NEUTRAL[200],
+      // 4.59:1 against white. Input borders are held to the control-boundary
+      // rule, and this errs deliberately on the dark side — GOV.UK, the most
+      // rigorously tested accessible form system in production, goes darker
+      // still.
+      borderStrong: NEUTRAL[500],
+      text: brand.navy,
+      textMuted: NEUTRAL[600],
+      textSubtle: NEUTRAL[500],
+      textOnFill: NEUTRAL[0],
+      textOnAnchor: NEUTRAL[0],
+      // On white, step 500 always clears 3:1 — a colour pale enough to fail is
+      // already refused by `validateTheme`.
+      focusRing: primary[500],
+    },
+  }
+}
+
+/**
+ * Dark mode, derived from the same brand input rather than authored separately.
+ *
+ * The surface is `#151A24` — the navy pushed down to near-black, not a neutral
+ * charcoal, so the dark theme is recognisably the same product. Text sits at
+ * `NEUTRAL[100]` rather than pure white: full white on near-black is
+ * uncomfortable over a long working day and is a common accessibility
+ * complaint, though not a WCAG failure.
+ */
+export function buildDarkTheme(brand: {
+  navy: string
+  blue: string
+  green: string
+  amber: string
+  coral: string
+  teal: string
+}): ThemeTokens {
+  const surface = NEUTRAL[900]
+
+  const primary = deriveDarkScale(brand.blue, surface)
+
+  return {
+    mode: 'dark',
+    colors: {
+      anchor: deriveDarkScale(brand.navy, surface),
+      primary,
+      success: deriveDarkScale(brand.green, surface),
+      warning: deriveDarkScale(brand.amber, surface),
+      danger: deriveDarkScale(brand.coral, surface),
+      accent: deriveDarkScale(brand.teal, surface),
+    },
+    surface: {
+      background: surface,
+      surface: NEUTRAL[800],
+      surfaceSunken: '#1B2130',
+      border: '#323A4B',
+      // 3.04:1 against the dark surface — the same control-boundary rule as
+      // light mode, measured against a different background.
+      borderStrong: NEUTRAL[500],
+      text: NEUTRAL[100],
+      // Both bumped one step lighter than the light-mode equivalents: on a dark
+      // surface, NEUTRAL[500] as subtle text measures 3.04:1 and fails AA.
+      textMuted: NEUTRAL[300],
+      textSubtle: NEUTRAL[400],
+      textOnFill: NEUTRAL[900],
+      // The header stays deep navy in dark mode, so its text stays light.
+      textOnAnchor: NEUTRAL[100],
+      // Step 600 here, not 500: it is lightened until it clears 4.5:1 against
+      // this surface, so the ring stays visible whatever the school chose.
+      focusRing: primary[600],
+    },
+  }
+}
+
+/** The ZSMS default theme — the fallback whenever a school has set nothing. */
+export const ZSMS_LIGHT = buildLightTheme(BRAND)
+export const ZSMS_DARK = buildDarkTheme(BRAND)

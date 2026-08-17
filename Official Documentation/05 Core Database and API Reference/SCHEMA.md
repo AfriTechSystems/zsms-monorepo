@@ -39,6 +39,19 @@ afritech schema       — AfriTech internal team tables
 
 ---
 
+### `school_branding`
+**What it is:** The school's visual identity — two brand colours and two logo variants. One row per school; `school_id` is both the primary key and the tenant column. An absent row, or a NULL column, means the ZSMS default, which is the normal state for a school that has not been through the branding step.
+
+**Key columns:** `school_id` (PK → `schools.id`), `anchor_color` (header and navigation), `primary_color` (buttons, links, active states), `logo_url` (full wordmark, R2 public bucket), `icon_url` (square mark for favicon and collapsed nav), `updated_by`.
+
+**Constraints worth knowing:** both colours are `#RRGGBB`, and both are contrast-constrained — `anchor_color` must reach **4.5:1** against white (white navigation text sits on it), `primary_color` must reach **3:1** (it is used unmodified as a button fill). Enforced by CHECK constraints calling `wcag_contrast_ratio()`, not only by the application. The format constraints are separate and necessary: a CHECK that evaluates to NULL passes, and the contrast function returns NULL for a malformed colour. Logo URLs must be HTTPS. See ADR-043 and `DESIGN_SYSTEM.md`.
+
+**Read scope is wider than most configuration:** every member of the school can SELECT it, because parents, students, and teachers all render the theme. Writing is owner, principal, and admin only. `anon` holds no privilege on the table at all — the unauthenticated parent login screen reads through `school_branding_by_slug()` instead.
+
+**Relates to:** `schools` (one-to-one). Read by `school_branding_by_slug()` (login screens), `worker_school_branding()` (report cards, statements), and `worker_payment_context()` (receipts).
+
+---
+
 ### `school_academic_config`
 **What it is:** Stores each school's academic structure choices — curriculum type, grading system preferences, report card format, and class naming convention. Created during onboarding, editable in settings.
 

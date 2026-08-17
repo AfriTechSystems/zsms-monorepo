@@ -2,7 +2,7 @@
 
 ## What this repository currently is
 
-**Phases 0–3 complete, plus the fee arrears model. Phase 4 not started.**
+**Phases 0–3 complete, plus the fee arrears model. Phase 4 in progress — the design foundation (sub-phase 1) is built; no portal screens yet.**
 
 ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development, so the docs still specify more than exists.
 
@@ -11,16 +11,16 @@ The tree is:
 | Path | State |
 |---|---|
 | `Official Documentation/` | 119 markdown files across 18 numbered folders — the specification |
-| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **15 API routes**, no UI beyond `/` |
+| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **15 API routes**; UI is the design foundation plus `/design` preview — no portal screens |
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
-| `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0091` applied to `zsms-dev`** (44 migrations) |
-| `supabase/tests/rls/` | **5 pgTAP suites, 225 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26). `npm run db:test` checks every `plan(N)` against the real assertion count first |
+| `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0093` applied to `zsms-dev`** (46 migrations) |
+| `supabase/tests/rls/` | **6 pgTAP suites, 261 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (36). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/`, `seed/` | Empty — no Edge Functions yet |
 
-**What exists is a backend, not a product.** 31 `public` tables with RLS enabled *and* forced on every one, 124 policies, two `security_invoker` views, and the API routes below. **There is still no user interface** — no dashboard, no parent portal, no mobile screens.
+**What exists is a backend plus a design system, not a product.** 32 `public` tables with RLS enabled *and* forced on every one, 128 policies, two `security_invoker` views, and the API routes below. **There is still no portal** — no dashboard, no parent portal, no mobile screens. What Phase 4 has added so far is `packages/design-tokens` (the single source of colour, type, spacing, and per-school theming), the `apps/web/components` primitives built on it, and `/design`, a preview page that renders the whole foundation including a live WCAG contrast audit.
 
 **API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages`
 
@@ -36,7 +36,7 @@ Docs are grouped by domain in numbered folders:
 
 | Folder | Contents |
 |---|---|
-| `01 Foundation Layer` | ARCHITECTURE, DATABASE, CONVENTIONS, DECISIONS (ADRs), RLS, GLOSSARY, COMPLIANCE, SECURITY_POLICIES, ENV, CHANGELOG |
+| `01 Foundation Layer` | ARCHITECTURE, DATABASE, CONVENTIONS, DECISIONS (ADRs), DESIGN_SYSTEM, DYNAMIC_CONFIG, RLS, GLOSSARY, COMPLIANCE, SECURITY_POLICIES, ENV, CHANGELOG |
 | `02 Authentication and Identity` | AUTH, ROLES, PERMISSIONS, SESSIONS, IMPERSONATION |
 | `03 Infrastructure Services` | Supabase, Clerk, Vercel, R2, QStash, BullMQ, PowerSync, Twilio, Railway, Sentry, PostHog, Cloudflare WAF, Meta API |
 | `04 Country and Configuration` | ZM (Zambia reference), ADDING_COUNTRY |
@@ -49,7 +49,7 @@ Docs are grouped by domain in numbered folders:
 
 **Cross-reference paths inside the docs are wrong.** Every file references siblings as `docs/ARCHITECTURE.md`, `docs/modules/fees/PAYMENTS.md`, etc. That layout does not exist. Resolve by filename against the folder map above.
 
-Start any substantive task by reading `01 Foundation Layer/CONVENTIONS.md` and `01 Foundation Layer/DECISIONS.md`. `DECISIONS.md` holds 42 ADRs — check it before proposing an architectural change, so settled decisions are not relitigated.
+Start any substantive task by reading `01 Foundation Layer/CONVENTIONS.md` and `01 Foundation Layer/DECISIONS.md`. `DECISIONS.md` holds 43 ADRs — check it before proposing an architectural change, so settled decisions are not relitigated.
 
 ---
 
@@ -77,7 +77,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 44 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 46 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -147,7 +147,7 @@ From `01 Foundation Layer/CONVENTIONS.md` — that file is authoritative; this i
 
 ## Known documentation inconsistencies
 
-The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 42 ADRs.
+The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 43 ADRs.
 
 **A pattern worth knowing before you trust any doc:** repeatedly, a document has described something the schema could not do. `class_enrolments` was referenced by four documents and defined by none. `GLOSSARY.md` promised a fee statement with a running balance that nothing could produce. `DATABASE.md`'s `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, not by reading it. **Verify against the applied schema before building on a documented claim.**
 
@@ -158,7 +158,7 @@ The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session le
 | **Multi-country config hardening** | ADR-040 | Deferred. `curriculum_type`, `grading_system`, `examination_type`, `level_type`, and `term_number` are hardcoded CHECK constraints; `reference_subjects_zm` bakes the country into a table name. Each needs a migration to admit a second country. Decide when the second country is real. |
 | **Grading-scale versioning on `exam_results`** | ADR-041 | **Open data-integrity gap.** A grade letter is stored without the scale that produced it, so a mid-year scale revision makes historical grades unexplainable. Needs fixing before results are relied on long term. |
 | Migration numbering | `MIGRATIONS.md` | `0022`–`0068` are **void** — they sort below the applied high-water mark and `db push` would skip them. Numbers are assigned when a migration is written, never reserved. Read *Next Available Sequence Number*. |
-| Layer 1 (Frontend), Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. |
+| Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. Layer 1 (Frontend) now has a foundation — `DESIGN_SYSTEM.md` and `packages/design-tokens` — but no portal screens yet. |
 
 If you resolve one of these, remove its row.
 

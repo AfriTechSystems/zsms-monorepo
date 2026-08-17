@@ -1222,6 +1222,47 @@ export type Database = {
           },
         ]
       }
+      school_branding: {
+        Row: {
+          anchor_color: string | null
+          created_at: string
+          icon_url: string | null
+          logo_url: string | null
+          primary_color: string | null
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          anchor_color?: string | null
+          created_at?: string
+          icon_url?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          anchor_color?: string | null
+          created_at?: string
+          icon_url?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_branding_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_grade_levels: {
         Row: {
           created_at: string
@@ -2197,6 +2238,8 @@ export type Database = {
           skipped_count: number
         }[]
       }
+      school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
+      srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }
       student_in_current_school: {
         Args: { p_student_id: string }
         Returns: boolean
@@ -2255,6 +2298,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      wcag_contrast_ratio: {
+        Args: { p_a: string; p_b: string }
+        Returns: number
       }
       worker_announcement_recipients: {
         Args: { p_announcement_id: string; p_limit?: number }

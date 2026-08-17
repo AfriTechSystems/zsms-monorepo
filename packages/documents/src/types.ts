@@ -23,6 +23,20 @@ export interface SchoolBranding {
   email?: string
   /** R2 path, resolved to bytes by the caller. */
   logoBytes?: Uint8Array
+
+  /**
+   * The school's brand colours, from `public.school_branding` (0092).
+   *
+   * A document is the artefact a parent keeps. If the portal is maroon and the
+   * receipt for the same money is ZSMS blue, the receipt reads as coming from
+   * somewhere else — which is precisely the wrong signal on proof of payment.
+   *
+   * Both are `#RRGGBB` or absent, and both are safe to print on white: the
+   * database constrains the anchor to 4.5:1 and the primary to 3:1 against
+   * white (ADR-043), and paper is white. Absent means the ZSMS default.
+   */
+  anchorColor?: string
+  primaryColor?: string
 }
 
 export interface ReceiptData {

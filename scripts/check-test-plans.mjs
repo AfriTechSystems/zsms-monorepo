@@ -23,7 +23,13 @@ const DIR = 'supabase/tests/rls'
 
 // pgTAP assertion functions used in this repository. Add to this list when a
 // new one is used, or the count silently drifts low.
-const ASSERTIONS = ['is', 'isnt', 'ok', 'throws_ok', 'lives_ok', 'results_eq', 'set_eq']
+// Longer names first: `is` would otherwise be tried before `is_empty` at the
+// same position. JS backtracks and gets it right either way, but the ordering
+// makes that independent of the engine.
+const ASSERTIONS = [
+  'is_empty', 'isnt', 'is',
+  'throws_ok', 'lives_ok', 'results_eq', 'set_eq', 'ok',
+]
 
 const CALL = new RegExp(String.raw`\bSELECT\s+(?:${ASSERTIONS.join('|')})\s*\(`, 'g')
 

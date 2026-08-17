@@ -237,6 +237,28 @@ Derived arrears (ADR-038).
 
   Covered by `supabase/tests/rls/worker_boundary_test.sql` (26 assertions, both migrations).
 
+**`0092`** - APPLIED to `zsms-dev` 2026-08-16 (Phase 4)
+- `0092_create_school_branding.sql` — per-school theming, with the accessibility guardrail in the database.
+
+  Creates `public.school_branding` (one row per school, `school_id` as both primary key and tenant column), `srgb_relative_luminance()` and `wcag_contrast_ratio()`, and `school_branding_by_slug()`.
+
+  **The WCAG maths is in SQL because the guardrail has to hold for writers that are not the API.** `validateTheme()` in `packages/design-tokens` gives a school a readable error; the CHECK constraints hold for an admin tool, a support script, or a bulk import. Anchor ≥4.5:1 against white (white nav text sits on it), primary ≥3:1 (used unmodified as a button fill). ADR-043.
+
+  **The format constraints are not redundant with the contrast constraints.** A CHECK that evaluates to NULL *passes*, and `wcag_contrast_ratio()` returns NULL for a malformed colour — without `~ '^#[0-9A-Fa-f]{6}$'`, `'#GGGGGG'` would be stored.
+
+  `school_branding_by_slug()` is granted to `anon` and is the only anon-reachable path: the parent login screen must be branded before a session exists, so RLS has nothing to resolve. It returns one school by `lower(school_id)` — the same value used as the Clerk organisation slug — with exactly five keys, pinned by test so a new `schools` column cannot widen an unauthenticated surface by accident.
+
+  Also replaces `worker_school_branding()` (0091) additively, adding the brand colours so report cards and statements are themed.
+
+  Covered by `supabase/tests/rls/school_branding_test.sql` (36 assertions).
+
+**`0093`** - APPLIED to `zsms-dev` 2026-08-16 (Phase 4)
+- `0093_theme_worker_payment_context.sql` — brand colours in the receipt job's context.
+
+  `0092` themed the branding function, which covers report cards and statements. Receipts take a different route: `worker_payment_context()` assembles the whole receipt from a payment id in one call, and its embedded `school` object predates `school_branding`. Left alone, a maroon school would send maroon report cards and ZSMS-blue receipts — and the receipt is the document a parent is most likely to keep and to question.
+
+  Only the `school` object changes; every join stays anchored to the payment's own `school_id`, and `school_branding` joins on `s.id` so it cannot introduce a second school.
+
 ---
 
 ### Core Schemas
@@ -505,9 +527,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0092`** — available for the next migration.
+**`0094`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0091` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0093` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -519,7 +541,7 @@ So a migration written today as `0030_create_timetables.sql` would simply never 
 
 The `0022`–`0068` labels are retained in the sequence below only so the descriptions stay findable; read them as ordering, not as filenames.
 
-When creating a new migration, use `0069` and update this document with the new entry before committing. Read this pointer rather than the highest number in `supabase/migrations/` — most of the sequence is planned here before it exists on disk, which is exactly how the `0019`–`0021` collision happened.
+When creating a new migration, use the number in the pointer above and update this document with the new entry before committing. Read this pointer rather than the highest number in `supabase/migrations/` — most of the sequence is planned here before it exists on disk, which is exactly how the `0019`–`0021` collision happened.
 
 ---
 
@@ -1052,3 +1074,5 @@ CREATE INDEX idx_rate_limit_config_lookup
 ---
 
 **NEXT AVAILABLE: `0092`** — see *Next Available Sequence Number* above, which is authoritative.
+| 2026-08-16 | **Added `0092` — `school_branding`, with the WCAG AA guardrail as a CHECK constraint** | `validateTheme()` alone would leave the rule absent from every writer that is not the API. Implementing the luminance formula a second time in SQL is real duplication, paid because a guardrail present in one of two writers is one that will eventually be walked past. ADR-043. |
+| 2026-08-16 | **Added `0093` — brand colours in `worker_payment_context()`** | Receipts assemble from a single call whose `school` object predates `school_branding`; without this a themed school would send themed report cards and unthemed receipts. Next available advances to `0094`. |

@@ -4,6 +4,66 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-16 — Phase 4 sub-phase 1: the design foundation
+
+Branch `feature/phase-4-design-foundation`. **New package `@zsms/design-tokens` (24 tests). Migrations `0092` and `0093` applied. New `school_branding_test.sql` 36/36; suites now 261 assertions across six files.** No portal screens — this sub-phase deliberately stops at the foundation and a preview page.
+
+### The brand palette does not pass WCAG AA, and that had to be settled first
+
+Before designing anything I measured the six supplied brand colours against white. **Five of the six fail 4.5:1 for normal text.** Primary blue is 3.47:1. Amber is 1.95:1 — it fails even the 3:1 non-text threshold.
+
+That is not a criticism of the palette; it is a brand palette, and brand palettes are chosen against paper and signage. But using those hexes directly as text colours would have failed accessibility on nearly every label in the product, and discarding them would have thrown away the brand.
+
+The resolution is a **derived scale**: the brand hex is preserved *exactly* at step 500, where it is used as a fill (and clears the 3:1 non-text minimum), and step 600 is the same hue darkened in HSL until it clears 4.5:1 for text. A parent sees the school's actual green on a status bar; the label beside it is the same green, legibly darker. Nobody is told their colour is wrong.
+
+Amber is the case that proved the rule rather than fitting it — no usable lightness of it carries white text — so `AMBER_REQUIRES_DARK_TEXT` is exported and warning fills take dark text.
+
+### Dark mode is not an inverted light mode, and one switch is not two
+
+Inverting the light theme puts step-600 text — picked *because* it is dark — onto a dark surface. `deriveDarkScale()` takes the light end of each hue for text instead, and the audit is re-run against the dark surface set rather than assumed to transfer.
+
+Separately, a self-caught defect before it shipped: I had CSS variables flipping on `prefers-color-scheme` while Tailwind's `dark:` utilities flipped on a class. For any user on the "system" setting those two can disagree — variables dark, utilities light. **`data-theme` is now the single switch**, with a pre-paint script resolving "system" to an explicit value, and the media query kept only as a no-JS fallback scoped to `:not([data-theme])`.
+
+### Three contrast failures found by arithmetic, not by looking
+
+The token tests are accessibility assertions, so they fail rather than warn. Three did, and all three were real: a dark-mode header whose text measured **1.53:1** because `textOnFill` had been conflated with text on the anchor; dark-mode subtle text at 3.04:1; and — the one that mattered most — a **focus ring at 2.82:1 in dark mode for a custom school colour**, which is invisible to exactly the users who depend on it. Fixed with a mode-aware `focusRing` token and a regression test. None of these would have been caught by eye, and the school-colour one would not have been caught at all without testing a *non-default* theme.
+
+### The guardrail is a constraint, not a validator
+
+The brief asked that a school not be able to choose an unreadable palette. `validateTheme()` does that at the API boundary and produces the message a school reads. But an admin tool, a support script, or a bulk import would never pass through it.
+
+So `0092` implements the WCAG luminance formula **a second time, in SQL**, as CHECK constraints on `public.school_branding`. That is genuine duplication and I want it on the record as a cost accepted rather than overlooked: a guardrail present in one of two writers is one that will eventually be walked past. The two implementations are pinned to each other by assertions on fixed ratios (`11.4185`, `3.4742`) — and that pinning immediately earned itself, because my hand-computed expectation of `3.22` in the first draft was simply wrong arithmetic, and the migration refused to apply until it matched what both implementations actually produce.
+
+**It refuses rather than warns.** A warning gets dismissed by whoever is setting the school up the night before launch; the cost lands on parents who never chose the colour.
+
+A subtlety worth recording: the format constraints are **not** redundant with the contrast constraints. A CHECK evaluating to NULL *passes*, and `wcag_contrast_ratio()` returns NULL for a malformed colour — without the `~ '^#[0-9A-Fa-f]{6}$'` checks, `'#GGGGGG'` would be stored happily.
+
+### The login screen has no session, so it cannot use RLS
+
+A parent login page must be the school's before anyone signs in. `current_school_uuid()` is NULL there. The easy answer — an `anon` SELECT policy on `school_branding` — hands any caller the whole branding table.
+
+`school_branding_by_slug()` is the narrow version: one school, by the slug already in the URL, returning exactly five keys. The key count is **pinned by a test**, so that adding a column to `schools` cannot silently widen an unauthenticated surface.
+
+The slug is `lower(schools.school_id)` — the value Clerk already uses as the organisation slug. It is sequential and therefore enumerable, and I chose to accept that rather than invent a second public identifier: what a walk of the sequence yields is a school's name, two colours, and a logo. Public signage, no personal data, and terminated schools return nothing.
+
+### The theme had to reach the PDFs, and receipts took a different road
+
+Report cards and statements read `worker_school_branding()`, so `0092` extended it. Receipts do not — `worker_payment_context()` assembles the entire receipt from a payment id in one call, and its embedded `school` object predates `school_branding`. Left alone, a maroon school would have sent maroon report cards and ZSMS-blue receipts, and the receipt is the document a parent keeps and questions. `0093` fixes that; every join stays anchored to the payment's own `school_id`.
+
+In `packages/documents` the brand colour is applied to the school name and the header rule **and nowhere else**. Body text and money stay ink: a themed amount column would trade legibility for brand on the page a parent reads to check what they paid. The 4.5:1 anchor constraint means paper — which is white — is covered by the same guarantee as the screen.
+
+### Two smaller things found on the way
+
+**`npm test` had never run this package.** The `test` script used `node --experimental-strip-types`, which requires explicit `.ts` extensions on relative imports; the 23 passes I recorded came from `npx tsx`, which does not. Switched to `tsx`. 24 tests now pass under `npm test` at the root, which is the command anyone else would run.
+
+**`check-test-plans.mjs` did not know `is_empty`.** Its own comment warned that the assertion list has to be extended or counts drift low — and the first suite to use `is_empty` undercounted by one. Added, longer names first.
+
+### What this sub-phase deliberately did not do
+
+No portal screens. No logo upload flow — `school_branding` stores URLs and nothing yet mints them, so branding is set by direct write until the school settings screen exists. **Email templates still use fixed ZSMS colours**: the colours are available to the notification layer, but the HTML templates have not been changed, and I would rather record that than imply the propagation is complete.
+
+---
+
 ## 2026-08-15 — Phase 3 completion: worker boundary, crons, routes, AI capture design
 
 Branch `feature/phase-3-completion`, cut first. **Migrations `0090` and `0091` applied. New `worker_boundary_test.sql` 26/26; suites now 225 assertions across five files.** Phase 3 closes the three things the previous entry listed as unfinished.

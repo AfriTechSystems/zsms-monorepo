@@ -90,7 +90,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       type={type}
       ref={ref}
       className={cn(
-        'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base',
+        'flex h-tap min-h-tap w-full rounded-md border border-input bg-background px-3 py-2 text-base',
         'placeholder:text-subtle',
         'disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-70',
         // The invalid state is driven by aria-invalid, so the visual and the
@@ -109,7 +109,7 @@ export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttrib
     <select
       ref={ref}
       className={cn(
-        'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base',
+        'flex h-tap min-h-tap w-full rounded-md border border-input bg-background px-3 py-2 text-base',
         'disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-70',
         'aria-[invalid=true]:border-danger',
         className,

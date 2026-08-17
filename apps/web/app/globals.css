@@ -81,4 +81,75 @@
            focus:rounded-md focus:bg-primary focus:px-4 focus:py-2
            focus:text-primary-foreground focus:shadow-lg;
   }
+
+  /*
+   * Branded splash.
+   *
+   * The 180ms delay is the whole trick: a load that resolves before then
+   * unmounts the component while it is still fully transparent, so a fast
+   * navigation never flashes a full-screen takeover. No timer, no state, and it
+   * works inside a server-side suspense boundary where there is no client to run
+   * one.
+   */
+  .zsms-splash {
+    animation: zsms-splash-in 220ms ease-out 180ms both;
+  }
+
+  /*
+   * The indeterminate indicator. A segment sweeping a track — it makes exactly
+   * one claim, that work is ongoing, and no claim it could be wrong about.
+   */
+  .zsms-splash-bar {
+    animation: zsms-splash-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+    will-change: transform;
+  }
+
+  /*
+   * Reduced motion. The global rule above collapses animation DURATION, which
+   * for a looping sweep would leave the segment frozen at its start position —
+   * a bar that looks stuck rather than one that is deliberately still. So the
+   * sweep is replaced by a gentle opacity pulse on a full-width track: still an
+   * honest "something is happening", without translating anything across the
+   * screen.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .zsms-splash {
+      animation: none;
+    }
+
+    .zsms-splash-bar {
+      width: 100%;
+      animation: zsms-splash-pulse 2s ease-in-out infinite !important;
+      animation-duration: 2s !important;
+      animation-iteration-count: infinite !important;
+    }
+  }
+}
+
+@keyframes zsms-splash-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zsms-splash-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes zsms-splash-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
 }

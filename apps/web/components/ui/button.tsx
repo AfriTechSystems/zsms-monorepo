@@ -35,10 +35,17 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-11 px-4 py-2',
-        sm: 'h-9 rounded-md px-3 text-sm',
+        // `h-tap` is the 44px token, and it is the SAME value at every
+        // breakpoint — see SIZING in the token package. Cards, gaps, and
+        // headings tighten on a phone; the things a finger has to hit do not.
+        default: 'h-tap px-4 py-2',
+        // `sm` is 36px and is for dense toolbars and table rows on a pointer
+        // device. It is below the touch minimum on purpose and must not be the
+        // primary action on a mobile screen; `min-h-tap` keeps the hit area
+        // legal wherever it is used inside a taller row.
+        sm: 'h-9 min-h-9 rounded-md px-3 text-sm',
         lg: 'h-12 rounded-md px-6 text-base',
-        icon: 'h-11 w-11',
+        icon: 'h-tap w-tap',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

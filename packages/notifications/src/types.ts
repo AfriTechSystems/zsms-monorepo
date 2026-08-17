@@ -17,6 +17,8 @@
  * a configuration change into a refactor.
  */
 
+import type { EmailBranding } from './email-shell'
+
 /** Delivery channels, in fallback order for critical messages. */
 export const CHANNELS = ['whatsapp', 'email', 'sms', 'push', 'in_app'] as const
 export type Channel = (typeof CHANNELS)[number]
@@ -61,6 +63,20 @@ export interface SendRequest {
   attachmentPaths?: string[]
   studentId?: string | null
   languageCode?: string
+  /**
+   * The school's colours and logo, for channels that can render them.
+   *
+   * Email only in practice — WhatsApp and SMS have no presentation layer to
+   * brand. Resolved by the worker from `worker_school_branding()` once per
+   * school and passed down, so a provider never queries anything and stays
+   * testable without a database.
+   *
+   * Absent means the ZSMS default, which is also what a school that has set no
+   * branding gets. **Carries no PII**: a name, two hex colours, and a logo URL,
+   * consistent with the rule that job payloads carry IDs rather than personal
+   * data.
+   */
+  branding?: EmailBranding | null
 }
 
 export interface SendResult {

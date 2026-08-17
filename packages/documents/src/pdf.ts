@@ -11,6 +11,7 @@
  */
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
+import { zsmsLogoBytes } from './branding'
 import type { RenderedDocument } from './types'
 
 export const A4 = { width: 595.28, height: 841.89 } as const
@@ -20,8 +21,8 @@ export const INK = rgb(0.11, 0.12, 0.14)
 export const MUTED = rgb(0.42, 0.45, 0.5)
 export const RULE = rgb(0.85, 0.87, 0.9)
 
-/** ZSMS navy — the anchor colour a school has not overridden. */
-export const BRAND_DEFAULT = rgb(0x2b / 255, 0x3a / 255, 0x55 / 255)
+/** ZSMS navy `#1E2A3F` — the anchor colour a school has not overridden. */
+export const BRAND_DEFAULT = rgb(0x1e / 255, 0x2a / 255, 0x3f / 255)
 
 /**
  * `#RRGGBB` → pdf-lib colour, falling back rather than throwing.
@@ -142,11 +143,16 @@ export async function header(
   // and this is the page a parent reads to check what they paid.
   const brand = brandColor(school.anchorColor)
 
-  if (school.logoBytes && school.logoBytes.length > 0) {
+  // A school that has not uploaded a logo still gets a mark. An empty header on
+  // a payment receipt reads as a draft rather than as a record of money
+  // received, which is the one impression this document must not give.
+  const logo = school.logoBytes && school.logoBytes.length > 0 ? school.logoBytes : zsmsLogoBytes()
+
+  if (logo && logo.length > 0) {
     try {
       // PNG first, JPEG on failure — schools upload whatever their designer
       // gave them, and a failed logo must not fail the document.
-      const image = await doc.pdf.embedPng(school.logoBytes).catch(() => doc.pdf.embedJpg(school.logoBytes!))
+      const image = await doc.pdf.embedPng(logo).catch(() => doc.pdf.embedJpg(logo))
       const dims = image.scale(40 / image.height)
       doc.page.drawImage(image, {
         x: A4.width - MARGIN - dims.width,

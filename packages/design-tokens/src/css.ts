@@ -13,7 +13,48 @@
  */
 
 import type { ResolvedTheme } from './theme'
-import { RADIUS, SHADOW, TYPOGRAPHY, type ThemeTokens } from './tokens'
+import {
+  MOBILE_MAX_WIDTH,
+  RADIUS,
+  SHADOW,
+  SIZING,
+  TYPOGRAPHY,
+  type ThemeTokens,
+} from './tokens'
+
+const rem = (px: number): string => `${px / 16}rem`
+
+/**
+ * Type scale and layout sizing as variables.
+ *
+ * Tailwind's `fontSize` and spacing utilities compile to static values, so the
+ * only way to make one class correct at two widths is to have the class point at
+ * a variable and move the variable. `text-3xl` resolves to
+ * `var(--zsms-fs-3xl)` and shrinks below 480px without a single responsive
+ * modifier in a component.
+ */
+function sizingVars(scale: 'base' | 'mobile'): Record<string, string> {
+  const vars: Record<string, string> = {}
+
+  for (const [name, v] of Object.entries(TYPOGRAPHY.size)) {
+    const override = scale === 'mobile'
+      ? (TYPOGRAPHY.mobileSize as Record<string, { size: number; lineHeight: number }>)[name]
+      : undefined
+    const chosen = override ?? v
+    vars[`--zsms-fs-${name}`] = rem(chosen.size)
+    vars[`--zsms-lh-${name}`] = rem(chosen.lineHeight)
+  }
+
+  const s = SIZING[scale]
+  vars['--zsms-card-padding'] = `${s.cardPadding}px`
+  vars['--zsms-card-gap'] = `${s.cardGap}px`
+  vars['--zsms-stack-gap'] = `${s.stackGap}px`
+  vars['--zsms-section-gap'] = `${s.sectionGap}px`
+  vars['--zsms-page-gutter'] = `${s.pageGutter}px`
+  vars['--zsms-tap-target'] = `${s.tapTarget}px`
+
+  return vars
+}
 
 /**
  * shadcn expects `--primary` to be a colour a foreground sits on. We map the
@@ -107,6 +148,7 @@ const staticVars: Record<string, string> = {
   '--zsms-shadow-md': SHADOW.md,
   '--zsms-shadow-lg': SHADOW.lg,
   '--zsms-font-sans': TYPOGRAPHY.fontFamily.sans,
+  ...sizingVars('base'),
 }
 
 function declarations(vars: Record<string, string>, indent = '  '): string {
@@ -171,6 +213,13 @@ export function themeToStyleSheet(theme: ResolvedTheme, selector = ':root'): str
     `@media (prefers-color-scheme: dark) {`,
     `  ${selector}:not([data-theme]) {`,
     declarations(themeVars(theme.dark), '    '),
+    `  }`,
+    `}`,
+    ``,
+    `/* Small screens. Headings and chrome tighten; body text and tap targets do not. */`,
+    `@media (max-width: ${MOBILE_MAX_WIDTH}px) {`,
+    `  ${selector} {`,
+    declarations(sizingVars('mobile'), '    '),
     `  }`,
     `}`,
   ].join('\n')

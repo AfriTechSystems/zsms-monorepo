@@ -35,12 +35,13 @@ import {
 import { Alert } from '../../components/ui/alert'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/empty-state'
 import { Field, Input, Select } from '../../components/ui/field'
 import { Skeleton, LoadingRegion } from '../../components/ui/skeleton'
 import { StatCard, type StatTone } from '../../components/ui/stat-card'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
+import { BrandSplash } from '../../components/brand/brand-splash'
 import { SchoolLogo } from '../../components/brand/school-logo'
 import { AttendanceCard } from '../../components/domain/attendance-card'
 import { FeeCard } from '../../components/domain/fee-card'
@@ -486,6 +487,111 @@ export default function DesignFoundationPage(): JSX.Element {
               </div>
             </div>
           </div>
+        </Section>
+
+        {/* ---------------------------------------------------------------- */}
+        <Section
+          id="loading"
+          title="Loading"
+          description="Two mechanisms, chosen by how long the wait actually is. The branded splash is for a cold start or a heavy dashboard; skeletons are for everything else, because a full-screen takeover on a 120ms navigation makes a fast app feel slower."
+        >
+          <div className="grid gap-cards lg:grid-cols-2">
+            <Card className="overflow-hidden">
+              <CardHeader>
+                <CardTitle>Branded splash</CardTitle>
+                <CardDescription>Initial load, and entering a heavy dashboard.</CardDescription>
+              </CardHeader>
+              <div className="border-t border-border">
+                <BrandSplash inline message="Preparing your workspace" />
+              </div>
+              <CardContent className="pt-card">
+                <p className="text-sm text-muted-foreground">
+                  <strong>No percentage, deliberately.</strong> A counted figure needs a denominator, and
+                  a server render over an unknown connection has none — so every number would be
+                  invented, and a progress bar that stalls at 87% teaches people the number was never
+                  measuring anything. The sweeping indicator makes one claim it cannot be wrong about.
+                </p>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  It also <strong>fades in after 180ms</strong>, in CSS rather than with a timer, so a
+                  fast load unmounts it before it was ever visible.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Skeletons</CardTitle>
+                <CardDescription>In-app navigation between screens.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <LoadingRegion label="Loading students">
+                  <div className="space-y-3">
+                    <Skeleton className="h-6 w-2/5" />
+                    <Skeleton className="h-24 w-full" />
+                    <div className="grid grid-cols-3 gap-2">
+                      <Skeleton className="h-16" />
+                      <Skeleton className="h-16" />
+                      <Skeleton className="h-16" />
+                    </div>
+                  </div>
+                </LoadingRegion>
+                <p className="text-sm text-muted-foreground">
+                  Shaped like the content that replaces them, so the layout does not jump when data
+                  arrives.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </Section>
+
+        {/* ---------------------------------------------------------------- */}
+        <Section
+          id="responsive"
+          title="Small screens"
+          description="Below 480px the type scale, card padding, and gaps tighten — through the token layer, so no component carries a breakpoint modifier. Tap targets are the explicit exception."
+        >
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <caption className="sr-only">Token values above and below the 480px breakpoint</caption>
+              <thead className="bg-sunken text-left">
+                <tr>
+                  <th scope="col" className="px-4 py-2.5 font-medium">Token</th>
+                  <th scope="col" className="px-4 py-2.5 text-right font-medium">≥ 480px</th>
+                  <th scope="col" className="px-4 py-2.5 text-right font-medium">&lt; 480px</th>
+                  <th scope="col" className="px-4 py-2.5 font-medium">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Page title (4xl)', '36px', '26px', 'A 36px title costs most of the fold before any content'],
+                  ['Section heading (3xl)', '30px', '22px', ''],
+                  ['Card title (xl)', '20px', '17px', ''],
+                  ['Body (base)', '15px', '15px', 'Does not shrink — already at the comfortable floor'],
+                  ['Card padding', '20px', '14px', ''],
+                  ['Gap between cards', '20px', '12px', ''],
+                  ['Page gutter', '24px', '16px', ''],
+                  ['Tap target', '44px', '44px', 'WCAG 2.5.5. Never shrinks.'],
+                ].map(([token, wide, narrow, note]) => (
+                  <tr key={token} className="border-t border-border">
+                    <th scope="row" className="px-4 py-2.5 text-left font-normal">{token}</th>
+                    <td data-numeric className="px-4 py-2.5 text-right">{wide}</td>
+                    <td data-numeric className="px-4 py-2.5 text-right">
+                      {wide === narrow ? <Badge variant="success">{narrow}</Badge> : narrow}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Alert variant="info" title="Resize this window below 480px">
+            <p>
+              Everything on this page reflows through the same tokens — nothing here is a special mobile
+              layout. The buttons and inputs stay 44px while the headings and padding tighten around
+              them.
+            </p>
+          </Alert>
         </Section>
 
         {/* ---------------------------------------------------------------- */}

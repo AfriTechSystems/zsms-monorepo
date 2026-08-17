@@ -1,6 +1,10 @@
 /**
  * Card. Bordered rather than shadowed by default — see SHADOW in the tokens for
  * why elevation is rationed.
+ *
+ * Padding is `p-card`, a responsive token: 20px normally, 14px below 480px.
+ * Nothing here carries a breakpoint modifier — the variable moves, the class
+ * does not.
  */
 import * as React from 'react'
 import { cn } from '../../lib/utils'
@@ -14,7 +18,7 @@ Card.displayName = 'Card'
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-5', className)} {...props} />
+    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-card', className)} {...props} />
   ),
 )
 CardHeader.displayName = 'CardHeader'
@@ -34,13 +38,13 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
 CardDescription.displayName = 'CardDescription'
 
 const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => <div ref={ref} className={cn('p-5 pt-0', className)} {...props} />,
+  ({ className, ...props }, ref) => <div ref={ref} className={cn('p-card pt-0', className)} {...props} />,
 )
 CardContent.displayName = 'CardContent'
 
 const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center p-5 pt-0', className)} {...props} />
+    <div ref={ref} className={cn('flex items-center p-card pt-0', className)} {...props} />
   ),
 )
 CardFooter.displayName = 'CardFooter'

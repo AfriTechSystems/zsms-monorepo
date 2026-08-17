@@ -19,6 +19,7 @@
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",
+    "brand:assets": "node scripts/generate-brand-assets.mjs",
     "db:push": "supabase db push",
     "db:list": "supabase migration list",
     "db:diff": "supabase db diff --linked",

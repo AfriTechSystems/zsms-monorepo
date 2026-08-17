@@ -116,6 +116,26 @@ export const TYPOGRAPHY = {
     '3xl': { size: 30, lineHeight: 38 },
     '4xl': { size: 36, lineHeight: 44 },
   },
+  /**
+   * Small-screen overrides, applied below 480px.
+   *
+   * **Headings and chrome shrink. Body text does not.** A 15px body is already
+   * at the floor of comfortable reading, and the users who most need this
+   * product to work on a phone — a parent checking a fee balance outside a
+   * school gate — are the least able to zoom their way out of a bad decision.
+   * What actually wastes a small screen is display type sized for a 27" monitor:
+   * a 36px page title costs three lines and most of the fold before any content
+   * appears.
+   *
+   * `base`, `sm`, and `xs` are deliberately absent from this map.
+   */
+  mobileSize: {
+    lg: { size: 16, lineHeight: 24 },
+    xl: { size: 17, lineHeight: 24 },
+    '2xl': { size: 19, lineHeight: 26 },
+    '3xl': { size: 22, lineHeight: 28 },
+    '4xl': { size: 26, lineHeight: 32 },
+  },
   weight: {
     normal: 400,
     medium: 500,
@@ -149,6 +169,44 @@ export const SPACING = {
   16: 64,
   20: 80,
 } as const
+
+/**
+ * Layout sizing that changes with the viewport.
+ *
+ * Emitted as CSS custom properties and swapped in one media query, so a
+ * component writes `p-[var(--zsms-card-padding)]` once and is correct at every
+ * width. The alternative — `p-3 sm:p-5` scattered across sixty components — is
+ * the same decision made sixty times, and it drifts.
+ *
+ * **`tapTarget` is in this object and is identical in both rows.** That is the
+ * point of listing it: it makes "this one does not shrink" a visible property of
+ * the system rather than something a reviewer has to notice is missing. 44px is
+ * the WCAG 2.5.5 / iOS floor, and a school corridor with a cracked screen
+ * protector is not the place to test whether 36px is good enough.
+ */
+export const SIZING = {
+  /** ≥ 480px. */
+  base: {
+    cardPadding: 20,
+    cardGap: 20,
+    stackGap: 16,
+    sectionGap: 40,
+    pageGutter: 24,
+    tapTarget: 44,
+  },
+  /** < 480px. */
+  mobile: {
+    cardPadding: 14,
+    cardGap: 12,
+    stackGap: 12,
+    sectionGap: 28,
+    pageGutter: 16,
+    tapTarget: 44,
+  },
+} as const
+
+/** The breakpoint the mobile row applies below. */
+export const MOBILE_MAX_WIDTH = 480
 
 export const RADIUS = {
   none: 0,

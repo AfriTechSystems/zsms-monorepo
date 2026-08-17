@@ -125,17 +125,35 @@ const config: Config = {
         sans: ['var(--zsms-font-sans)'],
       },
       fontSize: {
-        // Paired with line-heights from the token scale. Body is 15px rather
-        // than Tailwind's 16px default: at 16px a fees table fits noticeably
-        // fewer rows per screen, and this is a product people scan all day.
-        xs: ['0.75rem', { lineHeight: '1rem' }],
-        sm: ['0.8125rem', { lineHeight: '1.25rem' }],
-        base: ['0.9375rem', { lineHeight: '1.5rem' }],
-        lg: ['1.0625rem', { lineHeight: '1.625rem' }],
-        xl: ['1.25rem', { lineHeight: '1.75rem' }],
-        '2xl': ['1.5rem', { lineHeight: '2rem' }],
-        '3xl': ['1.875rem', { lineHeight: '2.375rem' }],
-        '4xl': ['2.25rem', { lineHeight: '2.75rem' }],
+        // Every size points at a variable rather than a literal, so `text-3xl`
+        // is one class that is correct at 375px and at 1440px — the token layer
+        // swaps the value below 480px. Writing `text-2xl sm:text-3xl` in each
+        // component would be the same decision made once per heading, and it
+        // drifts.
+        //
+        // Body is 15px rather than Tailwind's 16px default: at 16px a fees table
+        // fits noticeably fewer rows, and this is a product people scan all day.
+        // `xs`/`sm`/`base` do NOT shrink on mobile — see TYPOGRAPHY.mobileSize.
+        xs: ['var(--zsms-fs-xs)', { lineHeight: 'var(--zsms-lh-xs)' }],
+        sm: ['var(--zsms-fs-sm)', { lineHeight: 'var(--zsms-lh-sm)' }],
+        base: ['var(--zsms-fs-base)', { lineHeight: 'var(--zsms-lh-base)' }],
+        lg: ['var(--zsms-fs-lg)', { lineHeight: 'var(--zsms-lh-lg)' }],
+        xl: ['var(--zsms-fs-xl)', { lineHeight: 'var(--zsms-lh-xl)' }],
+        '2xl': ['var(--zsms-fs-2xl)', { lineHeight: 'var(--zsms-lh-2xl)' }],
+        '3xl': ['var(--zsms-fs-3xl)', { lineHeight: 'var(--zsms-lh-3xl)' }],
+        '4xl': ['var(--zsms-fs-4xl)', { lineHeight: 'var(--zsms-lh-4xl)' }],
+      },
+      spacing: {
+        // Responsive layout sizing. `p-card`, `gap-cards`, `gap-stack`,
+        // `space-y-section`, `px-gutter` tighten below 480px on their own.
+        card: 'var(--zsms-card-padding)',
+        cards: 'var(--zsms-card-gap)',
+        stack: 'var(--zsms-stack-gap)',
+        section: 'var(--zsms-section-gap)',
+        gutter: 'var(--zsms-page-gutter)',
+        // The one that never changes. Used for min-height/min-width on anything
+        // a finger has to hit.
+        tap: 'var(--zsms-tap-target)',
       },
       keyframes: {
         shimmer: {

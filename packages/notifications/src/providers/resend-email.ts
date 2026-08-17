@@ -12,6 +12,7 @@
  * anything beyond plain transactional send.
  */
 
+import { renderBrandedEmail } from '../email-shell'
 import type { NotificationChannel, Recipient, SendRequest, SendResult } from '../types'
 
 export class ResendEmailChannel implements NotificationChannel {
@@ -23,6 +24,11 @@ export class ResendEmailChannel implements NotificationChannel {
   }
 
   async send(request: SendRequest, renderedBody: string, subject?: string): Promise<SendResult> {
+    // Branding rides on the request. The worker resolves it once per school from
+    // `worker_school_branding()` rather than this provider querying anything —
+    // a provider that reaches for the database is a provider that cannot be
+    // tested without one.
+    const branded = renderBrandedEmail(renderedBody, request.branding ?? null)
     const apiKey = process.env['RESEND_API_KEY']
     const from = process.env['RESEND_FROM_ADDRESS']
 
@@ -50,7 +56,12 @@ export class ResendEmailChannel implements NotificationChannel {
           from,
           to: [request.recipient.email],
           subject: subject ?? 'Message from your school',
-          text: renderedBody,
+          // Multipart. The HTML carries the school's mark and colours; the text
+          // part is what a feature phone, a screen reader in plain-text mode, and
+          // every spam filter actually reads. Sending only one of the two is a
+          // deliverability cost as well as an accessibility one.
+          html: branded.html,
+          text: branded.text,
           // Attachments are passed as R2 paths by the caller and resolved by
           // the worker before this point; a signed URL is never embedded here,
           // because an email is forwardable and a signed URL is a bearer token.

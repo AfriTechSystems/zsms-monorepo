@@ -249,3 +249,5 @@ export type {
   ProviderName,
 } from './types'
 export { mockSentMessages, resetMockMessages } from './providers/mock'
+
+export { renderBrandedEmail, type BrandedEmail, type EmailBranding } from './email-shell'

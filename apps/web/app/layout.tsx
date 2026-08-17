@@ -27,9 +27,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Not `maximum-scale: 1` — blocking pinch-zoom is a WCAG 1.4.4 failure and
   // this product is read on phones by parents who may need to enlarge it.
+  // The browser chrome colour. These are the *page ground* tokens, not white and
+  // near-black — a mismatched address bar above a lavender page is the one place
+  // a themed app still looks unfinished on a phone.
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
-    { media: '(prefers-color-scheme: dark)', color: '#151A24' },
+    { media: '(prefers-color-scheme: light)', color: '#F1F3FA' },
+    { media: '(prefers-color-scheme: dark)', color: '#14181F' },
   ],
 }
 

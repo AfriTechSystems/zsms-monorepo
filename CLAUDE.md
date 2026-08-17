@@ -15,12 +15,13 @@ The tree is:
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0094` applied to `zsms-dev`** (47 migrations) |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0098` applied to `zsms-dev`** (51 migrations) |
 | `supabase/tests/rls/` | **6 pgTAP suites, 263 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
-| `supabase/functions/`, `seed/` | Empty — no Edge Functions yet |
+| `supabase/functions/` | Empty — no Edge Functions yet |
+| `supabase/seed/` | `dev_seed.sql` — 6 synthetic schools spanning health bands. `npm run db:seed`, which **refuses any project but `zsms-dev`** |
 
-**What exists is a backend plus a design system, not a product.** 32 `public` tables with RLS enabled *and* forced on every one, 128 policies, two `security_invoker` views, and the API routes below. **There is still no portal** — no dashboard, no parent portal, no mobile screens. What Phase 4 has added so far is `packages/design-tokens` (the single source of colour, type, spacing, and per-school theming), the `apps/web/components` primitives built on it, and `/design`, a preview page that renders the whole foundation including a live WCAG contrast audit.
+**What exists is a backend plus a design system, not a product.** 32 `public` tables and 4 `afritech` tables with RLS enabled *and* forced on every one, six `security_invoker` views, and the API routes below. **There is still no portal** — no dashboard, no parent portal, no mobile screens. What Phase 4 has added so far is `packages/design-tokens` (the single source of colour, type, spacing, and per-school theming), the `apps/web/components` primitives built on it, and `/design`, a preview page that renders the whole foundation including a live WCAG contrast audit.
 
 **API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages`
 
@@ -69,7 +70,14 @@ Modular monolith (explicitly **not** microservices), Turborepo monorepo.
 Two decisions shape almost everything else:
 
 1. **Tenant isolation lives in the database, not the application.** Every `public` table carries `school_id`; RLS policies filter through the `get_school_id()` helper reading Clerk JWT claims. A new table without an RLS policy is a defect.
-2. **Pricing and feature access are entirely database-driven.** Four `afritech`-schema tables (`subscription_tiers`, `feature_flags`, `tier_features`, `school_feature_overrides`) drive everything. Never hardcode a price, tier, or feature inclusion. Gate features through `schoolHasFeature()`, whose resolution order is fixed: revoke override → grant override → tier override → module subscription → tier matrix.
+2. **Pricing and feature access are entirely database-driven.** Four `afritech`-schema tables (`subscription_tiers`, `feature_flags`, `tier_features`, `school_feature_overrides`) drive everything. Never hardcode a price, tier, or feature inclusion. Gate features through **`public.school_has_feature(school_id, feature_key)`** (migration `0095`), whose resolution order is fixed: **revoke override → grant override → tier override → tier matrix.**
+
+   **Two corrections to what this file used to say, both found by building against it:**
+
+   - Until 2026-08-17 **three of those four tables did not exist.** `afritech` held `subscription_tiers` alone. They were created in `0095`, to the DDL `PRICING.md` already specified, seed matrix included. The claim was written from the documentation rather than from the schema — the same failure the *Known documentation inconsistencies* section below warns about, in this file's own text.
+   - The resolution order lists **five** steps; the implemented one has **four**. There is no module-subscription table in this schema, so that step is omitted rather than faked. It slots between the tier override and the matrix when per-module billing is built.
+
+   `schoolHasFeature()` is the TypeScript wrapper named throughout the docs. **It does not exist yet** — nothing in `apps/` or `packages/` calls the resolver. `school_has_feature()` in the database is the only implementation.
 
 ---
 
@@ -79,7 +87,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 47 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 51 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -151,7 +159,7 @@ From `01 Foundation Layer/CONVENTIONS.md` — that file is authoritative; this i
 
 The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 43 ADRs.
 
-**A pattern worth knowing before you trust any doc:** repeatedly, a document has described something the schema could not do. `class_enrolments` was referenced by four documents and defined by none. `GLOSSARY.md` promised a fee statement with a running balance that nothing could produce. `DATABASE.md`'s `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, not by reading it. **Verify against the applied schema before building on a documented claim.**
+**A pattern worth knowing before you trust any doc — and before you trust *this* one:** repeatedly, a document has described something the schema could not do. The most recent instance was in this file: the line above about four `afritech` tables was true of the documentation and false of the database for the whole of Phases 0–3. Repeatedly, a document has described something the schema could not do. `class_enrolments` was referenced by four documents and defined by none. `GLOSSARY.md` promised a fee statement with a running balance that nothing could produce. `DATABASE.md`'s `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, not by reading it. **Verify against the applied schema before building on a documented claim.**
 
 ### Open, tracked
 
@@ -160,6 +168,9 @@ The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session le
 | **Multi-country config hardening** | ADR-040 | Deferred. `curriculum_type`, `grading_system`, `examination_type`, `level_type`, and `term_number` are hardcoded CHECK constraints; `reference_subjects_zm` bakes the country into a table name. Each needs a migration to admit a second country. Decide when the second country is real. |
 | **Grading-scale versioning on `exam_results`** | ADR-041 | **Open data-integrity gap.** A grade letter is stored without the scale that produced it, so a mid-year scale revision makes historical grades unexplainable. Needs fixing before results are relied on long term. |
 | Migration numbering | `MIGRATIONS.md` | `0022`–`0068` are **void** — they sort below the applied high-water mark and `db push` would skip them. Numbers are assigned when a migration is written, never reserved. Read *Next Available Sequence Number*. |
+| **`schoolHasFeature()` has no TypeScript implementation** | `ARCHITECTURE.md`, ADR-014 | Open. `public.school_has_feature()` exists in the database (`0095`) and the admin API calls it by RPC. No package exports the wrapper the docs name, and nothing caches it — ADR-014 specifies a Redis cache (5-min overrides / 60-min tier). Write it when the first feature is actually gated. |
+| **Per-module subscription** | `PRICING.md`, `DYNAMIC_CONFIG.md` | Open. The documented resolution order has five steps; the implementation has four. No table exists for per-module billing, so the step is omitted rather than faked. |
+| **`payments.payment_method` has no `mobile_money`** | `SCHEMA.md`, `ZM.md` | Open. The CHECK admits `cash`/`bank_deposit`/`cheque`/`online_gateway`/`loan_disbursement`/`reversal`/`waiver`. Mobile money is the dominant rail in Zambia and currently has to be recorded as `online_gateway`, which loses the distinction on every receipt and reconciliation. Needs a migration and a product decision. |
 | Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. Layer 1 (Frontend) now has a foundation — `DESIGN_SYSTEM.md` and `packages/design-tokens` — but no portal screens yet. |
 
 If you resolve one of these, remove its row.

@@ -268,6 +268,34 @@ Derived arrears (ADR-038).
 
   `PAGE_GROUND` in `packages/design-tokens/src/theme.ts` holds the same literal and `validateTheme()` uses it. **These two move together** or the database and the API begin disagreeing about which palettes a school may save.
 
+**`0095`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0095_create_feature_access_tables.sql` — the three feature-access tables that were documented but absent.
+
+  `CLAUDE.md` and ADR-014 both state that four `afritech` tables drive pricing and feature access. **Three of them did not exist**; the schema held `subscription_tiers` alone. Created here to the DDL `PRICING.md` already specified, adopted as written including the seed matrix, plus RLS on all three.
+
+  Also adds `public.school_has_feature(school_id, feature_key)` — the resolution order as a function rather than a query each caller assembles, because `DYNAMIC_CONFIG.md` is explicit that the order is fixed logic and not configuration. **Revoke wins outright**: a revoke exists because someone decided a school must NOT have something, and a later grant that silently overturns it is how a suspended school keeps a feature it was cut off from.
+
+  The documented fifth step, module subscription, has no table. It is omitted and named in the function's comment rather than approximated.
+
+**`0096`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0096_create_platform_metrics.sql` — `platform_metrics()` and `school_health_scores()`.
+
+  **Both are `SECURITY INVOKER`, and that is the design.** Every table they read already carries an `afritech_admin_all_*` policy, so RLS already answers "who may see across schools". The obvious `SECURITY DEFINER` shape would put a second copy of that authorisation rule somewhere no test covers. The migration fails if either function is ever changed to definer.
+
+  Health follows `SCHOOL_HEALTH_SCORES.md`'s 40/30/30 weights and 80/65/45 bands. Four of the six documented inputs are computable from this schema; the two that are not need per-user login telemetry and mobile session data. Each dimension is rescaled over the inputs that exist, so a missing one does not read as a zero, and `inputs_available` is returned so a dashboard can mark the score provisional.
+
+**`0097`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0097_expose_feature_access_to_api.sql` — `security_invoker` views and named write functions over the 0095 tables.
+
+  PostgREST exposes a configured schema list and `afritech` is not on it, deliberately. Rather than widen that — which would put every future `afritech` table one URL away from the internet, opted *out* rather than in — the three relations the admin dashboard needs are surfaced through `public`.
+
+  Writes go through `admin_set_tier_feature()`, `admin_create_override()`, and `admin_revoke_override()` so the API never issues a free-form UPDATE against a pricing table. All invoker-rights: authorisation stays in the 0095 policies and nowhere else. Revoking an override is an UPDATE, not a DELETE — the row is the only record that a support decision was made.
+
+**`0098`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0098_expose_subscription_tiers.sql` — pricing view, `admin_update_tier()`, and **RLS on `subscription_tiers`, which had none**.
+
+  A view is not a security boundary. Exposing an unpoliced base table through a public view makes it readable by anyone, so the policy was added in the same migration as the view rather than left for later.
+
 ---
 
 ### Core Schemas
@@ -536,9 +564,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0095`** — available for the next migration.
+**`0099`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0094` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0098` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -1086,3 +1114,6 @@ CREATE INDEX idx_rate_limit_config_lookup
 | 2026-08-16 | **Added `0092` — `school_branding`, with the WCAG AA guardrail as a CHECK constraint** | `validateTheme()` alone would leave the rule absent from every writer that is not the API. Implementing the luminance formula a second time in SQL is real duplication, paid because a guardrail present in one of two writers is one that will eventually be walked past. ADR-043. |
 | 2026-08-16 | **Added `0093` — brand colours in `worker_payment_context()`** | Receipts assemble from a single call whose `school` object predates `school_branding`; without this a themed school would send themed report cards and unthemed receipts. Next available advances to `0094`. |
 | 2026-08-17 | **Added `0094` — branding contrast re-measured against the page ground** | The page stopped being white, so thresholds measured against white were measuring the wrong surface. Next available advances to `0095`. |
+| 2026-08-17 | **Added `0095` — the three missing `afritech` feature-access tables** | Documented as existing since Phase 0 and never created. Built to PRICING.md's DDL rather than an invented shape. |
+| 2026-08-17 | **Added `0096` — platform metrics and health scores as SECURITY INVOKER** | RLS already decides who sees across schools; a DEFINER function would duplicate that rule where nothing tests it. |
+| 2026-08-17 | **Added `0097`/`0098` — public views and named write functions over `afritech`** | Keeps the schema off PostgREST while giving the admin dashboard exactly four relations. `0098` also closed the missing RLS on `subscription_tiers`. Next available advances to `0099`. |

@@ -4,6 +4,60 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-17 — Admin sub-phase: the feature tables that were never there
+
+Branch `feature/phase-4-design-foundation`. **Migrations `0095`–`0098` applied. `afritech` went from one table to four. Dev seeded with 6 synthetic schools.** Backend for the admin dashboard; screens follow.
+
+### CLAUDE.md described a schema that did not exist
+
+Building the feature-flag screen meant reading `afritech.feature_flags`. It is not there. Nor is `tier_features`, nor `school_feature_overrides`. The schema held `subscription_tiers` and nothing else.
+
+`CLAUDE.md` states this as one of the *two decisions that shape everything else*:
+
+> Pricing and feature access are entirely database-driven. Four `afritech`-schema tables (`subscription_tiers`, `feature_flags`, `tier_features`, `school_feature_overrides`) drive everything.
+
+Three of the four were fiction for the whole of Phases 0–3. What makes this worth more than a line in a changelog is that **the same file warns about exactly this failure** — it has a section headed *"A pattern worth knowing before you trust any doc"*, listing `class_enrolments`, the GLOSSARY fee statement, and the `payments` DDL. The warning was accurate and the file was still wrong two paragraphs earlier, because the architecture summary was written from the specification and never checked against the database.
+
+I have corrected the claim rather than deleted it, and pointed the warning at itself. A doc that says "I was wrong here, in this specific way" is worth more than one quietly fixed.
+
+`0095` builds the three tables to `PRICING.md`'s DDL **as written**, seed matrix included. Nothing invented — where I added anything (a CHECK that an add-on offered for sale has a price; a CHECK that a `grant_feature` row actually names a feature) it is called out in the migration.
+
+**The resolution order is four steps, not five.** The published order is revoke → grant → tier override → *module subscription* → matrix, and no module-subscription table exists. Omitted and named in the function comment rather than approximated. Revoke wins outright, which is the safe direction: a revoke exists because someone decided a school must not have something, and a grant that silently overturns it is how a suspended school keeps the feature it was cut off from.
+
+### The metrics functions are INVOKER, and I want the reasoning on record
+
+The natural shape for an admin dashboard is a `SECURITY DEFINER` function that checks `is_afritech_admin()` and then reads everything. It works. It also creates a second copy of the authorisation rule, in application-adjacent code that no pgTAP suite covers — the same trade ADR-042 had to make for workers, and worth making only when there is no alternative.
+
+Here there was one. Every table these read already carries an `afritech_admin_all_*` policy. Running as INVOKER means the aggregate is scoped by the policies the existing suites already assert: an admin gets the platform, a school owner calling the same function gets their own school, a parent gets nothing. `0096` fails the migration if either function is ever changed to definer, because the change would be invisible in review and silent in behaviour until someone read another school's finances.
+
+The same reasoning drove `0097`: `afritech` stays off PostgREST, and the four relations the dashboard needs are surfaced as `security_invoker` views instead. `0098` added RLS to `subscription_tiers`, **which had none** — putting a public view over an unpoliced table would have made it world-readable, so the policy went in the same migration as the view rather than being left for later.
+
+### Health scores that do not lie about what they measure
+
+`SCHOOL_HEALTH_SCORES.md` specifies six inputs. Two need per-user login telemetry and mobile session data, neither of which this schema has.
+
+The tempting implementation scores the missing inputs as zero. That produces a dashboard where every school looks like it is churning, and a customer-success report that says "call today" about all of them is a report nobody reads twice. Each dimension is rescaled over the inputs that exist instead, and `inputs_available` is returned as 4 of 6 so the screen can mark the score provisional rather than presenting a partial calculation as a complete one.
+
+Deriving `active_teacher_rate` from whether a teacher has marked attendance was considered and rejected — it makes the operational score partly a function of itself.
+
+### The fixture set had to contain failure
+
+First seed had six healthy schools. Loading it proved nothing: a ranking that puts six identical schools in some order has not demonstrated it ranks. D is now billing for forty pupils and doing nothing with them, E is onboarded and never configured, F is suspended. The set spans **excellent 85 to critical 0**, and school A only reaches "excellent" because it has attendance, marks, linked guardians, *and* message traffic — which is the point.
+
+An unbilled school scores 50 on finance rather than 0, deliberately. A school with no fee records is unconfigured, not failing, and a nightly report that calls every new customer critical is one the team learns to ignore.
+
+### Three schema facts found by writing the seed
+
+- **`staff_members` has no `role` column.** Roles are Clerk organisation memberships. Anything reasoning about staff roles from the database alone is reasoning about something that is not there.
+- **`fee_structures` has no `due_date`** — it is a price list; the date lives on `fee_records`, which is what lets one structure be issued with different deadlines.
+- **`payments.payment_method` has no `mobile_money`.** The CHECK admits cash, bank_deposit, cheque, online_gateway, loan_disbursement, reversal, waiver. Mobile money is the dominant payment rail in Zambia and currently has to be recorded as `online_gateway`, which loses the distinction on every receipt and every reconciliation. Flagged in `CLAUDE.md` rather than worked around — it needs a migration and a product decision, not a seed-file shrug.
+
+### What is not done
+
+No screens. No `.env`, so **nothing has been exercised end to end** — every route here is correct against the real schema and the generated types, and not one has answered an HTTP request. Same posture as the Phase 3 delivery caveat, and it should be read the same way.
+
+---
+
 ## 2026-08-17 — Phase 4 sub-phase 1 revision: the aesthetic retune, and a worker that never ran
 
 Branch `feature/phase-4-design-foundation`, continued. **Migration `0094` applied. Token tests 25/25; `school_branding_test.sql` now 38/38; contrast audit grew from 21 to 25 pairings per mode, all passing.** Still no portal screens.

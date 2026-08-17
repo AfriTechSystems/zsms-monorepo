@@ -15,8 +15,8 @@ The tree is:
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0093` applied to `zsms-dev`** (46 migrations) |
-| `supabase/tests/rls/` | **6 pgTAP suites, 261 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (36). `npm run db:test` checks every `plan(N)` against the real assertion count first |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0094` applied to `zsms-dev`** (47 migrations) |
+| `supabase/tests/rls/` | **6 pgTAP suites, 263 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/`, `seed/` | Empty — no Edge Functions yet |
 
@@ -25,6 +25,8 @@ The tree is:
 **API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages`
 
 **Phase 3 caveat — the logic is proven, the delivery is not.** Communications and PDF generation are verified against the real handlers, the real renderer, and the real fallback chain, but **no job has round-tripped through Redis and no message has left this machine.** There is no Redis locally and no Meta/Resend/Twilio credentials, so every channel runs through the mock provider. Live BullMQ→Redis transport and real delivery are **Phase 6, with credentials.** Do not build on the assumption that either has been exercised.
+
+**Running locally.** `npm run dev` starts **only** `apps/web`, on `http://localhost:3000`. Workers are excluded on purpose — they need Redis and provider credentials a UI session has no reason to hold, and a worker crash used to take the web app down with it. Use `npm run dev:workers` to run one deliberately, or `npm run dev:all` for the whole set. Note that `node --experimental-strip-types` is **not** a drop-in TypeScript runner: it requires explicit `.ts` on every relative import, and it has silently broken two scripts in this repo. Use `tsx`.
 
 **Read `JOURNAL.md` first.** It records what each session actually did, the defects found, and what was deliberately deferred — including several cases where a documented claim turned out not to match the schema.
 
@@ -77,7 +79,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 46 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 47 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 

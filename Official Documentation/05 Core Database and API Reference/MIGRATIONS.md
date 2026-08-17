@@ -259,6 +259,15 @@ Derived arrears (ADR-038).
 
   Only the `school` object changes; every join stays anchored to the payment's own `school_id`, and `school_branding` joins on `s.id` so it cannot introduce a second school.
 
+**`0094`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0094_retune_branding_contrast_ground.sql` — the guardrail is re-measured against the page, not white.
+
+  The design foundation moved the page to a soft lavender-grey (`#F1F3FA`) with white cards. That ground is **darker than white**, so `0092`'s thresholds were measuring against the easier of the two surfaces a colour is drawn on. The gap is one-directional: a palette could pass `0092` and still be unreadable in place. `#6E7690` is the worked example — 4.51:1 on white, 4.07:1 on the page.
+
+  Measuring against the page subsumes the white case rather than trading one for it: for a dark anchor, contrast against white is always higher, so clearing the page clears white too.
+
+  `PAGE_GROUND` in `packages/design-tokens/src/theme.ts` holds the same literal and `validateTheme()` uses it. **These two move together** or the database and the API begin disagreeing about which palettes a school may save.
+
 ---
 
 ### Core Schemas
@@ -527,9 +536,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0094`** — available for the next migration.
+**`0095`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0093` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0094` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -1076,3 +1085,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 **NEXT AVAILABLE: `0092`** — see *Next Available Sequence Number* above, which is authoritative.
 | 2026-08-16 | **Added `0092` — `school_branding`, with the WCAG AA guardrail as a CHECK constraint** | `validateTheme()` alone would leave the rule absent from every writer that is not the API. Implementing the luminance formula a second time in SQL is real duplication, paid because a guardrail present in one of two writers is one that will eventually be walked past. ADR-043. |
 | 2026-08-16 | **Added `0093` — brand colours in `worker_payment_context()`** | Receipts assemble from a single call whose `school` object predates `school_branding`; without this a themed school would send themed report cards and unthemed receipts. Next available advances to `0094`. |
+| 2026-08-17 | **Added `0094` — branding contrast re-measured against the page ground** | The page stopped being white, so thresholds measured against white were measuring the wrong surface. Next available advances to `0095`. |

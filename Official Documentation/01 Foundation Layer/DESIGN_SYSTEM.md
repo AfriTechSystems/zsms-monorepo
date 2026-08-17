@@ -32,7 +32,9 @@ Three structural decisions follow from that ordering and are not negotiable per 
 
 **1. Nothing is styled per screen.** Every colour, radius, shadow, and font size is a token in `packages/design-tokens`, emitted as CSS custom properties. A component reads `var(--primary)`; it never reads `#3A8DDE`. This is what makes per-school theming free: the school's colours arrive as different values for the same variables, and no component knows the difference.
 
-**2. Colour carries hierarchy, not decoration.** The brand palette has six colours, and using them at equal weight would produce a noisy interface. They are ranked instead — see *Colour Hierarchy* below. Navy and white do the work; blue is the single action colour; the rest are semantic and appear only where they mean something.
+**2. Colour is applied as a tint, not as a block, and it carries hierarchy.** The brand palette has six colours; used at equal weight and full saturation they produce a carnival. They are ranked instead — see *Colour Hierarchy* — and applied as pale chips with darker text on top rather than as saturated panels. A row of saturated cards competes with the data underneath it: every card shouts equally, so none of them signals anything.
+
+**Navy is ink, not fill.** The anchor colour's job is body text, headings, and navigation labels. It should rarely appear as a large solid block — a saturated navy panel reads as chrome from an older generation of admin software, while the same navy used as ink on a light ground reads as considered. The airiness comes from what is left uncoloured.
 
 **3. Accessibility is arithmetic, not opinion.** WCAG AA contrast is computed, asserted in tests, and enforced by a database constraint. It is not reviewed by eye. The palette a school supplies is checked before it is stored, and a palette that fails is refused rather than warned about.
 
@@ -45,33 +47,40 @@ Three structural decisions follow from that ordering and are not negotiable per 
 | Module | Responsibility |
 |---|---|
 | `contrast.ts` | WCAG relative luminance, contrast ratio, AA thresholds, `readableTextOn()` |
-| `scale.ts` | Derives a 7-step colour scale from one brand hex |
+| `scale.ts` | Derives an 8-step colour scale from one brand hex |
 | `tokens.ts` | Brand, neutral, typography, spacing, radius, shadow; builds light and dark themes |
 | `theme.ts` | School branding input, validation, logo fallback, resolution |
 | `css.ts` | Tokens → CSS custom properties |
 
 ### Why a scale is derived rather than authored
 
-The supplied ZSMS brand palette is a *brand* palette, not an interface palette. Measured against white, only navy passes WCAG AA for normal text:
+The supplied ZSMS brand palette is a *brand* palette, not an interface palette. Measured against the ground it is drawn on, only the anchor navy passes WCAG AA for normal text:
 
-| Role | Hex | Contrast vs white | Passes AA text (4.5:1)? | Passes AA non-text (3:1)? |
+| Role | Hex | vs page `#F1F3FA` | Passes AA text (4.5:1)? | Passes AA non-text (3:1)? |
 |---|---|---|---|---|
-| Anchor navy | `#2B3A55` | 11.42:1 | Yes | Yes |
-| Primary blue | `#3A8DDE` | 3.47:1 | **No** | Yes |
-| Success green | `#4A9B4F` | 3.45:1 | **No** | Yes |
-| Warning amber | `#F5A623` | 1.95:1 | **No** | **No** |
-| Danger coral | `#E15A44` | 3.44:1 | **No** | Yes |
-| Accent teal | `#1BA0B0` | 2.77:1 | **No** | **No** |
+| Anchor navy | `#1E2A3F` | 12.99:1 | Yes | Yes |
+| Primary blue | `#3A8DDE` | 3.13:1 | **No** | Yes |
+| Success green | `#4A9B4F` | 3.11:1 | **No** | Yes |
+| Warning amber | `#F5A623` | 1.83:1 | **No** | **No** |
+| Danger coral | `#E15A44` | 3.30:1 | **No** | Yes |
+| Accent teal | `#1BA0B0` | 2.83:1 | **No** | **No** |
+
+**Measured against the page, not white.** The page ground is a soft lavender-grey, and it is darker than white, so it is the binding surface — a colour derived to clear 4.5:1 on `#FFFFFF` lands at 4.15:1 once it is drawn on the page. That is the easier test passing while the real one fails, and it is exactly what happened when the page stopped being white; the audit caught it the same afternoon.
 
 Using these directly as text colours would fail accessibility on nearly every label in the product. Discarding them would throw away the brand. The resolution is a derived scale:
 
 | Step | Role | Guarantee |
 |---|---|---|
-| 50 / 100 / 200 | Tints — badge and callout backgrounds | Light enough to carry step-700 text |
-| **500** | **The brand hex, unmodified** — fills, bars, chart marks | ≥3:1 against white (WCAG 1.4.11) |
-| 600 | Text and solid button backgrounds | Darkened in HSL until ≥4.5:1 against white |
+| 50 / 100 / 200 | Tints — stat-card, badge, and callout backgrounds | Light enough to carry step-700 text; progressively desaturated as they lighten |
+| **500** | **The brand hex, unmodified** — large decorative fills, swatches | None. It is the brand as given. |
+| **mark** | Icons, status dots, bar segments | ≥3:1 against this hue's own `100` tint |
+| 600 | Text and solid button backgrounds | Darkened in HSL until ≥4.5:1 against the page |
 | 700 | Text on a tint of the same hue | ≥7:1 |
 | 800 | Deepest step, borders on dark fills | — |
+
+**Why `mark` exists as a separate step.** WCAG 1.4.11 asks 3:1 of a graphical object against what surrounds it, and the ground these marks sit on is the hue's own `100` chip — the tightest pairing in the system. Measured flat, the brand hues do not all clear it: blue lands at 2.93, teal at 2.79, and **amber at 1.80**, which is a status dot invisible on the chip it is meant to label. So the mark is derived to guarantee the bar, exactly as `600` is derived to guarantee text. For hues that already pass, it is indistinguishable from `500`.
+
+**Tints are desaturated as they lighten.** Raising lightness alone preserves saturation, and a fully saturated colour at 93% lightness reads as sherbet. Pulling saturation down as lightness rises gives the chalky, slightly greyed tint the aesthetic wants. It is the single adjustment that most changes how designed the result looks, and it costs one multiplier.
 
 **The brand colour itself is preserved exactly, at step 500.** A parent looking at a fee card sees the school's actual green on the status bar. The 4.5:1 obligation is met by step 600, which is the same hue at lower lightness — recognisably the same colour, legibly darker.
 
@@ -80,6 +89,16 @@ Amber is the case that proves the rule: it cannot carry white text at any usable
 ### Dark mode
 
 Dark mode is **not** an inversion. Inverting a light theme puts step-600 text (chosen to be dark) on a dark surface, which fails immediately. `deriveDarkScale()` takes the *light* end of each hue for text on dark surfaces and the mid steps for fills, and the audit is re-run against the dark surface set rather than assumed to transfer.
+
+Three properties, each chosen against a specific failure:
+
+| Property | Value | Why |
+|---|---|---|
+| Ground | `#14181F` — deep charcoal, never pure black | Text on `#000` produces halation, the smearing where light letterforms bleed at their edges. It is the most common complaint about dark themes from people who read them all day, and a charcoal a few points off black removes it at no measurable cost. |
+| Card | `#1A1F2A` — one step **lighter** than the page | In light mode elevation reads as a shadow; on a dark ground shadows are invisible, so lightness is the only depth cue left. Cards darker than the page — the naive inversion — read as holes. |
+| Accents | Desaturated ~18% | A fully saturated hue on charcoal does not read as brighter, it reads as *vibrating*: the eye cannot settle on the edge between a neon accent and a near-black ground. Over a shift that is fatigue, not emphasis. |
+
+Dark scales are derived against the **card**, not the page, because tinted chips and their text live inside cards. Deriving against the darker page returns steps that pass there and fall short by a hair where they are actually drawn. Body text sits at `#F1F3FA` rather than pure white, again for halation rather than for WCAG.
 
 `data-theme` on `<html>` is the single switch. Tailwind's `dark:` utilities compile against a selector, and CSS custom properties can flip on a media query; if both mechanisms were live they would disagree for every user on the "system" setting — variables dark, utilities light. A pre-paint script resolves "system" to an explicit `data-theme` value so exactly one mechanism is ever in play. The `prefers-color-scheme` block in the emitted stylesheet is scoped to `:root:not([data-theme])` and exists only as a no-JavaScript fallback.
 
@@ -91,10 +110,12 @@ Equal-weight use of six brand colours produces a carnival. The ranking is:
 
 | Rank | Colour | Where it may appear |
 |---|---|---|
-| Workhorse | Navy + white + grey neutrals | Headers, navigation, body text, surfaces, borders. The majority of every screen. |
+| Workhorse | Navy ink + white cards + lavender-grey page | Body text, headings, navigation labels, surfaces, borders. The majority of every screen, and almost none of it as a solid navy area. |
 | Single action | Blue | Primary buttons, links, active states, focus rings. **One filled primary button per view.** |
 | Semantic | Green / amber / coral | Only where they carry meaning — see the mapping below |
-| Sparing accent | Teal | Occasional highlight. Never a status. |
+| Sparing accent | Teal | Informational figures and occasional highlight. Never a status. |
+
+All six hues — plus a lavender-grey derived from the anchor — are available as **soft-tint chips**: `bg-<role>-tint` for the panel, `text-<role>-text` for its text, `text-<role>-fill` for its icon or status dot. Warmth comes from having six quiet tints available, not from turning any one of them up.
 
 ### Semantic mapping — fixed across every domain
 
@@ -139,6 +160,7 @@ Body is 15px rather than the more common 16px: the product is table-dense, and 1
 
 ## Component Rules
 
+- **Colour arrives as a tint.** A coloured area is `bg-<role>-tint` with `text-<role>-text` on it. Saturated fills are reserved for the one primary button and for small marks — icons, status dots, bar segments — drawn in `<role>-fill`, the step derived to clear 3:1 against its own tint.
 - **One filled primary button per view.** A screen with three competing filled buttons is a screen where a tired bursar clicks the wrong one. Secondary actions are `outline`, `secondary`, or `ghost`.
 - **`destructive` is reserved** for actions that delete or reverse money. It is not a general-purpose red button.
 - **Every input has a visible label.** Placeholder-as-label disappears exactly when the user needs it.
@@ -157,7 +179,7 @@ A school configures **colours and a logo. Nothing else.**
 
 | Field | Meaning | Unset behaviour |
 |---|---|---|
-| `anchor_color` | Header, navigation | ZSMS navy `#2B3A55` |
+| `anchor_color` | Ink — body text, headings, navigation | ZSMS navy `#1E2A3F` |
 | `primary_color` | Buttons, links, active states | ZSMS blue `#3A8DDE` |
 | `logo_url` | Full wordmark | School initials |
 | `icon_url` | Square mark — favicon, collapsed nav | School initials |
@@ -196,8 +218,10 @@ A school's colour choice is validated before it is stored, against two threshold
 
 | Field | Requirement | Why |
 |---|---|---|
-| `anchor_color` | ≥ **4.5:1** against white | White navigation text sits on it — normal-size text, WCAG 1.4.3 |
-| `primary_color` | ≥ **3:1** against white | Used unmodified as a button fill; below this the button edge vanishes — WCAG 1.4.11 |
+| `anchor_color` | ≥ **4.5:1** against the page `#F1F3FA` | It is the ink the interface is written in — normal-size text, WCAG 1.4.3 |
+| `primary_color` | ≥ **3:1** against the page `#F1F3FA` | Used unmodified as a button and chip fill; below this the control's own edge vanishes — WCAG 1.4.11 |
+
+Both are measured against the **page**, not white, because the page is the darker of the two light grounds and therefore the binding one. Measuring against white would let a near-miss through: `#6E7690` reaches 4.51:1 on white and falls to 4.07:1 on the page. This changed in migration `0094`, after the page stopped being white.
 
 **These are refusals, not warnings.** A warning would be dismissed by whoever is setting the school up at 9pm the night before launch, and the people who then cannot read their fee balance are parents who never chose the colour.
 
@@ -295,3 +319,10 @@ No logo is the normal state for a new school. The fallback is the school's initi
 | 2026-08-16 | Documented the derived-scale approach and the measured brand-palette contrast failures | Five of six brand colours fail AA as text; recording the measurements prevents the decision being relitigated by eye |
 | 2026-08-16 | Per-school theming defined — scope, propagation, guardrail, logo fallback | ADR-043 |
 | 2026-08-16 | Recorded the two-place enforcement of the AA guardrail and the SQL/TS agreement assertions | A guardrail present in only one of two writers is one that will eventually be walked past |
+| 2026-08-17 | Anchor navy deepened to `#1E2A3F` and reframed as **ink rather than fill** | A saturated navy bar reads as older admin chrome; the same colour as text reads as considered, and the airiness comes from what is left uncoloured |
+| 2026-08-17 | Page ground moved to lavender-grey `#F1F3FA` with white cards | A white page with white cards must draw every boundary with a line; a tinted ground lets a card sit on the page without one |
+| 2026-08-17 | Text steps re-derived against the **page** rather than white; guardrail thresholds moved with them (migration `0094`) | A link derived to clear 4.5:1 on white lands at 4.15:1 on the page — the easier test passing while the real one fails. Caught by the audit, not by review |
+| 2026-08-17 | Added the derived **`mark`** step and the tint/fill/text triple for all six hues | Flat brand hues do not clear 3:1 on their own chips — amber measures 1.80:1, an invisible status dot |
+| 2026-08-17 | Tints desaturated as they lighten | Full saturation at 93% lightness reads as sherbet; damping saturation gives the chalky tint the aesthetic wants |
+| 2026-08-17 | Dark mode retuned — charcoal `#14181F` ground, `#1A1F2A` cards one step lighter, accents desaturated ~18% | Halation on pure black; shadows are invisible on dark so lightness is the only depth cue; saturated hues on charcoal vibrate rather than glow |
+| 2026-08-17 | Dark/light CSS blocks made element-scoped rather than `:root`-scoped | Lets a dark panel sit inside a light page — the only way to review both modes at once — and matches Tailwind's `dark:` variant, which was already element-scoped |

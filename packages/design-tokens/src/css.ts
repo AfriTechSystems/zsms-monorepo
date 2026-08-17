@@ -56,21 +56,45 @@ function themeVars(theme: ThemeTokens): Record<string, string> {
     '--zsms-surface-sunken': s.surfaceSunken,
     '--zsms-text-subtle': s.textSubtle,
 
+    // Every hue is exposed as the same three roles, so a component picks a
+    // *meaning* and gets a consistent triple rather than choosing shades:
+    //
+    //   --zsms-<hue>-tint   pale chip background   (stat cards, badges, banners)
+    //   --zsms-<hue>-fill   saturated mark  (icons, dots, bar segments — guaranteed ≥3:1 on its tint)
+    //   --zsms-<hue>-text   text and emphasis on that tint (≥4.5:1)
+    //
+    // The uniformity is the point. Six hues each offering a different subset is
+    // how a "soft tint" pattern degrades into per-screen colour picking.
     '--zsms-success': c.success[600],
     '--zsms-success-tint': c.success[100],
+    '--zsms-success-fill': c.success.mark,
     '--zsms-success-text': c.success[700],
+
     '--zsms-warning': c.warning[600],
     '--zsms-warning-tint': c.warning[100],
+    '--zsms-warning-fill': c.warning.mark,
     '--zsms-warning-text': c.warning[700],
+
     '--zsms-danger': c.danger[600],
     '--zsms-danger-tint': c.danger[100],
+    '--zsms-danger-fill': c.danger.mark,
     '--zsms-danger-text': c.danger[700],
+
+    '--zsms-accent': c.accent[600],
     '--zsms-accent-tint': c.accent[100],
+    '--zsms-accent-fill': c.accent.mark,
     '--zsms-accent-text': c.accent[700],
 
-    '--zsms-primary-fill': c.primary[500],
     '--zsms-primary-tint': c.primary[100],
+    '--zsms-primary-fill': c.primary.mark,
     '--zsms-primary-text': c.primary[700],
+
+    // The sixth chip. Derived from the anchor rather than added as a seventh
+    // brand hue — a low-saturation navy tint IS lavender-grey, so the neutral
+    // chip in the set comes free and stays in the same hue family as the ink.
+    '--zsms-neutral-tint': c.anchor[100],
+    '--zsms-neutral-fill': c.anchor.mark,
+    '--zsms-neutral-text': c.anchor[700],
   }
 }
 
@@ -113,6 +137,19 @@ export function themeToStyleObject(theme: ResolvedTheme): Record<string, string>
  *
  * The media query is kept only as a no-JavaScript fallback, scoped to
  * `:not([data-theme])` so it never fights an explicit choice.
+ *
+ * The dark block is written as a bare `[data-theme="dark"]` rather than
+ * `:root[data-theme="dark"]`, so it matches **any** element carrying the
+ * attribute, not only the document root. Two things fall out of that: a dark
+ * panel can be embedded in a light page (the design preview shows both modes
+ * side by side, which is the only way to tell whether they are one design or
+ * two), and it lines up with Tailwind's `dark:` variant, which is configured as
+ * `[data-theme="dark"] &` and has always matched nested elements. The two
+ * mechanisms disagreeing about scope is the same class of bug as them
+ * disagreeing about which mode is active.
+ *
+ * Specificity is unchanged — `[data-theme="dark"]` and `:root` are both (0,1,0),
+ * and this block comes second, so it still wins on the root element.
  */
 export function themeToStyleSheet(theme: ResolvedTheme, selector = ':root'): string {
   return [
@@ -120,8 +157,14 @@ export function themeToStyleSheet(theme: ResolvedTheme, selector = ':root'): str
     declarations({ ...staticVars, ...themeVars(theme.light) }),
     `}`,
     ``,
-    `${selector}[data-theme="dark"] {`,
+    `[data-theme="dark"] {`,
     declarations(themeVars(theme.dark)),
+    `}`,
+    ``,
+    `/* Re-declared so a light panel nested inside a dark page resolves. Without`,
+    `   this, [data-theme="light"] has no rule and simply inherits the dark vars. */`,
+    `[data-theme="light"] {`,
+    declarations(themeVars(theme.light)),
     `}`,
     ``,
     `/* No-JS fallback only. The script resolves 'system' to an explicit value. */`,

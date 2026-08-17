@@ -47,6 +47,7 @@ const config: Config = {
           DEFAULT: 'var(--accent)',
           foreground: 'var(--accent-foreground)',
           tint: 'var(--zsms-accent-tint)',
+          fill: 'var(--zsms-accent-fill)',
           text: 'var(--zsms-accent-text)',
         },
         card: {
@@ -61,6 +62,14 @@ const config: Config = {
         // ZSMS semantic roles. Named for meaning, not hue — a component asks
         // for `success`, never for "the green one", so a status colour cannot
         // drift into decoration.
+        //
+        // Every role offers the same three shades, which is what makes the
+        // soft-tint pattern writable without picking colours per screen:
+        //
+        //   bg-<role>-tint   pale chip background
+        //   text-<role>-text text and emphasis on that chip
+        //   bg-<role>-fill   the saturated mark — icon, dot, bar segment
+        //
         anchor: {
           DEFAULT: 'var(--zsms-anchor)',
           strong: 'var(--zsms-anchor-strong)',
@@ -69,17 +78,34 @@ const config: Config = {
         success: {
           DEFAULT: 'var(--zsms-success)',
           tint: 'var(--zsms-success-tint)',
+          fill: 'var(--zsms-success-fill)',
           text: 'var(--zsms-success-text)',
         },
         warning: {
           DEFAULT: 'var(--zsms-warning)',
           tint: 'var(--zsms-warning-tint)',
+          fill: 'var(--zsms-warning-fill)',
           text: 'var(--zsms-warning-text)',
         },
         danger: {
           DEFAULT: 'var(--zsms-danger)',
           tint: 'var(--zsms-danger-tint)',
+          fill: 'var(--zsms-danger-fill)',
           text: 'var(--zsms-danger-text)',
+        },
+        // The lavender-grey chip. Derived from the anchor hue rather than being
+        // a seventh brand colour — see css.ts.
+        //
+        // NOTE: this replaces Tailwind's built-in `neutral` scale rather than
+        // extending it — `extend.colors.neutral` overwrites the key wholesale —
+        // so `neutral-50` … `neutral-950` no longer exist. That is intended: a
+        // raw Tailwind grey is a hardcoded colour no school can theme, and the
+        // greys this product uses come from the token layer. Nothing in the app
+        // referenced them.
+        neutral: {
+          tint: 'var(--zsms-neutral-tint)',
+          fill: 'var(--zsms-neutral-fill)',
+          text: 'var(--zsms-neutral-text)',
         },
         sunken: 'var(--zsms-surface-sunken)',
         subtle: 'var(--zsms-text-subtle)',

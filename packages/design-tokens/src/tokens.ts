@@ -31,7 +31,17 @@ import { deriveDarkScale, deriveScale, type ColorScale } from './scale'
  * an audit can compare it against the logo without reading derivation code.
  */
 export const BRAND = {
-  navy: '#2B3A55',
+  /**
+   * Near-charcoal navy. Deliberately deeper than the original `#2B3A55`.
+   *
+   * This colour's job is **text and structure, not fill.** At 14.4:1 on white it
+   * is a body-text colour first, a heading colour second, and a navigation
+   * colour third — and it should rarely appear as a large solid block. A saturated
+   * navy panel reads as a heavy chrome bar from an older generation of admin
+   * software; the same navy used as *ink* on a light ground reads as considered.
+   * The airiness the product wants comes from what is left uncoloured.
+   */
+  navy: '#1E2A3F',
   blue: '#3A8DDE',
   green: '#4A9B4F',
   amber: '#F5A623',
@@ -40,24 +50,41 @@ export const BRAND = {
 } as const
 
 /**
- * Neutrals. Warm-tinted rather than pure grey — a hint of the navy hue runs
- * through them, which is what keeps a white-dominant UI feeling warm instead of
- * clinical. Pure `#808080` greys next to a navy header read as two unrelated
- * palettes.
+ * Neutrals, tinted toward lavender-blue rather than pure grey.
+ *
+ * The hue runs at roughly 228°, at very low saturation. Two things follow:
+ *
+ * The **page** can be a soft tinted ground (`100`) rather than white, with cards
+ * in true white on top. That inversion — coloured page, white card — is most of
+ * what makes an interface feel modern and calm rather than flat. A white page
+ * with white cards has to draw every boundary with a line; a tinted page lets the
+ * card float without one.
+ *
+ * And the neutrals sit in the *same hue family* as the navy, so greys next to
+ * navy text read as one palette. Pure `#808080` beside a blue-black looks like
+ * two products glued together.
  */
 export const NEUTRAL = {
   0: '#FFFFFF',
-  25: '#FCFCFD',
-  50: '#F7F8FA',
-  100: '#EFF1F5',
-  200: '#E1E5EC',
-  300: '#CBD2DD',
-  400: '#9AA4B6',
-  500: '#6B7688',
-  600: '#4E5768',
-  700: '#3A4254',
-  800: '#252C3B',
-  900: '#151A24',
+  25: '#FAFBFE',
+  50: '#F6F7FC',
+  /** The page ground. Soft lavender-grey — the surface everything else sits on. */
+  100: '#F1F3FA',
+  /** Recessed inside a card: zebra rows, track fills, ghost-button hover. */
+  150: '#E9ECF6',
+  /** Decorative dividers and card edges. */
+  200: '#E0E4F0',
+  300: '#C7CDDF',
+  400: '#98A0B8',
+  /** 5.19:1 on white, 4.69:1 on the page ground — safe as subtle text on both. */
+  500: '#646C88',
+  600: '#4C5470',
+  700: '#363D54',
+  800: '#232838',
+  /** Dark-mode card. A touch lighter than the page, which is the whole depth cue. */
+  850: '#1A1F2A',
+  /** Dark-mode page ground. Deep charcoal, never pure black. */
+  900: '#14181F',
 } as const
 
 // ---------------------------------------------------------------------------
@@ -174,11 +201,17 @@ export interface SemanticColors {
 }
 
 export interface SurfaceColors {
-  /** The page itself. White dominant. */
+  /**
+   * The page ground.
+   *
+   * Not white. A soft lavender-grey in light mode, deep charcoal in dark — in
+   * both cases a shade *away* from the card colour, so a card reads as sitting
+   * on the page rather than being cut out of it.
+   */
   background: string
-  /** Cards, panels, table headers. */
+  /** Cards and panels. White in light mode; one step up from the page in dark. */
   surface: string
-  /** A recessed area — table zebra striping, disabled fields. */
+  /** A recessed area — table zebra striping, track fills, ghost-button hover. */
   surfaceSunken: string
   /**
    * Decorative dividers — card edges, table rules, separators.
@@ -257,27 +290,33 @@ export function buildLightTheme(brand: {
   coral: string
   teal: string
 }): ThemeTokens {
-  const primary = deriveScale(brand.blue)
+  // Text steps are derived against the PAGE, not white — the page is the darker
+  // of the two light grounds, so clearing it clears the card too. See
+  // `deriveScale`'s note for the failure that made this explicit.
+  const ground = NEUTRAL[100]
+  const primary = deriveScale(brand.blue, ground)
 
   return {
     mode: 'light',
     colors: {
-      anchor: deriveScale(brand.navy),
+      anchor: deriveScale(brand.navy, ground),
       primary,
-      success: deriveScale(brand.green),
-      warning: deriveScale(brand.amber),
-      danger: deriveScale(brand.coral),
-      accent: deriveScale(brand.teal),
+      success: deriveScale(brand.green, ground),
+      warning: deriveScale(brand.amber, ground),
+      danger: deriveScale(brand.coral, ground),
+      accent: deriveScale(brand.teal, ground),
     },
     surface: {
-      background: NEUTRAL[0],
+      // Tinted page, white cards. See NEUTRAL's note — this pairing is what
+      // carries the airy, modern feel, and it costs nothing at runtime.
+      background: NEUTRAL[100],
       surface: NEUTRAL[0],
-      surfaceSunken: NEUTRAL[50],
+      surfaceSunken: NEUTRAL[150],
       border: NEUTRAL[200],
-      // 4.59:1 against white. Input borders are held to the control-boundary
-      // rule, and this errs deliberately on the dark side — GOV.UK, the most
-      // rigorously tested accessible form system in production, goes darker
-      // still.
+      // 5.19:1 against white, 4.69:1 against the page. Input borders are held to
+      // the control-boundary rule, and this errs deliberately on the dark side —
+      // GOV.UK, the most rigorously tested accessible form system in production,
+      // goes darker still.
       borderStrong: NEUTRAL[500],
       text: brand.navy,
       textMuted: NEUTRAL[600],
@@ -294,11 +333,23 @@ export function buildLightTheme(brand: {
 /**
  * Dark mode, derived from the same brand input rather than authored separately.
  *
- * The surface is `#151A24` — the navy pushed down to near-black, not a neutral
- * charcoal, so the dark theme is recognisably the same product. Text sits at
- * `NEUTRAL[100]` rather than pure white: full white on near-black is
- * uncomfortable over a long working day and is a common accessibility
- * complaint, though not a WCAG failure.
+ * Three properties, each chosen against a specific failure:
+ *
+ * **The ground is deep charcoal (`#14181F`), never pure black.** Pure black
+ * maximises contrast and is worse for it: text on `#000` produces halation, the
+ * smearing effect where light letterforms bleed at their edges, and it is the
+ * single most common complaint about dark themes from people who read them all
+ * day. A charcoal a few points off black removes it and costs nothing measurable.
+ *
+ * **Cards sit one step *lighter* than the page (`#1A1F2A`).** In light mode
+ * elevation reads as a shadow; on a dark ground shadows are invisible, so
+ * lightness is the only depth cue available. Cards darker than the page — the
+ * naive inversion of the light theme — read as holes.
+ *
+ * **Accents are desaturated**, in `deriveDarkScale`. See its note.
+ *
+ * Body text sits at `NEUTRAL[100]` rather than pure white for the same
+ * halation reason; it is not a WCAG requirement, it is a comfort one.
  */
 export function buildDarkTheme(brand: {
   navy: string
@@ -308,38 +359,44 @@ export function buildDarkTheme(brand: {
   coral: string
   teal: string
 }): ThemeTokens {
-  const surface = NEUTRAL[900]
+  const page = NEUTRAL[900]
+  const card = NEUTRAL[850]
 
-  const primary = deriveDarkScale(brand.blue, surface)
+  // Scales are derived against the CARD, not the page. Tinted chips and their
+  // text live inside cards, so the card is the ground the contrast search must
+  // clear — deriving against the darker page would return steps that pass there
+  // and fall short by a hair where they are actually drawn.
+  const primary = deriveDarkScale(brand.blue, card)
 
   return {
     mode: 'dark',
     colors: {
-      anchor: deriveDarkScale(brand.navy, surface),
+      anchor: deriveDarkScale(brand.navy, card),
       primary,
-      success: deriveDarkScale(brand.green, surface),
-      warning: deriveDarkScale(brand.amber, surface),
-      danger: deriveDarkScale(brand.coral, surface),
-      accent: deriveDarkScale(brand.teal, surface),
+      success: deriveDarkScale(brand.green, card),
+      warning: deriveDarkScale(brand.amber, card),
+      danger: deriveDarkScale(brand.coral, card),
+      accent: deriveDarkScale(brand.teal, card),
     },
     surface: {
-      background: surface,
-      surface: NEUTRAL[800],
-      surfaceSunken: '#1B2130',
-      border: '#323A4B',
-      // 3.04:1 against the dark surface — the same control-boundary rule as
-      // light mode, measured against a different background.
+      background: page,
+      surface: card,
+      surfaceSunken: '#232935',
+      border: '#2B3240',
+      // 3.47:1 against the card — the same control-boundary rule as light mode,
+      // measured against a different ground.
       borderStrong: NEUTRAL[500],
       text: NEUTRAL[100],
-      // Both bumped one step lighter than the light-mode equivalents: on a dark
-      // surface, NEUTRAL[500] as subtle text measures 3.04:1 and fails AA.
+      // Both bumped lighter than the light-mode equivalents: on a dark surface,
+      // NEUTRAL[500] as body text fails AA.
       textMuted: NEUTRAL[300],
       textSubtle: NEUTRAL[400],
       textOnFill: NEUTRAL[900],
-      // The header stays deep navy in dark mode, so its text stays light.
+      // In dark mode the anchor is a light ink on a dark ground, not a navy
+      // block, so "text on anchor" means text on the anchor's tinted panel.
       textOnAnchor: NEUTRAL[100],
-      // Step 600 here, not 500: it is lightened until it clears 4.5:1 against
-      // this surface, so the ring stays visible whatever the school chose.
+      // Step 600, not 500: lightened until it clears 4.5:1 against this ground,
+      // so the ring stays visible whatever colour the school chose.
       focusRing: primary[600],
     },
   }

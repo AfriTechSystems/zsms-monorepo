@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "main": "./src/worker.ts",
+  "//dev:worker": "Named 'dev:worker', not 'dev', so `turbo dev` does not start it. A worker needs Redis and provider credentials that a UI session has no reason to hold, and a worker crash must never take the web app down with it. Run it explicitly with `npm run dev:workers` from the root.",
+  "//runner": "tsx, not `node --experimental-strip-types`. Node's type stripping is an ESM loader and requires explicit '.ts' on every relative import; this package writes `from './db'` throughout, which that runner cannot resolve. tsx is the root devDependency already used for the e2e script.",
   "scripts": {
     "type-check": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "dev": "node --experimental-strip-types src/worker.ts"
+    "dev:worker": "tsx src/worker.ts"
   },
   "dependencies": {
     "@zsms/documents": "*",

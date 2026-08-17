@@ -22,7 +22,7 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        neutral: 'bg-sunken text-muted-foreground',
+        neutral: 'bg-neutral-tint text-neutral-text',
         /** Paid, present, active. */
         success: 'bg-success-tint text-success-text',
         /** Due soon, partial, pending. */

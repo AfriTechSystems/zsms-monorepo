@@ -3,7 +3,8 @@
 --
 -- Spec: Official Documentation/01 Foundation Layer/DECISIONS.md ADR-043,
 --       DESIGN_SYSTEM.md, DYNAMIC_CONFIG.md — School Branding.
--- Migration under test: 0092_create_school_branding.sql
+-- Migrations under test: 0092_create_school_branding.sql
+--                        0094_retune_branding_contrast_ground.sql
 --
 -- Three things are asserted here that nothing else can assert:
 --
@@ -30,7 +31,7 @@
 
 BEGIN;
 
-SELECT plan(36);
+SELECT plan(38);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
@@ -63,33 +64,34 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims',
   '{"sub":"user_owner_b","o":{"id":"org_school_b","slg":"beta-school","rol":"org:owner"}}', TRUE);
 
--- Pale yellow measures 1.07:1 against the white navigation text that sits on
--- the anchor. This is the case the constraint exists for.
+-- Pale yellow measures 1.03:1 against the page it would be ink on. This is the
+-- case the constraint exists for.
 SELECT throws_ok(
   $$ INSERT INTO public.school_branding (school_id, anchor_color)
      VALUES ('22222222-2222-2222-2222-222222222222','#FFF9C4') $$,
   '23514',
   NULL,
-  'GUARDRAIL an anchor colour too light for white nav text is refused'
+  'GUARDRAIL an anchor colour far too light to be read as text is refused'
 );
 
--- 4.28:1 — close, and still refused. A near miss is where a warning-only
--- implementation would let the palette through.
+-- The near miss, and the one that changed in 0094. `#6E7690` measures 4.51:1
+-- against white — it would have passed the original constraint — and 4.07:1
+-- against the page it is actually drawn on. Refused, not warned about.
 SELECT throws_ok(
   $$ INSERT INTO public.school_branding (school_id, anchor_color)
-     VALUES ('22222222-2222-2222-2222-222222222222','#6B7B8C') $$,
+     VALUES ('22222222-2222-2222-2222-222222222222','#6E7690') $$,
   '23514',
   NULL,
-  'GUARDRAIL an anchor colour just below 4.5:1 is refused, not warned about'
+  'GUARDRAIL an anchor that clears white but not the page is refused (0094)'
 );
 
 SELECT lives_ok(
   $$ INSERT INTO public.school_branding (school_id, anchor_color, primary_color)
-     VALUES ('22222222-2222-2222-2222-222222222222','#2B3A55','#3A8DDE') $$,
+     VALUES ('22222222-2222-2222-2222-222222222222','#1E2A3F','#3A8DDE') $$,
   'GUARDRAIL the ZSMS default palette is accepted'
 );
 
--- A pale primary would leave the button edge invisible against a white page —
+-- A pale primary would leave the button's own edge invisible against the page —
 -- WCAG 1.4.11, 3:1.
 SELECT throws_ok(
   $$ UPDATE public.school_branding SET primary_color = '#9FD3FF'
@@ -134,15 +136,32 @@ DELETE FROM public.school_branding WHERE school_id = '22222222-2222-2222-2222-22
 -- ===========================================================================
 
 SELECT is(
-  round(public.wcag_contrast_ratio('#FFFFFF','#2B3A55')::NUMERIC, 4),
-  11.4185::NUMERIC,
-  'MATHS white on ZSMS navy is 11.4185:1, as contrastRatio() computes it'
+  round(public.wcag_contrast_ratio('#F1F3FA','#1E2A3F')::NUMERIC, 4),
+  12.9895::NUMERIC,
+  'MATHS the ZSMS anchor on the page ground is 12.9895:1, as contrastRatio() computes it'
+);
+
+-- The tightest number in the shipped default: brand blue clears the 3:1 fill
+-- threshold on the page by 0.13. If the page ground is ever lightened or the
+-- brand blue changed, this is the assertion that notices.
+SELECT is(
+  round(public.wcag_contrast_ratio('#3A8DDE','#F1F3FA')::NUMERIC, 4),
+  3.1335::NUMERIC,
+  'MATHS the ZSMS primary on the page ground is 3.1335:1, as contrastRatio() computes it'
+);
+
+-- Both halves of the 0094 worked example, pinned. The gap between these two
+-- numbers IS the reason the ground moved.
+SELECT is(
+  round(public.wcag_contrast_ratio('#FFFFFF','#6E7690')::NUMERIC, 4),
+  4.5092::NUMERIC,
+  'MATHS #6E7690 clears 4.5:1 against white — the measurement 0092 would have made'
 );
 
 SELECT is(
-  round(public.wcag_contrast_ratio('#3A8DDE','#FFFFFF')::NUMERIC, 4),
-  3.4742::NUMERIC,
-  'MATHS ZSMS blue on white is 3.4742:1, as contrastRatio() computes it'
+  round(public.wcag_contrast_ratio('#F1F3FA','#6E7690')::NUMERIC, 4),
+  4.0671::NUMERIC,
+  'MATHS #6E7690 falls to 4.0671:1 against the page — the measurement that binds'
 );
 
 SELECT is(

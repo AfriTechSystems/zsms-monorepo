@@ -4,6 +4,56 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-17 — Phase 4 sub-phase 1 revision: the aesthetic retune, and a worker that never ran
+
+Branch `feature/phase-4-design-foundation`, continued. **Migration `0094` applied. Token tests 25/25; `school_branding_test.sql` now 38/38; contrast audit grew from 21 to 25 pairings per mode, all passing.** Still no portal screens.
+
+### Navy became ink
+
+The anchor moved from `#2B3A55` to `#1E2A3F`, and more importantly its *job* changed. It was being used as a solid header bar, which is the visual language of an older generation of admin software — a heavy chrome strip with white text on it. The same colour used as body text and headings on a light ground reads as considered rather than dated. The preview page's own header is now a white surface with navy ink and a hairline border, which is the clearest single demonstration of the difference.
+
+The page ground moved to a soft lavender-grey (`#F1F3FA`) with white cards on top. That inversion — tinted page, white card — is most of what makes an interface feel airy. A white page with white cards has to draw every boundary with a line.
+
+### The tinted page broke a pairing, and the audit found it the same minute
+
+Step 600 is derived by darkening until it clears 4.5:1 **against white**. The moment the page stopped being white, `primary link on page` measured **4.15:1** — the derivation passing the test it was given while failing the one that matters.
+
+Fixed by deriving the text steps against the page instead, which is the darker of the two light grounds and therefore the binding one. This is the second time in two sessions that the audit has caught something no amount of looking would have: the colour still looks blue, it is just 0.35 short.
+
+That change had a consequence I nearly missed. `validateTheme()` and the `0092` CHECK constraints were *also* measuring against white, so a school palette could pass both and still be unreadable in place. `#6E7690` is the worked example — 4.51:1 on white, 4.07:1 on the page. **Migration `0094`** moves both thresholds onto the page ground, and `PAGE_GROUND` is now exported from the token package specifically so the SQL literal and the TS constant are traceable to each other. Both halves of that example are pinned in the pgTAP suite, because the gap between those two numbers *is* the reason the ground moved.
+
+### Amber, again
+
+The brief asked for saturated variants for "icons, dots, emphasis" alongside the pale tints. I wired `--zsms-<hue>-fill` to step 500 — the brand hex — and then measured it against the tint it would sit on. Blue 2.93, teal 2.79, **amber 1.80**. A status dot invisible on the chip it labels.
+
+So `mark` is now a derived step of its own, guaranteed 3:1 against that hue's own `100` tint, sitting alongside 500 rather than replacing it. For hues that already pass it is indistinguishable; for amber it is visibly deeper, which is the honest consequence of amber being pale rather than a fault in the design. All six marks are audited rather than the two I sampled first.
+
+A related trap avoided: the first `StatCard` draft put a white glyph on a filled square of the mark colour. That works in light mode and fails in dark, where marks are *lightened* rather than darkened — white on a light amber mark is about 2:1. The icon is now drawn directly in the mark colour, which is the pairing that is actually guaranteed.
+
+### Dark mode, and why it is charcoal rather than black
+
+Three things, each against a specific failure. The ground is `#14181F` rather than `#000000` because pure black causes halation — light letterforms smearing at their edges — which is the most common complaint from people who read dark themes all day and is not a WCAG failure at all. Cards sit *lighter* than the page at `#1A1F2A`, because shadows are invisible on a dark ground so lightness is the only depth cue left; cards darker than the page read as holes. And every accent step is desaturated ~18%, because a saturated hue on charcoal vibrates rather than glows.
+
+Dark scales are now derived against the **card** rather than the page, since tinted chips live inside cards. Deriving against the darker page returns steps that pass there and fall a hair short where they are actually drawn.
+
+### One CSS change that was not cosmetic
+
+To show light and dark side by side on the preview page — the only way to tell whether they are one design or two — the dark block had to match nested elements, not just `:root`. It is now emitted as a bare `[data-theme="dark"]`, with a `[data-theme="light"]` block added so a light panel inside a dark page also resolves rather than silently inheriting dark.
+
+This also closes a scope mismatch I had not noticed: Tailwind's `dark:` variant was configured as `[data-theme="dark"] &` and has always matched nested elements, while the variables were root-only. Same class of bug as the two mechanisms disagreeing about which mode is active, which is the thing the single-switch decision exists to prevent.
+
+### The worker had never started, and `npm run dev` was the casualty
+
+`@zsms/workers` crashed with `ERR_MODULE_NOT_FOUND: Cannot find module '…/src/db'`, taking the turbo dev set with it.
+
+Nothing was missing. `db.ts` is there. The `dev` script used `node --experimental-strip-types`, which is an ESM loader and requires explicit `.ts` on every relative import — and this package writes `from './db'` throughout. **Exactly the same defect as the design-tokens test script yesterday**, from the same cause, which is worth naming: `--experimental-strip-types` looks like a drop-in TypeScript runner and is not one. Both now use `tsx`, which is already the root devDependency behind the e2e script.
+
+Two changes so this cannot block UI work again. The worker script is named `dev:worker`, not `dev`, so `turbo dev` does not pick it up — a worker needs Redis and provider credentials a UI session has no reason to hold. And root `dev` is now `turbo dev --filter=@zsms/web`; `dev:all` keeps the old behaviour and `dev:workers` runs the worker deliberately.
+
+I could not verify the worker *processes* anything — there is still no Redis locally, so it starts and idles. What is verified is that its module graph resolves, which is what was broken.
+
+---
+
 ## 2026-08-16 — Phase 4 sub-phase 1: the design foundation
 
 Branch `feature/phase-4-design-foundation`. **New package `@zsms/design-tokens` (24 tests). Migrations `0092` and `0093` applied. New `school_branding_test.sql` 36/36; suites now 261 assertions across six files.** No portal screens — this sub-phase deliberately stops at the foundation and a preview page.

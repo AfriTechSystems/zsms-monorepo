@@ -35,8 +35,25 @@ export interface ColorScale {
   100: string
   /** Borders and dividers in this hue. */
   200: string
-  /** The brand colour exactly as specified. Fills, ≥3:1 surfaces. */
+  /** The brand colour exactly as specified. Large decorative fills, swatches. */
   500: string
+  /**
+   * The saturated step for **icons, status dots, and bar segments** — anything
+   * small that carries meaning by colour.
+   *
+   * Not the same as `500`, and the difference is not cosmetic. WCAG 1.4.11 asks
+   * 3:1 of a graphical object against what surrounds it, and the ground these
+   * marks sit on is this hue's own `100` tint — the tightest pairing in the
+   * system. Measured flat, the brand hues do not all clear it: blue lands at
+   * 2.93, teal at 2.79, and amber at **1.80**, which is a status dot nobody can
+   * see on the chip it is meant to label.
+   *
+   * So this step is derived to guarantee the bar, exactly as `600` is derived to
+   * guarantee text. For hues that already pass it is indistinguishable from
+   * `500`; for amber it is visibly deeper, which is the honest consequence of
+   * amber being a pale colour rather than a fault in the design.
+   */
+  mark: string
   /** AA against white. Solid buttons with white labels, links, icons. */
   600: string
   /** Hover/pressed for 600, and text on a 50/100 tint. */
@@ -105,11 +122,25 @@ function hslToRgb({ h, s, l }: Hsl): Rgb {
   }
 }
 
-function withLightness(hex: string, lightness: number): string {
+const clamp01 = (n: number): number => Math.max(0, Math.min(1, n))
+
+/**
+ * Re-lightens a hue, optionally damping its saturation.
+ *
+ * The saturation argument is what separates a *soft tint* from a pastel. Raising
+ * lightness alone keeps the original saturation, and a fully saturated colour at
+ * 93% lightness reads as sherbet — cheerful, and wrong for a page a bursar looks
+ * at for six hours. Pulling saturation down as lightness rises produces the
+ * chalky, slightly greyed tint the reference aesthetic uses, and it is the single
+ * adjustment that most changes how "designed" the result looks.
+ */
+function adjust(hex: string, lightness: number, saturationScale = 1): string {
   const rgb = parseHex(hex)
   if (!rgb) return hex
   const hsl = rgbToHsl(rgb)
-  return toHex(hslToRgb({ ...hsl, l: Math.max(0, Math.min(1, lightness)) }))
+  return toHex(
+    hslToRgb({ h: hsl.h, s: clamp01(hsl.s * saturationScale), l: clamp01(lightness) }),
+  )
 }
 
 /**
@@ -139,22 +170,36 @@ function darkenUntilContrast(hex: string, target: number, against = '#FFFFFF'): 
  * Builds a full scale from one brand hex.
  *
  * Step 500 is returned unchanged — a school that enters `#3A8DDE` sees exactly
- * that colour on its buttons and header. The derived steps carry the text.
+ * that colour on its buttons and chips. The derived steps carry the text.
+ *
+ * **`ground` is the lightest-but-one surface the text steps must survive, and it
+ * is not white.** The page is a soft lavender-grey, so a link derived to clear
+ * 4.5:1 against `#FFFFFF` lands at 4.15:1 once it is drawn on the page — passing
+ * the test it was given and failing the one that matters. Deriving against the
+ * page instead is very slightly darker everywhere and correct on both grounds.
+ * The audit caught this the moment the page stopped being white, which is the
+ * argument for auditing rather than reasoning.
  */
-export function deriveScale(brandHex: string): ColorScale {
+export function deriveScale(brandHex: string, ground = '#FFFFFF'): ColorScale {
   const rgb = parseHex(brandHex)
   if (!rgb) throw new Error(`deriveScale: '${brandHex}' is not a valid hex colour`)
 
   const { l } = rgbToHsl(rgb)
 
+  // Tints are progressively desaturated as they lighten. See `adjust()`.
+  const tint100 = adjust(brandHex, Math.max(l, 0.93), 0.76)
+
   return {
-    50: withLightness(brandHex, Math.max(l, 0.96)),
-    100: withLightness(brandHex, Math.max(l, 0.92)),
-    200: withLightness(brandHex, Math.max(l, 0.84)),
+    50: adjust(brandHex, Math.max(l, 0.965), 0.7),
+    100: tint100,
+    200: adjust(brandHex, Math.max(l, 0.86), 0.84),
     500: toHex(rgb),
-    600: darkenUntilContrast(brandHex, 4.5),
-    700: darkenUntilContrast(brandHex, 7),
-    800: darkenUntilContrast(brandHex, 10),
+    // Against the tint, which is a tighter ground than either the page or a
+    // card — so a mark that clears its own chip clears everywhere it is used.
+    mark: darkenUntilContrast(brandHex, 3, tint100),
+    600: darkenUntilContrast(brandHex, 4.5, ground),
+    700: darkenUntilContrast(brandHex, 7, ground),
+    800: darkenUntilContrast(brandHex, 10, ground),
   }
 }
 
@@ -163,8 +208,20 @@ export function deriveScale(brandHex: string): ColorScale {
  *
  * Dark mode is not the light scale inverted. On a dark surface the *light* end
  * of a hue carries text, and a colour that passed 4.5:1 on white can fail badly
- * on `#151A24`. So the step used for text is lightened until it clears AA
- * against the dark surface it will actually sit on.
+ * on a charcoal ground. So the step used for text is lightened until it clears
+ * AA against the dark surface it will actually sit on.
+ *
+ * **Every step is also desaturated.** A fully saturated hue on charcoal does not
+ * read as brighter, it reads as *vibrating* — the eye cannot settle on the edge
+ * between a neon accent and a near-black ground, and on a long shift that is
+ * fatigue rather than emphasis. Pulling saturation back lets the colour glow
+ * against the dark instead of fighting it, and it is the reason a dark theme
+ * built by inverting a light one always looks harsher than one derived for the
+ * ground it sits on.
+ *
+ * The damping is applied inside the search loop, not after it, so the returned
+ * step is the *desaturated* colour that was measured — desaturating afterwards
+ * would silently move it back below the threshold it was chosen to clear.
  */
 export function deriveDarkScale(brandHex: string, surface: string): ColorScale {
   const rgb = parseHex(brandHex)
@@ -172,23 +229,35 @@ export function deriveDarkScale(brandHex: string, surface: string): ColorScale {
 
   const hsl = rgbToHsl(rgb)
 
-  const lightenUntil = (target: number): string => {
+  /** Saturation retained on text-bearing steps. */
+  const DAMP = 0.82
+
+  const lightenUntil = (target: number, against = surface): string => {
     let lightness = hsl.l
     for (let i = 0; i < 200 && lightness < 1; i += 1) {
-      const candidate = toHex(hslToRgb({ ...hsl, l: lightness }))
-      if (contrastRatio(candidate, surface) >= target) return candidate
+      const candidate = toHex(
+        hslToRgb({ h: hsl.h, s: clamp01(hsl.s * DAMP), l: lightness }),
+      )
+      if (contrastRatio(candidate, against) >= target) return candidate
       lightness += 0.005
     }
     return '#FFFFFF'
   }
 
+  // On dark, a "tint" is a low-lightness wash the eye reads as a tinted panel
+  // rather than a pale chip. Heavily desaturated so a row of six of them stays
+  // a set of quiet panels rather than a row of stained glass.
+  const tint100 = adjust(brandHex, 0.17, 0.55)
+
   return {
-    // On dark, the "tint" is a low-lightness wash the eye reads as a coloured
-    // panel rather than a pale chip.
-    50: withLightness(brandHex, 0.12),
-    100: withLightness(brandHex, 0.16),
-    200: withLightness(brandHex, 0.24),
-    500: toHex(rgb),
+    50: adjust(brandHex, 0.13, 0.5),
+    100: tint100,
+    200: adjust(brandHex, 0.26, 0.65),
+    500: adjust(brandHex, hsl.l, 0.88),
+    // Lightened, not darkened, and measured against the dark tint. The naive
+    // choice — reusing step 500 — puts a dark navy dot on a dark navy panel at
+    // 1.03:1 for the anchor hue, which is simply not there.
+    mark: lightenUntil(3, tint100),
     600: lightenUntil(4.5),
     700: lightenUntil(7),
     800: lightenUntil(10),

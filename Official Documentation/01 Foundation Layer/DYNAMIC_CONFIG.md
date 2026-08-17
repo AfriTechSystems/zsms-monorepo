@@ -134,8 +134,8 @@ The one registry section that is **school-scoped rather than platform-scoped**: 
 
 | Parameter | Storage | Owner | Default | Notes |
 |---|---|---|---|---|
-| Anchor colour | `public.school_branding.anchor_color` | `org:owner`, `org:principal`, `org:admin` | ZSMS navy `#2B3A55` | Header and navigation. **Must reach 4.5:1 against white** — CHECK constraint, not a warning |
-| Primary colour | `public.school_branding.primary_color` | `org:owner`, `org:principal`, `org:admin` | ZSMS blue `#3A8DDE` | Buttons, links, active states. **Must reach 3:1 against white** — CHECK constraint |
+| Anchor colour | `public.school_branding.anchor_color` | `org:owner`, `org:principal`, `org:admin` | ZSMS navy `#1E2A3F` | Ink — body text, headings, navigation. **Must reach 4.5:1 against the page ground `#F1F3FA`** — CHECK constraint, not a warning |
+| Primary colour | `public.school_branding.primary_color` | `org:owner`, `org:principal`, `org:admin` | ZSMS blue `#3A8DDE` | Buttons, links, active states. **Must reach 3:1 against the page ground** — CHECK constraint |
 | Full logo | `public.school_branding.logo_url` | `org:owner`, `org:principal`, `org:admin` | School initials | R2 public bucket, HTTPS enforced |
 | Icon / favicon | `public.school_branding.icon_url` | `org:owner`, `org:principal`, `org:admin` | School initials | Square variant |
 

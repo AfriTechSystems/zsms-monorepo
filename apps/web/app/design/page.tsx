@@ -19,7 +19,18 @@ import {
   TYPOGRAPHY,
   type ColorScale,
 } from '@zsms/design-tokens'
-import { BookOpen, Download, Plus, Receipt, Trash2, Users } from 'lucide-react'
+import {
+  BookOpen,
+  CalendarCheck,
+  Clock,
+  Download,
+  Plus,
+  Receipt,
+  Trash2,
+  TriangleAlert,
+  Users,
+  Wallet,
+} from 'lucide-react'
 
 import { Alert } from '../../components/ui/alert'
 import { Badge } from '../../components/ui/badge'
@@ -28,6 +39,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { EmptyState } from '../../components/ui/empty-state'
 import { Field, Input, Select } from '../../components/ui/field'
 import { Skeleton, LoadingRegion } from '../../components/ui/skeleton'
+import { StatCard, type StatTone } from '../../components/ui/stat-card'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { SchoolLogo } from '../../components/brand/school-logo'
 import { AttendanceCard } from '../../components/domain/attendance-card'
@@ -81,26 +93,66 @@ function Swatch({ hex, label, on }: { hex: string; label: string; on?: string })
   )
 }
 
+const SCALE_STEPS: Array<{ key: keyof ColorScale; label: string; role: string }> = [
+  { key: 50, label: '50', role: 'wash' },
+  { key: 100, label: '100', role: 'chip' },
+  { key: 200, label: '200', role: 'edge' },
+  { key: 500, label: '500', role: 'brand' },
+  { key: 'mark', label: 'mark', role: 'icon' },
+  { key: 600, label: '600', role: 'solid' },
+  { key: 700, label: '700', role: 'text' },
+  { key: 800, label: '800', role: 'deep' },
+]
+
 function ScaleRow({ name, scale, note }: { name: string; scale: ColorScale; note: string }): JSX.Element {
-  const steps: Array<keyof ColorScale> = [50, 100, 200, 500, 600, 700, 800]
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-3">
         <h3 className="text-base font-semibold capitalize">{name}</h3>
         <p className="text-sm text-muted-foreground">{note}</p>
       </div>
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-        {steps.map((step) => (
-          <div key={String(step)} className="space-y-1">
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+        {SCALE_STEPS.map(({ key, label, role }) => (
+          <div key={label} className="space-y-1">
             <div
               className="h-12 rounded-md border border-border"
-              style={{ backgroundColor: scale[step] }}
+              style={{ backgroundColor: scale[key] }}
             />
-            <p className="text-xs font-medium">{String(step)}</p>
+            <p className="text-xs font-medium">
+              {label} <span className="font-normal text-subtle">{role}</span>
+            </p>
             <p data-numeric className="font-mono text-[11px] text-subtle">
-              {scale[step]}
+              {scale[key]}
             </p>
           </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A row of stat cards rendered inside a forced theme.
+ *
+ * The dark row is drawn with the dark tokens applied inline rather than by
+ * toggling the page, so both modes are visible at once — which is the only way
+ * to judge whether they are the same design or two designs.
+ */
+function TintRow({ tone }: { tone: 'light' | 'dark' }): JSX.Element {
+  const cards: Array<{ label: string; value: string; hint: string; tone: StatTone; icon: JSX.Element }> = [
+    { label: 'Collected this term', value: 'K 412,900', hint: '78% of billed', tone: 'success', icon: <Wallet /> },
+    { label: 'Due within 7 days', value: 'K 68,400', hint: '54 families', tone: 'warning', icon: <Clock /> },
+    { label: 'In arrears', value: 'K 91,250', hint: '31 families', tone: 'danger', icon: <TriangleAlert /> },
+    { label: 'Students enrolled', value: '1,284', hint: 'across 34 classes', tone: 'neutral', icon: <Users /> },
+    { label: 'Attendance today', value: '94.2%', hint: '74 absent', tone: 'info', icon: <CalendarCheck /> },
+    { label: 'Receipts issued', value: '318', hint: 'this week', tone: 'primary', icon: <Receipt /> },
+  ]
+
+  return (
+    <div data-theme={tone} className="rounded-xl border border-border bg-background p-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((c) => (
+          <StatCard key={c.label} {...c} />
         ))}
       </div>
     </div>
@@ -134,14 +186,19 @@ export default function DesignFoundationPage(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header uses the anchor colour — the workhorse pairing. */}
-      <header className="bg-anchor text-anchor-foreground">
+      {/*
+        The navigation is a white surface with navy INK on it, not a navy block.
+        That is the single most visible consequence of the retune: the anchor
+        colour now does its work as text and structure, and the airiness comes
+        from what is left uncoloured.
+      */}
+      <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <SchoolLogo initials="ZS" schoolName="ZSMS" />
             <div>
-              <p className="text-base font-semibold">ZSMS Design Foundation</p>
-              <p className="text-sm opacity-80">Phase 4 · Step 1</p>
+              <p className="text-base font-semibold text-foreground">ZSMS Design Foundation</p>
+              <p className="text-sm text-muted-foreground">Phase 4 · Step 1</p>
             </div>
           </div>
           <ThemeToggle />
@@ -170,19 +227,56 @@ export default function DesignFoundationPage(): JSX.Element {
               ))}
             </div>
             <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
-              Four of these fail the 4.5:1 minimum for normal text against white, and amber fails even
-              the 3:1 bar for interface elements. Used flat, blue would fail both as a link and as a
-              white label on a button — so each hue becomes a scale.
+              Measured against the page ground, <strong>five of the six fail</strong> the 4.5:1 minimum
+              for normal text, and amber and teal fail even the 3:1 bar for interface elements. Used
+              flat, blue would fail both as a link and as a white label on a button — so each hue
+              becomes a scale. Only the anchor navy, which is deliberately a near-charcoal, is safe as
+              ink at its given value.
             </p>
           </div>
 
+          <div className="rounded-lg border border-border bg-card p-5">
+            <h3 className="mb-2 text-base font-semibold">Surfaces</h3>
+            <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
+              The page is a soft lavender-grey and the cards are white — not the other way round. A
+              white page with white cards has to draw every boundary with a line; a tinted ground lets
+              a card sit on the page without one.
+            </p>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Swatch hex={zsms.light.surface.background} label="page (light)" />
+              <Swatch hex={zsms.light.surface.surface} label="card (light)" />
+              <Swatch hex={zsms.dark.surface.background} label="page (dark)" on={zsms.dark.surface.text} />
+              <Swatch hex={zsms.dark.surface.surface} label="card (dark)" on={zsms.dark.surface.text} />
+            </div>
+          </div>
+
           <div className="space-y-6 rounded-lg border border-border bg-card p-5">
-            <ScaleRow name="anchor" scale={zsms.light.colors.anchor} note="Navy — headers, navigation, body text" />
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              <strong>Light scales.</strong> <code className="font-mono text-xs">500</code> is the brand
+              hex untouched. <code className="font-mono text-xs">mark</code> is derived to clear 3:1
+              against this hue&rsquo;s own <code className="font-mono text-xs">100</code> chip — flat brand
+              amber measures 1.80:1 there, which is a status dot nobody can see.
+            </p>
+            <ScaleRow name="anchor" scale={zsms.light.colors.anchor} note="Navy — ink, structure, the lavender chip" />
             <ScaleRow name="primary" scale={zsms.light.colors.primary} note="Blue — the single action colour" />
             <ScaleRow name="success" scale={zsms.light.colors.success} note="Green — paid, present" />
             <ScaleRow name="warning" scale={zsms.light.colors.warning} note="Amber — due soon, partial" />
             <ScaleRow name="danger" scale={zsms.light.colors.danger} note="Coral — overdue, arrears, destructive" />
-            <ScaleRow name="accent" scale={zsms.light.colors.accent} note="Teal — sparingly" />
+            <ScaleRow name="accent" scale={zsms.light.colors.accent} note="Teal — informational" />
+          </div>
+
+          <div data-theme="dark" className="space-y-6 rounded-lg border border-border bg-card p-5">
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              <strong>Dark scales</strong>, derived against the dark card rather than inverted. Every
+              step is desaturated: a fully saturated hue on charcoal vibrates rather than glows, and
+              that is fatigue over a long shift rather than emphasis.
+            </p>
+            <ScaleRow name="anchor" scale={zsms.dark.colors.anchor} note="Now a light ink, not a dark block" />
+            <ScaleRow name="primary" scale={zsms.dark.colors.primary} note="Blue" />
+            <ScaleRow name="success" scale={zsms.dark.colors.success} note="Green" />
+            <ScaleRow name="warning" scale={zsms.dark.colors.warning} note="Amber" />
+            <ScaleRow name="danger" scale={zsms.dark.colors.danger} note="Coral" />
+            <ScaleRow name="accent" scale={zsms.dark.colors.accent} note="Teal" />
           </div>
 
           <div>
@@ -396,6 +490,37 @@ export default function DesignFoundationPage(): JSX.Element {
 
         {/* ---------------------------------------------------------------- */}
         <Section
+          id="tints"
+          title="Soft tints"
+          description="The unit a dashboard is built from: a pale tinted panel with a figure, a label, and a mark. Colour applied as a chip rather than as a block — a row of saturated cards competes with the data underneath it, so every card shouts equally and none of them signals anything."
+        >
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold">Light</h3>
+            <TintRow tone="light" />
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold">Dark</h3>
+            <TintRow tone="dark" />
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              The same six components, the same tokens, no dark-specific markup. Both rows are rendered
+              on this page at once because side by side is the only way to tell whether they are one
+              design or two.
+            </p>
+          </div>
+
+          <Alert variant="info" title="The tone is a meaning, not a colour">
+            <p>
+              Green is paid, amber is due soon, coral is in arrears — the same mapping as the badges and
+              the fee cards below. Lavender-grey carries counts that imply no judgement, and blue and
+              teal carry figures that are notable without being good or bad. A stat card cannot ask for
+              &ldquo;the teal one&rdquo;.
+            </p>
+          </Alert>
+        </Section>
+
+        {/* ---------------------------------------------------------------- */}
+        <Section
           id="semantic"
           title="Semantic colour in use"
           description="Green is paid, amber is due soon, coral is overdue — and every status is written in words as well as coloured, so the meaning survives a colour vision deficiency or a photocopied page."
@@ -469,16 +594,25 @@ export default function DesignFoundationPage(): JSX.Element {
               { label: 'A school theme', theme: school, name: 'Kabulonga Girls Secondary School', initials: school.initials },
             ].map(({ label, theme, name, initials }) => (
               <Card key={label} className="overflow-hidden">
+                {/*
+                  A school's identity on a light bar, not a colour block: the
+                  anchor tint as the ground, the anchor itself as the ink. This
+                  is the treatment the school portal header uses.
+                */}
                 <div
-                  className="flex items-center gap-3 px-5 py-4"
+                  className="flex items-center gap-3 border-b px-5 py-4"
                   style={{
-                    backgroundColor: theme.light.colors.anchor[500],
-                    color: theme.light.surface.textOnAnchor,
+                    backgroundColor: theme.light.colors.anchor[100],
+                    borderColor: theme.light.colors.anchor[200],
+                    color: theme.light.colors.anchor[700],
                   }}
                 >
                   <span
                     className="inline-flex size-9 items-center justify-center rounded-md text-sm font-semibold"
-                    style={{ backgroundColor: theme.light.colors.anchor[700] }}
+                    style={{
+                      backgroundColor: theme.light.colors.anchor[600],
+                      color: theme.light.surface.textOnFill,
+                    }}
                     aria-hidden="true"
                   >
                     {initials}

@@ -72,6 +72,17 @@ export interface ThemeValidationResult {
 }
 
 /**
+ * The ground both guardrail thresholds are measured against.
+ *
+ * Exported because the CHECK constraints in migration `0094` measure against
+ * this exact value, and the two enforcement points must not drift. If the page
+ * ground ever changes, this constant, `NEUTRAL[100]`, and that migration move
+ * together or the database and the API start disagreeing about which palettes
+ * are acceptable.
+ */
+export const PAGE_GROUND = NEUTRAL[100]
+
+/**
  * Refuses a palette that cannot be read.
  *
  * The check is on the *derived* steps, not the raw input, because that is what
@@ -104,18 +115,22 @@ export function validateTheme(input: SchoolBrandingInput): ThemeValidationResult
     }
 
     if (field === 'anchorColor') {
-      // The anchor fills the header and side navigation with white text on it.
-      // That is normal-size text, so 4.5:1 is the bar.
-      const ratio = contrastRatio('#FFFFFF', value)
+      // The anchor's main job is INK — body text, headings, navigation labels —
+      // drawn on the page, which is a soft lavender-grey rather than white. So
+      // the page is what it must clear at 4.5:1, and measuring against white
+      // would be measuring the easier of the two grounds. This also subsumes the
+      // rarer case of white text on a solid anchor panel: white is lighter than
+      // the page, so anything readable on the page is readable there too.
+      const ratio = contrastRatio(PAGE_GROUND, value)
       if (ratio < 4.5) {
         violations.push({
           field,
           color: value,
-          against: '#FFFFFF',
+          against: PAGE_GROUND,
           ratio,
           required: 4.5,
           message:
-            `This colour is too light for the header — white navigation text on it measures ` +
+            `This colour is too light to read as text — on the page background it measures ` +
             `${ratio.toFixed(2)}:1, below the ${(4.5).toFixed(1)}:1 minimum. Choose a deeper shade.`,
         })
       }
@@ -124,17 +139,19 @@ export function validateTheme(input: SchoolBrandingInput): ThemeValidationResult
 
     // The primary colour must work as a 3:1 UI fill. Its text-bearing step is
     // derived by darkening, which always succeeds, so the only unrecoverable
-    // case is a fill so pale its own button edge vanishes against the page.
-    const ratio = contrastRatio(value, NEUTRAL[0])
+    // case is a fill so pale its own button edge vanishes. Measured against the
+    // page for the same reason as the anchor: it is the darker of the two
+    // grounds a button or chip is drawn on, and therefore the binding one.
+    const ratio = contrastRatio(value, PAGE_GROUND)
     if (ratio < 3) {
       violations.push({
         field,
         color: value,
-        against: NEUTRAL[0],
+        against: PAGE_GROUND,
         ratio,
         required: 3,
         message:
-          `This colour is too pale for buttons — against a white page it measures ` +
+          `This colour is too pale for buttons — against the page background it measures ` +
           `${ratio.toFixed(2)}:1, below the 3:1 minimum, so the button edge would be ` +
           `invisible. Choose a stronger shade.`,
       })
@@ -159,23 +176,45 @@ export function auditTheme(theme: ThemeTokens): Array<{ pair: string; ratio: num
   const c = theme.colors
 
   const pairs: Array<[string, string, string, 'normal' | 'ui']> = [
-    ['body text on background', s.text, s.background, 'normal'],
-    ['muted text on background', s.textMuted, s.background, 'normal'],
-    ['subtle text on surface', s.textSubtle, s.surface, 'normal'],
+    ['body text on page', s.text, s.background, 'normal'],
+    ['body text on card', s.text, s.surface, 'normal'],
+    ['muted text on page', s.textMuted, s.background, 'normal'],
+    ['subtle text on card', s.textSubtle, s.surface, 'normal'],
+    // The page is a tinted ground, not white, so subtle text has *less* to work
+    // with there than on a card. Audited separately because it is the pairing
+    // the tinted-page decision put at risk.
+    ['subtle text on page', s.textSubtle, s.background, 'normal'],
     ['label on primary button', s.textOnFill, c.primary[600], 'normal'],
     ['label on danger button', s.textOnFill, c.danger[600], 'normal'],
-    ['text on anchor header', s.textOnAnchor, c.anchor[500], 'normal'],
-    ['primary link on background', c.primary[600], s.background, 'normal'],
+    ['text on anchor surface', s.textOnAnchor, c.anchor[500], 'normal'],
+    ['primary link on page', c.primary[600], s.background, 'normal'],
+    // The soft-tint chips. Each is a stat-card or badge background with its own
+    // hue's text on top — the pattern the interface leans on hardest, so every
+    // one of the six is measured rather than the three that used to be.
     ['success text on success tint', c.success[700], c.success[100], 'normal'],
     ['warning text on warning tint', c.warning[700], c.warning[100], 'normal'],
     ['danger text on danger tint', c.danger[700], c.danger[100], 'normal'],
+    ['primary text on primary tint', c.primary[700], c.primary[100], 'normal'],
+    ['accent text on accent tint', c.accent[700], c.accent[100], 'normal'],
+    ['anchor text on anchor tint', c.anchor[700], c.anchor[100], 'normal'],
     // Control boundaries only. `surface.border` is decorative and exempt from
     // 1.4.11 — auditing it at 3:1 would demand a harsh grey box around every
     // card, which is a worse product and not what the criterion asks for.
-    ['input boundary against surface', s.borderStrong, s.surface, 'ui'],
-    ['input boundary against background', s.borderStrong, s.background, 'ui'],
-    ['focus ring against background', s.focusRing, s.background, 'ui'],
-    ['focus ring against surface', s.focusRing, s.surface, 'ui'],
+    ['input boundary against card', s.borderStrong, s.surface, 'ui'],
+    ['input boundary against page', s.borderStrong, s.background, 'ui'],
+    ['focus ring against page', s.focusRing, s.background, 'ui'],
+    ['focus ring against card', s.focusRing, s.surface, 'ui'],
+    // Saturated marks — icon, status dot, bar segment — on their own tint.
+    // Non-text, so 3:1. All six are audited rather than a sample: this is the
+    // tightest pairing in the system, and it is where a pale tint stops carrying
+    // information and becomes decoration. Flat brand hues fail it (amber at
+    // 1.80), which is why `mark` is derived rather than being step 500.
+    ['success mark on success tint', c.success.mark, c.success[100], 'ui'],
+    ['warning mark on warning tint', c.warning.mark, c.warning[100], 'ui'],
+    ['danger mark on danger tint', c.danger.mark, c.danger[100], 'ui'],
+    ['primary mark on primary tint', c.primary.mark, c.primary[100], 'ui'],
+    ['accent mark on accent tint', c.accent.mark, c.accent[100], 'ui'],
+    ['neutral mark on neutral tint', c.anchor.mark, c.anchor[100], 'ui'],
   ]
 
   return pairs.map(([pair, fg, bg, level]) => ({

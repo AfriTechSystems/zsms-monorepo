@@ -13,7 +13,9 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=@zsms/web",
+    "dev:all": "turbo dev",
+    "dev:workers": "npm run dev:worker --workspace @zsms/workers",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",

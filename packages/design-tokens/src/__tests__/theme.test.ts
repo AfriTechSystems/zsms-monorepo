@@ -14,7 +14,7 @@ import { test } from 'node:test'
 import { contrastRatio, meetsAA, parseHex, readableTextOn } from '../contrast'
 import { deriveScale } from '../scale'
 import { BRAND, ZSMS_DARK, ZSMS_LIGHT } from '../tokens'
-import { auditTheme, resolveTheme, schoolInitials, validateTheme } from '../theme'
+import { auditTheme, PAGE_GROUND, resolveTheme, schoolInitials, validateTheme } from '../theme'
 
 // ---------------------------------------------------------------------------
 // Contrast arithmetic
@@ -173,11 +173,24 @@ test('school theme: corrupt stored colour degrades to default instead of throwin
 // The guardrail
 // ---------------------------------------------------------------------------
 
-test('guardrail: an unreadable header colour is refused', () => {
+test('guardrail: an unreadable anchor colour is refused', () => {
   const result = validateTheme({ anchorColor: '#FFF9C4' }) // pale yellow
   assert.equal(result.valid, false)
   assert.equal(result.violations[0]?.field, 'anchorColor')
-  assert.match(result.violations[0]?.message ?? '', /too light for the header/)
+  assert.match(result.violations[0]?.message ?? '', /too light to read as text/)
+  // Measured against the page, not white. A near-miss anchor would pass the
+  // easier ground and fail where it is actually drawn.
+  assert.equal(result.violations[0]?.against, PAGE_GROUND)
+})
+
+test('guardrail: thresholds are measured against the page, not white', () => {
+  // 4.51:1 on white, 4.07:1 on the page ground. Passes the old check and fails
+  // the one that matters — this is the exact class of colour the move to a
+  // tinted page put at risk, so it is pinned rather than left to reasoning.
+  const borderline = '#6E7690'
+  assert.ok(contrastRatio(borderline, '#FFFFFF') >= 4.5)
+  assert.ok(contrastRatio(borderline, PAGE_GROUND) < 4.5)
+  assert.equal(validateTheme({ anchorColor: borderline }).valid, false)
 })
 
 test('guardrail: a washed-out button colour is refused', () => {

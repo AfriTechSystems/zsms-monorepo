@@ -2,7 +2,7 @@
 
 ## What this repository currently is
 
-**Phases 0–3 complete, plus the fee arrears model. Phase 4 in progress — the design foundation (sub-phase 1) is built; no portal screens yet.**
+**Phases 0–3 complete, plus the fee arrears model. Phase 4 in progress — the design foundation is built and the AfriTech admin dashboard is complete. No school, parent, or teacher screens yet.**
 
 ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development, so the docs still specify more than exists.
 
@@ -11,19 +11,21 @@ The tree is:
 | Path | State |
 |---|---|
 | `Official Documentation/` | 119 markdown files across 18 numbered folders — the specification |
-| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **15 API routes**; UI is the design foundation plus `/design` preview — no portal screens |
+| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **22 API routes**; Clerk mounted (middleware + provider); the admin dashboard (5 screens) plus `/design` preview. No school/parent/teacher screens |
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0098` applied to `zsms-dev`** (51 migrations) |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0099` applied to `zsms-dev`** (52 migrations) |
 | `supabase/tests/rls/` | **6 pgTAP suites, 263 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/` | Empty — no Edge Functions yet |
 | `supabase/seed/` | `dev_seed.sql` — 6 synthetic schools spanning health bands. `npm run db:seed`, which **refuses any project but `zsms-dev`** |
 
-**What exists is a backend plus a design system, not a product.** 32 `public` tables and 4 `afritech` tables with RLS enabled *and* forced on every one, six `security_invoker` views, and the API routes below. **There is still no portal** — no dashboard, no parent portal, no mobile screens. What Phase 4 has added so far is `packages/design-tokens` (the single source of colour, type, spacing, and per-school theming), the `apps/web/components` primitives built on it, and `/design`, a preview page that renders the whole foundation including a live WCAG contrast audit.
+**What exists is a backend, a design system, and one portal.** 32 `public` tables and 4 `afritech` tables with RLS enabled *and* forced on every one, six `security_invoker` views, and the API routes below. Phase 4 has added `packages/design-tokens` (the single source of colour, type, spacing, and per-school theming), the `apps/web/components` primitives built on it, `/design` (a preview page rendering the whole foundation including a live WCAG contrast audit), and the **AfriTech admin dashboard** — overview, schools list, school detail, health, features, pricing. **The school, parent, and teacher portals do not exist**, nor do any mobile screens.
 
-**API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages`
+**Clerk is now actually mounted.** `apps/web/middleware.ts` re-exports `authMiddleware` from `@zsms/auth-provider/middleware`, and the root layout wraps `SessionProvider` from `@zsms/auth-provider/react` — both provider-neutral names, so ADR-032 still holds. Without the middleware, `auth()` **throws** rather than returning "signed out", which surfaced as a 500 from every route that asks who the caller is. Note also that Supabase authenticates Clerk as a **third-party auth provider**, not via the deprecated `supabase` JWT template: `getSupabaseToken()` returns the plain session token, and the token needs a `role: "authenticated"` claim or PostgREST treats it as anonymous.
+
+**API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages` · `admin/overview` · `admin/schools` · `admin/schools/[id]` · `admin/features` · `admin/tiers` · `admin/overrides` · `admin/impersonate` (501 — needs Clerk actor tokens)
 
 **Phase 3 caveat — the logic is proven, the delivery is not.** Communications and PDF generation are verified against the real handlers, the real renderer, and the real fallback chain, but **no job has round-tripped through Redis and no message has left this machine.** There is no Redis locally and no Meta/Resend/Twilio credentials, so every channel runs through the mock provider. Live BullMQ→Redis transport and real delivery are **Phase 6, with credentials.** Do not build on the assumption that either has been exercised.
 
@@ -87,7 +89,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 51 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 52 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -171,6 +173,8 @@ The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session le
 | **`schoolHasFeature()` has no TypeScript implementation** | `ARCHITECTURE.md`, ADR-014 | Open. `public.school_has_feature()` exists in the database (`0095`) and the admin API calls it by RPC. No package exports the wrapper the docs name, and nothing caches it — ADR-014 specifies a Redis cache (5-min overrides / 60-min tier). Write it when the first feature is actually gated. |
 | **Per-module subscription** | `PRICING.md`, `DYNAMIC_CONFIG.md` | Open. The documented resolution order has five steps; the implementation has four. No table exists for per-module billing, so the step is omitted rather than faked. |
 | **`payments.payment_method` has no `mobile_money`** | `SCHEMA.md`, `ZM.md` | Open. The CHECK admits `cash`/`bank_deposit`/`cheque`/`online_gateway`/`loan_disbursement`/`reversal`/`waiver`. Mobile money is the dominant rail in Zambia and currently has to be recorded as `online_gateway`, which loses the distinction on every receipt and reconciliation. Needs a migration and a product decision. |
+| **Staff seats are not a modelled dimension** | `PRICING.md`, `CLERK.md`, `ONBOARDING.md` | **Open, blocks school onboarding.** A Clerk org's `maxAllowedMemberships` caps *staff* accounts, and `CLERK.md`'s onboarding snippet never sets it — so every school would inherit the instance default (5, far too low). Deriving it from the tier is impossible today: `afritech.subscription_tiers` has `student_limit` and `whatsapp_quota` and **no staff-seat column**. Needs a product decision — unlimited seats and pass `maxAllowedMemberships: 0`, or seats become priced and the tier table gains a column — before `school-onboard` is written. |
+| **Clerk instance settings are undocumented configuration** | `CLERK.md` | Open. "Allow user-created organisations" must be **off** in production (only ZSMS provisions school orgs; otherwise the reserved-slug check is bypassable), and "new members can delete organisations" must stay disabled (deleting the org orphans every `clerk_org_id` in `schools`). Neither is expressible in the repository. `CLERK.md` needs an instance-settings section that a new environment is checked against. |
 | Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. Layer 1 (Frontend) now has a foundation — `DESIGN_SYSTEM.md` and `packages/design-tokens` — but no portal screens yet. |
 
 If you resolve one of these, remove its row.

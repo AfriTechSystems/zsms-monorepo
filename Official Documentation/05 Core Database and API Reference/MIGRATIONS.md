@@ -564,7 +564,7 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0099`** — available for the next migration.
+**`0100`** — available for the next migration.
 
 `0001`–`0021` and `0069`–`0098` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
@@ -1117,3 +1117,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 | 2026-08-17 | **Added `0095` — the three missing `afritech` feature-access tables** | Documented as existing since Phase 0 and never created. Built to PRICING.md's DDL rather than an invented shape. |
 | 2026-08-17 | **Added `0096` — platform metrics and health scores as SECURITY INVOKER** | RLS already decides who sees across schools; a DEFINER function would duplicate that rule where nothing tests it. |
 | 2026-08-17 | **Added `0097`/`0098` — public views and named write functions over `afritech`** | Keeps the schema off PostgREST while giving the admin dashboard exactly four relations. `0098` also closed the missing RLS on `subscription_tiers`. Next available advances to `0099`. |
+| 2026-08-18 | **Added `0099` — deduplicated feature overrides, partial unique index on `is_active`** | The seed's `ON CONFLICT DO NOTHING` was unreachable with no unique constraint to conflict with, so re-running it duplicated every override. Duplicates resolve identically through `EXISTS` but are revoked *by id*, so revoking one would leave access in force — the dashboard would have lied to the operator. Partial on `is_active` so grant→revoke→grant history stays legal. Next available advances to `0100`. |

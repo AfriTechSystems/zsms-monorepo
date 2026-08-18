@@ -15,6 +15,8 @@ import type { ReactNode } from 'react'
 import '@fontsource-variable/inter'
 import './globals.css'
 
+import { SessionProvider } from '@zsms/auth-provider/react'
+
 import { platformTheme, ThemeStyle } from '../lib/theme'
 
 export const metadata: Metadata = {
@@ -64,17 +66,23 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   const theme = platformTheme()
 
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <ThemeStyle theme={theme} />
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
-      </head>
-      <body>
-        <a href="#main" className="skip-link">
-          Skip to main content
-        </a>
-        {children}
-      </body>
-    </html>
+    // `SessionProvider` is the auth-provider's neutral name for the Clerk
+    // context (ADR-032). It wraps `<html>` rather than sitting inside `<body>`
+    // because Clerk's own guidance is that the provider owns the document — and
+    // because sign-in redirects need to be decidable before anything renders.
+    <SessionProvider>
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <ThemeStyle theme={theme} />
+          <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        </head>
+        <body>
+          <a href="#main" className="skip-link">
+            Skip to main content
+          </a>
+          {children}
+        </body>
+      </html>
+    </SessionProvider>
   )
 }

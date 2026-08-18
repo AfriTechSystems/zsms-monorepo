@@ -5,8 +5,11 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "//exports": "Three entry points, split by execution context rather than by topic. `.` is server-only and safe to import from a Node worker. `./middleware` pulls in Clerk's edge runtime and belongs to exactly one file in apps/web. `./react` re-exports client components. Keeping them apart means importing the session helper into a background worker does not drag React along with it.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./middleware": "./src/middleware.ts",
+    "./react": "./src/react.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit",

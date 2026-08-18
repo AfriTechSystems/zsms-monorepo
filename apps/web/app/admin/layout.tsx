@@ -17,6 +17,9 @@
 
 import type { JSX, ReactNode } from 'react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+
+import { getAuthProvider } from '@zsms/auth-provider'
 
 import { platformTheme, ThemeStyle } from '../../lib/theme'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
@@ -27,7 +30,15 @@ export const metadata = {
   description: 'Platform administration for ZSMS',
 }
 
-export default function AdminLayout({ children }: { children: ReactNode }): JSX.Element {
+export default async function AdminLayout({ children }: { children: ReactNode }): Promise<JSX.Element> {
+  // Signed-out visitors are sent to sign in rather than shown the shell with
+  // five failed panels inside it. This is a *routing* courtesy, not the access
+  // check: a signed-in non-admin still reaches this layout, and the honest 403
+  // they get from each route is the real answer. Authorisation stays in the RLS
+  // policy, exactly as `lib/admin-context.ts` argues.
+  const session = await getAuthProvider().getSessionUser()
+  if (!session) redirect('/sign-in?redirect_url=/admin')
+
   const theme = platformTheme()
 
   return (

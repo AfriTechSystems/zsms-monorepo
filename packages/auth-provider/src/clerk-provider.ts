@@ -73,9 +73,32 @@ export class ClerkAuthProvider implements AuthProvider {
     return verifyToken(token, { secretKey })
   }
 
+  /**
+   * The token forwarded to PostgREST as the caller's identity.
+   *
+   * **This returns the plain Clerk session token, deliberately — not a JWT
+   * template.** The distinction is the whole integration:
+   *
+   * - The *old* path minted a bespoke token from a Clerk JWT template named
+   *   `supabase`, signed with Supabase's legacy JWT secret. Clerk deprecated it
+   *   in 2025 and Supabase is retiring the shared secret it depends on.
+   * - The *current* path registers Clerk as a **third-party auth provider** in
+   *   Supabase. Supabase then verifies the ordinary session token against
+   *   Clerk's JWKS, so no shared secret exists to leak or rotate.
+   *
+   * Calling `getToken({ template: 'supabase' })` against a project configured
+   * the new way does not degrade — it fails, because no such template exists.
+   * That is worth stating because the failure reads as an authorisation bug
+   * rather than a configuration one: every route 403s with a valid session.
+   *
+   * The claims the RLS helpers read (`o.id`, `o.slg`, `o.rol`, `act`) now come
+   * from the session token's own customisation rather than a template body, and
+   * Supabase additionally requires `role: "authenticated"` on it — added by
+   * activating the Supabase integration on the Clerk side. Without that claim
+   * PostgREST treats a perfectly valid token as anonymous.
+   */
   async getSupabaseToken(): Promise<string | null> {
     const auth = await this.clerkAuth()
-    // The 'supabase' JWT template shapes the o/act claims the RLS helpers read.
-    return auth.getToken({ template: 'supabase' })
+    return auth.getToken()
   }
 }

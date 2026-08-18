@@ -4,6 +4,65 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-18 — Admin dashboard: auth was never wired, and the build said so
+
+Branch `feature/phase-4-design-foundation`. **The admin dashboard is complete and running against real seed data over real HTTP. Migration `0099` applied.** The session's headline is not a screen, though — it is that Clerk had never actually been mounted, and three separate layers had to be corrected before a single authenticated request was possible.
+
+### `auth()` threw on every admin route, and had since Phase 0
+
+`/api/admin/overview` answered `500`. The cause was not the route, the policy, or the Clerk configuration — all three were correct. There was **no `middleware.ts` in `apps/web` and no provider in the root layout.** Clerk's `auth()` does not read a cookie by itself; the middleware verifies the session and `auth()` reads what it left behind. With no middleware it does not return "signed out", it *throws*.
+
+That failure mode is worth recording because of how it presents: a valid session, correct claims, correct RLS, and a 500 from every route that asks who the caller is. Nothing points at the missing file. It had been latent since Phase 0 — the auth package was interface-complete and never once executed in a request.
+
+Fixed in `packages/auth-provider`, not in `apps/web`, so ADR-032's single-importer rule survives: `./middleware` exports `authMiddleware`, `./react` re-exports Clerk's client components under neutral names (`SessionProvider`, `SignedIn`), and `apps/web/middleware.ts` is a re-export. `500` → `403`.
+
+### The JWT template was the wrong integration entirely
+
+`getSupabaseToken()` requested `getToken({ template: 'supabase' })`. That is the **deprecated** path — a bespoke token signed with Supabase's legacy JWT secret. The project is configured the current way, with Clerk registered as a **third-party auth provider** and the ordinary session token verified against Clerk's JWKS.
+
+Against a project configured the new way, the old call does not degrade — it fails, because no such template exists. Every route would have 403'd with a perfectly valid session, and the symptom points squarely at authorisation rather than at a two-year-old API change. Now returns the plain session token.
+
+### Three infrastructure defects, each invisible to the one before it
+
+- **`npm run dev` exited seconds after printing `Ready`.** `turbo.json` had `"ui": "tui"`, which needs a raw-mode-capable stdin and quits when it cannot get one, reporting `Tasks: 0 successful`. It had also been swallowing all task output under a pipe, which is why the real error was never visible. Now `"stream"`. Also worth knowing: turbo.json accepts JSONC comments but **rejects unknown keys**, so the `"//key"` convention this repo uses in `package.json` is a parse error there.
+- **The root `.env.local` was never being read.** Next loads env from its own project directory — `apps/web` — because that is Turborepo's cwd. A root file is simply invisible, and the symptom is "Supabase URL not set", which reads as a missing variable rather than a misplaced file. `next.config.mjs` now loads it explicitly. Deliberately *not* solved by copying the file: two copies of a credentials file drift, and the stale one is always the copy nobody is looking at.
+- **`config.matcher` cannot be an imported identifier.** Next resolves it by static analysis at build time. `next dev` accepted the imported version happily; `next build` rejected it. The literal now lives in `apps/web/middleware.ts` with the reason written next to it.
+
+### `0099` — duplicate overrides, and why `ON CONFLICT DO NOTHING` lied
+
+Verification against seed data turned up two identical *active* override rows per school, created 90 seconds apart — the seed had been run twice.
+
+`dev_seed.sql` ends that INSERT with `ON CONFLICT DO NOTHING`. **With no unique constraint to conflict with, the clause is unreachable** — it inserts the duplicate while reading like a guard. That is the trap: the code looks defensive and is inert.
+
+The consequence lands on the screen built this session. `school_has_feature()` resolves with `EXISTS`, so duplicates resolve identically — but the dashboard lists overrides individually and revokes them **by id**. An operator revoking the visible grant would watch access persist, and would reasonably conclude the resolver was broken. Uniqueness is what keeps "revoked" and "no longer in force" the same statement.
+
+`0099` deactivates the duplicates (keeping the earliest, never deleting — the table is the audit record of a support decision) and adds a **partial** unique index on `is_active`, so a grant → revoke → grant history stays legal. `COALESCE` on the nullable key columns, because `NULL != NULL` in an index would let two active NULL-valued rows straight through the guard being added.
+
+### What was verified, and what was not
+
+Real HTTP against the running server: every admin route answers `403` signed out — not a crash, and not an empty `200` that would read as "the platform has no schools". `/admin` redirects to `/sign-in`. Production build passes.
+
+The data layer was verified under a genuine AfriTech-admin JWT through RLS: 6 schools, 6 health rows, 13 features, 35 matrix cells, 4 tiers. The resolver demonstrably disagrees with the tier matrix in exactly the two seeded cases — `ZM-LSK-9001` holds `loan_module` its tier excludes, `ZM-KIT-9001` lacks `per_absence_alerts` its tier includes — which is the whole justification for resolving per-school rather than rendering the tier row.
+
+**Not verified: an authenticated browser session.** Signing in needs a browser, so the authenticated render is the user's gate review. The 403s prove the boundary; they do not prove the happy path.
+
+### Clerk organisation settings — decisions to revisit before school onboarding
+
+Set on the Clerk instance this session, recorded here because they are invisible in the repository and each one becomes load-bearing the moment a real school is provisioned.
+
+1. **Default membership limit must not stay at 5.** A Zambian private school has far more than five staff needing accounts; the limit applies to *members*, so it caps teachers and administrators, not parents. Either unlimited, or set per school at creation.
+2. **"Allow user-created organisations" should be OFF in production.** Only ZSMS provisions school organisations. Left on, anyone signing up can mint an organisation that satisfies no naming convention, has no `schools` row behind it, and holds a slug the reserved-slug check never sees.
+3. **"New members can delete organisations" — disabled.** Correct, and worth keeping: deleting the Clerk org orphans every `school_id` reference in the database with no corresponding delete, which is not a recoverable state.
+
+**How do school orgs get their member limits set during onboarding? Today: they do not, and there is nothing to derive one from.** Two gaps, one in code and one in the product:
+
+- `CLERK.md`'s onboarding snippet calls `createOrganization({ name, slug, createdBy })` with **no `maxAllowedMemberships`**, so every school would silently inherit the instance default. (The `school-onboard` Edge Function it describes does not exist yet — `supabase/functions/` is empty — so this is a gap to close before it is written, not a bug to fix.)
+- Deriving the limit from the tier is the obvious answer and **is not currently possible**: `afritech.subscription_tiers` has `student_limit` and `whatsapp_quota`, and no staff-seat column at all. Pricing has never distinguished pupils from staff accounts.
+
+So this needs a product decision before code: either staff seats are unlimited on every tier and onboarding passes `maxAllowedMemberships: 0`, or seats become a priced dimension and the tier table gains a column. Tracked in `CLAUDE.md`.
+
+---
+
 ## 2026-08-17 — Admin sub-phase: the feature tables that were never there
 
 Branch `feature/phase-4-design-foundation`. **Migrations `0095`–`0098` applied. `afritech` went from one table to four. Dev seeded with 6 synthetic schools.** Backend for the admin dashboard; screens follow.

@@ -1,7 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "ui": "tui",
-  "globalDependencies": [".env"],
+  // `tui` renders a full-screen interactive pane that needs a raw-mode-capable
+  // stdin. On Windows it exits the moment it cannot get one — printing
+  // `Tasks: 0 successful` and returning to the prompt seconds after Next
+  // reports `Ready`, which reads as a crashed dev server rather than a
+  // terminal-capability problem. It also swallowed task output entirely when
+  // stdout was piped. `stream` prefixes each task's output with its package
+  // name, stays attached, and behaves the same under a pipe, a CI log, and an
+  // interactive shell.
+  //
+  // Note: turbo.json accepts JSONC comments but rejects unknown keys, so the
+  // `"//key": "…"` convention used in package.json is a parse error here.
+  "ui": "stream",
+  "globalDependencies": [".env", ".env.local"],
   "globalEnv": [
     "NEXT_PUBLIC_COUNTRY_CODE",
     "NEXT_PUBLIC_SUPABASE_URL",

@@ -46,6 +46,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../../components
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../components/ui/field'
+import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
 import { StatusBadge, TIER_LABEL, formatKwacha } from '../../health-shared'
 
 interface School {
@@ -147,60 +148,55 @@ function SubscriptionPanel({ school, onSaved }: { school: School; onSaved: () =>
   )
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Subscription and standing</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={save} className="space-y-stack">
-          <div className="grid gap-stack sm:grid-cols-2">
-            <Field id="school-status-edit" label="Status">
-              {(props) => (
-                <Select {...props} value={status} onChange={(e) => setStatus(e.target.value)}>
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
+    <FormSection title="Subscription and standing">
+      <form onSubmit={save} noValidate>
+        <FormGrid columns={2}>
+          <Field id="school-status-edit" label="Status">
+            {(props) => (
+              <Select {...props} value={status} onChange={(e) => setStatus(e.target.value)}>
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
 
-            <Field
-              id="school-tier-edit"
-              label="Subscription tier"
-              hint="Changes which features resolve by default"
-            >
-              {(props) => (
-                <Select {...props} value={tier} onChange={(e) => setTier(e.target.value)}>
-                  {TIERS.map((t) => (
-                    <option key={t} value={t}>
-                      {TIER_LABEL[t] ?? t}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
+          <Field
+            id="school-tier-edit"
+            label="Subscription tier"
+            hint="Changes which features resolve by default"
+          >
+            {(props) => (
+              <Select {...props} value={tier} onChange={(e) => setTier(e.target.value)}>
+                {TIERS.map((t) => (
+                  <option key={t} value={t}>
+                    {TIER_LABEL[t] ?? t}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </FormGrid>
 
-          {error && (
-            <Alert variant="danger" title="Not saved">
-              {error}
-            </Alert>
-          )}
+        {error && (
+          <Alert variant="danger" title="Not saved" className="mt-stack">
+            {error}
+          </Alert>
+        )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" disabled={saving || !dirty}>
-              {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
-              Save changes
-            </Button>
-            <p role="status" aria-live="polite" className="text-sm text-success-text">
-              {saved && !dirty ? 'Saved.' : ''}
-            </p>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <FormActions>
+          <Button type="submit" disabled={saving || !dirty}>
+            {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
+            Save changes
+          </Button>
+          <p role="status" aria-live="polite" className="text-sm text-success-text">
+            {saved && !dirty ? 'Saved.' : ''}
+          </p>
+        </FormActions>
+      </form>
+    </FormSection>
   )
 }
 
@@ -250,8 +246,11 @@ function OverrideForm({ schoolId, features, onSaved }: {
   )
 
   return (
-    <form onSubmit={submit} className="space-y-stack">
-      <div className="grid gap-stack sm:grid-cols-2">
+    <form onSubmit={submit} noValidate>
+      {/* One grid for the whole form. The reason spans both columns rather than
+          sitting in a grid of its own, so it shares the tracks above and below
+          it instead of merely appearing to. */}
+      <FormGrid columns={2}>
         <Field id="override-type" label="Decision" required>
           {(props) => (
             <Select
@@ -276,49 +275,50 @@ function OverrideForm({ schoolId, features, onSaved }: {
             </Select>
           )}
         </Field>
-      </div>
 
-      <Field
-        id="override-reason"
-        label="Reason"
-        required
-        hint="At least 10 characters. This is the only record of why, long after the conversation."
-      >
-        {(props) => (
-          <Input
-            {...props}
-            value={reason}
-            minLength={10}
-            maxLength={500}
-            required
-            placeholder="Pilot school — WhatsApp enabled for the term while they evaluate"
-            onChange={(e) => setReason(e.target.value)}
-          />
-        )}
-      </Field>
+        <Field
+          id="override-reason"
+          label="Reason"
+          required
+          className="sm:col-span-2"
+          hint="At least 10 characters. This is the only record of why, long after the conversation."
+        >
+          {(props) => (
+            <Input
+              {...props}
+              value={reason}
+              minLength={10}
+              maxLength={500}
+              required
+              placeholder="Pilot school — WhatsApp enabled for the term while they evaluate"
+              onChange={(e) => setReason(e.target.value)}
+            />
+          )}
+        </Field>
 
-      <div className="grid gap-stack sm:grid-cols-2">
         <Field id="override-ticket" label="Ticket reference" hint="Optional">
           {(props) => (
             <Input {...props} value={ticket} maxLength={64} placeholder="SUP-1042" onChange={(e) => setTicket(e.target.value)} />
           )}
         </Field>
 
-        <Field id="override-expires" label="Expires" hint="Optional — leave blank for indefinite">
+        <Field id="override-expires" label="Expires" hint="Optional — blank means indefinite">
           {(props) => <Input {...props} type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />}
         </Field>
-      </div>
+      </FormGrid>
 
       {error && (
-        <Alert variant="danger" title="Override not created">
+        <Alert variant="danger" title="Override not created" className="mt-stack">
           {error}
         </Alert>
       )}
 
-      <Button type="submit" disabled={saving || reason.trim().length < 10}>
-        {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
-        Record override
-      </Button>
+      <FormActions>
+        <Button type="submit" disabled={saving || reason.trim().length < 10}>
+          {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
+          Record override
+        </Button>
+      </FormActions>
     </form>
   )
 }
@@ -368,9 +368,9 @@ export default function AdminSchoolDetailPage({
       </Button>
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
-      {loading && !error && <TableSkeleton rows={8} columns={3} />}
+      {loading && !data && !error && <TableSkeleton rows={8} columns={3} />}
 
-      {!loading && !error && data && (
+      {!error && data && (
         <>
           <PageHeader
             title={data.school.name}

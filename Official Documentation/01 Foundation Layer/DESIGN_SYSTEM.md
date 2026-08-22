@@ -171,6 +171,52 @@ Body is 15px rather than the more common 16px: the product is table-dense, and 1
 
 ---
 
+## Form Layout
+
+Forms are built from `components/ui/form.tsx` and `components/ui/field.tsx`. A screen that lays out its own form grid will drift, and the drift is not subtle — it shows up as controls that stair-step across a row.
+
+### The rule
+
+> **Nothing of variable height sits above the control.**
+
+Field order is therefore **label → control → hint → error**.
+
+This is the whole convention, and it is worth understanding rather than following. A hint is one line for one field and two for the field beside it. Put the hint above the control and those two controls start at different heights, so a two-column row visibly stair-steps. No amount of per-field padding corrects it, because the padding was never what was wrong — the source of the variance was simply above the thing that needed to align.
+
+With everything above the control fixed in height, labels align and controls align across any grid, with no subgrid, no measuring, and no breakpoint overrides. The variable-height content hangs below the control where it disturbs nothing.
+
+The hint remains attached through `aria-describedby`, so a screen reader still announces it as part of the field regardless of DOM order. Sighted users read it just before they commit rather than just before they focus — arguably the better moment.
+
+**Labels fit on one line.** This is the one constraint the rule imposes: a wrapped label reintroduces exactly the variance being avoided. `Field` applies `truncate` so a long label is visibly clipped rather than silently breaking the row. If a field needs a sentence, that sentence is a `hint`.
+
+### The components
+
+| Component | Use |
+|---|---|
+| `FormGrid` | The column container. `columns` of 1–4; **always one column on a phone.** Row and column gutters are the same token, which is what makes a grid read as a grid |
+| `FormSection` | A titled block, as a card. Exists so "a section of a form" has exactly one padding value product-wide |
+| `FormActions` | The submit row — rule above, consistent spacing, `items-center` so a status message does not drop to a 44px button's floor |
+| `Field` | Label, control, hint, error, correctly wired. `footer` holds a subordinate control belonging to the same cell |
+| `CheckboxField` | A checkbox as a full field, so it occupies a grid cell like anything else |
+
+### Rules that follow from it
+
+- **One grid per form, not one per row.** Two grids with different column counts cannot align, because they do not share column tracks. Where a field must be wider, span it: `className="sm:col-span-2"`.
+- **A subordinate control goes in its field's `footer`**, not in a cell of its own. An "unlimited" checkbox that claims its own cell pushes every field after it one position out of place.
+- **A button in a form grid occupies a cell like a field**, with a spacer holding its row position. `items-end` on a bare `div` aligns to the stretched cell rather than to the controls, which puts the button a hint's height below its neighbours.
+- **No ad-hoc spacing.** Every gap resolves to a `--zsms-*` token that already tightens below 480px. A form reaching for `mt-4` or `gap-6` has left the system, and those values will not move with the breakpoint.
+- **The control's appearance is defined once.** Height, padding, radius, border, focus, and invalid states live in a single `controlClasses` constant shared by `Input`, `Select`, and `PrefixedInput`. `h-tap` is the 44px accessibility floor, not a design preference a screen may override.
+- **Number inputs lose their spinners.** A scroll wheel over a focused price field otherwise changes the price.
+- **Selects for a fixed set of options**, number inputs for quantities and money, and a currency marker as a `PrefixedInput` prefix rather than inside the label.
+
+### Admin screens versus the portals
+
+Admin dashboards are **desktop-primary**. On a narrow screen the bar is *graceful, not polished*: multi-column forms collapse to one column, tables scroll inside their own `overflow-x-auto` container rather than stretching the page, nothing overlaps, and padding stays legible. That is the whole requirement — an operator's phone is not where a school is administered.
+
+The parent and teacher portals are genuinely used on phones and get the fuller treatment.
+
+---
+
 ## Per-School Theming
 
 A school configures **colours and a logo. Nothing else.**
@@ -326,3 +372,6 @@ No logo is the normal state for a new school. The fallback is the school's initi
 | 2026-08-17 | Tints desaturated as they lighten | Full saturation at 93% lightness reads as sherbet; damping saturation gives the chalky tint the aesthetic wants |
 | 2026-08-17 | Dark mode retuned — charcoal `#14181F` ground, `#1A1F2A` cards one step lighter, accents desaturated ~18% | Halation on pure black; shadows are invisible on dark so lightness is the only depth cue; saturated hues on charcoal vibrate rather than glow |
 | 2026-08-17 | Dark/light CSS blocks made element-scoped rather than `:root`-scoped | Lets a dark panel sit inside a light page — the only way to review both modes at once — and matches Tailwind's `dark:` variant, which was already element-scoped |
+| 2026-08-18 | **Added the Form Layout section; hint moved below the control** | A hint above the control is variable height, so two controls in a row started at different heights and the row stair-stepped. Fixing the ordering fixes every form at once; per-field padding could not have |
+| 2026-08-18 | Form layout extracted into `FormGrid` / `FormSection` / `FormActions` / `CheckboxField`, control appearance unified in one `controlClasses` | The pricing screen had built three grids with different column counts, which cannot align by construction. Shared components make the aligned version the default rather than something each screen re-derives |
+| 2026-08-18 | Stated the admin-vs-portal mobile bar explicitly | Admin screens are desktop-primary; "graceful, not polished" is a deliberate ceiling, so effort goes to the portals parents actually use on phones |

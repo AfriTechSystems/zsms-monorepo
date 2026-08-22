@@ -146,7 +146,7 @@ export default function AdminFeaturesPage(): JSX.Element {
       />
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
-      {loading && !error && <TableSkeleton rows={8} columns={5} />}
+      {loading && !data && !error && <TableSkeleton rows={8} columns={5} />}
 
       {failure && (
         <Alert variant="danger" title="The change was not saved" className="mb-cards">
@@ -154,7 +154,7 @@ export default function AdminFeaturesPage(): JSX.Element {
         </Alert>
       )}
 
-      {!loading && !error && data && (
+      {!error && data && (
         <div className="space-y-cards">
           <Alert variant="info" title="This grid is the fallback, not the final answer">
             <p>

@@ -23,6 +23,7 @@ import { Card, CardContent } from '../../../components/ui/card'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../components/ui/field'
+import { FormGrid, FormSection } from '../../../components/ui/form'
 import { StatusBadge, TIER_LABEL } from '../health-shared'
 
 interface School {
@@ -85,16 +86,15 @@ function SchoolsTable(): JSX.Element {
         description="Every school on the platform. Filters are held in the URL, so a filtered view can be linked."
       />
 
-      <Card className="mb-cards">
-        <CardContent className="pt-card">
-          <form
-            className="grid gap-stack sm:grid-cols-2 lg:grid-cols-4"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const value = new FormData(e.currentTarget).get('q')
-              setParam('q', typeof value === 'string' ? value.trim() : '')
-            }}
-          >
+      <FormSection className="mb-cards">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const value = new FormData(e.currentTarget).get('q')
+            setParam('q', typeof value === 'string' ? value.trim() : '')
+          }}
+        >
+          <FormGrid columns={4}>
             <Field id="school-search" label="Search" hint="Name or school code">
               {(props) => (
                 <Input
@@ -140,21 +140,30 @@ function SchoolsTable(): JSX.Element {
               )}
             </Field>
 
-            <div className="flex items-end">
+            {/*
+              The button occupies a grid cell like any field, with an invisible
+              label holding its row position. `items-end` on a bare div was what
+              made this column sit a hint's height above the others — the button
+              was aligning to a box the grid had stretched, not to the controls.
+            */}
+            <div className="flex flex-col gap-1.5">
+              <span aria-hidden="true" className="hidden text-sm font-medium sm:block">
+                &nbsp;
+              </span>
               <Button type="submit" className="w-full">
                 <Search aria-hidden="true" />
                 Search
               </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </FormGrid>
+        </form>
+      </FormSection>
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
 
-      {loading && !error && <TableSkeleton rows={8} columns={5} />}
+      {loading && !data && !error && <TableSkeleton rows={8} columns={5} />}
 
-      {!loading && !error && data && data.length === 0 && (
+      {!error && data && data.length === 0 && (
         <EmptyState
           icon={Building2}
           title="No schools match these filters"
@@ -173,7 +182,7 @@ function SchoolsTable(): JSX.Element {
         />
       )}
 
-      {!loading && !error && data && data.length > 0 && (
+      {!error && data && data.length > 0 && (
         <>
           <Card>
             <CardContent className="p-0">

@@ -70,7 +70,7 @@ export function ThemeToggle({ className }: { className?: string }): JSX.Element 
     <div
       role="radiogroup"
       aria-label="Colour theme"
-      className={cn('inline-flex rounded-md border border-border bg-background p-0.5', className)}
+      className={cn('inline-flex shrink-0 rounded-md border border-border bg-background p-0.5', className)}
     >
       {OPTIONS.map(({ value, label, Icon }) => (
         <button
@@ -84,8 +84,16 @@ export function ThemeToggle({ className }: { className?: string }): JSX.Element 
             choice === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-sunken',
           )}
         >
-          <Icon className="size-4" aria-hidden="true" />
-          {label}
+          <Icon className="size-4 shrink-0" aria-hidden="true" />
+          {/*
+            Icon-only on a narrow screen. Measured, not guessed: the three
+            labelled buttons need 237px, and on a 375px header that leaves the
+            product name about 90px — truncated to nothing. The label stays in
+            the accessible name either way, so the control is unchanged for a
+            screen reader.
+          */}
+          <span className="hidden sm:inline">{label}</span>
+          <span className="sr-only sm:hidden">{label}</span>
         </button>
       ))}
     </div>

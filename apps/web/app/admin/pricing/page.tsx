@@ -10,14 +10,26 @@
  * without a deployment?" A price is the canonical yes, which is why this screen
  * exists and why nothing in the codebase contains the string K600.
  *
+ * ## Layout
+ *
+ * Every control sits in **one** `FormGrid`. The first version used three
+ * separate grids — `sm:grid-cols-3` for the money fields above `sm:grid-cols-2`
+ * for the limits — which cannot align by construction, because they do not
+ * share column tracks. One grid, one set of tracks, and the row below the money
+ * fields lands on the same columns for free.
+ *
+ * The "unlimited" checkboxes live *inside* their number field's cell via the
+ * field `footer` slot, rather than claiming grid cells of their own and pushing
+ * everything after them one position out.
+ *
  * ## The unlimited sentinel
  *
  * `student_limit` and `whatsapp_quota` use NULL for *unlimited* in the column.
  * NULL therefore cannot also mean "leave unchanged" in a partial update, so the
- * RPC takes `-1` for unlimited and NULL for unchanged. This screen renders that
- * as an explicit checkbox rather than asking anyone to type `-1`: a numeric
- * field where a negative number has a special meaning is a field someone will
- * eventually put `0` in, and a tier capped at zero pupils sells nothing.
+ * RPC takes `-1` for unlimited and NULL for unchanged. The checkbox is the only
+ * route to that sentinel: a numeric field where a negative number has a special
+ * meaning is a field someone will eventually type `0` into, and a tier capped at
+ * zero pupils sells nothing.
  *
  * Editing is per-tier and explicit — a form with a save button, not
  * save-on-blur. Prices are the one thing on this dashboard where an accidental
@@ -32,11 +44,11 @@ import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
-import { Field, Input } from '../../../components/ui/field'
-import { formatKwacha } from '../health-shared'
+import { Field, Input, PrefixedInput } from '../../../components/ui/field'
+import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../components/ui/form'
+import { formatPrice } from '../health-shared'
 
 interface Tier {
   tier_name: string
@@ -93,8 +105,6 @@ function TierEditor({
         monthlyPriceZmw: monthlyZmw === '' ? undefined : Number(monthlyZmw),
         monthlyPriceUsd: monthlyUsd === '' ? undefined : Number(monthlyUsd),
         annualPriceZmw: annualZmw === '' ? undefined : Number(annualZmw),
-        // -1 is the RPC's unlimited sentinel; the checkbox is the only way to
-        // reach it, so nobody types a magic number.
         studentLimit: unlimitedStudents ? -1 : studentLimit === '' ? undefined : Number(studentLimit),
         whatsappQuota: unlimitedQuota ? -1 : quota === '' ? undefined : Number(quota),
         isPubliclyListed: listed,
@@ -127,158 +137,169 @@ function TierEditor({
   const id = `tier-${tier.tier_name}`
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>{tier.display_name}</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
-            {!tier.is_publicly_listed && <Badge variant="neutral">Unlisted</Badge>}
-            <Badge variant={billing > 0 ? 'primary' : 'neutral'}>
-              {billing} billing school{billing === 1 ? '' : 's'}
-            </Badge>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Currently {formatKwacha(tier.monthly_price_zmw)}/month.{' '}
+    <FormSection
+      title={tier.display_name}
+      actions={
+        <>
+          {!tier.is_publicly_listed && <Badge variant="neutral">Unlisted</Badge>}
+          <Badge variant={billing > 0 ? 'primary' : 'neutral'}>
+            {billing} billing school{billing === 1 ? '' : 's'}
+          </Badge>
+        </>
+      }
+      description={
+        <>
+          Currently {formatPrice(tier.monthly_price_zmw)}
+          {tier.monthly_price_zmw !== null && '/month'}.{' '}
           {billing > 0
             ? `A change here re-prices ${billing} active school${billing === 1 ? '' : 's'} on the next invoice.`
             : 'No active school is on this tier, so a change affects nothing today.'}
-        </p>
-      </CardHeader>
+        </>
+      }
+    >
+      <form onSubmit={save} noValidate>
+        <FormGrid columns={3}>
+          <Field id={`${id}-monthly-zmw`} label="Monthly price (ZMW)">
+            {(props) => (
+              <PrefixedInput
+                {...props}
+                prefix="K"
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                value={monthlyZmw}
+                onChange={(e) => setMonthlyZmw(e.target.value)}
+              />
+            )}
+          </Field>
 
-      <CardContent>
-        <form onSubmit={save} className="space-y-stack">
-          <div className="grid gap-stack sm:grid-cols-3">
-            <Field id={`${id}-monthly-zmw`} label="Monthly (ZMW)">
-              {(props) => (
-                <Input
-                  {...props}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={monthlyZmw}
-                  onChange={(e) => setMonthlyZmw(e.target.value)}
-                />
-              )}
-            </Field>
+          <Field id={`${id}-monthly-usd`} label="Monthly price (USD)" hint="For cross-border schools">
+            {(props) => (
+              <PrefixedInput
+                {...props}
+                prefix="$"
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                value={monthlyUsd}
+                onChange={(e) => setMonthlyUsd(e.target.value)}
+              />
+            )}
+          </Field>
 
-            <Field id={`${id}-monthly-usd`} label="Monthly (USD)" hint="For cross-border schools">
-              {(props) => (
-                <Input
-                  {...props}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={monthlyUsd}
-                  onChange={(e) => setMonthlyUsd(e.target.value)}
-                />
-              )}
-            </Field>
+          <Field id={`${id}-annual-zmw`} label="Annual price (ZMW)" hint="Blank if no annual plan is offered">
+            {(props) => (
+              <PrefixedInput
+                {...props}
+                prefix="K"
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                value={annualZmw}
+                onChange={(e) => setAnnualZmw(e.target.value)}
+              />
+            )}
+          </Field>
 
-            <Field id={`${id}-annual-zmw`} label="Annual (ZMW)" hint="Leave blank for no annual plan">
-              {(props) => (
-                <Input
-                  {...props}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={annualZmw}
-                  onChange={(e) => setAnnualZmw(e.target.value)}
-                />
-              )}
-            </Field>
-          </div>
+          <Field
+            id={`${id}-students`}
+            label="Student limit"
+            hint="Pupils this tier admits"
+            footer={
+              <CheckboxField
+                id={`${id}-students-unlimited`}
+                label="No limit"
+                checked={unlimitedStudents}
+                onChange={setUnlimitedStudents}
+              />
+            }
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                disabled={unlimitedStudents}
+                value={unlimitedStudents ? '' : studentLimit}
+                placeholder={unlimitedStudents ? 'Unlimited' : undefined}
+                onChange={(e) => setStudentLimit(e.target.value)}
+              />
+            )}
+          </Field>
 
-          <div className="grid gap-stack sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Field id={`${id}-students`} label="Student limit">
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="numeric"
-                    disabled={unlimitedStudents}
-                    value={unlimitedStudents ? '' : studentLimit}
-                    placeholder={unlimitedStudents ? 'Unlimited' : undefined}
-                    onChange={(e) => setStudentLimit(e.target.value)}
-                  />
-                )}
-              </Field>
-              <label className="flex min-h-tap items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4"
-                  checked={unlimitedStudents}
-                  onChange={(e) => setUnlimitedStudents(e.target.checked)}
-                />
-                No student limit
-              </label>
-            </div>
+          <Field
+            id={`${id}-quota`}
+            label="WhatsApp quota"
+            hint="Messages included per month"
+            footer={
+              <CheckboxField
+                id={`${id}-quota-unlimited`}
+                label="No quota"
+                checked={unlimitedQuota}
+                onChange={setUnlimitedQuota}
+              />
+            }
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                disabled={unlimitedQuota}
+                value={unlimitedQuota ? '' : quota}
+                placeholder={unlimitedQuota ? 'Unlimited' : undefined}
+                onChange={(e) => setQuota(e.target.value)}
+              />
+            )}
+          </Field>
 
-            <div className="space-y-1.5">
-              <Field id={`${id}-quota`} label="WhatsApp quota" hint="Messages included per month">
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="numeric"
-                    disabled={unlimitedQuota}
-                    value={unlimitedQuota ? '' : quota}
-                    placeholder={unlimitedQuota ? 'Unlimited' : undefined}
-                    onChange={(e) => setQuota(e.target.value)}
-                  />
-                )}
-              </Field>
-              <label className="flex min-h-tap items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4"
-                  checked={unlimitedQuota}
-                  onChange={(e) => setUnlimitedQuota(e.target.checked)}
-                />
-                No message quota
-              </label>
-            </div>
-          </div>
+        </FormGrid>
 
-          <label className="flex min-h-tap items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4"
-              checked={listed}
-              onChange={(e) => setListed(e.target.checked)}
-            />
-            Show this tier on the public pricing page
-          </label>
+        {/*
+          Outside the grid deliberately. A bare checkbox sharing a row with
+          fields that carry an input, a hint, and a checkbox of their own has
+          nothing to align to — it floated a couple of dozen pixels above its
+          neighbours whichever way the row was aligned. It is also a different
+          kind of setting: the fields above are what the tier *is*, this is
+          whether anyone is shown it.
+        */}
+        <div className="mt-stack border-t border-border pt-stack">
+          <CheckboxField
+            id={`${id}-listed`}
+            label="List publicly"
+            hint="Show this tier on the public pricing page at zsms.co.zm/pricing"
+            checked={listed}
+            onChange={setListed}
+          />
+        </div>
 
-          {error && (
-            <Alert variant="danger" title="Not saved">
-              {error}
-            </Alert>
-          )}
+        {error && (
+          <Alert variant="danger" title="Not saved" className="mt-stack">
+            {error}
+          </Alert>
+        )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" disabled={saving}>
-              {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
-              Save {tier.display_name}
-            </Button>
-            {/* Announced, not just shown — the button does not change shape on
-                success, so a sighted user and a screen-reader user get the
-                same confirmation. */}
-            <p role="status" aria-live="polite" className="text-sm text-success-text">
-              {saved ? 'Saved.' : ''}
-            </p>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <FormActions>
+          <Button type="submit" disabled={saving}>
+            {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
+            Save {tier.display_name}
+          </Button>
+          {/* Announced, not just shown — the button does not change shape on
+              success, so a sighted user and a screen-reader user get the same
+              confirmation. */}
+          <p role="status" aria-live="polite" className="text-sm text-success-text">
+            {saved ? 'Saved.' : ''}
+          </p>
+        </FormActions>
+      </form>
+    </FormSection>
   )
 }
 
@@ -293,9 +314,9 @@ export default function AdminPricingPage(): JSX.Element {
       />
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
-      {loading && !error && <TableSkeleton rows={4} columns={3} />}
+      {loading && !data && !error && <TableSkeleton rows={4} columns={3} />}
 
-      {!loading && !error && data && (
+      {!error && data && (
         <div className="space-y-cards">
           {data.tiers.length === 0 ? (
             <EmptyState

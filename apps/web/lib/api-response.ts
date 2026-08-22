@@ -77,6 +77,19 @@ export function fromPostgrestError(error: { code?: string; message: string }): N
       return fail('VALIDATION_ERROR', 'A field value is outside its permitted set.')
     case 'PGRST116':
       return fail('NOT_FOUND', 'Record not found.')
+    case 'PGRST301':
+      return fail('UNAUTHORIZED', 'Your session has expired. Sign in again.')
+    case 'PGRST303':
+      // "JWT not yet valid" — the token's `nbf` is fractionally ahead of the
+      // database server's clock. Clerk mints the token and Supabase validates
+      // it, so a sub-second skew between two third-party clocks is enough, and
+      // neither is ours to correct. It is genuinely transient: the same token
+      // succeeds a moment later, which is exactly why it must not be reported
+      // as SERVER_ERROR. That code renders as "an unexpected error occurred"
+      // with no retry, sending an operator to look for a fault that is already
+      // gone.
+      console.warn('[api] clock skew between Clerk and Supabase (PGRST303)')
+      return fail('CONFLICT', 'The session token is a moment ahead of the server clock. Try again.')
     default:
       // Never surface the raw driver message: it can carry column names,
       // constraint definitions, and row values from other tenants.

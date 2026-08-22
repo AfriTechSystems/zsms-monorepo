@@ -4,6 +4,59 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-18 — Form layout standard, and four defects only a browser could find
+
+Branch `feature/phase-4-design-foundation`. **Migration `0100` applied. Every admin screen reviewed in a real browser against real data for the first time.**
+
+### The alignment bug had one cause, not many
+
+The pricing form's fields stair-stepped across each row. The instinct is to reach for per-field padding; the actual cause was structural and one line deep:
+
+`Field` rendered **label → hint → control**. A hint is one line for one field and two for its neighbour, so two controls in the same grid row started at different heights. Nothing above a control may vary in height if controls are to align — so the order is now **label → control → hint → error**, and everything above the control is fixed. No subgrid, no measuring, no breakpoint overrides.
+
+Pricing compounded it by building **three grids** — `sm:grid-cols-3` above `sm:grid-cols-2` — which cannot align by construction, because they do not share column tracks. One grid fixed it.
+
+Extracted into `components/ui/form.tsx` (`FormGrid`, `FormSection`, `FormActions`, `CheckboxField`) and documented in `DESIGN_SYSTEM.md` → *Form Layout*, so the next portal inherits aligned forms rather than re-deriving them. One `controlClasses` constant now defines every control's height, padding, and focus state; `Input` and `Select` had already drifted apart.
+
+### The stray "N" was Next's, not ours
+
+The floating avatar bleeding into the left margin was Next's **dev-tools indicator**, whose `devIndicators.position` defaults to `bottom-left`. Injected by the dev server, never shipped. Moved to `bottom-right` rather than disabled — it reports route type and compile state, which are worth keeping.
+
+### `0100` — the price list had no prices
+
+Every tier rendered "K 0/month" with empty inputs. Not a display bug: `monthly_price_zmw`, `monthly_price_usd`, and `annual_price_zmw` were **NULL for all four tiers**, and had been since `0082`, whose seed simply omitted the price columns:
+
+```sql
+INSERT INTO afritech.subscription_tiers
+  (tier_name, display_name, whatsapp_quota, student_limit, display_order)
+```
+
+It survived because nothing read a price until this screen existed. ADR-031 makes the database the price list, and the public pricing page reads these same rows — it would have advertised four free tiers.
+
+`0100` backfills PRICING.md's figures verbatim (Starter K600/$22/K6,480 through Enterprise K3,000/$109/K32,400), fills only where NULL so a super admin's own edit is never overwritten, and sets the three columns **NOT NULL** as PRICING.md's DDL always specified. The gap is now unrepresentable.
+
+**Deliberately not corrected:** PRICING.md and the seed also disagree on two *ceilings* — Starter 200 students vs 150 seeded, Professional 1,000 vs NULL (unlimited). A price is inert until someone is invoiced; a ceiling is enforced, so changing one decides whether a real school can enrol its next pupil. That is a commercial question, not a migration. Tracked in `CLAUDE.md`.
+
+`formatKwacha` also had to be split. It renders absent as `K 0`, which is right for a sum — no payments really is zero — and wrong for a price, where it claims the tier is free. `formatPrice` renders "Not set".
+
+### Saving one tier blanked all four
+
+`reload()` set `loading`, and every screen gated its content on `!loading`, so a refetch discarded what was already on screen. Fixed across all six admin screens: the skeleton now appears only when there is nothing to show yet, and data stays visible while a refetch is in flight.
+
+### `PGRST303 JWT not yet valid`
+
+Intermittent 500s on `/api/admin/tiers`. The Clerk token's `nbf` is fractionally ahead of the database server's clock — Clerk mints, Supabase validates, and a sub-second skew between two third-party clocks is enough. Neither is ours to correct, and it is genuinely transient: the same token succeeds moments later.
+
+It was falling through to `SERVER_ERROR`, which renders as "an unexpected error occurred" with no retry — sending an operator to hunt a fault that has already passed. Now mapped to `CONFLICT` with an accurate message, so the existing "Try again" resolves it.
+
+### Verified in the browser, and what still is not
+
+Signed in as an AfriTech admin at 1358px: overview, schools, school detail, health, features, and pricing all render against seed data. **`PATCH /api/admin/tiers` returned 200 — the authenticated write path is now proven end to end**, which the last gate could only assert. The resolver shows through on the school page: `ZM-LSK-9001` reads *Available* for `per_absence_alerts` on a Growth tier.
+
+**Narrow width was measured, not seen.** Chrome's window is maximised so it ignores `resize_window`, and popups are blocked, so no 375px screenshot was possible. What was measured is the min-content width of every region — `main` collapses to **233px** and each form to **121–143px**, both comfortably inside 375px. The one region over budget was the header, at 237px for the theme toggle alone, leaving the product name ~90px on a phone; its labels are now icon-only below `sm`. A visual check at 375px still needs an unmaximised window.
+
+---
+
 ## 2026-08-18 — Admin dashboard: auth was never wired, and the build said so
 
 Branch `feature/phase-4-design-foundation`. **The admin dashboard is complete and running against real seed data over real HTTP. Migration `0099` applied.** The session's headline is not a screen, though — it is that Clerk had never actually been mounted, and three separate layers had to be corrected before a single authenticated request was possible.

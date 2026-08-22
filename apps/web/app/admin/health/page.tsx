@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { Field, Select } from '../../../components/ui/field'
+import { FormGrid, FormSection } from '../../../components/ui/form'
 import { HealthBadge, StatusBadge, TIER_LABEL, type HealthBand, type HealthRow } from '../health-shared'
 
 interface Overview {
@@ -86,9 +87,9 @@ export default function AdminHealthPage(): JSX.Element {
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
 
-      {loading && !error && <TableSkeleton rows={6} columns={6} />}
+      {loading && !data && !error && <TableSkeleton rows={6} columns={6} />}
 
-      {!loading && !error && data && (
+      {!error && data && (
         <div className="space-y-cards">
           <Card>
             <CardHeader>
@@ -124,12 +125,11 @@ export default function AdminHealthPage(): JSX.Element {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-card">
+          <FormSection>
+            <FormGrid columns={4}>
               <Field
                 id="health-band"
                 label="Show"
-                className="max-w-xs"
                 hint="Ordered lowest score first, whichever band is selected"
               >
                 {(props) => (
@@ -146,8 +146,8 @@ export default function AdminHealthPage(): JSX.Element {
                   </Select>
                 )}
               </Field>
-            </CardContent>
-          </Card>
+            </FormGrid>
+          </FormSection>
 
           {rows.length === 0 ? (
             <EmptyState

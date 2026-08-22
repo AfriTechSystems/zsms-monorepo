@@ -73,14 +73,14 @@ export default function AdminOverviewPage(): JSX.Element {
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
 
-      {loading && !error && (
+      {loading && !data && !error && (
         <div className="space-y-cards">
           <StatSkeleton count={6} />
           <TableSkeleton rows={5} columns={4} />
         </div>
       )}
 
-      {!loading && !error && data && (
+      {!error && data && (
         <div className="space-y-section">
           <section aria-labelledby="figures">
             <h2 id="figures" className="sr-only">

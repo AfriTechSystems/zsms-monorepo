@@ -82,6 +82,13 @@ loadRootEnv()
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Next's dev-tools badge — the floating "N" — defaults to `bottom-left`,
+  // where it sits on top of the page gutter and reads as a stray avatar bleeding
+  // out of the layout. It is injected by the dev server and never ships to
+  // production, so this is purely so it stops being mistaken for our own
+  // markup. Moved rather than disabled: it reports route type, compilation
+  // state, and errors, which are worth keeping.
+  devIndicators: { position: 'bottom-right' },
   // Workspace packages ship TypeScript source — Next compiles them.
   transpilePackages: [
     '@zsms/auth-provider',

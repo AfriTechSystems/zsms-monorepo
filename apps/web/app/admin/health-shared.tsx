@@ -76,6 +76,23 @@ export function formatKwacha(value: string | number | null | undefined): string 
   return `K ${n.toLocaleString('en-ZM', { maximumFractionDigits: 0 })}`
 }
 
+/**
+ * Money that might not be set yet.
+ *
+ * `formatKwacha` treats absent as zero, which is right for a sum — no payments
+ * really is K 0. It is wrong for a *price*: rendering an unset tier price as
+ * "K 0/month" says the tier is free, and that is the reading the public pricing
+ * page would have taken too. Absent and free are different commercial claims,
+ * so anything nullable and price-shaped uses this instead.
+ */
+export function formatPrice(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') return 'Not set'
+  const n = typeof value === 'string' ? Number(value) : value
+  if (!Number.isFinite(n)) return 'Not set'
+
+  return `K ${n.toLocaleString('en-ZM', { maximumFractionDigits: 0 })}`
+}
+
 export const TIER_LABEL: Record<string, string> = {
   starter: 'Starter',
   growth: 'Growth',

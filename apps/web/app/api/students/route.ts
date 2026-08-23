@@ -21,6 +21,7 @@ import {
   guard,
   ok,
   validationFailed,
+  type Meta,
 } from '../../../lib/api-response'
 import { createStudentSchema, listStudentsQuerySchema } from '../../../lib/validation'
 import { nextStudentId, resolveSchoolContext } from '../../../lib/school-context'
@@ -63,7 +64,24 @@ export async function GET(request: NextRequest): Promise<Response> {
     const { data, error, count } = await query
     if (error) return fromPostgrestError(error)
 
-    return ok(data ?? [], { page, perPage, total: count ?? 0 })
+    // The ceiling travels with the list. The students screen needs it to decide
+    // whether "Enrol pupil" can be offered at all, and taking it from a second
+    // request would let the roll and the limit be read at two different
+    // instants — visible precisely when a school is at the boundary.
+    //
+    // `school_student_capacity()` is SECURITY DEFINER and takes the school id,
+    // so it is resolved from the session rather than from a query parameter.
+    // A caller cannot ask about another school's capacity through this route.
+    const school = await resolveSchoolContext(client)
+    let capacity: Meta['capacity'] = null
+    if (school) {
+      const { data: row } = await client.rpc('school_student_capacity', {
+        p_school_id: school.uuid,
+      })
+      capacity = (Array.isArray(row) ? row[0] : row) ?? null
+    }
+
+    return ok(data ?? [], { page, perPage, total: count ?? 0, capacity })
   })
 }
 

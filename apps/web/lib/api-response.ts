@@ -31,6 +31,25 @@ export interface Meta {
   page?: number
   perPage?: number
   total?: number
+  /**
+   * The resolved student ceiling, on list routes where it governs what the
+   * caller may do next.
+   *
+   * It rides in `meta` rather than in `data` because it is not part of the
+   * collection — it describes the collection's limit. Returning it with the
+   * list rather than from a second endpoint matters: a students screen that
+   * fetched the roll and the ceiling separately would render "142 pupils" and
+   * "of 140" from two different instants, and the disagreement would appear
+   * exactly when the school is at the boundary and someone is watching.
+   */
+  capacity?: {
+    student_limit: number | null
+    is_unlimited: boolean
+    source: string
+    current_count: number
+    remaining: number | null
+    at_capacity: boolean
+  } | null
 }
 
 export function ok<T>(data: T, meta?: Meta): NextResponse {

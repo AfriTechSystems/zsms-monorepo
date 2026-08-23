@@ -18,9 +18,29 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+/**
+ * The `meta` block routes return alongside a collection.
+ *
+ * Mirrors `Meta` in `lib/api-response.ts`. Duplicated rather than imported
+ * because that module pulls in `next/server` and this one runs in the browser.
+ */
+export interface ApiMeta {
+  page?: number
+  perPage?: number
+  total?: number
+  capacity?: {
+    student_limit: number | null
+    is_unlimited: boolean
+    source: string
+    current_count: number
+    remaining: number | null
+    at_capacity: boolean
+  } | null
+}
+
 export interface ApiState<T> {
   data: T | null
-  meta: { page?: number; perPage?: number; total?: number } | null
+  meta: ApiMeta | null
   loading: boolean
   /** Human-readable. Already safe to render — routes never leak driver text. */
   error: string | null
@@ -31,7 +51,7 @@ export interface ApiState<T> {
 
 interface Envelope<T> {
   data?: T
-  meta?: { page?: number; perPage?: number; total?: number }
+  meta?: ApiMeta
   error?: string
   code?: string
 }

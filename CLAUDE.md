@@ -2,7 +2,7 @@
 
 ## What this repository currently is
 
-**Phases 0–3 complete, plus the fee arrears model. Phase 4 in progress — the design foundation is built and the AfriTech admin dashboard is complete. No school, parent, or teacher screens yet.**
+**Phases 0–3 complete, plus the fee arrears model. Phase 4 in progress — the design foundation and the AfriTech admin dashboard are complete, and the school portal has its shell, dashboard, and pupil screens. No parent or teacher screens yet.**
 
 ZSMS is a school management SaaS by AfriTech Systems Limited, targeting Zambia (`zsms.co.zm`) with a multi-country expansion path. Commercial launch is dated January 2027. The documentation set was completed pre-development, so the docs still specify more than exists.
 
@@ -11,12 +11,12 @@ The tree is:
 | Path | State |
 |---|---|
 | `Official Documentation/` | 119 markdown files across 18 numbered folders — the specification |
-| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **22 API routes**; Clerk mounted (middleware + provider); the admin dashboard (5 screens) plus `/design` preview. No school/parent/teacher screens |
+| `apps/web` | Next.js 15 App Router (pinned `15.5.23`). Builds. **24 API routes**; Clerk mounted (middleware + provider); the admin dashboard (5 screens), the school portal (shell, dashboard, pupil list/enrol/detail), plus `/design` preview. No parent/teacher screens |
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0102` applied to `zsms-dev`** (55 migrations) |
-| `supabase/tests/rls/` | **6 pgTAP suites, 263 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38). `npm run db:test` checks every `plan(N)` against the real assertion count first |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0103` applied to `zsms-dev`** (56 migrations) |
+| `supabase/tests/rls/` | **7 pgTAP suites, 304 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38), student ceiling (41). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/` | Empty — no Edge Functions yet |
 | `supabase/seed/` | `dev_seed.sql` — 6 synthetic schools spanning health bands. `npm run db:seed`, which **refuses any project but `zsms-dev`** |
@@ -25,7 +25,7 @@ The tree is:
 
 **Clerk is now actually mounted.** `apps/web/middleware.ts` re-exports `authMiddleware` from `@zsms/auth-provider/middleware`, and the root layout wraps `SessionProvider` from `@zsms/auth-provider/react` — both provider-neutral names, so ADR-032 still holds. Without the middleware, `auth()` **throws** rather than returning "signed out", which surfaced as a 500 from every route that asks who the caller is. Note also that Supabase authenticates Clerk as a **third-party auth provider**, not via the deprecated `supabase` JWT template: `getSupabaseToken()` returns the plain session token, and the token needs a `role: "authenticated"` claim or PostgREST treats it as anonymous.
 
-**API routes built** (all `/api/…`): `health` · `schools` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages` · `admin/overview` · `admin/schools` · `admin/schools/[id]` · `admin/features` · `admin/tiers` · `admin/overrides` · `admin/impersonate` (501 — needs Clerk actor tokens)
+**API routes built** (all `/api/…`): `health` · `schools` · `school/overview` · `school/structure` · `students` · `students/[id]` · `staff` · `fees/structures` · `fees/records` · `payments` · `payments/[id]/verify` · `attendance` · `results` · `results/publish` · `announcements` · `announcements/[id]/read` · `messages` · `admin/overview` · `admin/schools` · `admin/schools/[id]` · `admin/features` · `admin/tiers` · `admin/overrides` · `admin/impersonate` (501 — needs Clerk actor tokens)
 
 **Phase 3 caveat — the logic is proven, the delivery is not.** Communications and PDF generation are verified against the real handlers, the real renderer, and the real fallback chain, but **no job has round-tripped through Redis and no message has left this machine.** There is no Redis locally and no Meta/Resend/Twilio credentials, so every channel runs through the mock provider. Live BullMQ→Redis transport and real delivery are **Phase 6, with credentials.** Do not build on the assumption that either has been exercised.
 
@@ -81,7 +81,9 @@ Two decisions shape almost everything else:
 
    `schoolHasFeature()` is the TypeScript wrapper named throughout the docs. **It does not exist yet** — nothing in `apps/` or `packages/` calls the resolver. `school_has_feature()` in the database is the only implementation.
 
-   **The student ceiling resolves the same way** (migration `0101`). Never read `subscription_tiers.student_limit` directly and never read `schools.max_students` at all — that column is deprecated and unenforced. Use **`public.school_student_limit(school_id)`** for the ceiling (order: `student_limit_override` → `tier_override` → tier) or **`public.school_student_capacity(school_id)`** for the ceiling plus the current roll, and `public.school_capacity` for a whole list in one query. A trigger on `students` enforces it on INSERT and on any UPDATE that puts a pupil back on the roll, raising `SQLSTATE ZS001`, which `fromPostgrestError` renders as a `CONFLICT` carrying the ceiling in the message. Pupils count toward it when `status IN ('active','on_leave')` and not soft-deleted.
+   **The student ceiling resolves the same way** (migrations `0101`–`0103`). Never read `subscription_tiers.student_limit` directly and never read `schools.max_students` at all — that column is deprecated and unenforced. Use **`public.school_student_limit(school_id)`** for the ceiling (order: `student_limit_override` → `tier_override` → tier) or **`public.school_student_capacity(school_id)`** for the ceiling plus the current roll, and `public.school_capacity` for a whole list in one query. An **AFTER** trigger on `students` enforces it on INSERT and on any UPDATE that puts a pupil back on the roll, raising `SQLSTATE ZS001`, which `fromPostgrestError` renders as a `CONFLICT` carrying the ceiling in the message. Pupils count toward it when `status IN ('active','on_leave')` and not soft-deleted.
+
+   **Why AFTER matters, and the general rule it stands for:** a BEFORE ROW trigger runs *ahead of* the RLS `WITH CHECK`, so `0101`'s guard told School B the exact ceiling of a full School A before establishing that School B could write there at all. **Any trigger that raises a message describing tenant state must be AFTER**, or it speaks before the policy has decided whether the caller is entitled to hear it.
 
 ---
 
@@ -91,7 +93,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 55 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 56 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -178,7 +180,7 @@ The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session le
 | **`schools.max_students` is a dead column still holding data** | migration `0003`, `0102` | Open, needs approval to drop. Deprecated by comment in `0102` and removed from every screen and from `PATCH /api/admin/schools/[id]`. Nothing has ever read it to make a decision; the live ceiling is `public.school_student_limit()`. Left in the table because dropping a column is destructive and the seeded values are the only record of what onboarding intended. |
 | **The tier form has no optimistic concurrency** | `app/admin/pricing/page.tsx` | Open, low priority. Every field is rendered, so saving a stale tab silently reverts a value changed elsewhere — observed on 2026-08-23, when a pre-migration tab put Professional's ceiling back to unlimited. `admin_update_tier` treats NULL as "unchanged" for the other fields, but a checkbox has no unchanged state to send. Acceptable for a single-operator panel; revisit if a second admin exists. |
 | **`/api/admin/schools/[id]` issues one RPC per feature** | `app/api/admin/schools/[id]/route.ts` | Open, performance. Resolved access calls `school_has_feature()` once per feature — 13 PostgREST round-trips today, growing with the catalogue. Correct, but an N+1 over the network. Wants a single set-returning `school_feature_resolution(school_id)` when the catalogue grows or the page feels slow. |
-| **Staff seats are not a modelled dimension** | `PRICING.md`, `CLERK.md`, `ONBOARDING.md` | **Open, blocks school onboarding.** A Clerk org's `maxAllowedMemberships` caps *staff* accounts, and `CLERK.md`'s onboarding snippet never sets it — so every school would inherit the instance default (5, far too low). Deriving it from the tier is impossible today: `afritech.subscription_tiers` has `student_limit` and `whatsapp_quota` and **no staff-seat column**. Needs a product decision — unlimited seats and pass `maxAllowedMemberships: 0`, or seats become priced and the tier table gains a column — before `school-onboard` is written. |
+| **Staff seats: decided, not yet implemented** | `PRICING.md`, `CLERK.md`, `ONBOARDING.md` | **Decided 2026-08-23: staff are not a priced dimension.** School onboarding passes `maxAllowedMemberships: 0` (unlimited) so no school can be blocked from adding a teacher, and `afritech.subscription_tiers` gains no staff-seat column. Tiers price on students and WhatsApp only. Reversible — pricing seats later means a column, a per-school override, and a Clerk backfill. Remove this row once `school-onboard` sets the limit. |
 | **Clerk instance settings are undocumented configuration** | `CLERK.md` | Open. "Allow user-created organisations" must be **off** in production (only ZSMS provisions school orgs; otherwise the reserved-slug check is bypassable), and "new members can delete organisations" must stay disabled (deleting the org orphans every `clerk_org_id` in `schools`). Neither is expressible in the repository. `CLERK.md` needs an instance-settings section that a new environment is checked against. |
 | Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. Layer 1 (Frontend) now has a foundation — `DESIGN_SYSTEM.md` and `packages/design-tokens` — but no portal screens yet. |
 

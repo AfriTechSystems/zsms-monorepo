@@ -4,6 +4,73 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-23 — School portal, groups 0 and 2: a trigger that spoke before the policy
+
+Branch `feature/phase-4-design-foundation`. **Migration `0103` applied. New adversarial suite: 41 assertions, all passing.** First school-portal screens exist: the shell, the dashboard, and the pupil roll.
+
+### The suite found a cross-tenant disclosure in code written the same day
+
+`0101` attached the ceiling guard as a **BEFORE** ROW trigger, which is the obvious choice and the wrong one. In PostgreSQL a BEFORE ROW trigger runs *ahead of* the RLS `WITH CHECK`. So the ceiling was evaluated before anything had established that the caller could write into that school at all:
+
+```
+School B owner → INSERT INTO students (school_id = School A)
+→ ZS001: "This school has reached its plan limit of 3 enrolled pupils."
+```
+
+Three facts about another tenant, to a caller entitled to none of them: that School A exists, that it is full, and the exact ceiling AfriTech has configured for it. A school's enrolment and its commercial limits are precisely what the tenant boundary exists to keep apart. The correct answer was `42501` — "not permitted", and nothing else.
+
+The same ordering produced a lesser wrong answer *inside* a school: an accountant, who may read the roll but not enrol, was told the school was full rather than that enrolment is not theirs to do. Not a disclosure, but it sends someone to buy a tier upgrade to solve a permissions problem.
+
+`0103` moves the trigger to **AFTER**, which puts the order back: BEFORE triggers → constraints and RLS `WITH CHECK` → the row lands → AFTER triggers. Enforcement is unchanged; an exception in an AFTER trigger aborts the statement just as one in a BEFORE trigger does. The one consequence to get right is that the new row is already counted at AFTER time, so the comparison moves from `>=` to `>` — an off-by-one that is silent in both directions.
+
+**The general rule this stands for, now in `CLAUDE.md`: any trigger that raises a message describing tenant state must be AFTER.** Otherwise it speaks before the policy has decided whether the caller is entitled to hear it.
+
+Worth being plain about how this was found. It was not found by reading the migration, which I had written and reviewed hours earlier, and not by the migration's own verification block. It was found because the suite asserted a *specific SQLSTATE* for a cross-tenant attempt rather than merely asserting that it failed. `throws_ok(..., '42501')` and `throws_ok(..., 'ZS001')` both pass a test that only checks "an error happened".
+
+### And a test that proved nothing
+
+The first draft asserted that undoing a soft delete at a full school is refused — against a pupil who had only been *withdrawn*, and was never soft-deleted. The UPDATE matched a row whose `is_deleted` was already false: a no-op, no exception, and pgTAP correctly reported "caught: no exception". The fixture now soft-deletes an on-roll pupil, has the freed place taken, and only then attempts the restore.
+
+Both escape routes are now covered separately, because they are separate columns: `status` withdrawn→active, and `is_deleted` true→false. A ceiling that watches only one is escapable through the other.
+
+### Group 0 — the shell
+
+`/school/[schoolCode]/…`, where the segment is the lowercase school code — the same string Clerk uses as the organisation slug and the same one `school_branding_by_slug()` takes. One identifier, three consumers, no mapping table.
+
+The segment is **not** what scopes the data; the JWT's `o.id` claim is, through `current_school_uuid()` in every policy. So the segment can only agree or disagree with the session, and `requireSchoolSession()` makes a disagreement a **404**. Not 403: answering "forbidden" for `/school/zm-ndl-0002/students` would confirm that `ZM-NDL-0002` is a school on this platform. Not-found is what a typo gets, and it discloses nothing.
+
+Three things this shell does that the admin shell does not:
+
+- **It is themed.** ADR-043 excludes the admin surface from per-school branding so an operator always knows whose system they are in; here the opposite is right. Resolved on the server and emitted as CSS variables in the first response — no client fetch, no flash of ZSMS blue, no JavaScript needed to render a school's colours. That matters more here: an accountant opening the fee list on a phone over a slow connection is the normal case, not the edge one.
+- **The nav is filtered by role, not disabled by it.** A greyed-out "Fees" tab tells a teacher there is a fees section and they are not trusted with it. Omitting it tells them nothing, which is the correct amount. `lib/roles.ts` holds the map, and every entry names the policy it is transcribed from so the two cannot drift silently.
+- **Impersonation gets a permanent band**, above the header so it survives scrolling to the top of any screen. Every action an operator takes while signed in as a school user is attributed to that user; the banner is what stands between "I looked" and "I changed something while looking".
+
+`lib/roles.ts` deliberately omits `has_permission_grant()`. Several policies admit it as an alternative to the role check — the custom-role system on the `org:staff` base — but grants are per-user rows, not a property of a JWT claim. A custom-role holder therefore sees the conservative nav and still succeeds at whatever their grants allow. Widening it needs the grant list per session; it is not guesswork this file should do.
+
+### Group 2 — the pupil roll, and where the ceiling shows up
+
+Nothing on these screens contains a pupil limit. The banner's number, the disabled button's explanation, and the number the database enforces are one value, resolved by `school_student_capacity()` and carried in the list response's **`meta`** rather than fetched separately. That placement is the point: a screen that fetched the roll and the ceiling from two endpoints would render "142 pupils" and "of 140" from two different instants, and the disagreement would appear exactly when a school is at the boundary and someone is watching.
+
+The enrolment form checks the ceiling and the trigger checks it again, and the second check is the real one. The case that matters is two registrars taking the last place at once: one submits a form that passed the client check and is refused by the trigger, which returns `CONFLICT` carrying the resolved ceiling in its message. The form renders it and **clears nothing** — a full pupil record retyped because the roll filled up mid-typing is the specific failure `DESIGN_SYSTEM.md` names.
+
+Two smaller decisions worth recording:
+
+- **Grades come from `/api/school/structure`, never a constant.** Zambia runs two education systems at once — traditional ECZ Grades 1–12 and the 2023 reform's Grades 1–6 then Forms 1–6 — and most private schools are mid-transition. A hardcoded list would have offered a Kitwe secondary school twelve options none of which were right. The seed proves it: `ZM-CBE-9001` has Form 1–6 and no grades at all.
+- **There is no delete, and the button says so.** The pupil screen offers "remove from the roll" — a status change that frees a place and keeps the record, the fee history, the attendance, and the results. "Delete" would be a promise the database refuses to keep: there is no DELETE policy and no DELETE privilege on `students` for any role, the owner included.
+
+### Also
+
+- `/api/school/*` refuses an AfriTech operator outright. Their policies match *every* school, so `.maybeSingle()` on `schools` raises "multiple rows" — which would have surfaced as an unexplained 500 for a request that is simply addressed to the wrong surface. `resolveSchoolContext()` had the same latent problem and now uses `.limit(2)`, treating "more than one" as "no school", which is the truthful answer for a platform account.
+- `P0002` (`no_data_found`, raised by the `admin_*` functions when a row is already in the target state) now maps to `NOT_FOUND` with a reload-and-retry message instead of falling through to "an unexpected error occurred".
+
+### Not yet verified, and why
+
+**No portal screen has been seen rendering real data.** Every seeded school's `clerk_org_id` is a placeholder (`org_test_d`), so no Clerk session can resolve to one — which means the guards are what I could exercise, and I did: an AfriTech session gets 404 on `/school/zm-lsk-9001`, `FORBIDDEN` on `/api/school/overview`, and a redirect to `/admin` from `/school`. All correct, and all the *negative* path.
+
+Rendering the dashboard and the roll needs a real Clerk organisation whose slug is a seeded school code, with a member on it. That is a two-minute action in the Clerk dashboard and it is not mine to take.
+
+---
+
 ## 2026-08-23 — Student ceilings: configuration that described a rule nothing applied
 
 Branch `feature/phase-4-design-foundation`. **Migrations `0101` and `0102` applied.** Admin dashboard signed off; this closes the two items raised at that gate before the school portal starts.

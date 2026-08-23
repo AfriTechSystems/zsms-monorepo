@@ -564,9 +564,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0103`** — available for the next migration.
+**`0104`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0102` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0103` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -1121,3 +1121,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 | 2026-08-18 | **Added `0099` — deduplicated feature overrides, partial unique index on `is_active`** | The seed's `ON CONFLICT DO NOTHING` was unreachable with no unique constraint to conflict with, so re-running it duplicated every override. Duplicates resolve identically through `EXISTS` but are revoked *by id*, so revoking one would leave access in force — the dashboard would have lied to the operator. Partial on `is_active` so grant→revoke→grant history stays legal. Next available advances to `0100`. |
 | 2026-08-23 | **Added `0101` — the student ceiling became a resolved configuration value** | `subscription_tiers.student_limit` had existed since `0082` and was already admin-editable, but nothing enforced it, no per-school exception existed, and the seeded figures disagreed with both PRICING.md and DYNAMIC_CONFIG.md (Starter 150 vs 200, Professional unlimited vs 1,000). Adds the `student_limit_override` override type, `school_student_limit()` (override → tier override → tier), `school_student_capacity()`, and a trigger on `students` that fires on INSERT *and* on the UPDATE that puts a pupil back on the roll — a ceiling watching only INSERT is one you get around by withdrawing and re-activating. The seed realignment is guarded to rows still holding `0082`'s exact values, because tightening Professional from unlimited is the one direction that could stop a real school enrolling. |
 | 2026-08-23 | **Added `0102` — `school_capacity` view; `schools.max_students` deprecated** | The list screens want the resolved ceiling for every school on the page, and one RPC per row is the same N+1 already tracked against `/api/admin/schools/[id]`. `LATERAL` over the function keeps one definition of the resolution order and the counting rule. `schools.max_students` is a per-school copy that nothing has ever read to make a decision, yet it was *displayed* as the cap on two admin screens — an operator editing it believed they had changed a limit. Left in place, not dropped: dropping is destructive and needs approval. Next available advances to `0103`. |
+| 2026-08-23 | **Added `0103` — the ceiling trigger moved from BEFORE to AFTER** | A BEFORE ROW trigger runs *ahead of* the RLS `WITH CHECK`, so `0101`'s guard evaluated the ceiling before anyone had established the caller could write into that school. School B attempting to enrol into a full School A was answered `ZS001: This school has reached its plan limit of 3 enrolled pupils` — three facts about another tenant to a caller entitled to none of them. Found by the new adversarial suite. AFTER puts RLS first; the comparison moves `>=` → `>` because the new row is already counted. |

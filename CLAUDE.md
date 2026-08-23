@@ -16,7 +16,7 @@ The tree is:
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
 | `supabase/migrations/` | **`0001`–`0021`, `0069`–`0105` applied to `zsms-dev`** (58 migrations). Role enforcement verified against Clerk's bare `o.rol` form for all nine role claims |
-| `supabase/tests/rls/` | **7 pgTAP suites, 304 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38), student ceiling (41). `npm run db:test` checks every `plan(N)` against the real assertion count first |
+| `supabase/tests/rls/` | **7 pgTAP suites, 307 assertions, all passing** — tenant isolation (72), fees/attendance/results (45), fee arrears (38), communications (47), worker boundary (26), school branding (38), student ceiling (41). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/` | Empty — no Edge Functions yet |
 | `supabase/seed/` | `dev_seed.sql` — 6 synthetic schools spanning health bands. `npm run db:seed`, which **refuses any project but `zsms-dev`** |

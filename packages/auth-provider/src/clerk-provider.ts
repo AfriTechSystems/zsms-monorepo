@@ -23,7 +23,8 @@ interface ClerkAuthLike {
   orgId: string | null
   orgSlug: string | null
   orgRole: string | null
-  actor: { sub: string } | null
+  /** Present only during impersonation. Clerk omits it entirely otherwise. */
+  actor?: { sub: string } | null
   getToken(opts?: { template?: string }): Promise<string | null>
   sessionClaims: Record<string, unknown> | null
 }
@@ -56,7 +57,18 @@ export class ClerkAuthProvider implements AuthProvider {
       organisationId: auth.orgId,
       organisationSlug: auth.orgSlug,
       role,
-      isImpersonating: auth.actor !== null,
+      // `!= null`, not `!== null`. Clerk returns `undefined` for `actor` on an
+      // ordinary session, not `null` — the local interface above says `| null`
+      // and is wrong about it. Strict inequality therefore reported EVERY
+      // session as an impersonation, which surfaced the moment a shell first
+      // rendered the impersonation banner: a school user signing in normally was
+      // told "you are signed in as a user at Test Academy Lusaka. Everything you
+      // do is recorded against them."
+      //
+      // That is worse than a cosmetic bug. The banner's whole value is that it
+      // is rare and alarming; one that shows on every session is one people
+      // learn to read past, and it would still be there on the day it was true.
+      isImpersonating: auth.actor != null,
       actorUserId: auth.actor?.sub ?? null,
     }
   }

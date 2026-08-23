@@ -42,6 +42,8 @@ import {
 } from 'lucide-react'
 
 import { useApi } from '../../../lib/use-api'
+import { can } from '../../../lib/roles'
+import type { Role } from '@zsms/auth-provider'
 import { Alert } from '../../../components/ui/alert'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
@@ -152,7 +154,11 @@ export default function SchoolDashboardPage({
         title={data?.school.name ?? 'Dashboard'}
         description="Today at a glance."
         actions={
-          data && (
+          // Gated on the capability, not merely on having loaded. Offering
+          // "Enrol pupil" to a role the INSERT policy refuses produces a
+          // filled-in form and a flat "you do not have permission" — which
+          // reads as a broken product rather than as a role boundary.
+          data && can(data.role as Role, 'students:write') && (
             <Button asChild>
               <Link href={`${base}/students/new`}>
                 <UserPlus aria-hidden="true" />
@@ -276,12 +282,14 @@ export default function SchoolDashboardPage({
                       title="No pupils yet"
                       description="Enrol the first pupil to start the roll."
                       action={
-                        <Button asChild size="sm">
-                          <Link href={`${base}/students/new`}>
-                            <UserPlus aria-hidden="true" />
-                            Enrol pupil
-                          </Link>
-                        </Button>
+                        can(data.role as Role, 'students:write') ? (
+                          <Button asChild size="sm">
+                            <Link href={`${base}/students/new`}>
+                              <UserPlus aria-hidden="true" />
+                              Enrol pupil
+                            </Link>
+                          </Button>
+                        ) : undefined
                       }
                     />
                   ) : (

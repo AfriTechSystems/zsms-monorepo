@@ -35,6 +35,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, UserPlus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
+import { ROLE_LABEL, can } from '../../../../../lib/roles'
+import type { Role } from '@zsms/auth-provider'
 import { Alert } from '../../../../../components/ui/alert'
 import { Button } from '../../../../../components/ui/button'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
@@ -43,6 +45,7 @@ import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../../.
 import { formatCount } from '../../school-shared'
 
 interface Structure {
+  role: string
   gradeLevels: Array<{ level_id: string; display_name: string; level_order: number }>
   classesByGrade: Record<string, string[]>
 }
@@ -75,6 +78,7 @@ export default function NewStudentPage({
   const { meta } = useApi<unknown[]>('/api/students?perPage=1')
   const capacity = (meta?.capacity ?? null) as CapacityMeta | null
   const atCapacity = capacity?.at_capacity === true
+  const mayEnrol = can(structure?.role as Role | undefined, 'students:write')
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -153,6 +157,20 @@ export default function NewStudentPage({
 
       {!error && structure && (
         <>
+          {/* Reached by URL, or by a stale tab from before a role change. The
+              form is still rendered rather than hidden — a blank screen does
+              not explain itself — but it says which role is required and which
+              one this session holds, so the answer is not "ask an
+              administrator why". */}
+          {!mayEnrol && structure && (
+            <Alert variant="warning" title="Your role cannot enrol pupils" className="mb-cards">
+              Enrolment is limited to the school owner, the principal, and administrators. This
+              session is signed in as{' '}
+              <strong>{ROLE_LABEL[structure.role] ?? structure.role}</strong>. Ask the school owner
+              to change your role in ZSMS, or to enrol the pupil for you.
+            </Alert>
+          )}
+
           {atCapacity && capacity && (
             <Alert variant="danger" title="The roll is full" className="mb-cards">
               This school has {formatCount(capacity.current_count)} pupils on the roll and its plan
@@ -324,7 +342,9 @@ export default function NewStudentPage({
               <FormActions>
                 <Button
                   type="submit"
-                  disabled={saving || !complete || atCapacity || structure.gradeLevels.length === 0}
+                  disabled={
+                    saving || !complete || !mayEnrol || atCapacity || structure.gradeLevels.length === 0
+                  }
                 >
                   {saving ? (
                     <Loader2 aria-hidden="true" className="animate-spin" />

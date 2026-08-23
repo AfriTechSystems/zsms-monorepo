@@ -36,6 +36,7 @@ const createSchema = z
       'extend_subscription',
       'extend_trial',
       'tier_override',
+      'student_limit_override',
     ]),
     featureKey: z.string().min(1).max(64).optional(),
     overrideValue: z.string().min(1).max(64).optional(),
@@ -56,6 +57,16 @@ const createSchema = z
   .refine((v) => (v.overrideType === 'tier_override' ? Boolean(v.overrideValue) : true), {
     message: 'A tier override must name the tier to treat the school as.',
   })
+  // Mirrors the CHECK added in 0101. Validated here as well as there so the
+  // operator gets a field-level message rather than a 409 from the driver — the
+  // database remains the boundary, this is only the better error.
+  .refine(
+    (v) =>
+      v.overrideType !== 'student_limit_override' ||
+      (typeof v.overrideValue === 'string' &&
+        (v.overrideValue === 'unlimited' || /^\d+$/.test(v.overrideValue))),
+    { message: 'A student limit override must be a whole number, or the word "unlimited".' },
+  )
 
 const revokeSchema = z.object({ id: z.string().uuid() })
 

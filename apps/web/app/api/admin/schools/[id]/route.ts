@@ -27,7 +27,14 @@ const patchSchema = z
     subscriptionTier: z.enum(['starter', 'growth', 'professional', 'enterprise']).optional(),
     financeModuleEnabled: z.boolean().optional(),
     whatsappEnabled: z.boolean().optional(),
-    maxStudents: z.number().int().min(0).nullable().optional(),
+    // `maxStudents` USED TO BE HERE and is deliberately gone. `schools.max_students`
+    // is a per-school copy of a tier ceiling that nothing has ever enforced;
+    // since 0101 the enforced ceiling is resolved by `school_student_limit()`
+    // from the tier plus an auditable `student_limit_override`. Leaving both
+    // writable gives an operator two fields that look like the same control,
+    // one of which does nothing — and the one that does nothing is the one with
+    // no reason, no actor, and no expiry attached. See the deprecation note in
+    // 0101 and the tracked row in CLAUDE.md.
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'No changes supplied.' })
 
@@ -74,24 +81,39 @@ export async function GET(
       }),
     )
 
-    const [overrides, counts] = await Promise.all([
+    // The ceiling is resolved by the same function the enrolment trigger reads,
+    // so the number an operator sees here is the number a school will actually
+    // hit. A count taken separately would eventually disagree with it — the
+    // capacity function's counting rule (on the roll: active or on_leave, not
+    // soft-deleted) is the part that must not be reimplemented per caller.
+    const [overrides, capacity] = await Promise.all([
       client
         .from('school_feature_exceptions')
         .select('*')
         .eq('school_id', id)
         .order('created_at', { ascending: false }),
-      client
-        .from('students')
-        .select('id', { count: 'exact', head: true })
-        .eq('school_id', id)
-        .eq('is_deleted', false),
+      client.rpc('school_student_capacity', { p_school_id: id }),
     ])
+
+    const cap = (Array.isArray(capacity.data) ? capacity.data[0] : capacity.data) as
+      | {
+          student_limit: number | null
+          is_unlimited: boolean
+          source: string
+          current_count: number
+          remaining: number | null
+          at_capacity: boolean
+        }
+      | undefined
 
     return ok({
       school,
       features: resolved,
       overrides: overrides.data ?? [],
-      studentCount: counts.count ?? 0,
+      capacity: cap ?? null,
+      // Kept for callers that only want the headline number. It is the same
+      // count the capacity function took, not a second query that could drift.
+      studentCount: cap?.current_count ?? 0,
     })
   })
 }
@@ -125,13 +147,12 @@ export async function PATCH(
     if (input.subscriptionTier !== undefined) patch['subscription_tier'] = input.subscriptionTier
     if (input.financeModuleEnabled !== undefined) patch['finance_module_enabled'] = input.financeModuleEnabled
     if (input.whatsappEnabled !== undefined) patch['whatsapp_enabled'] = input.whatsappEnabled
-    if (input.maxStudents !== undefined) patch['max_students'] = input.maxStudents
 
     const { data, error } = await client
       .from('schools')
       .update(patch)
       .eq('id', id)
-      .select('id, school_id, name, status, subscription_tier, finance_module_enabled, whatsapp_enabled, max_students, updated_at')
+      .select('id, school_id, name, status, subscription_tier, finance_module_enabled, whatsapp_enabled, updated_at')
 
     if (error) return fromPostgrestError(error)
 

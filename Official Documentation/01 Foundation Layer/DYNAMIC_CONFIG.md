@@ -41,11 +41,12 @@ Every row below is a parameter that must be database-backed. The **Owner** colum
 | Tier monthly price (ZMW/USD) | `afritech.subscription_tiers` | `super_admin` | K600 / K1,100 / K2,000 / K3,000 | Per tier, both currencies |
 | Tier annual price | `afritech.subscription_tiers` | `super_admin` | Derived | Calculated from monthly + discount |
 | Annual discount percentage | `afritech.subscription_tiers` | `super_admin` | 10.00 | Drives annual price calculation |
-| Student limit per tier | `afritech.subscription_tiers` | `super_admin` | 200 / 500 / 1,000 / NULL | NULL = unlimited |
+| Student limit per tier | `afritech.subscription_tiers` | `super_admin` | 200 / 500 / 1,000 / NULL | NULL = unlimited. Editable from Admin → Pricing. Resolved by `public.school_student_limit()`, enforced by a trigger on `students` (migration `0101`) |
+| Student limit for one school | `afritech.school_feature_overrides` | `super_admin` | None | `override_type = 'student_limit_override'`, value a whole number or `'unlimited'`. Beats the tier. Carries a reason, an actor, and an optional expiry like every other override |
 | WhatsApp quota per tier | `afritech.subscription_tiers` | `super_admin` | 500 / 1,500 / 4,000 / unlimited | Monthly messages included |
 | Per-feature add-on price | `afritech.feature_flags` | `super_admin` | Per feature | e.g. timetable K100, loan_module K275 |
 | Feature-to-tier inclusion matrix | `afritech.tier_features` | `super_admin` | Per ADR-014 | The toggle grid |
-| Per-school overrides | `afritech.school_feature_overrides` | `super_admin` | None | Grant, revoke, extend, tier override |
+| Per-school overrides | `afritech.school_feature_overrides` | `super_admin` | None | Grant, revoke, extend, tier override, student limit override |
 | Promotional / discount codes | `afritech.promo_codes` | `super_admin` | None | Percentage or fixed, expiry, usage cap |
 | Standalone teacher subscription price | `afritech.platform_products` | `super_admin` | K300/mo, K3,000/yr | Teacher Hub B2C pricing |
 | Standalone teacher free-trial plan count | `afritech.platform_products` | `super_admin` | 5 | Free lesson plans before paywall |

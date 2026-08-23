@@ -75,6 +75,24 @@ export function fromPostgrestError(error: { code?: string; message: string }): N
       return fail('VALIDATION_ERROR', 'A referenced record does not exist.')
     case '23514':
       return fail('VALIDATION_ERROR', 'A field value is outside its permitted set.')
+    case 'P0002':
+      // `no_data_found`, raised by the admin_* functions when the row they were
+      // asked to change is not there or is already in the target state — most
+      // often an override revoked in another tab. Reporting that as a server
+      // fault sends an operator looking for a bug behind a screen that is
+      // merely stale.
+      return fail('NOT_FOUND', 'That record no longer exists, or has already been changed. Reload and try again.')
+    case 'ZS001':
+      // The student ceiling (migration 0101). The exception message is raised by
+      // `enforce_student_limit()` and is written for the person trying to enrol
+      // a pupil — it names the resolved limit and the two ways out. This is the
+      // one place a driver message is passed through, and it is safe because the
+      // text is ours and contains a configured ceiling, not row data.
+      //
+      // CONFLICT rather than FORBIDDEN: the caller has every right to enrol
+      // students, and nothing about their permissions would change the outcome.
+      // The school's state is what refuses it.
+      return fail('CONFLICT', error.message)
     case 'PGRST116':
       return fail('NOT_FOUND', 'Record not found.')
     case 'PGRST301':

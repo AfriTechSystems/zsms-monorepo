@@ -88,11 +88,49 @@ interface Override {
   revoked_at: string | null
 }
 
+/** The resolver's row, as `school_student_capacity()` returns it. */
+interface CapacityRow {
+  student_limit: number | null
+  is_unlimited: boolean
+  source: string
+  current_count: number
+  remaining: number | null
+  at_capacity: boolean
+}
+
 interface Detail {
   school: School
   features: ResolvedFeature[]
   overrides: Override[]
+  capacity: CapacityRow | null
   studentCount: number
+}
+
+/**
+ * The capacity row in the shape the screen renders.
+ *
+ * `limitLabel` exists because the unlimited case must never render as a number.
+ * `student_limit` is NULL for an uncapped school, and a template that prints it
+ * straight shows "of " followed by nothing — which reads as a missing value
+ * rather than as the deliberate absence of a ceiling.
+ */
+interface Capacity {
+  limitLabel: string
+  currentCount: number
+  remaining: number | null
+  source: string
+  atCapacity: boolean
+}
+
+function toCapacity(row: CapacityRow | null | undefined): Capacity | null {
+  if (!row) return null
+  return {
+    limitLabel: row.is_unlimited ? 'no limit' : String(row.student_limit ?? 0),
+    currentCount: row.current_count,
+    remaining: row.remaining,
+    source: row.source,
+    atCapacity: row.at_capacity,
+  }
 }
 
 const STATUSES = ['pending_verification', 'trial', 'active', 'suspended', 'terminated'] as const
@@ -200,19 +238,32 @@ function SubscriptionPanel({ school, onSaved }: { school: School; onSaved: () =>
   )
 }
 
-/** Grant or revoke a feature for this school alone. */
-function OverrideForm({ schoolId, features, onSaved }: {
+type OverrideKind = 'grant_feature' | 'revoke_feature' | 'student_limit_override'
+
+/** Grant or revoke a feature, or vary the student ceiling, for this school alone. */
+function OverrideForm({ schoolId, features, capacity, onSaved }: {
   schoolId: string
   features: ResolvedFeature[]
+  capacity: Capacity | null
   onSaved: () => void
 }): JSX.Element {
   const [featureKey, setFeatureKey] = useState(features[0]?.feature_key ?? '')
-  const [type, setType] = useState<'grant_feature' | 'revoke_feature'>('grant_feature')
+  const [type, setType] = useState<OverrideKind>('grant_feature')
+  const [limit, setLimit] = useState('')
+  const [unlimited, setUnlimited] = useState(false)
   const [reason, setReason] = useState('')
   const [ticket, setTicket] = useState('')
   const [expires, setExpires] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const isLimit = type === 'student_limit_override'
+  // A ceiling below the school's current roll is not refused — a school may
+  // legitimately be capped at what it already has, and the trigger blocks only
+  // the NEXT enrolment. But it changes what the operator is agreeing to, so it
+  // is said out loud rather than discovered by the school.
+  const belowRoll =
+    isLimit && !unlimited && limit !== '' && capacity !== null && Number(limit) < capacity.currentCount
 
   const submit = useCallback(
     async (event: FormEvent) => {
@@ -223,7 +274,9 @@ function OverrideForm({ schoolId, features, onSaved }: {
       const result = await apiSend('/api/admin/overrides', 'POST', {
         schoolId,
         overrideType: type,
-        featureKey,
+        featureKey: type === 'student_limit_override' ? undefined : featureKey,
+        overrideValue:
+          type === 'student_limit_override' ? (unlimited ? 'unlimited' : limit) : undefined,
         reason: reason.trim(),
         ticketRef: ticket.trim() || undefined,
         // A date input gives a bare date; the column is TIMESTAMPTZ and the
@@ -240,9 +293,11 @@ function OverrideForm({ schoolId, features, onSaved }: {
       setReason('')
       setTicket('')
       setExpires('')
+      setLimit('')
+      setUnlimited(false)
       onSaved()
     },
-    [schoolId, type, featureKey, reason, ticket, expires, onSaved],
+    [schoolId, type, featureKey, limit, unlimited, reason, ticket, expires, onSaved],
   )
 
   return (
@@ -256,25 +311,65 @@ function OverrideForm({ schoolId, features, onSaved }: {
             <Select
               {...props}
               value={type}
-              onChange={(e) => setType(e.target.value as 'grant_feature' | 'revoke_feature')}
+              onChange={(e) => setType(e.target.value as OverrideKind)}
             >
               <option value="grant_feature">Grant a feature this tier excludes</option>
               <option value="revoke_feature">Revoke a feature this tier includes</option>
+              <option value="student_limit_override">Vary the student ceiling</option>
             </Select>
           )}
         </Field>
 
-        <Field id="override-feature" label="Feature" required>
-          {(props) => (
-            <Select {...props} value={featureKey} onChange={(e) => setFeatureKey(e.target.value)}>
-              {features.map((f) => (
-                <option key={f.feature_key} value={f.feature_key}>
-                  {f.display_name} {f.enabled ? '(currently on)' : '(currently off)'}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        {isLimit ? (
+          <Field
+            id="override-limit"
+            label="Student ceiling"
+            required={!unlimited}
+            hint={
+              capacity
+                ? `Currently ${capacity.limitLabel} from the ${capacity.source === 'tier' ? 'tier' : 'existing override'}; ${capacity.currentCount} enrolled.`
+                : 'Pupils this school may have on the roll.'
+            }
+            footer={
+              <label className="flex min-h-tap items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={unlimited}
+                  onChange={(e) => setUnlimited(e.target.checked)}
+                />
+                No limit
+              </label>
+            }
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={unlimited ? '' : limit}
+                disabled={unlimited}
+                required={!unlimited}
+                placeholder={unlimited ? 'Unlimited' : '250'}
+                onChange={(e) => setLimit(e.target.value)}
+              />
+            )}
+          </Field>
+        ) : (
+          <Field id="override-feature" label="Feature" required>
+            {(props) => (
+              <Select {...props} value={featureKey} onChange={(e) => setFeatureKey(e.target.value)}>
+                {features.map((f) => (
+                  <option key={f.feature_key} value={f.feature_key}>
+                    {f.display_name} {f.enabled ? '(currently on)' : '(currently off)'}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )}
 
         <Field
           id="override-reason"
@@ -307,6 +402,13 @@ function OverrideForm({ schoolId, features, onSaved }: {
         </Field>
       </FormGrid>
 
+      {belowRoll && capacity && (
+        <Alert variant="warning" title="Below the current roll" className="mt-stack">
+          {capacity.currentCount} pupils are already enrolled. Setting the ceiling to {limit} does not
+          remove anyone — it stops the school enrolling anybody else until the roll falls below it.
+        </Alert>
+      )}
+
       {error && (
         <Alert variant="danger" title="Override not created" className="mt-stack">
           {error}
@@ -314,7 +416,10 @@ function OverrideForm({ schoolId, features, onSaved }: {
       )}
 
       <FormActions>
-        <Button type="submit" disabled={saving || reason.trim().length < 10}>
+        <Button
+          type="submit"
+          disabled={saving || reason.trim().length < 10 || (isLimit && !unlimited && limit === '')}
+        >
           {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
           Record override
         </Button>
@@ -334,6 +439,7 @@ export default function AdminSchoolDetailPage({
   const { data, loading, error, code, reload } = useApi<Detail>(`/api/admin/schools/${id}`)
   const [revoking, setRevoking] = useState<string | null>(null)
   const [revokeError, setRevokeError] = useState<string | null>(null)
+  const capacity = toCapacity(data?.capacity)
 
   const revoke = useCallback(
     async (override: Override) => {
@@ -395,15 +501,33 @@ export default function AdminSchoolDetailPage({
                   </div>
                   <div>
                     <dt className="text-sm text-muted-foreground">Pupils enrolled</dt>
+                    {/* The ceiling shown is the RESOLVED one — the same value
+                        the enrolment trigger reads — with where it came from
+                        named. `schools.max_students` was shown here before; it
+                        is a per-school copy nothing enforces, so it could and
+                        eventually would disagree with what a school actually
+                        hits. */}
                     <dd data-numeric className="text-lg font-semibold">
-                      {data.studentCount}
-                      {data.school.max_students !== null && (
+                      {capacity ? capacity.currentCount : data.studentCount}
+                      {capacity && (
                         <span className="text-sm font-normal text-muted-foreground">
                           {' '}
-                          of {data.school.max_students}
+                          of {capacity.limitLabel}
                         </span>
                       )}
                     </dd>
+                    {capacity && (
+                      <p className="text-xs text-subtle">
+                        {capacity.source === 'school_override'
+                          ? 'Per-school override'
+                          : capacity.source === 'tier_override'
+                            ? 'Tier override'
+                            : capacity.source === 'tier'
+                              ? `${TIER_LABEL[data.school.subscription_tier] ?? data.school.subscription_tier} tier`
+                              : 'No ceiling configured'}
+                        {capacity.atCapacity ? ' · at capacity' : ''}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <dt className="text-sm text-muted-foreground">Joined</dt>
@@ -506,11 +630,26 @@ export default function AdminSchoolDetailPage({
                       >
                         <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={o.override_type === 'revoke_feature' ? 'danger' : 'success'}>
+                            {/* Only a revoke is danger and only a grant is
+                                success. The rest change a value rather than
+                                turn something on or off, and colouring a
+                                lowered ceiling green would read as a favour. */}
+                            <Badge
+                              variant={
+                                o.override_type === 'revoke_feature'
+                                  ? 'danger'
+                                  : o.override_type === 'grant_feature'
+                                    ? 'success'
+                                    : 'primary'
+                              }
+                            >
                               {o.override_type.replace(/_/g, ' ')}
                             </Badge>
                             {o.feature_key && (
                               <span className="font-mono text-xs text-subtle">{o.feature_key}</span>
+                            )}
+                            {o.override_value && (
+                              <span className="font-mono text-xs text-subtle">{o.override_value}</span>
                             )}
                             {!o.is_active && <Badge variant="neutral">Revoked {formatDate(o.revoked_at)}</Badge>}
                           </div>
@@ -544,7 +683,12 @@ export default function AdminSchoolDetailPage({
 
                 <div className="border-t border-border pt-cards">
                   <h3 className="mb-stack font-semibold">Record a new override</h3>
-                  <OverrideForm schoolId={data.school.id} features={data.features} onSaved={reload} />
+                  <OverrideForm
+                    schoolId={data.school.id}
+                    features={data.features}
+                    capacity={capacity}
+                    onSaved={reload}
+                  />
                 </div>
               </CardContent>
             </Card>

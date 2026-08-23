@@ -15,7 +15,7 @@ The tree is:
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0099` applied to `zsms-dev`** (52 migrations) |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0102` applied to `zsms-dev`** (55 migrations) |
 | `supabase/tests/rls/` | **6 pgTAP suites, 263 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/` | Empty — no Edge Functions yet |
@@ -81,6 +81,8 @@ Two decisions shape almost everything else:
 
    `schoolHasFeature()` is the TypeScript wrapper named throughout the docs. **It does not exist yet** — nothing in `apps/` or `packages/` calls the resolver. `school_has_feature()` in the database is the only implementation.
 
+   **The student ceiling resolves the same way** (migration `0101`). Never read `subscription_tiers.student_limit` directly and never read `schools.max_students` at all — that column is deprecated and unenforced. Use **`public.school_student_limit(school_id)`** for the ceiling (order: `student_limit_override` → `tier_override` → tier) or **`public.school_student_capacity(school_id)`** for the ceiling plus the current roll, and `public.school_capacity` for a whole list in one query. A trigger on `students` enforces it on INSERT and on any UPDATE that puts a pupil back on the roll, raising `SQLSTATE ZS001`, which `fromPostgrestError` renders as a `CONFLICT` carrying the ceiling in the message. Pupils count toward it when `status IN ('active','on_leave')` and not soft-deleted.
+
 ---
 
 ## Supabase environments
@@ -89,7 +91,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 52 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 55 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -173,7 +175,8 @@ The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session le
 | **`schoolHasFeature()` has no TypeScript implementation** | `ARCHITECTURE.md`, ADR-014 | Open. `public.school_has_feature()` exists in the database (`0095`) and the admin API calls it by RPC. No package exports the wrapper the docs name, and nothing caches it — ADR-014 specifies a Redis cache (5-min overrides / 60-min tier). Write it when the first feature is actually gated. |
 | **Per-module subscription** | `PRICING.md`, `DYNAMIC_CONFIG.md` | Open. The documented resolution order has five steps; the implementation has four. No table exists for per-module billing, so the step is omitted rather than faked. |
 | **`payments.payment_method` has no `mobile_money`** | `SCHEMA.md`, `ZM.md` | Open. The CHECK admits `cash`/`bank_deposit`/`cheque`/`online_gateway`/`loan_disbursement`/`reversal`/`waiver`. Mobile money is the dominant rail in Zambia and currently has to be recorded as `online_gateway`, which loses the distinction on every receipt and reconciliation. Needs a migration and a product decision. |
-| **Tier student ceilings disagree between doc and schema** | `PRICING.md`, migration `0082` | Open, needs a commercial decision. `PRICING.md` lists Starter at **200** students and Professional at **1,000**; `0082` seeded **150** and **NULL** (unlimited). Migration `0100` fixed the missing *prices* but deliberately left the ceilings alone — a price is inert until invoicing, whereas a ceiling decides whether a school can enrol its next pupil. Decide which document is authoritative, then migrate. |
+| **`schools.max_students` is a dead column still holding data** | migration `0003`, `0102` | Open, needs approval to drop. Deprecated by comment in `0102` and removed from every screen and from `PATCH /api/admin/schools/[id]`. Nothing has ever read it to make a decision; the live ceiling is `public.school_student_limit()`. Left in the table because dropping a column is destructive and the seeded values are the only record of what onboarding intended. |
+| **The tier form has no optimistic concurrency** | `app/admin/pricing/page.tsx` | Open, low priority. Every field is rendered, so saving a stale tab silently reverts a value changed elsewhere — observed on 2026-08-23, when a pre-migration tab put Professional's ceiling back to unlimited. `admin_update_tier` treats NULL as "unchanged" for the other fields, but a checkbox has no unchanged state to send. Acceptable for a single-operator panel; revisit if a second admin exists. |
 | **`/api/admin/schools/[id]` issues one RPC per feature** | `app/api/admin/schools/[id]/route.ts` | Open, performance. Resolved access calls `school_has_feature()` once per feature — 13 PostgREST round-trips today, growing with the catalogue. Correct, but an N+1 over the network. Wants a single set-returning `school_feature_resolution(school_id)` when the catalogue grows or the page feels slow. |
 | **Staff seats are not a modelled dimension** | `PRICING.md`, `CLERK.md`, `ONBOARDING.md` | **Open, blocks school onboarding.** A Clerk org's `maxAllowedMemberships` caps *staff* accounts, and `CLERK.md`'s onboarding snippet never sets it — so every school would inherit the instance default (5, far too low). Deriving it from the tier is impossible today: `afritech.subscription_tiers` has `student_limit` and `whatsapp_quota` and **no staff-seat column**. Needs a product decision — unlimited seats and pass `maxAllowedMemberships: 0`, or seats become priced and the tier table gains a column — before `school-onboard` is written. |
 | **Clerk instance settings are undocumented configuration** | `CLERK.md` | Open. "Allow user-created organisations" must be **off** in production (only ZSMS provisions school orgs; otherwise the reserved-slug check is bypassable), and "new members can delete organisations" must stay disabled (deleting the org orphans every `clerk_org_id` in `schools`). Neither is expressible in the repository. `CLERK.md` needs an instance-settings section that a new environment is checked against. |

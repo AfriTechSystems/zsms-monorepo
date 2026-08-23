@@ -18,6 +18,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Building2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 
 import { useApi } from '../../../lib/use-api'
+import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent } from '../../../components/ui/card'
 import { EmptyState } from '../../../components/ui/empty-state'
@@ -35,8 +36,13 @@ interface School {
   city_code: string
   status: string
   subscription_tier: string
-  max_students: number | null
   created_at: string
+  capacity: {
+    student_limit: number | null
+    is_unlimited: boolean
+    current_count: number
+    at_capacity: boolean
+  } | null
 }
 
 function SchoolsTable(): JSX.Element {
@@ -197,7 +203,7 @@ function SchoolsTable(): JSX.Element {
                       <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
                       <th scope="col" className="px-4 py-2.5 font-medium">Tier</th>
                       <th scope="col" className="px-4 py-2.5 font-medium">Type</th>
-                      <th scope="col" className="px-4 py-2.5 text-right font-medium">Cap</th>
+                      <th scope="col" className="px-4 py-2.5 text-right font-medium">Roll</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -222,10 +228,30 @@ function SchoolsTable(): JSX.Element {
                           {school.type} · {school.level}
                         </td>
                         <td data-numeric className="px-4 py-3 text-right">
-                          {/* NULL means unlimited in this schema, and rendering
-                              it as an em dash rather than "0" matters: a cap of
-                              zero and no cap are opposites. */}
-                          {school.max_students ?? '—'}
+                          {/* Roll against the RESOLVED ceiling — the number the
+                              enrolment guard enforces, not the unenforced copy
+                              in `schools.max_students` this column used to show.
+                              "No limit" is spelled out rather than left as a
+                              dash: a cap of zero and no cap are opposites, and
+                              a dash reads as neither. */}
+                          {school.capacity ? (
+                            <>
+                              {school.capacity.current_count}
+                              <span className="text-muted-foreground">
+                                {' / '}
+                                {school.capacity.is_unlimited
+                                  ? '∞'
+                                  : school.capacity.student_limit}
+                              </span>
+                              {school.capacity.at_capacity && (
+                                <span className="ml-1.5 align-middle">
+                                  <Badge variant="warning">Full</Badge>
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                       </tr>
                     ))}

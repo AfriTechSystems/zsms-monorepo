@@ -4,6 +4,63 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-23 — Student ceilings: configuration that described a rule nothing applied
+
+Branch `feature/phase-4-design-foundation`. **Migrations `0101` and `0102` applied.** Admin dashboard signed off; this closes the two items raised at that gate before the school portal starts.
+
+### The column existed. Everything around it did not.
+
+`afritech.subscription_tiers.student_limit` has been there since `0082`, and the pricing screen has been editing it since Phase 4 began. That made it look finished. Implementing against it found three separate gaps:
+
+1. **Nothing enforced it.** `whatsapp_quota` has `consume_message_quota()`. `student_limit` had no equivalent — no trigger, no function, no route. It was a number in a table describing a rule the product did not apply. A school on Starter could have enrolled its ten-thousandth pupil.
+2. **There was no per-school exception.** Every other commercial value can be varied for one school through `school_feature_overrides` — a tier, a trial, a single feature. A ceiling could not be, so letting one school run thirty pupils over meant raising the ceiling for every school on that tier.
+3. **The seeded figures disagreed with both documents.** `PRICING.md` and `DYNAMIC_CONFIG.md` both say 200 / 500 / 1,000 / unlimited. The database said 150 / 500 / **unlimited** / unlimited. This was already a tracked open row, deliberately left alone by `0100` on the grounds that a price is inert until invoicing while a ceiling decides whether a school can enrol its next pupil. That reasoning is exactly why it could not stay open once the ceiling became enforced.
+
+### `0101` — resolve, then enforce
+
+`school_student_limit()` mirrors `school_has_feature()`, deliberately: the same discipline of a fixed order in one function rather than assembled per caller. The order is **student_limit_override → tier_override → tier**. There is no revoke direction, because a ceiling is a number rather than a boolean — an override that lowers it just gives a lower number.
+
+Two decisions in the signature are worth recording:
+
+- **`is_unlimited` is its own column, not an implied NULL.** NULL in `student_limit` means unlimited, but NULL out of a function also reads as "no answer". A caller that ignored the flag and read only the number would see NULL, and if it treated that as zero it would block everything — the wrong direction to fail by accident.
+- **A school that does not exist resolves to `0`, not to unlimited.** A missing school must never read as permission to enrol into it.
+
+`school_student_capacity()` adds the current roll in the same call, because every consumer needs both halves and the **counting rule** is the part that must not be reimplemented three times. What counts is pupils on the roll — `status IN ('active','on_leave')`, not soft-deleted. Transferred, graduated, and withdrawn do not, and that is a commercial decision rather than a technicality: counting them would make every school's usage rise monotonically forever, so a school would eventually be billed a tier upgrade for pupils who left years ago. `on_leave` does count; the place is still occupied.
+
+The guard is a trigger, not a check in the students route, for the same reason tenant isolation is in the database: **there is more than one writer.** The API route is one, the CSV import job is another, a support operator with the service role is a third. It fires on INSERT *and* on the UPDATE that puts a pupil back on the roll — undoing a soft delete, or moving `withdrawn` back to `active`. A ceiling that only watches INSERT is one you get around by withdrawing a pupil and re-activating them. An edit to an already-enrolled pupil's name is never blocked, which took an explicit `OLD` check to get right.
+
+`ERRCODE 'ZS001'` rather than a generic raise: the API has to tell this apart from a constraint violation to render the upgrade message, and matching on the text of an error message is not a contract. It maps to `CONFLICT`, not `FORBIDDEN` — the caller has every right to enrol students, and nothing about their permissions would change the outcome.
+
+Verified against the live schema inside a transaction rolled back by a closing `RAISE`: a ceiling equal to the roll refuses with `ZS001`; `'unlimited'` admits; withdraw-then-reactivate is allowed at 11/12 and refused at 11/11; a non-numeric override value is refused by the CHECK; no rows survived.
+
+### The seed realignment is guarded, and that guard matters
+
+Each tier is updated **only if it still holds exactly what `0082` wrote**. Starter 150 → 200 is a loosening. Professional unlimited → 1,000 is a **tightening**, and silently capping a tier an operator had deliberately uncapped is the one direction of this change that could stop a real school enrolling. A no-op UPDATE was also avoided for Growth and Enterprise: it would still bump `updated_at` and `updated_by`, making it look as though a decision had been taken that was not.
+
+### `0102` — and a second ceiling that had been lying for months
+
+The list screens want the resolved ceiling for every school on the page. One RPC per row is the same N+1 already tracked against `/api/admin/schools/[id]`, so `school_capacity` is a `security_invoker` view doing `LATERAL` over the function — one query, one definition of both the order and the counting rule.
+
+Building it surfaced **`schools.max_students`**. It has existed since `0003` as a per-school copy of the tier ceiling. Nothing has ever read it to make a decision — no trigger, no function, no route. But it was *displayed as the cap* on the schools list and the school detail page, and `PATCH /api/admin/schools/[id]` accepted writes to it. An operator editing that field believed they had changed a limit. That is worse than a dead column: it is a control that does nothing, sitting where a real one belongs, with no reason, actor, or expiry attached to it.
+
+It is now deprecated by comment, removed from both screens and from the PATCH schema, and left in the table. Dropping a column is destructive and irreversible, and the seeded values are the only record of what onboarding intended — that is a separate, approved migration.
+
+### Someone reverted Professional while the build was running
+
+Fifteen minutes after `0101` applied, `subscription_tiers.professional.student_limit` went back to NULL, stamped with a real Clerk user id. The cause is benign and instructive: a pricing screen loaded *before* the migration still had "No limit" ticked for Professional, and saving that form sent the unlimited sentinel. The tier form renders every field, so a stale tab silently reverts a value changed elsewhere — `admin_update_tier`'s NULL-means-unchanged design avoids read-modify-write for the other fields, but a checkbox has no "unchanged" state to send.
+
+Restored to 1,000. Not a blocker for a single-operator admin panel and not worth optimistic concurrency today, but it is the mechanism by which a price or a ceiling can be undone by a tab nobody remembers leaving open.
+
+### Also
+
+- `P0002` (`no_data_found`, raised by the `admin_*` functions when a row is already in the target state) mapped to `NOT_FOUND` with a reload-and-retry message. It was falling through to "An unexpected error occurred", which sends an operator looking for a bug behind a screen that is merely stale.
+- The override list now shows `override_value`, and only a revoke is red and only a grant is green. Colouring a *lowered* ceiling green would read as a favour.
+- The new ceiling field is a number input with a "No limit" checkbox in the field's `footer`, per the form standard — and warns, before saving, when the ceiling is below the current roll. It does not refuse: capping a school at what it already has is legitimate, and the trigger blocks only the *next* enrolment. But it changes what the operator is agreeing to.
+- Round-tripped in the browser under a real signed-in session: `POST /api/admin/overrides` 201, the row rendered with its value, and the hint on the same form immediately re-read "Currently 260 from the existing override; 40 enrolled" — the resolver, not the form's own state.
+
+---
+
+
 ## 2026-08-18 — Form layout standard, and four defects only a browser could find
 
 Branch `feature/phase-4-design-foundation`. **Migration `0100` applied. Every admin screen reviewed in a real browser against real data for the first time.**

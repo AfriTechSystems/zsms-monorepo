@@ -23,13 +23,21 @@ export async function resolveSchoolContext(
   // RLS restricts this to the caller's own school row, so no filter is needed:
   // the policy IS the filter. maybeSingle() keeps "no school" as null rather
   // than an exception, which is the correct state for a platform-level account.
+  //
+  // ONE CALLER IS NOT SO RESTRICTED. `afritech_admin_all_schools` matches every
+  // row, so an AfriTech operator's query returns many and `maybeSingle()`
+  // errors. That is handled here as "no school", which is the truthful answer —
+  // a platform operator does not have one — rather than propagating a driver
+  // error the caller cannot act on. Routes that must refuse an operator outright
+  // check the org slug before reaching this (see `/api/school/overview`).
   const { data, error } = await client
     .from('schools')
     .select('id, school_id')
-    .maybeSingle()
+    .limit(2)
 
-  if (error || !data) return null
-  return { uuid: data.id as string, code: data.school_id as string }
+  const row = data?.[0]
+  if (error || !row || data.length !== 1) return null
+  return { uuid: row.id as string, code: row.school_id as string }
 }
 
 /**

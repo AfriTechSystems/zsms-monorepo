@@ -41,11 +41,12 @@ Every row below is a parameter that must be database-backed. The **Owner** colum
 | Tier monthly price (ZMW/USD) | `afritech.subscription_tiers` | `super_admin` | K600 / K1,100 / K2,000 / K3,000 | Per tier, both currencies |
 | Tier annual price | `afritech.subscription_tiers` | `super_admin` | Derived | Calculated from monthly + discount |
 | Annual discount percentage | `afritech.subscription_tiers` | `super_admin` | 10.00 | Drives annual price calculation |
-| Student limit per tier | `afritech.subscription_tiers` | `super_admin` | 200 / 500 / 1,000 / NULL | NULL = unlimited |
+| Student limit per tier | `afritech.subscription_tiers` | `super_admin` | 200 / 500 / 1,000 / NULL | NULL = unlimited. Editable from Admin → Pricing. Resolved by `public.school_student_limit()`, enforced by a trigger on `students` (migration `0101`) |
+| Student limit for one school | `afritech.school_feature_overrides` | `super_admin` | None | `override_type = 'student_limit_override'`, value a whole number or `'unlimited'`. Beats the tier. Carries a reason, an actor, and an optional expiry like every other override |
 | WhatsApp quota per tier | `afritech.subscription_tiers` | `super_admin` | 500 / 1,500 / 4,000 / unlimited | Monthly messages included |
 | Per-feature add-on price | `afritech.feature_flags` | `super_admin` | Per feature | e.g. timetable K100, loan_module K275 |
 | Feature-to-tier inclusion matrix | `afritech.tier_features` | `super_admin` | Per ADR-014 | The toggle grid |
-| Per-school overrides | `afritech.school_feature_overrides` | `super_admin` | None | Grant, revoke, extend, tier override |
+| Per-school overrides | `afritech.school_feature_overrides` | `super_admin` | None | Grant, revoke, extend, tier override, student limit override |
 | Promotional / discount codes | `afritech.promo_codes` | `super_admin` | None | Percentage or fixed, expiry, usage cap |
 | Standalone teacher subscription price | `afritech.platform_products` | `super_admin` | K300/mo, K3,000/yr | Teacher Hub B2C pricing |
 | Standalone teacher free-trial plan count | `afritech.platform_products` | `super_admin` | 5 | Free lesson plans before paywall |
@@ -128,6 +129,25 @@ Not yet implemented. Recorded here so the module is built against configuration 
 | Fee reminder escalation days | `afritech.platform_settings` | `super_admin` | 7 / 14 / 30 | Days past due for each escalation |
 | School health score weights | `afritech.platform_settings` | `super_admin` | Per `SCHOOL_HEALTH_SCORES.md` | Operational, financial, engagement |
 
+### School Branding
+
+The one registry section that is **school-scoped rather than platform-scoped**: a school changes these itself, and only for itself. Full treatment in `DESIGN_SYSTEM.md`; ADR-043 records why the list is this short.
+
+| Parameter | Storage | Owner | Default | Notes |
+|---|---|---|---|---|
+| Anchor colour | `public.school_branding.anchor_color` | `org:owner`, `org:principal`, `org:admin` | ZSMS navy `#1E2A3F` | Ink — body text, headings, navigation. **Must reach 4.5:1 against the page ground `#F1F3FA`** — CHECK constraint, not a warning |
+| Primary colour | `public.school_branding.primary_color` | `org:owner`, `org:principal`, `org:admin` | ZSMS blue `#3A8DDE` | Buttons, links, active states. **Must reach 3:1 against the page ground** — CHECK constraint |
+| Full logo | `public.school_branding.logo_url` | `org:owner`, `org:principal`, `org:admin` | School initials | R2 public bucket, HTTPS enforced |
+| Icon / favicon | `public.school_branding.icon_url` | `org:owner`, `org:principal`, `org:admin` | School initials | Square variant |
+
+Three properties distinguish this section from the rest of the registry:
+
+- **The theme is not cached in Redis.** It is resolved per request and emitted into the first HTML response. A cached theme would need invalidating on the same request path that renders it, and the query is a single row on a primary key.
+- **It propagates beyond the web UI** — parent login screen, PDFs, and emails all resolve from this row. See `DESIGN_SYSTEM.md` → *Where the theme propagates*.
+- **The AfriTech admin dashboard ignores it entirely** and is always ZSMS-branded (ADR-043).
+
+**Not configurable within theming:** layout, navigation structure, typography, spacing, and the semantic colour mapping (green = paid, amber = due soon, coral = overdue). These are listed in *What Is Deliberately Not Configurable* below.
+
 ---
 
 ## What Is Deliberately Not Configurable
@@ -143,6 +163,10 @@ Making these configurable would create the ability to misconfigure the system in
 | Currency decimal precision | `NUMERIC(12,2)` is a schema decision; changing it is a migration. |
 | Country configuration files | `packages/config/countries/*.ts` stays in code. Adding a country is a deliberate, reviewed, tested event — not a form submission. See `ADDING_COUNTRY.md`. |
 | Behaviour score prohibited inputs | ADR-020 forbids gender, ethnicity, religion, and location as score inputs. Not configurable at any level. |
+| Layout, navigation structure, typography, spacing | A school themes colours and a logo. Structure is what makes the product learnable by staff who move between schools and supportable by one team. ADR-043. |
+| The semantic colour mapping | Green = paid, amber = due soon, coral = overdue, everywhere. A school that set "overdue" to green would be creating a misreading of money, not expressing a brand. ADR-043. |
+| The WCAG AA minimum on a school palette | Enforced by CHECK constraint and refused at write time. There is no override, because the person who would exercise it is never the person who pays for it. ADR-043. |
+| The AfriTech admin dashboard's theme | Always ZSMS. An operator working across forty schools, and impersonating inside them, needs one constant frame. ADR-043. |
 
 ---
 
@@ -313,3 +337,4 @@ The invariant validations described above are a security control, not a usabilit
 | 2026-08-13 | Flagged missing `afritech` tables for Phase 0 migrations | Registry specifies tables ahead of the schema — gap recorded rather than assumed |
 | 2026-08-13 | **Migration gap closed** — all eight `afritech` tables now defined as migrations `0061`–`0065` | Registry is no longer ahead of the migration sequence; documentation only, not yet applied |
 | 2026-08-13 | Gap scope corrected from five tables to eight | `platform_settings`, `platform_products`, and `commission_rates` were also absent from the sequence |
+| 2026-08-16 | Added the **School Branding** registry section and four new non-configurables | Per-school theming (ADR-043) is school-scoped dynamic config; the registry had no theme, brand, or logo entry at all |

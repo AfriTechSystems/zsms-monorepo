@@ -148,11 +148,17 @@ function reportCardDeps() {
         name?: string
         schoolCode?: string
         address?: string | null
+        anchorColor?: string | null
+        primaryColor?: string | null
       } | null
       return {
         name: b?.name ?? 'School',
         schoolCode: b?.schoolCode ?? 'UNKNOWN',
         address: b?.address ?? undefined,
+        // NULL here is a school that has not set a brand, not an error: the
+        // renderer falls back to ZSMS navy.
+        anchorColor: b?.anchorColor ?? undefined,
+        primaryColor: b?.primaryColor ?? undefined,
       }
     },
 

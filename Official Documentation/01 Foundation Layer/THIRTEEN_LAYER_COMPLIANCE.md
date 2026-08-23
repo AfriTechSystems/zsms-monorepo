@@ -58,9 +58,11 @@ This document is an audit, not a design. Each layer below states what ZSMS actua
 
 **Implementation.** Next.js 15 App Router (ADR-036) serves the school portal, parent portal, admin panel, and Teacher Hub from `apps/web`. React Native/Expo serves the teacher attendance app and parent mobile app from `apps/mobile`. Component conventions, folder flatness, and PascalCase component naming are specified in `CONVENTIONS.md`.
 
-**Coverage: Thin.** Frontend concerns are distributed across module documents — each module document describes its own screens — but no document owns frontend architecture as a whole. There is no specification for the component library choice, state management approach, form handling strategy, error boundary placement, loading-state conventions, or accessibility baseline.
+**Coverage: Partial** (was Thin until 2026-08-16). `DESIGN_SYSTEM.md` now owns the visual layer: component library choice (shadcn/ui + Lucide), the token architecture in `packages/design-tokens`, typography, colour hierarchy and its semantic mapping, component rules, loading and empty state conventions, the WCAG AA accessibility baseline, and per-school theming under ADR-043. Contrast is asserted arithmetically in tests rather than reviewed by eye, and enforced by database constraint for school-supplied palettes.
 
-**Recommendation.** Author `FRONTEND.md` during Phase 0 before the first UI is built. Deciding component library and state management after twenty screens exist is significantly more expensive than deciding it before the first. Not a launch blocker, but the cost of the gap grows with every screen.
+**Still missing.** State management approach, data-fetching and caching strategy, form handling library, error boundary placement, and route-level layout composition. These are answerable only against real screens, and no portal screen exists yet.
+
+**Recommendation.** Settle the remaining items during Phase 4 sub-phase 2 (admin dashboard), which is the first sub-phase with enough real screens to decide them against — and record them in `DESIGN_SYSTEM.md` or a sibling `FRONTEND.md` at that point. The original recommendation stands in spirit: deciding these after twenty screens exist is significantly more expensive than deciding them after two.
 
 ---
 

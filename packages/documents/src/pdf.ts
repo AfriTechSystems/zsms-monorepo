@@ -11,6 +11,7 @@
  */
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
+import { zsmsLogoBytes } from './branding'
 import type { RenderedDocument } from './types'
 
 export const A4 = { width: 595.28, height: 841.89 } as const
@@ -19,6 +20,21 @@ export const MARGIN = 48
 export const INK = rgb(0.11, 0.12, 0.14)
 export const MUTED = rgb(0.42, 0.45, 0.5)
 export const RULE = rgb(0.85, 0.87, 0.9)
+
+/** ZSMS navy `#1E2A3F` — the anchor colour a school has not overridden. */
+export const BRAND_DEFAULT = rgb(0x1e / 255, 0x2a / 255, 0x3f / 255)
+
+/**
+ * `#RRGGBB` → pdf-lib colour, falling back rather than throwing.
+ *
+ * Bad data reaching a renderer means the 0092 constraints were bypassed. A
+ * receipt is proof of payment; it must still print.
+ */
+export function brandColor(hex: string | undefined, fallback = BRAND_DEFAULT): ReturnType<typeof rgb> {
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return fallback
+  const n = parseInt(hex.slice(1), 16)
+  return rgb(((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255)
+}
 
 export interface Doc {
   pdf: PDFDocument
@@ -94,13 +110,13 @@ export function move(doc: Doc, dy: number): void {
   doc.y -= dy
 }
 
-export function rule(doc: Doc, dy = 8): void {
+export function rule(doc: Doc, dy = 8, color = RULE, thickness = 0.75): void {
   doc.y -= dy
   doc.page.drawLine({
     start: { x: MARGIN, y: doc.y },
     end: { x: A4.width - MARGIN, y: doc.y },
-    thickness: 0.75,
-    color: RULE,
+    thickness,
+    color,
   })
   doc.y -= dy
 }
@@ -110,12 +126,33 @@ export function needsPage(doc: Doc, needed: number): boolean {
   return doc.y - needed < MARGIN + 40
 }
 
-export async function header(doc: Doc, school: { name: string; schoolCode: string; address?: string; logoBytes?: Uint8Array }, title: string): Promise<void> {
-  if (school.logoBytes && school.logoBytes.length > 0) {
+export async function header(
+  doc: Doc,
+  school: {
+    name: string
+    schoolCode: string
+    address?: string
+    logoBytes?: Uint8Array
+    anchorColor?: string
+  },
+  title: string,
+): Promise<void> {
+  // The school's colour is applied to the name and the rule beneath the title —
+  // the two marks that say whose document this is — and nowhere else. Body text
+  // and money stay INK: a themed amount column would trade legibility for brand,
+  // and this is the page a parent reads to check what they paid.
+  const brand = brandColor(school.anchorColor)
+
+  // A school that has not uploaded a logo still gets a mark. An empty header on
+  // a payment receipt reads as a draft rather than as a record of money
+  // received, which is the one impression this document must not give.
+  const logo = school.logoBytes && school.logoBytes.length > 0 ? school.logoBytes : zsmsLogoBytes()
+
+  if (logo && logo.length > 0) {
     try {
       // PNG first, JPEG on failure — schools upload whatever their designer
       // gave them, and a failed logo must not fail the document.
-      const image = await doc.pdf.embedPng(school.logoBytes).catch(() => doc.pdf.embedJpg(school.logoBytes!))
+      const image = await doc.pdf.embedPng(logo).catch(() => doc.pdf.embedJpg(logo))
       const dims = image.scale(40 / image.height)
       doc.page.drawImage(image, {
         x: A4.width - MARGIN - dims.width,
@@ -128,7 +165,7 @@ export async function header(doc: Doc, school: { name: string; schoolCode: strin
     }
   }
 
-  text(doc, school.name, { size: 16, bold: true })
+  text(doc, school.name, { size: 16, bold: true, color: brand })
   move(doc, 14)
   text(doc, school.schoolCode, { size: 9, color: MUTED })
   if (school.address) {
@@ -137,7 +174,7 @@ export async function header(doc: Doc, school: { name: string; schoolCode: strin
   }
   move(doc, 22)
   text(doc, title, { size: 13, bold: true })
-  rule(doc, 10)
+  rule(doc, 10, brand, 1.25)
 }
 
 export function footer(doc: Doc, note: string): void {

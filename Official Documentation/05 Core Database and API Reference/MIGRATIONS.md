@@ -237,6 +237,65 @@ Derived arrears (ADR-038).
 
   Covered by `supabase/tests/rls/worker_boundary_test.sql` (26 assertions, both migrations).
 
+**`0092`** - APPLIED to `zsms-dev` 2026-08-16 (Phase 4)
+- `0092_create_school_branding.sql` — per-school theming, with the accessibility guardrail in the database.
+
+  Creates `public.school_branding` (one row per school, `school_id` as both primary key and tenant column), `srgb_relative_luminance()` and `wcag_contrast_ratio()`, and `school_branding_by_slug()`.
+
+  **The WCAG maths is in SQL because the guardrail has to hold for writers that are not the API.** `validateTheme()` in `packages/design-tokens` gives a school a readable error; the CHECK constraints hold for an admin tool, a support script, or a bulk import. Anchor ≥4.5:1 against white (white nav text sits on it), primary ≥3:1 (used unmodified as a button fill). ADR-043.
+
+  **The format constraints are not redundant with the contrast constraints.** A CHECK that evaluates to NULL *passes*, and `wcag_contrast_ratio()` returns NULL for a malformed colour — without `~ '^#[0-9A-Fa-f]{6}$'`, `'#GGGGGG'` would be stored.
+
+  `school_branding_by_slug()` is granted to `anon` and is the only anon-reachable path: the parent login screen must be branded before a session exists, so RLS has nothing to resolve. It returns one school by `lower(school_id)` — the same value used as the Clerk organisation slug — with exactly five keys, pinned by test so a new `schools` column cannot widen an unauthenticated surface by accident.
+
+  Also replaces `worker_school_branding()` (0091) additively, adding the brand colours so report cards and statements are themed.
+
+  Covered by `supabase/tests/rls/school_branding_test.sql` (36 assertions).
+
+**`0093`** - APPLIED to `zsms-dev` 2026-08-16 (Phase 4)
+- `0093_theme_worker_payment_context.sql` — brand colours in the receipt job's context.
+
+  `0092` themed the branding function, which covers report cards and statements. Receipts take a different route: `worker_payment_context()` assembles the whole receipt from a payment id in one call, and its embedded `school` object predates `school_branding`. Left alone, a maroon school would send maroon report cards and ZSMS-blue receipts — and the receipt is the document a parent is most likely to keep and to question.
+
+  Only the `school` object changes; every join stays anchored to the payment's own `school_id`, and `school_branding` joins on `s.id` so it cannot introduce a second school.
+
+**`0094`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0094_retune_branding_contrast_ground.sql` — the guardrail is re-measured against the page, not white.
+
+  The design foundation moved the page to a soft lavender-grey (`#F1F3FA`) with white cards. That ground is **darker than white**, so `0092`'s thresholds were measuring against the easier of the two surfaces a colour is drawn on. The gap is one-directional: a palette could pass `0092` and still be unreadable in place. `#6E7690` is the worked example — 4.51:1 on white, 4.07:1 on the page.
+
+  Measuring against the page subsumes the white case rather than trading one for it: for a dark anchor, contrast against white is always higher, so clearing the page clears white too.
+
+  `PAGE_GROUND` in `packages/design-tokens/src/theme.ts` holds the same literal and `validateTheme()` uses it. **These two move together** or the database and the API begin disagreeing about which palettes a school may save.
+
+**`0095`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0095_create_feature_access_tables.sql` — the three feature-access tables that were documented but absent.
+
+  `CLAUDE.md` and ADR-014 both state that four `afritech` tables drive pricing and feature access. **Three of them did not exist**; the schema held `subscription_tiers` alone. Created here to the DDL `PRICING.md` already specified, adopted as written including the seed matrix, plus RLS on all three.
+
+  Also adds `public.school_has_feature(school_id, feature_key)` — the resolution order as a function rather than a query each caller assembles, because `DYNAMIC_CONFIG.md` is explicit that the order is fixed logic and not configuration. **Revoke wins outright**: a revoke exists because someone decided a school must NOT have something, and a later grant that silently overturns it is how a suspended school keeps a feature it was cut off from.
+
+  The documented fifth step, module subscription, has no table. It is omitted and named in the function's comment rather than approximated.
+
+**`0096`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0096_create_platform_metrics.sql` — `platform_metrics()` and `school_health_scores()`.
+
+  **Both are `SECURITY INVOKER`, and that is the design.** Every table they read already carries an `afritech_admin_all_*` policy, so RLS already answers "who may see across schools". The obvious `SECURITY DEFINER` shape would put a second copy of that authorisation rule somewhere no test covers. The migration fails if either function is ever changed to definer.
+
+  Health follows `SCHOOL_HEALTH_SCORES.md`'s 40/30/30 weights and 80/65/45 bands. Four of the six documented inputs are computable from this schema; the two that are not need per-user login telemetry and mobile session data. Each dimension is rescaled over the inputs that exist, so a missing one does not read as a zero, and `inputs_available` is returned so a dashboard can mark the score provisional.
+
+**`0097`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0097_expose_feature_access_to_api.sql` — `security_invoker` views and named write functions over the 0095 tables.
+
+  PostgREST exposes a configured schema list and `afritech` is not on it, deliberately. Rather than widen that — which would put every future `afritech` table one URL away from the internet, opted *out* rather than in — the three relations the admin dashboard needs are surfaced through `public`.
+
+  Writes go through `admin_set_tier_feature()`, `admin_create_override()`, and `admin_revoke_override()` so the API never issues a free-form UPDATE against a pricing table. All invoker-rights: authorisation stays in the 0095 policies and nowhere else. Revoking an override is an UPDATE, not a DELETE — the row is the only record that a support decision was made.
+
+**`0098`** - APPLIED to `zsms-dev` 2026-08-17 (Phase 4)
+- `0098_expose_subscription_tiers.sql` — pricing view, `admin_update_tier()`, and **RLS on `subscription_tiers`, which had none**.
+
+  A view is not a security boundary. Exposing an unpoliced base table through a public view makes it readable by anyone, so the policy was added in the same migration as the view rather than left for later.
+
 ---
 
 ### Core Schemas
@@ -505,9 +564,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0092`** — available for the next migration.
+**`0104`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0091` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0103` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -519,7 +578,7 @@ So a migration written today as `0030_create_timetables.sql` would simply never 
 
 The `0022`–`0068` labels are retained in the sequence below only so the descriptions stay findable; read them as ordering, not as filenames.
 
-When creating a new migration, use `0069` and update this document with the new entry before committing. Read this pointer rather than the highest number in `supabase/migrations/` — most of the sequence is planned here before it exists on disk, which is exactly how the `0019`–`0021` collision happened.
+When creating a new migration, use the number in the pointer above and update this document with the new entry before committing. Read this pointer rather than the highest number in `supabase/migrations/` — most of the sequence is planned here before it exists on disk, which is exactly how the `0019`–`0021` collision happened.
 
 ---
 
@@ -1052,3 +1111,14 @@ CREATE INDEX idx_rate_limit_config_lookup
 ---
 
 **NEXT AVAILABLE: `0092`** — see *Next Available Sequence Number* above, which is authoritative.
+| 2026-08-16 | **Added `0092` — `school_branding`, with the WCAG AA guardrail as a CHECK constraint** | `validateTheme()` alone would leave the rule absent from every writer that is not the API. Implementing the luminance formula a second time in SQL is real duplication, paid because a guardrail present in one of two writers is one that will eventually be walked past. ADR-043. |
+| 2026-08-16 | **Added `0093` — brand colours in `worker_payment_context()`** | Receipts assemble from a single call whose `school` object predates `school_branding`; without this a themed school would send themed report cards and unthemed receipts. Next available advances to `0094`. |
+| 2026-08-17 | **Added `0094` — branding contrast re-measured against the page ground** | The page stopped being white, so thresholds measured against white were measuring the wrong surface. Next available advances to `0095`. |
+| 2026-08-17 | **Added `0095` — the three missing `afritech` feature-access tables** | Documented as existing since Phase 0 and never created. Built to PRICING.md's DDL rather than an invented shape. |
+| 2026-08-17 | **Added `0096` — platform metrics and health scores as SECURITY INVOKER** | RLS already decides who sees across schools; a DEFINER function would duplicate that rule where nothing tests it. |
+| 2026-08-17 | **Added `0097`/`0098` — public views and named write functions over `afritech`** | Keeps the schema off PostgREST while giving the admin dashboard exactly four relations. `0098` also closed the missing RLS on `subscription_tiers`. Next available advances to `0099`. |
+| 2026-08-18 | **Added `0100` — backfilled the tier prices, which were never seeded; price columns set NOT NULL** | `0082` created the four tiers with quotas and ceilings and omitted the price columns entirely. Nothing read a price until the pricing screen existed, which then rendered four free tiers — as the public pricing page would have. Figures are PRICING.md's. The student-ceiling divergence is left open deliberately: a ceiling is enforced, a price is not. Next available advances to `0101`. |
+| 2026-08-18 | **Added `0099` — deduplicated feature overrides, partial unique index on `is_active`** | The seed's `ON CONFLICT DO NOTHING` was unreachable with no unique constraint to conflict with, so re-running it duplicated every override. Duplicates resolve identically through `EXISTS` but are revoked *by id*, so revoking one would leave access in force — the dashboard would have lied to the operator. Partial on `is_active` so grant→revoke→grant history stays legal. Next available advances to `0100`. |
+| 2026-08-23 | **Added `0101` — the student ceiling became a resolved configuration value** | `subscription_tiers.student_limit` had existed since `0082` and was already admin-editable, but nothing enforced it, no per-school exception existed, and the seeded figures disagreed with both PRICING.md and DYNAMIC_CONFIG.md (Starter 150 vs 200, Professional unlimited vs 1,000). Adds the `student_limit_override` override type, `school_student_limit()` (override → tier override → tier), `school_student_capacity()`, and a trigger on `students` that fires on INSERT *and* on the UPDATE that puts a pupil back on the roll — a ceiling watching only INSERT is one you get around by withdrawing and re-activating. The seed realignment is guarded to rows still holding `0082`'s exact values, because tightening Professional from unlimited is the one direction that could stop a real school enrolling. |
+| 2026-08-23 | **Added `0102` — `school_capacity` view; `schools.max_students` deprecated** | The list screens want the resolved ceiling for every school on the page, and one RPC per row is the same N+1 already tracked against `/api/admin/schools/[id]`. `LATERAL` over the function keeps one definition of the resolution order and the counting rule. `schools.max_students` is a per-school copy that nothing has ever read to make a decision, yet it was *displayed* as the cap on two admin screens — an operator editing it believed they had changed a limit. Left in place, not dropped: dropping is destructive and needs approval. Next available advances to `0103`. |
+| 2026-08-23 | **Added `0103` — the ceiling trigger moved from BEFORE to AFTER** | A BEFORE ROW trigger runs *ahead of* the RLS `WITH CHECK`, so `0101`'s guard evaluated the ceiling before anyone had established the caller could write into that school. School B attempting to enrol into a full School A was answered `ZS001: This school has reached its plan limit of 3 enrolled pupils` — three facts about another tenant to a caller entitled to none of them. Found by the new adversarial suite. AFTER puts RLS first; the comparison moves `>=` → `>` because the new row is already counted. |

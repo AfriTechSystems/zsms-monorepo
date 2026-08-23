@@ -56,6 +56,9 @@ export interface PaymentContext {
     schoolCode: string
     address?: string
     logoBytes?: Uint8Array
+    /** Brand colours from `school_branding` (0092/0093). Absent = ZSMS default. */
+    anchorColor?: string
+    primaryColor?: string
   }
   receiptNumber: string
   paidAt: string

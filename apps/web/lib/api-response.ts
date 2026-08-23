@@ -31,6 +31,25 @@ export interface Meta {
   page?: number
   perPage?: number
   total?: number
+  /**
+   * The resolved student ceiling, on list routes where it governs what the
+   * caller may do next.
+   *
+   * It rides in `meta` rather than in `data` because it is not part of the
+   * collection — it describes the collection's limit. Returning it with the
+   * list rather than from a second endpoint matters: a students screen that
+   * fetched the roll and the ceiling separately would render "142 pupils" and
+   * "of 140" from two different instants, and the disagreement would appear
+   * exactly when the school is at the boundary and someone is watching.
+   */
+  capacity?: {
+    student_limit: number | null
+    is_unlimited: boolean
+    source: string
+    current_count: number
+    remaining: number | null
+    at_capacity: boolean
+  } | null
 }
 
 export function ok<T>(data: T, meta?: Meta): NextResponse {
@@ -75,8 +94,39 @@ export function fromPostgrestError(error: { code?: string; message: string }): N
       return fail('VALIDATION_ERROR', 'A referenced record does not exist.')
     case '23514':
       return fail('VALIDATION_ERROR', 'A field value is outside its permitted set.')
+    case 'P0002':
+      // `no_data_found`, raised by the admin_* functions when the row they were
+      // asked to change is not there or is already in the target state — most
+      // often an override revoked in another tab. Reporting that as a server
+      // fault sends an operator looking for a bug behind a screen that is
+      // merely stale.
+      return fail('NOT_FOUND', 'That record no longer exists, or has already been changed. Reload and try again.')
+    case 'ZS001':
+      // The student ceiling (migration 0101). The exception message is raised by
+      // `enforce_student_limit()` and is written for the person trying to enrol
+      // a pupil — it names the resolved limit and the two ways out. This is the
+      // one place a driver message is passed through, and it is safe because the
+      // text is ours and contains a configured ceiling, not row data.
+      //
+      // CONFLICT rather than FORBIDDEN: the caller has every right to enrol
+      // students, and nothing about their permissions would change the outcome.
+      // The school's state is what refuses it.
+      return fail('CONFLICT', error.message)
     case 'PGRST116':
       return fail('NOT_FOUND', 'Record not found.')
+    case 'PGRST301':
+      return fail('UNAUTHORIZED', 'Your session has expired. Sign in again.')
+    case 'PGRST303':
+      // "JWT not yet valid" — the token's `nbf` is fractionally ahead of the
+      // database server's clock. Clerk mints the token and Supabase validates
+      // it, so a sub-second skew between two third-party clocks is enough, and
+      // neither is ours to correct. It is genuinely transient: the same token
+      // succeeds a moment later, which is exactly why it must not be reported
+      // as SERVER_ERROR. That code renders as "an unexpected error occurred"
+      // with no retry, sending an operator to look for a fault that is already
+      // gone.
+      console.warn('[api] clock skew between Clerk and Supabase (PGRST303)')
+      return fail('CONFLICT', 'The session token is a moment ahead of the server clock. Try again.')
     default:
       // Never surface the raw driver message: it can carry column names,
       // constraint definitions, and row values from other tenants.

@@ -15,7 +15,7 @@ The tree is:
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0104` applied to `zsms-dev`** (57 migrations) |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0105` applied to `zsms-dev`** (58 migrations) |
 | `supabase/tests/rls/` | **7 pgTAP suites, 304 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38), student ceiling (41). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/` | Empty — no Edge Functions yet |
@@ -93,7 +93,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 57 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 58 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -181,6 +181,7 @@ The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session le
 | **The tier form has no optimistic concurrency** | `app/admin/pricing/page.tsx` | Open, low priority. Every field is rendered, so saving a stale tab silently reverts a value changed elsewhere — observed on 2026-08-23, when a pre-migration tab put Professional's ceiling back to unlimited. `admin_update_tier` treats NULL as "unchanged" for the other fields, but a checkbox has no unchanged state to send. Acceptable for a single-operator panel; revisit if a second admin exists. |
 | **`/api/admin/schools/[id]` issues one RPC per feature** | `app/api/admin/schools/[id]/route.ts` | Open, performance. Resolved access calls `school_has_feature()` once per feature — 13 PostgREST round-trips today, growing with the catalogue. Correct, but an N+1 over the network. Wants a single set-returning `school_feature_resolution(school_id)` when the catalogue grows or the page feels slow. |
 | **Staff seats: decided, not yet implemented** | `PRICING.md`, `CLERK.md`, `ONBOARDING.md` | **Decided 2026-08-23: staff are not a priced dimension.** School onboarding passes `maxAllowedMemberships: 0` (unlimited) so no school can be blocked from adding a teacher, and `afritech.subscription_tiers` gains no staff-seat column. Tiers price on students and WhatsApp only. Reversible — pricing seats later means a column, a per-school override, and a Clerk backfill. Remove this row once `school-onboard` sets the limit. |
+| **The ZSMS org roles do not exist in the Clerk instance** | `CLERK.md`, `ROLES.md` | **Open, blocks the roles model.** The dev instance offers only Clerk's built-in `admin` and `member`, so `org:owner`, `org:principal`, `org:accountant`, `org:teacher`, and `org:staff` cannot be assigned to anyone — and five of the six portal roles are therefore untestable against a real session. `0105` makes `admin` resolve correctly, which unblocks one role, not the model. The seven roles in `CLERK.md` → *School Domain Roles* must be created in the Clerk dashboard before role-scoped screens (attendance, results) can be verified end to end. |
 | **Clerk instance settings are undocumented configuration** | `CLERK.md` | Open. "Allow user-created organisations" must be **off** in production (only ZSMS provisions school orgs; otherwise the reserved-slug check is bypassable), and "new members can delete organisations" must stay disabled (deleting the org orphans every `clerk_org_id` in `schools`). Neither is expressible in the repository. `CLERK.md` needs an instance-settings section that a new environment is checked against. |
 | Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. Layer 1 (Frontend) now has a foundation — `DESIGN_SYSTEM.md` and `packages/design-tokens` — but no portal screens yet. |
 

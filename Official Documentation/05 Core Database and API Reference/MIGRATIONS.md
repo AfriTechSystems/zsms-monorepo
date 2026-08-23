@@ -564,9 +564,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0105`** — available for the next migration.
+**`0106`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0104` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0105` are written and applied to `zsms-dev`. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -1123,3 +1123,4 @@ CREATE INDEX idx_rate_limit_config_lookup
 | 2026-08-23 | **Added `0102` — `school_capacity` view; `schools.max_students` deprecated** | The list screens want the resolved ceiling for every school on the page, and one RPC per row is the same N+1 already tracked against `/api/admin/schools/[id]`. `LATERAL` over the function keeps one definition of the resolution order and the counting rule. `schools.max_students` is a per-school copy that nothing has ever read to make a decision, yet it was *displayed* as the cap on two admin screens — an operator editing it believed they had changed a limit. Left in place, not dropped: dropping is destructive and needs approval. Next available advances to `0103`. |
 | 2026-08-23 | **Added `0103` — the ceiling trigger moved from BEFORE to AFTER** | A BEFORE ROW trigger runs *ahead of* the RLS `WITH CHECK`, so `0101`'s guard evaluated the ceiling before anyone had established the caller could write into that school. School B attempting to enrol into a full School A was answered `ZS001: This school has reached its plan limit of 3 enrolled pupils` — three facts about another tenant to a caller entitled to none of them. Found by the new adversarial suite. AFTER puts RLS first; the comparison moves `>=` → `>` because the new row is already counted. |
 | 2026-08-23 | **Added `0104` — `school_health_scores()` rewritten to grouped aggregates** | `/api/admin/overview` began timing out (`57014`) on six schools and 240 fee records. Measured: 105 ms as superuser, 3,289 ms as `authenticated` — a 30× gap on identical data is predicate evaluation, not volume. The `financial` CTE alone referenced `fee_records` in five correlated subqueries, re-run per school; `attendance_records` carries seven policies including two function calls evaluated per row. One pass per table instead. `SECURITY INVOKER` kept deliberately — `0096`'s argument still holds, and the cost was the query shape, not the security model. Every score verified identical to the old output, per school. 3,289 ms → 151 ms. |
+| 2026-08-23 | **Added `0105` — `get_user_role()` accepts Clerk's bare `o.rol`** | Clerk's v2 session token carries `admin`, not `org:admin`. The app read `auth().orgRole` (qualified) and rendered an administrator's portal; the policies read `o.rol` (bare) and refused every write. Neither layer looked wrong alone. Fixed in the helper rather than by a session-token template, because a template is undocumented per-environment configuration that fails silently as an empty school when a new environment misses it. Both forms accepted; a claim already carrying a namespace is passed through untouched. |

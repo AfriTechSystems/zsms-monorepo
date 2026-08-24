@@ -38,6 +38,7 @@ import type { Role } from '@zsms/auth-provider'
 import { Alert } from '../../../../components/ui/alert'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
+import { DataTable } from '../../../../components/ui/data-table'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../components/ui/field'
@@ -237,57 +238,51 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
         <>
           <Card>
             <CardContent className="p-0">
-              {data.length === 0 ? (
-                <EmptyState
-                  icon={Users}
-                  title={search || status !== 'all' || gradeId !== 'all' ? 'No pupils match' : 'No pupils yet'}
-                  description={
-                    search || status !== 'all' || gradeId !== 'all'
-                      ? 'Try a wider filter.'
-                      : 'Enrol the first pupil to start the roll.'
-                  }
-                />
-              ) : (
-                // The table scrolls inside its own container so a narrow screen
-                // never scrolls the whole page sideways.
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <caption className="sr-only">Pupils at this school</caption>
-                    <thead className="border-b border-border bg-sunken text-left">
-                      <tr>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Pupil</th>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Grade</th>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Class</th>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Boarding</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.map((s) => (
-                        <tr key={s.id} className="border-b border-border last:border-0">
-                          <th scope="row" className="px-4 py-3 text-left font-normal">
-                            <Link
-                              href={`${base}/students/${s.id}`}
-                              className="font-medium text-foreground hover:underline"
-                            >
-                              {s.last_name}, {s.first_name}
-                            </Link>
-                            <span className="block font-mono text-xs text-subtle">{s.student_id}</span>
-                          </th>
-                          <td className="px-4 py-3 text-muted-foreground">{formatLevel(s.grade_id)}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{formatLevel(s.class_id)}</td>
-                          <td className="px-4 py-3">
-                            <StudentStatusBadge status={s.status} />
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {s.is_boarding ? 'Boarding' : 'Day'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              {/* One component, two layouts: a real table from `sm` up, a card
+                  per pupil below it. See components/ui/data-table.tsx for why a
+                  horizontally scrolling table is not a mobile table. */}
+              <DataTable
+                caption="Pupils at this school"
+                rows={data}
+                rowKey={(s) => s.id}
+                columns={[
+                  {
+                    key: 'pupil',
+                    header: 'Pupil',
+                    primary: true,
+                    cell: (s) => (
+                      <>
+                        <Link
+                          href={`${base}/students/${s.id}`}
+                          className="font-medium text-foreground hover:underline"
+                        >
+                          {s.last_name}, {s.first_name}
+                        </Link>
+                        <span className="block font-mono text-xs text-subtle">{s.student_id}</span>
+                      </>
+                    ),
+                  },
+                  { key: 'grade', header: 'Grade', cell: (s) => formatLevel(s.grade_id) },
+                  { key: 'class', header: 'Class', cell: (s) => formatLevel(s.class_id) },
+                  { key: 'status', header: 'Status', cell: (s) => <StudentStatusBadge status={s.status} /> },
+                  {
+                    key: 'boarding',
+                    header: 'Boarding',
+                    cell: (s) => (s.is_boarding ? 'Boarding' : 'Day'),
+                  },
+                ]}
+                empty={
+                  <EmptyState
+                    icon={Users}
+                    title={search || status !== 'all' || gradeId !== 'all' ? 'No pupils match' : 'No pupils yet'}
+                    description={
+                      search || status !== 'all' || gradeId !== 'all'
+                        ? 'Try a wider filter.'
+                        : 'Enrol the first pupil to start the roll.'
+                    }
+                  />
+                }
+              />
             </CardContent>
           </Card>
 

@@ -91,11 +91,11 @@ export function StatSkeleton({ count = 4 }: { count?: number }): JSX.Element {
       role="status"
       aria-busy="true"
       aria-live="polite"
-      className="grid gap-cards sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-cards lg:grid-cols-4"
     >
       <span className="sr-only">Loading figures</span>
       {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} className="h-[104px] rounded-xl" />
+        <Skeleton key={i} className="h-[92px] rounded-xl sm:h-[104px]" />
       ))}
     </div>
   )
@@ -112,12 +112,22 @@ export function PageHeader({
   actions?: ReactNode
 }): JSX.Element {
   return (
-    <div className="mb-cards flex flex-wrap items-start justify-between gap-4">
+    // Stacked on a phone, side by side from `sm`. `flex-wrap` alone was not
+    // enough: an action group wrapping under a heading still sat right-aligned
+    // against the gutter, and a long title pushed a button off the edge before
+    // the wrap took effect.
+    <div className="mb-cards flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-muted-foreground">{description}</p>}
+        {/* `break-words` because a school name is user data and can be one long
+            token; without it the h1 sets the page's minimum width. */}
+        <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          {title}
+        </h1>
+        {description && (
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">{description}</p>
+        )}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap gap-2 sm:shrink-0">{actions}</div>}
     </div>
   )
 }

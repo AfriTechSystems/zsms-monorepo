@@ -61,14 +61,28 @@ export function SchoolNav({ base, role }: { base: string; role: Role }): JSX.Ele
   return (
     <nav aria-label="School sections" className="mx-auto max-w-7xl px-gutter">
       {/* Scrolls rather than wraps: a wrapped nav changes the header height
-          between screens, which moves content under the reader's cursor. */}
-      <ul className="-mb-px flex gap-1 overflow-x-auto">
+          between screens, which moves content under the reader's cursor.
+
+          `snap-x` plus the edge mask are what stop it reading as "cut off". A
+          plain overflow scroller ends mid-word at the viewport edge with nothing
+          to say it continues, so on a phone the last tabs look missing rather
+          than off-screen. The fade makes the truncation legible, and snapping
+          means a swipe lands on a tab instead of halfway across one. Removed
+          from `sm` up, where everything fits and a fade would be noise. */}
+      <ul
+        className={cn(
+          '-mb-px flex snap-x snap-mandatory gap-1 overflow-x-auto',
+          '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          '[mask-image:linear-gradient(to_right,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]',
+          'sm:[mask-image:none]',
+        )}
+      >
         {visible.map(({ path, label, icon: Icon, exact }) => {
           const href = `${base}${path}`
           const active = exact ? pathname === href : pathname.startsWith(href)
 
           return (
-            <li key={href} className="shrink-0">
+            <li key={href} className="shrink-0 snap-start">
               <Link
                 href={href}
                 aria-current={active ? 'page' : undefined}

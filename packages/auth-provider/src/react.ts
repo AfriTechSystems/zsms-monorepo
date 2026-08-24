@@ -28,4 +28,9 @@ export {
   useAuth,
   useUser,
   useOrganization,
+  // Needed to build our OWN organisation switcher rather than depend on
+  // Clerk's prebuilt one. `useOrganizationList` yields the memberships and
+  // `setActive`, which is the whole of what switching requires.
+  useOrganizationList,
+  useClerk,
 } from '@clerk/nextjs'

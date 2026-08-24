@@ -156,14 +156,26 @@ console.log('  must be on the same network (a hotspot counts). The address chang
 console.log('  whenever the network does, so read it here rather than remembering it.')
 console.log('')
 
+// Spawned as `node <next-cli>` rather than `npx next`, and WITHOUT `shell: true`.
+//
+// That detail is the whole point. `npx` on Windows is `npx.cmd`, which needs a
+// shell, which puts a `cmd.exe` between this script and the node process that
+// actually listens on the port. Killing or losing the shell then leaves the
+// server running and unowned — precisely the orphan this script exists to clean
+// up, recreated by the script itself. Observed: the wrapper exited 0 while port
+// 3000 stayed held by a live `next dev`.
+//
+// Resolving the CLI entry point directly gives one real child, whose exit is
+// Next's exit and whose kill actually kills the server.
+//
 // `-H 0.0.0.0` explicitly rather than relying on the default: it is what makes
-// the Network addresses above true, and it costs nothing to be sure of.
-// `-p` pins the port, so a port that is somehow still held becomes a loud
-// failure instead of a quiet move to 3001.
-const child = spawn('npx', ['next', 'dev', '-p', PORT, '-H', '0.0.0.0'], {
+// the Network addresses above true. `-p` pins the port, so a port somehow still
+// held becomes a loud failure instead of a quiet move to 3001.
+const NEXT_CLI = join(WEB, 'node_modules', 'next', 'dist', 'bin', 'next')
+
+const child = spawn(process.execPath, [NEXT_CLI, 'dev', '-p', PORT, '-H', '0.0.0.0'], {
   cwd: WEB,
   stdio: 'inherit',
-  shell: true,
 })
 
 // Pass signals through, so Ctrl-C stops the server rather than orphaning it —

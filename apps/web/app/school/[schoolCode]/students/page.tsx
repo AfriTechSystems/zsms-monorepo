@@ -33,6 +33,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Search, UserPlus, Users } from 'lucide-react'
 
 import { useApi } from '../../../../lib/use-api'
+import { can } from '../../../../lib/roles'
+import type { Role } from '@zsms/auth-provider'
 import { Alert } from '../../../../components/ui/alert'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
@@ -61,6 +63,7 @@ interface Student {
 }
 
 interface Structure {
+  role: string
   gradeLevels: Array<{ level_id: string; display_name: string; level_order: number }>
   classesByGrade: Record<string, string[]>
 }
@@ -90,6 +93,10 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
   // number — a missing capacity renders as unknown, not as unlimited.
   const capacity = meta?.capacity ?? null
   const atCapacity = capacity?.at_capacity === true
+  // Undefined while the structure loads, which renders as "cannot" — the safe
+  // direction. A button that appears and then vanishes is worse than one that
+  // appears a moment late.
+  const mayEnrol = can(structure?.role as Role | undefined, 'students:write')
   const ceiling = capacity?.is_unlimited ? null : (capacity?.student_limit ?? null)
 
   const total = meta?.total ?? 0
@@ -127,22 +134,28 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
         description="Everyone on the roll, and everyone who has left."
         actions={
           <div className="flex flex-col items-end gap-1">
-            <Button asChild disabled={atCapacity}>
-              {atCapacity ? (
-                // A disabled anchor is still clickable, so at capacity the
-                // control becomes a real button that does nothing rather than a
-                // link that navigates to a form which cannot succeed.
-                <button type="button" disabled>
-                  <UserPlus aria-hidden="true" />
-                  Enrol pupil
-                </button>
-              ) : (
-                <Link href={`${base}/students/new`}>
-                  <UserPlus aria-hidden="true" />
-                  Enrol pupil
-                </Link>
-              )}
-            </Button>
+            {/* Two different reasons not to offer enrolment, and they are not
+                interchangeable. A role that cannot enrol never sees the button
+                at all; a school that is full sees it disabled, because the
+                action is theirs and the obstacle is temporary. */}
+            {mayEnrol && (
+              <Button asChild disabled={atCapacity}>
+                {atCapacity ? (
+                  // A disabled anchor is still clickable, so at capacity the
+                  // control becomes a real button that does nothing rather than
+                  // a link to a form which cannot succeed.
+                  <button type="button" disabled>
+                    <UserPlus aria-hidden="true" />
+                    Enrol pupil
+                  </button>
+                ) : (
+                  <Link href={`${base}/students/new`}>
+                    <UserPlus aria-hidden="true" />
+                    Enrol pupil
+                  </Link>
+                )}
+              </Button>
+            )}
             {capacity && (
               <p className="text-xs text-muted-foreground">
                 <span data-numeric>{formatCount(capacity.current_count)}</span>

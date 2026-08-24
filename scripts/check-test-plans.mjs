@@ -28,7 +28,13 @@ const DIR = 'supabase/tests/rls'
 // makes that independent of the engine.
 const ASSERTIONS = [
   'is_empty', 'isnt', 'is',
-  'throws_ok', 'lives_ok', 'results_eq', 'set_eq', 'ok',
+  'throws_ok', 'lives_ok', 'results_eq', 'set_eq',
+  // `matches` was missing and cost exactly what this script exists to prevent:
+  // fees_attendance_results_test.sql carried 45 assertions under plan(44) and
+  // was reported clean. An under-counting checker is worse than none, because
+  // it is trusted. Longer names stay ahead of shorter prefixes.
+  'matches', 'imatches', 'alike', 'ialike', 'cmp_ok',
+  'ok',
 ]
 
 const CALL = new RegExp(String.raw`\bSELECT\s+(?:${ASSERTIONS.join('|')})\s*\(`, 'g')

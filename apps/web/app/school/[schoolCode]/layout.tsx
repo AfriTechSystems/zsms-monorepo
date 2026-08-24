@@ -33,6 +33,7 @@ import { resolveTheme } from '@zsms/design-tokens'
 import { loadSchoolBranding, ThemeStyle } from '../../../lib/theme'
 import { requireSchoolSession } from '../../../lib/school-session'
 import { ROLE_LABEL } from '../../../lib/roles'
+import { AccountMenu } from '../../../components/ui/account-menu'
 import { ThemeToggle } from '../../../components/ui/theme-toggle'
 import { SchoolNav } from './school-nav'
 
@@ -106,7 +107,10 @@ export default async function SchoolLayout({
               </div>
             </div>
 
-            <ThemeToggle />
+            <div className="flex shrink-0 items-center gap-2">
+              <ThemeToggle />
+              <AccountMenu />
+            </div>
           </div>
 
           {/* The nav is built from the session's role on the server, so a link

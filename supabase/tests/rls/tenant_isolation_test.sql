@@ -685,10 +685,28 @@ SELECT pg_temp.act_as(pg_temp.afritech_admin());
 
 SELECT ok(is_afritech_admin(), 'the afritech-systems-admin slug resolves to super admin');
 
-SELECT is((SELECT count(*)::INT FROM public.schools), 2,
+-- SCOPED TO THE FIXTURES 2026-08-23. This used to count every row in the table,
+-- which is only correct on an empty database — true under `pg_prove` against a
+-- fresh local instance, false the moment the suite is run against `zsms-dev`,
+-- where the seed adds six schools. The assertion then failed for a reason that
+-- has nothing to do with what it is testing, and a suite that fails for
+-- irrelevant reasons is one people stop reading.
+--
+-- Scoping to the fixture ids keeps exactly what matters — the super admin
+-- crosses the tenant boundary that every other role in this file cannot — while
+-- making the result independent of whatever else lives in the database.
+SELECT is(
+  (SELECT count(*)::INT FROM public.schools
+   WHERE id IN ('11111111-1111-1111-1111-111111111111',
+                '22222222-2222-2222-2222-222222222222')),
+  2,
   'super admin sees BOTH schools — cross-tenant access is intentional here');
 
-SELECT is((SELECT count(*)::INT FROM public.students), 4,
+SELECT is(
+  (SELECT count(*)::INT FROM public.students
+   WHERE school_id IN ('11111111-1111-1111-1111-111111111111',
+                       '22222222-2222-2222-2222-222222222222')),
+  4,
   'super admin sees all students across both schools');
 
 RESET ROLE;

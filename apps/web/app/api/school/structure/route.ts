@@ -78,6 +78,11 @@ export async function GET(): Promise<Response> {
     }
 
     return ok({
+      // The caller's role rides along, because every screen that fetches the
+      // structure also has to decide whether to offer a write. Fetching it
+      // separately would mean a second round trip to answer a question this
+      // response already knows the answer to.
+      role: session.role,
       gradeLevels: levels.data ?? [],
       classesByGrade: Object.fromEntries(
         [...byGrade.entries()].map(([grade, set]) => [grade, [...set].sort()]),

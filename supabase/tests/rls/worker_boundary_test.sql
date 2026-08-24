@@ -129,8 +129,20 @@ SELECT ok(
 -- to be load-bearing.
 -- ===========================================================================
 
+-- SCOPED TO THE FIXTURES 2026-08-23. This used to count every row in the table,
+-- which is only correct on an empty database — true under `pg_prove` against a
+-- fresh local instance, false the moment the suite is run against `zsms-dev`,
+-- where the seed adds six schools. The assertion then failed for a reason that
+-- has nothing to do with what it is testing, and a suite that fails for
+-- irrelevant reasons is one people stop reading.
+--
+-- Scoping to the fixture ids keeps exactly what matters — the super admin
+-- crosses the tenant boundary that every other role in this file cannot — while
+-- making the result independent of whatever else lives in the database.
 SELECT is(
-  (SELECT count(*)::INT FROM public.worker_due_fee_reminders(NULL, 1, 7, 500)),
+  (SELECT count(*)::INT FROM public.worker_due_fee_reminders(NULL, 1, 7, 500) r
+   WHERE r.out_school_id IN ('11111111-1111-1111-1111-111111111111',
+                             '22222222-2222-2222-2222-222222222222')),
   2,
   'WORKER a platform-wide reminder run sees both schools'
 );

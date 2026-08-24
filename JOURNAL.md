@@ -4,6 +4,61 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-08-23 — All seven suites run; three defects in the tests themselves
+
+Branch `feature/phase-4-design-foundation`. **307 assertions, all passing.** Docker is still not installed, so each suite was mechanically rewritten to collect its TAP lines into a temp table and run through the MCP as a single transaction. Three real defects surfaced — none of them regressions from `0103` or `0105`, and all three in the test apparatus rather than the product.
+
+### The plan checker was under-counting, in the file it was written for
+
+`scripts/check-test-plans.mjs` exists because `fees_attendance_results_test.sql` was once committed with 44 assertions under `plan(45)` and reported as passing. It has been reporting that same file clean ever since — while the file carried **45 assertions under `plan(44)`**.
+
+`matches` was missing from the checker's assertion list. It appears exactly once in the whole suite directory, in that file. So the count came out one short, matched the wrong plan, and the script that exists to catch precisely this said ✓.
+
+An under-counting checker is worse than no checker, because it is trusted. Added `matches`, `imatches`, `alike`, `ialike`, `cmp_ok`, and corrected the plan to 45.
+
+### An assertion describing a design that had been superseded
+
+`communications_test.sql` asserted *"afritech.subscription_tiers is unreachable by any end-user role"*. That was true when written — `0082` revoked everything. Then `0095`/`0097`/`0098` deliberately granted `authenticated` SELECT/INSERT/UPDATE on all four `afritech` tables so the admin dashboard could reach them through `public` views, with RLS deciding who may actually read or write. `0095`'s own words: *"Privileges are the outer gate; RLS is the decision."*
+
+So the assertion had to fail; it was describing a model the product had moved past. Deleting it would have discarded the part that still matters, so it became three:
+
+- `anon` holds no privilege on any `afritech` table — pricing is never public.
+- `authenticated` can never DELETE or TRUNCATE `afritech` configuration.
+- Every `afritech` table has RLS **enabled and forced** — an outer gate is only safe if the inner one is armed.
+
+The third is the one never to weaken. Granting table privileges and relying on RLS is a sound pattern exactly as long as somebody keeps checking that RLS is actually on.
+
+### Three assertions that were only true on an empty database
+
+`count(*)` over a whole table is a fine assertion under `pg_prove` against a fresh local instance and a wrong one against `zsms-dev`, where the seed adds six schools and 252 pupils. "Super admin sees both schools" wanted 2 and got 8; "a platform-wide reminder run sees both schools" wanted 2 and got 17.
+
+Both were **passing tests failing for reasons unrelated to what they test**, which is corrosive: a suite that cries wolf is a suite people stop reading. Scoped to their fixture ids, which preserves the thing being proved — the super admin crosses a boundary every other role cannot — while making the result independent of whatever else is in the database. Verified: 17 unscoped, 2 scoped.
+
+### What running them actually confirmed about 0103 and 0105
+
+The reason for the exercise. `0105` rewrote `get_user_role()`, which every policy in every suite depends on, and `0103` changed when the ceiling trigger fires relative to the RLS `WITH CHECK`. Both could have broken everything quietly.
+
+Neither did. Qualified claims (`org:owner`) pass through `0105` untouched, which is what all six older suites use; `0103`'s AFTER trigger leaves suite-shaped inserts alone because those schools sit far below their ceiling. 72/72 tenant isolation, 45/45 fees-attendance-results, 38/38 fee arrears, 47/47 communications, 26/26 worker boundary, 38/38 school branding, 41/41 student ceiling.
+
+### Role enforcement, against the claim form Clerk actually sends
+
+Separately, the full role matrix was exercised against the **bare** `o.rol` form — nine claims including Clerk's built-in `member`:
+
+| | enrol | edit pupil | mark register | read fees | read staff |
+|---|---|---|---|---|---|
+| owner / principal / admin | ✅ | ✅ | ✅ | ✅ | ✅ |
+| accountant | ❌ | ❌ | ❌ | ✅ | ❌ |
+| teacher | ❌ | ❌ | scope only | ❌ | ❌ |
+| staff / parent / student / member | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+Every figure matches `lib/roles.ts`, so the nav-gating map and the policies agree.
+
+**Two of my three attempts at that matrix returned false results before the third was right**, and the reason is worth keeping. The first deleted its test row afterwards — `students` has no DELETE privilege, so the same `42501` was caught for every role and every one read "refused". The second used `INSERT … SELECT` from a table a parent sees zero rows in, so it inserted nothing, raised nothing, and reported **ALLOWED** for parent and student.
+
+A test that measures *"did it throw"* rather than *"did it write a row"* passes for the worst possible reason. Both harnesses looked correct and both were lying in the dangerous direction.
+
+---
+
 ## 2026-08-23 — School portal, groups 0 and 2: a trigger that spoke before the policy
 
 Branch `feature/phase-4-design-foundation`. **Migration `0103` applied. New adversarial suite: 41 assertions, all passing.** First school-portal screens exist: the shell, the dashboard, and the pupil roll.

@@ -22,6 +22,7 @@ import { redirect } from 'next/navigation'
 import { getAuthProvider } from '@zsms/auth-provider'
 
 import { platformTheme, ThemeStyle } from '../../lib/theme'
+import { AccountMenu } from '../../components/ui/account-menu'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { AdminNav } from './admin-nav'
 
@@ -82,7 +83,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
               </div>
             </div>
 
-            <ThemeToggle />
+            <div className="flex shrink-0 items-center gap-2">
+              <ThemeToggle />
+              {/* The only way to leave this org from inside the product. An
+                  operator who also belongs to a school was previously stuck. */}
+              <AccountMenu />
+            </div>
           </div>
 
           <AdminNav />

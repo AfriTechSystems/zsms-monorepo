@@ -15,8 +15,8 @@ The tree is:
 | `apps/mobile` | Expo 52 / RN 0.76. Type-checks. **No screens yet** |
 | `apps/workers` | Railway background workers. Four registered: receipts, fee reminders, scheduled announcements, report-card batches |
 | `packages/` | `auth-provider`, `queue`, `storage`, `utils`, `types`, `config`, `notifications`, `documents`, `design-tokens` — `types/database.ts` generated from the live schema |
-| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0103` applied to `zsms-dev`** (56 migrations) |
-| `supabase/tests/rls/` | **7 pgTAP suites, 304 assertions** — tenant isolation (72), fees/attendance/results (44), fee arrears (38), communications (45), worker boundary (26), school branding (38), student ceiling (41). `npm run db:test` checks every `plan(N)` against the real assertion count first |
+| `supabase/migrations/` | **`0001`–`0021`, `0069`–`0105` applied to `zsms-dev`** (58 migrations). Role enforcement verified against Clerk's bare `o.rol` form for all nine role claims |
+| `supabase/tests/rls/` | **7 pgTAP suites, 307 assertions, all passing** — tenant isolation (72), fees/attendance/results (45), fee arrears (38), communications (47), worker boundary (26), school branding (38), student ceiling (41). `npm run db:test` checks every `plan(N)` against the real assertion count first |
 | `supabase/tests/e2e/` | `payment-verified-e2e.ts` — 28 checks, run via `npx tsx` |
 | `supabase/functions/` | Empty — no Edge Functions yet |
 | `supabase/seed/` | `dev_seed.sql` — 6 synthetic schools spanning health bands. `npm run db:seed`, which **refuses any project but `zsms-dev`** |
@@ -93,7 +93,7 @@ Only the dev project exists. Build against it exclusively.
 
 | Environment | Project | Ref | Region | Status |
 |---|---|---|---|---|
-| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 56 migrations applied |
+| Development | `zsms-dev` | `tevblmcebsqqjgzjptgw` | `eu-west-1` | Live, 58 migrations applied |
 | Staging | `zsms-staging` | — | `af-south-1` | Phase 0 final steps |
 | Production | `zsms-zm` | — | `af-south-1` | Phase 6 |
 
@@ -181,6 +181,7 @@ The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session le
 | **The tier form has no optimistic concurrency** | `app/admin/pricing/page.tsx` | Open, low priority. Every field is rendered, so saving a stale tab silently reverts a value changed elsewhere — observed on 2026-08-23, when a pre-migration tab put Professional's ceiling back to unlimited. `admin_update_tier` treats NULL as "unchanged" for the other fields, but a checkbox has no unchanged state to send. Acceptable for a single-operator panel; revisit if a second admin exists. |
 | **`/api/admin/schools/[id]` issues one RPC per feature** | `app/api/admin/schools/[id]/route.ts` | Open, performance. Resolved access calls `school_has_feature()` once per feature — 13 PostgREST round-trips today, growing with the catalogue. Correct, but an N+1 over the network. Wants a single set-returning `school_feature_resolution(school_id)` when the catalogue grows or the page feels slow. |
 | **Staff seats: decided, not yet implemented** | `PRICING.md`, `CLERK.md`, `ONBOARDING.md` | **Decided 2026-08-23: staff are not a priced dimension.** School onboarding passes `maxAllowedMemberships: 0` (unlimited) so no school can be blocked from adding a teacher, and `afritech.subscription_tiers` gains no staff-seat column. Tiers price on students and WhatsApp only. Reversible — pricing seats later means a column, a per-school override, and a Clerk backfill. Remove this row once `school-onboard` sets the limit. |
+| **Clerk roles carry no permissions, by decision** | `CLERK.md`, `ROLES.md` | Resolved 2026-08-23 — all seven `org:*` roles now exist in the Clerk instance. Their Clerk **permission sets are intentionally empty**: enforcement is RLS plus the role checks in `lib/roles.ts`, and a second permission model in Clerk would be a rule nothing tests. One consequence to verify before school onboarding: Clerk gates its own organisation management on `org:sys_*` permissions, so a school owner holding a custom role with none of them cannot invite members through Clerk's own UI. ZSMS invites server-side through the Backend API, which is unaffected — but the "Manage organisation" affordance in the org switcher will be inert for them. |
 | **Clerk instance settings are undocumented configuration** | `CLERK.md` | Open. "Allow user-created organisations" must be **off** in production (only ZSMS provisions school orgs; otherwise the reserved-slug check is bypassable), and "new members can delete organisations" must stay disabled (deleting the org orphans every `clerk_org_id` in `schools`). Neither is expressible in the repository. `CLERK.md` needs an instance-settings section that a new environment is checked against. |
 | Layer 7 (CI-CD) | `THIRTEEN_LAYER_COMPLIANCE.md` | Still **Thin**. No CI exists, so no test blocks a merge. Layer 1 (Frontend) now has a foundation — `DESIGN_SYSTEM.md` and `packages/design-tokens` — but no portal screens yet. |
 

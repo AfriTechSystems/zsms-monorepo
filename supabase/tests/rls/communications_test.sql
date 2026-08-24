@@ -18,7 +18,7 @@
 
 BEGIN;
 
-SELECT plan(45);
+SELECT plan(47);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
@@ -112,11 +112,39 @@ SELECT is(
 );
 
 -- afritech pricing is AfriTech's commercial configuration.
+-- REWRITTEN 2026-08-23. This assertion used to read "afritech is unreachable by
+-- any end-user role", and it was true when written: 0082 revoked everything.
+-- 0095/0097/0098 then deliberately granted `authenticated` SELECT/INSERT/UPDATE
+-- on all four afritech tables so the admin dashboard could reach them through
+-- `public` views, with RLS deciding who may actually read or write —
+-- 0095's phrasing: "Privileges are the outer gate; RLS is the decision."
+--
+-- So the old assertion was asserting a design that had been superseded, and it
+-- had to fail. Deleting it outright would have thrown away the part that still
+-- matters, so it is replaced by the three invariants that DO hold now. The one
+-- thing never to weaken: an outer gate is only safe if the inner one is armed,
+-- which is why the RLS check below is not optional.
+
 SELECT is(
   (SELECT count(*)::INT FROM information_schema.role_table_grants
-   WHERE table_schema='afritech' AND grantee IN ('authenticated','anon')),
+   WHERE table_schema='afritech' AND grantee = 'anon'),
   0,
-  'afritech.subscription_tiers is unreachable by any end-user role'
+  'anon holds no privilege on any afritech table — pricing is never public'
+);
+
+SELECT is(
+  (SELECT count(*)::INT FROM information_schema.role_table_grants
+   WHERE table_schema='afritech' AND grantee = 'authenticated'
+     AND privilege_type IN ('DELETE','TRUNCATE')),
+  0,
+  'authenticated can never DELETE or TRUNCATE afritech configuration'
+);
+
+SELECT ok(
+  (SELECT bool_and(c.relrowsecurity AND c.relforcerowsecurity)
+   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'afritech' AND c.relkind = 'r'),
+  'every afritech table has RLS ENABLED and FORCED — the grants above are gated, not open'
 );
 
 -- The arrears VIEWS carried INSERT and UPDATE until 0089. fee_record_status is

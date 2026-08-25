@@ -140,11 +140,7 @@ export async function DELETE(request: NextRequest): Promise<Response> {
 
     if (invitationId) {
       try {
-        await revokeInvitation({
-          organisationId: caller.organisationId,
-          invitationId,
-          requestingUserId: caller.userId,
-        })
+        await revokeInvitation({ organisationId: caller.organisationId, invitationId })
         return ok({ invitationId, revoked: true })
       } catch (err) {
         console.error('[api] clerk invitation revoke failed', err instanceof Error ? err.message : err)

@@ -128,14 +128,41 @@ export async function listPendingInvitations(organisationId: string): Promise<Or
 /**
  * Invites someone to the organisation with a ZSMS role.
  *
- * `inviterUserId` is passed so Clerk attributes the invitation, which is what
- * makes "who let this person in" answerable six months later. It is taken from
- * the session by the calling route and never from a request body.
+ * ## `inviterUserId` is recorded, and deliberately NOT sent to Clerk
+ *
+ * The obvious call passes `inviter_user_id`, and it fails:
+ *
+ *     403 missing_organization_permission
+ *     meta.permissions: ["org:sys_memberships:manage"]
+ *
+ * Supplying an inviter makes Clerk check **that user's** permissions rather than
+ * the secret key's — and ZSMS's org roles carry empty Clerk permission sets by
+ * decision, so a school owner has none. Every invitation therefore failed with
+ * "the invitation could not be sent", including the school owner's. Measured on
+ * the dev instance: identical request without the field returns 200.
+ *
+ * This is the third time that one decision has surfaced — the org switcher, the
+ * `<OrganizationProfile>` gap, and now this. The pattern is worth naming: **any
+ * Clerk endpoint that accepts an acting user will authorise against that user,**
+ * so anything ZSMS drives on a school's behalf must omit it and carry its own
+ * check.
+ *
+ * Attribution is not lost, only moved. `invitedBy` goes into the invitation's
+ * `publicMetadata`, which is the only metadata field this SDK version exposes on
+ * creation. **It is readable by the person invited**, and that is acceptable
+ * rather than ideal: the value is an opaque Clerk user id, not a name, and
+ * somebody being invited to a school already knows a person at that school
+ * invited them. It is recorded so "who let this person in" stays answerable.
+ *
+ * The proper home for this is a ZSMS audit row — `audit_logs` exists and nothing
+ * writes to it yet. When it does, this metadata becomes a convenience copy
+ * rather than the record.
  */
 export async function inviteToOrganisation(params: {
   organisationId: string
   email: string
   role: OrgRole
+  /** Recorded in private metadata. Taken from the session, never from a body. */
   inviterUserId: string
   redirectUrl?: string
 }): Promise<OrgInvitation> {
@@ -146,7 +173,7 @@ export async function inviteToOrganisation(params: {
     // against the qualified form. Sending the bare name here is how a member
     // ends up with a role the database does not recognise.
     role: params.role,
-    inviterUserId: params.inviterUserId,
+    publicMetadata: { invitedBy: params.inviterUserId, invitedAt: new Date().toISOString() },
     redirectUrl: params.redirectUrl,
   })
 
@@ -159,16 +186,20 @@ export async function inviteToOrganisation(params: {
   }
 }
 
-/** Withdraws an invitation that has not been accepted. */
+/**
+ * Withdraws an invitation that has not been accepted.
+ *
+ * `requestingUserId` is omitted for exactly the reason given above — supplying
+ * it returns the same `403 missing_organization_permission`. Verified against
+ * the dev instance: with the field 403, without it 200.
+ */
 export async function revokeInvitation(params: {
   organisationId: string
   invitationId: string
-  requestingUserId: string
 }): Promise<void> {
   await client().organizations.revokeOrganizationInvitation({
     organizationId: params.organisationId,
     invitationId: params.invitationId,
-    requestingUserId: params.requestingUserId,
   })
 }
 

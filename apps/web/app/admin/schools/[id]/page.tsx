@@ -494,7 +494,7 @@ export default function AdminSchoolDetailPage({
           <div className="space-y-cards">
             <Card>
               <CardContent className="pt-card">
-                <dl className="grid gap-stack sm:grid-cols-2 lg:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-stack lg:grid-cols-4">
                   <div>
                     <dt className="text-sm text-muted-foreground">School code</dt>
                     <dd className="font-mono text-sm">{data.school.school_id}</dd>

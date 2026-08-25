@@ -13,7 +13,10 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev --filter=@zsms/web",
+    "dev": "node scripts/dev-server.mjs",
+    "dev:clean": "node scripts/dev-server.mjs --clean",
+    "dev:turbo": "turbo dev --filter=@zsms/web",
+    "port:free": "node scripts/dev-server.mjs --kill-only",
     "dev:all": "turbo dev",
     "dev:workers": "npm run dev:worker --workspace @zsms/workers",
     "lint": "turbo lint",

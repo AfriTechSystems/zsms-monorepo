@@ -87,7 +87,7 @@ export default function AdminOverviewPage(): JSX.Element {
               Platform figures
             </h2>
 
-            <div className="grid gap-cards sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-cards lg:grid-cols-3">
               <StatCard
                 label="Schools"
                 value={String(data.metrics?.schools_total ?? 0)}

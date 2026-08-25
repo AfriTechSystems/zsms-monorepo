@@ -60,9 +60,12 @@ export function StatCard({
   const t = TONE[tone]
 
   return (
-    <div className={cn('rounded-xl p-4', t.panel, className)}>
-      <div className="flex items-start justify-between gap-3">
-        <p className={cn('text-sm font-medium', t.label)}>{label}</p>
+    // `p-card` rather than a fixed `p-4`: the token already tightens below
+    // 480px, and a hardcoded padding is exactly how a row of stat cards ends up
+    // taller than the content it summarises on a phone.
+    <div className={cn('rounded-xl p-card', t.panel, className)}>
+      <div className="flex items-start justify-between gap-2">
+        <p className={cn('text-sm font-medium leading-snug', t.label)}>{label}</p>
         {icon && (
           // Drawn directly in the derived `fill` step, which is guaranteed 3:1
           // against this exact tint. Two things this deliberately avoids: the
@@ -75,12 +78,15 @@ export function StatCard({
         )}
       </div>
 
-      {/* Tabular figures so a row of stat cards aligns rather than jitters. */}
-      <p data-numeric className={cn('mt-2 text-3xl font-semibold tracking-tight', t.label)}>
+      {/* Tabular figures so a row of stat cards aligns rather than jitters.
+          `text-2xl` on a phone and `text-3xl` from `sm` up: at two cards per row
+          on a 390px screen a 3xl figure is what pushes a long one — "K 588,000"
+          — onto a second line and makes the card grow. */}
+      <p data-numeric className={cn('mt-1.5 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-3xl', t.label)}>
         {value}
       </p>
 
-      {hint && <p className={cn('mt-1 text-sm opacity-80', t.label)}>{hint}</p>}
+      {hint && <p className={cn('mt-1 text-xs leading-snug opacity-80 sm:text-sm', t.label)}>{hint}</p>}
     </div>
   )
 }

@@ -203,7 +203,7 @@ export default function SchoolDashboardPage({
             </Alert>
           )}
 
-          <div className="grid gap-cards sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-cards lg:grid-cols-4">
             <StatCard
               label="Pupils on the roll"
               value={formatCount(data.roll.enrolled)}

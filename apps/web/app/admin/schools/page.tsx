@@ -21,6 +21,7 @@ import { useApi } from '../../../lib/use-api'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent } from '../../../components/ui/card'
+import { DataTable } from '../../../components/ui/data-table'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../components/ui/field'
@@ -192,72 +193,70 @@ function SchoolsTable(): JSX.Element {
         <>
           <Card>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <caption className="sr-only">
-                    Schools on the platform, {total} in total, page {page} of {lastPage}
-                  </caption>
-                  <thead className="border-b border-border bg-sunken text-left">
-                    <tr>
-                      <th scope="col" className="px-4 py-2.5 font-medium">School</th>
-                      <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
-                      <th scope="col" className="px-4 py-2.5 font-medium">Tier</th>
-                      <th scope="col" className="px-4 py-2.5 font-medium">Type</th>
-                      <th scope="col" className="px-4 py-2.5 text-right font-medium">Roll</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.map((school) => (
-                      <tr key={school.id} className="border-b border-border last:border-0">
-                        <th scope="row" className="px-4 py-3 text-left font-normal">
-                          <Link
-                            href={`/admin/schools/${school.id}`}
-                            className="font-medium text-foreground hover:underline"
-                          >
-                            {school.name}
-                          </Link>
-                          <span className="block font-mono text-xs text-subtle">{school.school_id}</span>
-                        </th>
-                        <td className="px-4 py-3">
-                          <StatusBadge status={school.status} />
-                        </td>
-                        <td className="px-4 py-3">
-                          {TIER_LABEL[school.subscription_tier] ?? school.subscription_tier}
-                        </td>
-                        <td className="px-4 py-3 capitalize text-muted-foreground">
-                          {school.type} · {school.level}
-                        </td>
-                        <td data-numeric className="px-4 py-3 text-right">
-                          {/* Roll against the RESOLVED ceiling — the number the
-                              enrolment guard enforces, not the unenforced copy
-                              in `schools.max_students` this column used to show.
-                              "No limit" is spelled out rather than left as a
-                              dash: a cap of zero and no cap are opposites, and
-                              a dash reads as neither. */}
-                          {school.capacity ? (
-                            <>
-                              {school.capacity.current_count}
-                              <span className="text-muted-foreground">
-                                {' / '}
-                                {school.capacity.is_unlimited
-                                  ? '∞'
-                                  : school.capacity.student_limit}
-                              </span>
-                              {school.capacity.at_capacity && (
-                                <span className="ml-1.5 align-middle">
-                                  <Badge variant="warning">Full</Badge>
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            '—'
+              <DataTable
+                caption={`Schools on the platform, ${total} in total, page ${page} of ${lastPage}`}
+                rows={data}
+                rowKey={(s) => s.id}
+                columns={[
+                  {
+                    key: 'school',
+                    header: 'School',
+                    primary: true,
+                    cell: (s) => (
+                      <>
+                        <Link
+                          href={`/admin/schools/${s.id}`}
+                          className="font-medium text-foreground hover:underline"
+                        >
+                          {s.name}
+                        </Link>
+                        <span className="block font-mono text-xs text-subtle">{s.school_id}</span>
+                      </>
+                    ),
+                  },
+                  { key: 'status', header: 'Status', cell: (s) => <StatusBadge status={s.status} /> },
+                  {
+                    key: 'tier',
+                    header: 'Tier',
+                    cell: (s) => TIER_LABEL[s.subscription_tier] ?? s.subscription_tier,
+                  },
+                  {
+                    key: 'type',
+                    header: 'Type',
+                    cell: (s) => (
+                      <span className="capitalize text-muted-foreground">
+                        {s.type} · {s.level}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'roll',
+                    header: 'Roll',
+                    numeric: true,
+                    // The RESOLVED ceiling — the number the enrolment guard
+                    // enforces, not the unenforced `schools.max_students` this
+                    // column used to show. "∞" rather than a dash: a cap of zero
+                    // and no cap are opposites, and a dash reads as neither.
+                    cell: (s) =>
+                      s.capacity ? (
+                        <>
+                          {s.capacity.current_count}
+                          <span className="text-muted-foreground">
+                            {' / '}
+                            {s.capacity.is_unlimited ? '∞' : s.capacity.student_limit}
+                          </span>
+                          {s.capacity.at_capacity && (
+                            <span className="ml-1.5 align-middle">
+                              <Badge variant="warning">Full</Badge>
+                            </span>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </>
+                      ) : (
+                        '—'
+                      ),
+                  },
+                ]}
+              />
             </CardContent>
           </Card>
 

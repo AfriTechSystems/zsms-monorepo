@@ -67,6 +67,10 @@ export type Capability =
   | 'results:read'
   /** Enter or publish marks. */
   | 'results:write'
+  /** See who teaches what. `management_read_teacher_assignments`. */
+  | 'assignments:read'
+  /** Assign a teacher to a class or subject. `management_write_teacher_assignments` — owner and principal only. */
+  | 'assignments:write'
   /** Compose and send announcements. `management_write_announcements`. */
   | 'announcements:write'
   /** Change the school's own record and academic structure. */
@@ -87,6 +91,13 @@ const CAPABILITIES: Record<Capability, readonly Role[]> = {
 
   'results:read': [...MANAGEMENT, 'org:teacher'],
   'results:write': ['org:owner', 'org:principal', 'org:teacher'],
+
+  // A teacher also reads their OWN assignments through
+  // `teacher_read_own_teacher_assignments`. That is a row-level grant, not a
+  // capability, so it is not listed here — the teaching screen is a management
+  // screen, and a teacher sees their scope on the screens it governs instead.
+  'assignments:read': MANAGEMENT,
+  'assignments:write': ['org:owner', 'org:principal'],
 
   'announcements:write': MANAGEMENT,
 

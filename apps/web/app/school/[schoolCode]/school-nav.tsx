@@ -22,6 +22,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   CalendarCheck,
+  ClipboardList,
   GraduationCap,
   LayoutDashboard,
   Megaphone,
@@ -48,9 +49,10 @@ const LINKS: readonly NavLink[] = [
   { path: '', label: 'Dashboard', icon: LayoutDashboard, exact: true, needs: null },
   { path: '/students', label: 'Pupils', icon: Users, exact: false, needs: 'students:read' },
   { path: '/staff', label: 'Staff', icon: UserCog, exact: false, needs: 'staff:read' },
+  { path: '/teaching', label: 'Teaching', icon: GraduationCap, exact: false, needs: 'assignments:read' },
   { path: '/fees', label: 'Fees', icon: Wallet, exact: false, needs: 'fees:read' },
   { path: '/attendance', label: 'Attendance', icon: CalendarCheck, exact: false, needs: 'attendance:read' },
-  { path: '/results', label: 'Results', icon: GraduationCap, exact: false, needs: 'results:read' },
+  { path: '/results', label: 'Results', icon: ClipboardList, exact: false, needs: 'results:read' },
   { path: '/announcements', label: 'Announcements', icon: Megaphone, exact: false, needs: null },
 ]
 

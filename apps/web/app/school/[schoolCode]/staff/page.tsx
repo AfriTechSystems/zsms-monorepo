@@ -256,6 +256,7 @@ export default function StaffPage({
       <PageHeader
         title="Staff"
         description="Everyone who works here and the access they hold."
+        note="A person needs a ROLE to sign in and a STAFF RECORD to appear on registers and mark sheets. Inviting someone creates the first; the second is filled in separately. Removing access never deletes their record or the work attached to it."
       />
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}

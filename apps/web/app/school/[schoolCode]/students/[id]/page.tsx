@@ -31,7 +31,7 @@
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Save, UserMinus } from 'lucide-react'
+import { Loader2, Save, UserMinus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -160,21 +160,17 @@ export default function StudentDetailPage({
 
   return (
     <>
-      <Button variant="ghost" size="sm" asChild className="mb-3">
-        <Link href={`${base}/students`}>
-          <ArrowLeft aria-hidden="true" />
-          All pupils
-        </Link>
-      </Button>
-
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
       {loading && !data && !error && <TableSkeleton rows={6} columns={2} />}
 
       {!error && data && (
         <>
           <PageHeader
+            backTo={`${base}/students`}
+            backLabel="All pupils"
             title={`${data.first_name} ${data.last_name}`}
             description={data.student_id}
+            note="Changes here take effect immediately for every teacher and parent who can see this pupil. Moving a pupil off the roll frees a place against the school's limit; it never deletes anything."
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <StudentStatusBadge status={data.status} />

@@ -38,7 +38,10 @@ export default function SignInPage(): JSX.Element {
 
       {/* Clerk's component renders its own markup; the surrounding page carries
           the ZSMS theme so the transition into it is not a visual cliff. */}
-      <SignIn />
+      {/* `signUpUrl` keeps the "create an account" link inside ZSMS. Left
+          to itself Clerk links to its hosted portal on `*.accounts.dev`,
+          which is how invited staff ended up outside the product. */}
+      <SignIn signUpUrl="/sign-up" fallbackRedirectUrl="/school" />
     </main>
   )
 }

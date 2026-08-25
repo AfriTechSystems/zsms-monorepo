@@ -28,7 +28,6 @@ import { useCallback, useState } from 'react'
 import { use } from 'react'
 import Link from 'next/link'
 import {
-  ArrowLeft,
   Check,
   KeyRound,
   Loader2,
@@ -466,21 +465,17 @@ export default function AdminSchoolDetailPage({
 
   return (
     <>
-      <Button variant="ghost" size="sm" asChild className="mb-3">
-        <Link href="/admin/schools">
-          <ArrowLeft aria-hidden="true" />
-          All schools
-        </Link>
-      </Button>
-
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
       {loading && !data && !error && <TableSkeleton rows={8} columns={3} />}
 
       {!error && data && (
         <>
           <PageHeader
+            backTo="/admin/schools"
+            backLabel="All schools"
             title={data.school.name}
             description={`${data.school.type} · ${data.school.level} · ${data.school.city_code}`}
+            note="Everything on this screen affects one school only. Changing the tier changes which features resolve for it and what its pupil limit is; suspending it cuts off every user there immediately."
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={data.school.status} />

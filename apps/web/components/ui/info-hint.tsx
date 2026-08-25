@@ -35,7 +35,7 @@
 
 import type { JSX, ReactNode } from 'react'
 import { useId, useState } from 'react'
-import { Info } from 'lucide-react'
+import { ChevronDown, Info } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 
@@ -102,26 +102,58 @@ export function InfoHint({
 /**
  * A page-level explainer: what this screen is for, and what changes here affect.
  *
- * Rendered as a dismissible note rather than a tooltip because it is longer than
- * a sentence and worth reading once. It sits under the page heading, where
- * someone arriving on an unfamiliar screen looks first.
+ * ## Collapsed by default, and that is a correction
+ *
+ * The first version rendered the note as a permanently visible block under the
+ * heading. On a laptop that is fine. On a 390px screen a three-line paragraph
+ * costs roughly a fifth of the viewport on **every** screen, forever — and it is
+ * read once. Something worth reading once should not be charged for on every
+ * visit.
+ *
+ * So it is a disclosure: one compact line that costs a single row, expanding on
+ * demand. `<details>`/`<summary>` rather than React state, because the browser
+ * gives the open/closed semantics, keyboard handling and screen-reader
+ * announcement for free, and it still works before hydration.
+ *
+ * It starts closed at every width rather than opening itself on a laptop. The
+ * argument for collapsing applies to a returning user on any screen, and one
+ * behaviour is easier to learn than two.
  */
 export function PageNote({
   children,
+  label = 'About this page',
   className,
 }: {
   children: ReactNode
+  /** The summary line. Name the screen when a page has more than one note. */
+  label?: string
   className?: string
 }): JSX.Element {
   return (
-    <p
+    <details
       className={cn(
-        'mb-cards flex items-start gap-2 rounded-lg border border-border bg-sunken p-3 text-sm text-muted-foreground',
+        'group mb-cards rounded-lg border border-border bg-sunken text-sm text-muted-foreground',
         className,
       )}
     >
-      <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span>{children}</span>
-    </p>
+      <summary
+        className={cn(
+          'flex min-h-tap cursor-pointer list-none items-center gap-2 px-3 py-2 font-medium',
+          'transition-colors hover:text-foreground',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          // Safari renders a disclosure triangle on `summary` regardless of
+          // `list-none`; this removes it so the chevron below is the only marker.
+          '[&::-webkit-details-marker]:hidden',
+        )}
+      >
+        <Info aria-hidden="true" className="size-4 shrink-0" />
+        <span className="flex-1">{label}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className="size-4 shrink-0 transition-transform group-open:rotate-180"
+        />
+      </summary>
+      <p className="px-3 pb-3 pl-9">{children}</p>
+    </details>
   )
 }

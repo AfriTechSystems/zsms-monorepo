@@ -232,6 +232,18 @@ export async function POST(request: NextRequest): Promise<Response> {
         // From the session. An operator cannot attribute an invitation to
         // someone else, which is what makes "who let this person in" answerable.
         inviterUserId: ctx.userId,
+        // Where the invitation link lands after Clerk consumes the ticket.
+        //
+        // Omitting this is not a small default — Clerk falls back to the
+        // instance's hosted Account Portal on `*.accounts.dev`, so every invited
+        // teacher accepted successfully and then arrived at a Clerk-branded page
+        // with no route into ZSMS. Their account existed; there was nowhere to
+        // send them.
+        //
+        // Derived from the request rather than an env var so it is correct on
+        // localhost, on a phone hitting the LAN address, and in production
+        // without three different values to keep in step.
+        redirectUrl: new URL('/sign-up', request.nextUrl.origin).toString(),
       })
       return created(invitation)
     } catch (err) {

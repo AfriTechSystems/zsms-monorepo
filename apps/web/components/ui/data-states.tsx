@@ -11,10 +11,12 @@
  */
 
 import type { JSX, ReactNode } from 'react'
-import { RefreshCw, ShieldAlert, TriangleAlert } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, RefreshCw, ShieldAlert, TriangleAlert } from 'lucide-react'
 
 import { Alert } from './alert'
 import { Button } from './button'
+import { PageNote } from './info-hint'
 import { Skeleton } from './skeleton'
 import { cn } from '../../lib/utils'
 
@@ -101,17 +103,58 @@ export function StatSkeleton({ count = 4 }: { count?: number }): JSX.Element {
   )
 }
 
-/** Page title block. Keeps the h1 and its description consistent across screens. */
+/**
+ * Page title block. Keeps the h1, its description and the way back consistent.
+ *
+ * `backTo` renders a labelled link ABOVE the heading rather than a bare arrow
+ * beside it. Two reasons. A browser back button is not always the right
+ * destination — arriving at a pupil from a search result, from the dashboard, or
+ * from a bookmark should all lead back to the roll. And an arrow with no words
+ * makes the reader guess where it goes; "All pupils" does not.
+ *
+ * `note` is the one-paragraph explainer for the screen: what it is for, and what
+ * changes here affect. Optional, and worth writing on any screen that changes
+ * something a school would notice.
+ */
 export function PageHeader({
   title,
   description,
   actions,
+  backTo,
+  backLabel,
+  note,
 }: {
   title: string
   description?: string
   actions?: ReactNode
+  /** Where "back" goes. Always a real destination, never `history.back()`. */
+  backTo?: string
+  /** What that destination is called. Required whenever `backTo` is given. */
+  backLabel?: string
+  note?: ReactNode
 }): JSX.Element {
   return (
+    <>
+      {backTo && (
+        <Link
+          href={backTo}
+          className={cn(
+            'mb-3 inline-flex min-h-tap items-center gap-1.5 rounded-md text-sm font-medium',
+            'text-muted-foreground transition-colors hover:text-foreground',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          )}
+        >
+          <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
+          {backLabel ?? 'Back'}
+        </Link>
+      )}
+      {note && <PageNote>{note}</PageNote>}
+      {renderHeader()}
+    </>
+  )
+
+  function renderHeader(): JSX.Element {
+    return (
     // Stacked on a phone, side by side from `sm`. `flex-wrap` alone was not
     // enough: an action group wrapping under a heading still sat right-aligned
     // against the gutter, and a long title pushed a button off the edge before
@@ -129,5 +172,6 @@ export function PageHeader({
       </div>
       {actions && <div className="flex flex-wrap gap-2 sm:shrink-0">{actions}</div>}
     </div>
-  )
+    )
+  }
 }

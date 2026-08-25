@@ -32,7 +32,7 @@ import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, UserPlus } from 'lucide-react'
+import { Loader2, UserPlus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { ROLE_LABEL, can } from '../../../../../lib/roles'
@@ -140,16 +140,11 @@ export default function NewStudentPage({
 
   return (
     <>
-      <Button variant="ghost" size="sm" asChild className="mb-3">
-        <Link href={`${base}/students`}>
-          <ArrowLeft aria-hidden="true" />
-          All pupils
-        </Link>
-      </Button>
-
       <PageHeader
+        backTo={`${base}/students`}
+        backLabel="All pupils"
         title="Enrol a pupil"
-        description="The pupil number is generated from the school code — it is not entered here."
+        note="The pupil number is generated from the school code. A new pupil counts against the school's limit as soon as they are enrolled."
       />
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}

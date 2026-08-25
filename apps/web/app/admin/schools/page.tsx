@@ -197,6 +197,7 @@ function SchoolsTable(): JSX.Element {
                 caption={`Schools on the platform, ${total} in total, page ${page} of ${lastPage}`}
                 rows={data}
                 rowKey={(s) => s.id}
+                href={(s) => `/admin/schools/${s.id}`}
                 columns={[
                   {
                     key: 'school',

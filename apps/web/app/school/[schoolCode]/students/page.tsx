@@ -133,6 +133,7 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
       <PageHeader
         title="Pupils"
         description="Everyone on the roll, and everyone who has left."
+        note="Active and on-leave pupils occupy a place against the school's limit; transferred, graduated and withdrawn pupils do not. Tap a name to open a pupil."
         actions={
           <div className="flex flex-col items-end gap-1">
             {/* Two different reasons not to offer enrolment, and they are not
@@ -245,6 +246,7 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
                 caption="Pupils at this school"
                 rows={data}
                 rowKey={(s) => s.id}
+                href={(s) => `${base}/students/${s.id}`}
                 columns={[
                   {
                     key: 'pupil',

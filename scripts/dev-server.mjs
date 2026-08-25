@@ -142,7 +142,22 @@ if (has('--kill-only')) {
 
 if (has('--clean')) {
   console.log('[dev] clearing apps/web/.next')
-  rmSync(join(WEB, '.next'), { recursive: true, force: true })
+  try {
+    // `maxRetries`/`retryDelay` exist for precisely this: on Windows the
+    // just-killed `next dev` (or a virus scanner walking the directory) can
+    // still hold handles inside `.next` for a moment after the process is gone,
+    // and the delete fails ENOTEMPTY. Observed exactly that.
+    rmSync(join(WEB, '.next'), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  } catch (err) {
+    // Warn and carry on. Clearing the cache is a convenience; refusing to start
+    // the server because a stale directory could not be removed turns a small
+    // inconvenience into no dev server at all — which is what happened before
+    // this catch existed.
+    console.warn(
+      `[dev] could not clear .next (${err.code ?? err.message}) — starting anyway. ` +
+        'If the server misbehaves, close anything reading apps/web/.next and retry.',
+    )
+  }
 }
 
 console.log('')

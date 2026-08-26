@@ -36,29 +36,42 @@ import Image from 'next/image'
 
 import { SignUp } from '@zsms/auth-provider/react'
 
+import { authAppearance } from '../../../components/ui/auth-appearance'
+
 export const metadata = { title: 'Create your account · ZSMS' }
 
 export default function SignUpPage(): JSX.Element {
   return (
-    <main id="main" className="flex min-h-dvh flex-col items-center justify-center gap-section p-gutter">
-      <div className="flex flex-col items-center gap-stack text-center">
+    <main
+      id="main"
+      className="flex min-h-dvh flex-col items-center justify-center gap-cards bg-background px-gutter py-10"
+    >
+      <div className="flex w-full max-w-md flex-col items-center gap-3 text-center">
         <Image
           src="/brand/zsms-lockup.png"
           alt="ZSMS — school management by AfriTech Systems"
           width={200}
           height={64}
           priority
-          className="h-auto w-[180px]"
+          className="h-auto w-[150px] sm:w-[180px]"
         />
-        <p className="max-w-sm text-muted-foreground">
-          Set a password and you will be taken straight into your school.
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+          Set up your account
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Choose a password and you will be taken straight into your school.
         </p>
       </div>
 
       {/* `signInUrl` so the "already have an account?" link stays inside ZSMS.
           Without it Clerk points at its own hosted portal, which is the same
           class of problem this page exists to fix. */}
-      <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/school" />
+      <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/school" appearance={authAppearance} />
+
+      <p className="max-w-md text-center text-xs text-subtle">
+        ZSMS is a product of AfriTech Systems Limited. Your school administrator invited you; if
+        anything looks wrong, ask them before continuing.
+      </p>
     </main>
   )
 }

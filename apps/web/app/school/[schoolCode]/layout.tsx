@@ -28,9 +28,7 @@ import type { JSX, ReactNode } from 'react'
 import Link from 'next/link'
 import { ShieldAlert } from 'lucide-react'
 
-import { resolveTheme } from '@zsms/design-tokens'
-
-import { loadSchoolBranding, ThemeStyle } from '../../../lib/theme'
+import { ThemeStyle } from '../../../lib/theme'
 import { requireSchoolSession } from '../../../lib/school-session'
 import { ROLE_LABEL } from '../../../lib/roles'
 import { AccountMenu } from '../../../components/ui/account-menu'
@@ -52,10 +50,11 @@ export default async function SchoolLayout({
 
   // Redirects when signed out, 404s when the URL names a school this session is
   // not in. Both exits happen here so no screen below has to remember to check.
+  // One resolution for the whole tree — `requireSchoolSession` is memoised per
+  // request, and it now returns the theme alongside the school so the shell does
+  // not make a second round trip for branding.
   const session = await requireSchoolSession(schoolCode)
-
-  const branding = await loadSchoolBranding(session.client, session.school.id)
-  const theme = resolveTheme(branding)
+  const theme = session.theme
   const base = `/school/${session.slug}`
 
   return (

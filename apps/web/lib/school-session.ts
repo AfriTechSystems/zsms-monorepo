@@ -24,11 +24,14 @@
  * no mapping table.
  */
 
+import { cache } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAuthProvider, type Role } from '@zsms/auth-provider'
+import { resolveTheme, type ResolvedTheme } from '@zsms/design-tokens'
 
 import { createUserClient } from './supabase'
+import { loadSchoolBranding } from './theme'
 import { isPortalRole } from './roles'
 
 export interface SchoolCapacity {
@@ -60,6 +63,15 @@ export interface SchoolSession {
   slug: string
   school: SchoolRecord
   capacity: SchoolCapacity | null
+  /**
+   * The school's resolved palette.
+   *
+   * Resolved here rather than by the layout so branding and capacity are fetched
+   * in ONE round trip together instead of two in sequence. Both depend only on
+   * the school id, so there was never a reason to wait for one before asking for
+   * the other.
+   */
+  theme: ResolvedTheme
   isImpersonating: boolean
   client: SupabaseClient
 }
@@ -109,8 +121,26 @@ export function capacityLabel(capacity: SchoolCapacity | null): string {
  *   - no session          → sign in, carrying the path back
  *   - not a school role   → 404 (a parent or platform account has no shell here)
  *   - slug ≠ session org  → 404 (see the header)
+ *
+ * ## Wrapped in `cache()`, and why that is not an optimisation detail
+ *
+ * A layout and the page inside it are separate server components, and both want
+ * the school. Without memoisation each resolution is a fresh set of round trips
+ * — the work doubles for no reason, and worse, the two could in principle
+ * disagree if a row changed between them. React's `cache()` scopes one result to
+ * one request, so every component in the tree sees the same school resolved once.
+ *
+ * ## The lookups that can be parallel, are
+ *
+ * The school row has to come first: capacity and branding are both keyed on its
+ * id. But those two do not depend on each other, so they run together. Measured
+ * on a warm dev server against `zsms-dev` in eu-west-1, that removes one full
+ * round trip from every school page — the difference between three sequential
+ * waits and two.
  */
-export async function requireSchoolSession(slug: string): Promise<SchoolSession> {
+export const requireSchoolSession = cache(async function requireSchoolSession(
+  slug: string,
+): Promise<SchoolSession> {
   const session = await getAuthProvider().getSessionUser()
   if (!session) redirect(`/sign-in?redirect_url=/school/${encodeURIComponent(slug)}`)
 
@@ -142,9 +172,12 @@ export async function requireSchoolSession(slug: string): Promise<SchoolSession>
   const school = schools?.[0]
   if (!school || schools.length !== 1) notFound()
 
-  const { data: capacityRow } = await client.rpc('school_student_capacity', {
-    p_school_id: school.id as string,
-  })
+  // Independent of each other, dependent only on the school id. Sequential
+  // awaits here were costing a whole round trip on every page in the portal.
+  const [capacityResult, branding] = await Promise.all([
+    client.rpc('school_student_capacity', { p_school_id: school.id as string }),
+    loadSchoolBranding(client, school.id as string),
+  ])
 
   return {
     userId: session.userId,
@@ -161,8 +194,9 @@ export async function requireSchoolSession(slug: string): Promise<SchoolSession>
       financeModuleEnabled: school.finance_module_enabled as boolean,
       whatsappEnabled: school.whatsapp_enabled as boolean,
     },
-    capacity: toCapacity(capacityRow),
+    capacity: toCapacity(capacityResult.data),
+    theme: resolveTheme(branding),
     isImpersonating: session.isImpersonating,
     client,
   }
-}
+})

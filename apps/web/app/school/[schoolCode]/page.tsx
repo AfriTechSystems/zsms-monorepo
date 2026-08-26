@@ -4,7 +4,7 @@
  * School dashboard.
  *
  * Spec: `Official Documentation/06 School and Tenant Module/SCHOOL.md`
- *       `Official Documentation/10 Fee Management/FEE_ARREARS.md`
+ *       `Official Documentation/09 Fee and Financial Management/PAYMENTS.md`
  *
  * ## What a dashboard is for here
  *

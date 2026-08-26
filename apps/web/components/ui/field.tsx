@@ -171,6 +171,30 @@ export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttrib
 Select.displayName = 'Select'
 
 /**
+ * Free text over more than one line — a rejection reason, a note on a payment.
+ *
+ * `min-h` rather than a fixed height, and resize left on, because the writer
+ * knows how much they need to say better than the layout does. `field-sizing`
+ * grows it with the content where the browser supports it, and is ignored
+ * harmlessly where it does not.
+ */
+export const Textarea = React.forwardRef<
+  HTMLTextAreaElement,
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>
+>(({ className, ...props }, ref) => (
+  <textarea
+    ref={ref}
+    className={cn(
+      controlClasses,
+      'min-h-20 resize-y py-2 leading-normal placeholder:text-subtle [field-sizing:content]',
+      className,
+    )}
+    {...props}
+  />
+))
+Textarea.displayName = 'Textarea'
+
+/**
  * A numeric input with a currency or unit marker.
  *
  * The prefix is `aria-hidden` and the unit repeated in the label, because

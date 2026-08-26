@@ -18,6 +18,7 @@ import './globals.css'
 import { SessionProvider } from '@zsms/auth-provider/react'
 
 import { platformTheme, ThemeStyle } from '../lib/theme'
+import { ToastProvider } from '../components/ui/toast'
 
 export const metadata: Metadata = {
   title: 'ZSMS',
@@ -80,7 +81,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <a href="#main" className="skip-link">
             Skip to main content
           </a>
-          {children}
+          {/* Mounted at the root so any screen can confirm an action without
+              each one rendering its own strip — and so the strip is in the same
+              place on every page, which is the point of a toast. */}
+          <ToastProvider>{children}</ToastProvider>
         </body>
       </html>
     </SessionProvider>

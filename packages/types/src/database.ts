@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -277,6 +277,7 @@ export type Database = {
           entered_by_user_id: string
           grade_letter: string | null
           grade_points: number | null
+          grading_scale_version_id: string | null
           id: string
           marks_obtained: number | null
           marks_total: number
@@ -300,6 +301,7 @@ export type Database = {
           entered_by_user_id: string
           grade_letter?: string | null
           grade_points?: number | null
+          grading_scale_version_id?: string | null
           id?: string
           marks_obtained?: number | null
           marks_total?: number
@@ -323,6 +325,7 @@ export type Database = {
           entered_by_user_id?: string
           grade_letter?: string | null
           grade_points?: number | null
+          grading_scale_version_id?: string | null
           id?: string
           marks_obtained?: number | null
           marks_total?: number
@@ -337,6 +340,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "exam_results_grading_scale_version_id_fkey"
+            columns: ["grading_scale_version_id"]
+            isOneToOne: false
+            referencedRelation: "school_grading_scale_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "exam_results_school_id_fkey"
             columns: ["school_id"]
@@ -1443,6 +1453,73 @@ export type Database = {
           },
         ]
       }
+      school_grading_scale_versions: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          credit_mark: number | null
+          effective_from: string
+          grade_bands: Json
+          grading_scale_id: string
+          id: string
+          pass_mark: number | null
+          revision_reason: string | null
+          school_id: string
+          superseded_at: string | null
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          credit_mark?: number | null
+          effective_from?: string
+          grade_bands: Json
+          grading_scale_id: string
+          id?: string
+          pass_mark?: number | null
+          revision_reason?: string | null
+          school_id: string
+          superseded_at?: string | null
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          credit_mark?: number | null
+          effective_from?: string
+          grade_bands?: Json
+          grading_scale_id?: string
+          id?: string
+          pass_mark?: number | null
+          revision_reason?: string | null
+          school_id?: string
+          superseded_at?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_grading_scale_versions_grading_scale_id_fkey"
+            columns: ["grading_scale_id"]
+            isOneToOne: false
+            referencedRelation: "school_grading_scales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_grading_scale_versions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_grading_scale_versions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_grading_scales: {
         Row: {
           applies_to_levels: string[]
@@ -2529,7 +2606,17 @@ export type Database = {
           out_reason: string
         }[]
       }
+      current_grading_scale_version: {
+        Args: { p_scale_id: string }
+        Returns: string
+      }
       current_school_uuid: { Args: never; Returns: string }
+      current_subject_scale_version:
+        | {
+            Args: { p_school_id: string; p_subject_code: string }
+            Returns: string
+          }
+        | { Args: { p_subject_code: string }; Returns: string }
       fee_statement: {
         Args: { p_from?: string; p_student_id: string; p_to?: string }
         Returns: {
@@ -2557,6 +2644,17 @@ export type Database = {
       get_school_id: { Args: never; Returns: string }
       get_user_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
+      grade_from_scale_version: {
+        Args: {
+          p_marks_obtained: number
+          p_marks_total: number
+          p_version_id: string
+        }
+        Returns: {
+          grade_letter: string
+          grade_points: number
+        }[]
+      }
       has_permission_grant: {
         Args: { p_action: string; p_module: string }
         Returns: boolean
@@ -2668,6 +2766,50 @@ export type Database = {
         Returns: {
           revised_count: number
           skipped_count: number
+        }[]
+      }
+      revise_grading_scale: {
+        Args: {
+          p_credit_mark?: number
+          p_grade_bands: Json
+          p_pass_mark?: number
+          p_reason?: string
+          p_scale_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by_user_id: string | null
+          credit_mark: number | null
+          effective_from: string
+          grade_bands: Json
+          grading_scale_id: string
+          id: string
+          pass_mark: number | null
+          revision_reason: string | null
+          school_id: string
+          superseded_at: string | null
+          version_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "school_grading_scale_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_exam_marks: {
+        Args: {
+          p_academic_year: string
+          p_class_id: string
+          p_marks: Json
+          p_marks_total: number
+          p_subject_code: string
+          p_subject_name: string
+          p_term_number: number
+        }
+        Returns: {
+          graded_count: number
+          saved_count: number
         }[]
       }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
@@ -2875,12 +3017,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2904,11 +3046,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2929,11 +3071,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2954,11 +3096,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2971,11 +3113,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

@@ -529,25 +529,32 @@ Also: **`reference_subjects_zm` bakes the country into the table name** even tho
 
 ---
 
-## ADR-041 — Grading Scale Versioning for Exam Results (Open Data-Integrity Gap)
+## ADR-041 — Grading Scale Versioning for Exam Results
 
-**Status:** Open — **must be resolved before results are relied on long term.** Not a multi-country concern; it affects a single Zambian school.
-**Decision:** **Recorded as a defect, not yet fixed.** `public.exam_results` stores `grade_letter` and `grade_points` but no reference to the grading scale that produced them. A school that revises its scale mid-year makes every historical grade unexplainable.
+**Status:** **Resolved 2026-09-26** — migrations `0106` and `0107`, 20 pgTAP assertions in `grading_scale_versioning_test.sql`.
+**Decision:** A stored grade records the grading-scale **version** that produced it. `public.exam_results.grading_scale_version_id` references `public.school_grading_scale_versions`, an immutable per-version snapshot of the bands. A scale revision creates a new version; existing results keep pointing at the version that graded them, so a March grade stays explainable in August.
 
 **The problem, concretely.** A school grades on ECZ percentages where 75 is a `B`. In Term 2 the board revises the bands and 75 becomes an `A`. `exam_results` now holds Term 1 rows saying `B` and Term 2 rows saying `A` for the same mark, with **nothing recording that the rule changed**. Nobody can answer *"why is this a B?"* — and a parent disputing a report card is asking exactly that. Recomputing from `marks_obtained` against the current scale silently rewrites history; not recomputing leaves two inconsistent letters with no explanation.
 
 **This is a solved problem elsewhere in ZSMS.** `afritech.score_config` versions loan scoring precisely so that a historical behaviour score remains explainable after weights change, and a loan application records the `config_version` it was scored under (ADR-020). Results need the same treatment and did not get it.
 
-**Sketch of the fix** (not built, and the shape is not final):
+**What was built.** The separate-table option, not the `version` column. A version column means a revision produces a new scale row with a new id, and `school_subjects.grading_scale_id` is a live FK that would need repointing on every revision. So the scale keeps a **stable identity** — "ECZ Secondary" is the same scale across revisions — and the bands move into immutable per-version snapshots.
 
-- Version `school_grading_scales` — either a `version` column with the scale immutable once used, or a separate `school_grading_scale_versions` table holding the bands.
-- Add `grading_scale_version_id` to `exam_results`, populated at mark-entry time.
-- Treat a scale in use as immutable: a revision creates a new version rather than editing bands in place, exactly as the loan score config does.
-- Backfill is impossible for rows written before the column exists, which is the argument for doing this **before** a school accumulates a year of results.
+- `public.school_grading_scale_versions` — `grade_bands`, `pass_mark`, `credit_mark`, `version_number`, `effective_from`, `superseded_at`, `revision_reason`. A partial unique index on `superseded_at IS NULL` makes "exactly one current version" unambiguous while keeping the full history legal.
+- `public.exam_results.grading_scale_version_id` — nullable, and the nullability is deliberate (see below).
+- `public.revise_grading_scale(scale, bands, pass, credit, reason)` — the only way to change what a grade means. **A reason is mandatory**: a boundary change nobody can explain is the defect wearing a different hat.
+- `public.grade_from_scale_version(version, marks, total)` — takes a *version*, never a scale, because the question it must answer is "what did this mark mean in March". Bands match on percentage, so a subject marked out of 30 uses the same boundaries as one out of 100.
+- Two guards, both AFTER triggers per the rule established in `0101`: a version that has graded anything cannot be rewritten or deleted, and `school_grading_scales.grade_bands` — now a derived mirror of the current version — cannot be edited in place.
 
-**Why it is not fixed in this pass.** It changes the marks-entry write path and needs a decision on whether published results are ever recomputed — a product question, not a schema one. It is recorded here so it is not rediscovered when a parent disputes a grade.
+**The product question the original ADR deferred, now settled: published results are never recomputed.** A published grade is a statement of record that has reached a parent. Silently restating it because a boundary moved is worse than a stale grade, and recomputation would make the version column decorative — it exists so an old grade can be *explained*, never so it can be quietly changed. A genuine error is corrected by an explicit, attributed re-grade. This is ADR-020's "snapshot calculated at application time only" applied to marks.
 
-**Consequences:** Flagged in `CLAUDE.md` as an open data-integrity item. Should be scheduled before the first cohort's results are treated as a permanent record — realistically before Phase 6 pilot, and certainly before any school completes a full academic year in ZSMS.
+**On the precedent this was asked to mirror.** ADR-041 originally pointed at `afritech.score_config` as the solved case. That table **does not exist in the applied schema** — it is documented in `DYNAMIC_CONFIG.md` and referenced here, and the loan module is unbuilt. So `0106` mirrors a documented *design*, not working code. Recorded because this is the exact "verify against the applied schema" trap `CLAUDE.md` warns about, and the next reader should not go looking for a table to copy.
+
+**Backfill was deliberately partial, and NULL means something.** A result whose `grading_scale_version_id` is NULL predates versioning and its grade genuinely cannot be explained. That is distinguishable from a known scale, which a plausible-looking guess would not be. On `zsms-dev` all 95 seeded results are NULL — the seed creates graded results with no grading scale at all, which is itself a seed defect worth fixing and a concrete demonstration of the problem this ADR describes.
+
+**One defect found in `0106` by probing the applied schema** rather than re-reading the migration: it backfilled existing scales but did not make a *new* scale create a version, so a scale added afterwards resolved to no current version and could silently grade nothing. Closed by `0107`, which puts the invariant in a trigger — an invariant that depends on every caller remembering a second INSERT is not an invariant.
+
+**Consequences:** The `CLAUDE.md` open-item row is removed. Mark entry must resolve a version and write it with the grade; `public.current_subject_scale_version(school, subject_code)` is the resolver.
 
 ---
 

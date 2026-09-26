@@ -56,13 +56,21 @@ export async function GET(): Promise<Response> {
     // `school_staff_read_grade_levels` admits any member of the school, so no
     // role check is needed or wanted — a teacher filling a register needs the
     // same list a registrar does.
-    const [levels, classes] = await Promise.all([
+    const [levels, classes, subjects] = await Promise.all([
       client
         .from('school_grade_levels')
         .select('level_id, display_name, level_order, level_type, examination_type')
         .eq('is_active', true)
         .order('level_order', { ascending: true }),
       client.from('students').select('grade_id, class_id').eq('is_deleted', false),
+      // Subjects ride along for the same reason the role does: the mark sheet
+      // needs a class AND a subject before it can ask for anything, and two
+      // round trips to fill two dropdowns on one screen is one too many.
+      client
+        .from('school_subjects')
+        .select('subject_code, subject_name, level_type, grading_scale_id')
+        .eq('is_active', true)
+        .order('subject_name', { ascending: true }),
     ])
 
     if (levels.error) return fromPostgrestError(levels.error)
@@ -87,6 +95,14 @@ export async function GET(): Promise<Response> {
       classesByGrade: Object.fromEntries(
         [...byGrade.entries()].map(([grade, set]) => [grade, [...set].sort()]),
       ),
+      // `hasScale` so a screen can warn before marks are entered rather than
+      // after they save ungraded (ADR-041).
+      subjects: (subjects.data ?? []).map((s) => ({
+        code: s.subject_code,
+        name: s.subject_name,
+        levelType: s.level_type,
+        hasScale: s.grading_scale_id !== null,
+      })),
     })
   })
 }

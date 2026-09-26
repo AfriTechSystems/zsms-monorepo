@@ -65,8 +65,19 @@ export type Capability =
   | 'attendance:write'
   /** See results across the school. */
   | 'results:read'
-  /** Enter or publish marks. */
+  /** Enter marks. `teacher_insert_own_results`, teacher scoped by class and subject. */
   | 'results:write'
+  /**
+   * Publish a term's marks to parents.
+   *
+   * Narrower than `results:write` on purpose, and the database agrees:
+   * `publish_results()` (0075) raises 42501 for anyone but the owner or
+   * principal, and `teacher_update_unpublished_results` refuses a teacher who
+   * tries to publish by flipping the flag on their own row. Publication is the
+   * moment a mark becomes visible to a family and stops being editable — that
+   * is a head's decision, not a marker's.
+   */
+  | 'results:publish'
   /** See who teaches what. `management_read_teacher_assignments`. */
   | 'assignments:read'
   /** Assign a teacher to a class or subject. `management_write_teacher_assignments` — owner and principal only. */
@@ -91,6 +102,7 @@ const CAPABILITIES: Record<Capability, readonly Role[]> = {
 
   'results:read': [...MANAGEMENT, 'org:teacher'],
   'results:write': ['org:owner', 'org:principal', 'org:teacher'],
+  'results:publish': ['org:owner', 'org:principal'],
 
   // A teacher also reads their OWN assignments through
   // `teacher_read_own_teacher_assignments`. That is a row-level grant, not a

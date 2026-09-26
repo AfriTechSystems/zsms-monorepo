@@ -134,7 +134,10 @@ export function useApi<T>(url: string | null): ApiState<T> {
  */
 export async function apiSend<T>(
   url: string,
-  method: 'POST' | 'PATCH' | 'DELETE',
+  // PUT included for endpoints whose semantics are a full replacement of a
+  // sub-resource rather than a partial patch — the pupil custom-value set, for
+  // one. Adding it here rather than at a call site keeps one helper.
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   body: unknown,
 ): Promise<{ data: T | null; error: string | null; code: string | null }> {
   try {

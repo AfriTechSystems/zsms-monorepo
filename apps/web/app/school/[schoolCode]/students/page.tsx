@@ -30,7 +30,7 @@ import type { FormEvent, JSX } from 'react'
 import { Suspense, use, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Search, UserPlus, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, UserPlus, Users, Upload } from 'lucide-react'
 
 import { useApi } from '../../../../lib/use-api'
 import { can } from '../../../../lib/roles'
@@ -140,6 +140,18 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
                 interchangeable. A role that cannot enrol never sees the button
                 at all; a school that is full sees it disabled, because the
                 action is theirs and the obstacle is temporary. */}
+            {/* Import sits beside enrolment rather than inside it: adding one
+                pupil and adding a term's intake are different jobs, and burying
+                the second behind the first is how a school types 300 rows by
+                hand. Disabled at capacity for the same reason as enrolment. */}
+            {mayEnrol && !atCapacity && (
+              <Button variant="outline" asChild>
+                <Link href={`${base}/students/import`}>
+                  <Upload aria-hidden="true" />
+                  Import from a spreadsheet
+                </Link>
+              </Button>
+            )}
             {mayEnrol && (
               <Button asChild disabled={atCapacity}>
                 {atCapacity ? (

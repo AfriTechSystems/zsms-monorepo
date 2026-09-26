@@ -1399,6 +1399,72 @@ export type Database = {
           },
         ]
       }
+      school_custom_fields: {
+        Row: {
+          created_at: string
+          display_order: number
+          entity_type: string
+          field_key: string
+          field_type: string
+          help_text: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          label: string
+          options: Json
+          school_id: string
+          sensitivity: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          entity_type?: string
+          field_key: string
+          field_type: string
+          help_text?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label: string
+          options?: Json
+          school_id: string
+          sensitivity?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          entity_type?: string
+          field_key?: string
+          field_type?: string
+          help_text?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label?: string
+          options?: Json
+          school_id?: string
+          sensitivity?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_custom_fields_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_custom_fields_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_grade_levels: {
         Row: {
           created_at: string
@@ -2025,6 +2091,77 @@ export type Database = {
           },
         ]
       }
+      student_custom_values: {
+        Row: {
+          created_at: string
+          field_id: string
+          id: string
+          school_id: string
+          student_id: string
+          updated_at: string
+          value_boolean: boolean | null
+          value_date: string | null
+          value_json: Json | null
+          value_number: number | null
+          value_text: string | null
+        }
+        Insert: {
+          created_at?: string
+          field_id: string
+          id?: string
+          school_id: string
+          student_id: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_date?: string | null
+          value_json?: Json | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          created_at?: string
+          field_id?: string
+          id?: string
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+          value_boolean?: boolean | null
+          value_date?: string | null
+          value_json?: Json | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_custom_values_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "school_custom_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_custom_values_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "student_custom_values_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_custom_values_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_parent_links: {
         Row: {
           created_at: string
@@ -2526,6 +2663,14 @@ export type Database = {
       }
     }
     Functions: {
+      academic_year_is_current: {
+        Args: { p_academic_year: string }
+        Returns: boolean
+      }
+      academic_years_match: {
+        Args: { p_left: string; p_right: string }
+        Returns: boolean
+      }
       admin_create_override: {
         Args: {
           p_actor: string
@@ -2659,6 +2804,12 @@ export type Database = {
         Args: { p_action: string; p_module: string }
         Returns: boolean
       }
+      import_students: {
+        Args: { p_rows: Json }
+        Returns: {
+          created_count: number
+        }[]
+      }
       is_afritech_admin: { Args: never; Returns: boolean }
       is_impersonation_session: { Args: never; Returns: boolean }
       is_linked_parent_of: { Args: { p_student_id: string }; Returns: boolean }
@@ -2666,6 +2817,7 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: boolean
       }
+      next_student_sequence: { Args: { p_school_id: string }; Returns: number }
       parent_can_access_fee_record: {
         Args: { p_fee_record_id: string }
         Returns: boolean
@@ -2874,6 +3026,14 @@ export type Database = {
       teacher_reaches_class: { Args: { p_class_id: string }; Returns: boolean }
       teacher_teaches_subject: {
         Args: { p_class_id: string; p_subject_code: string }
+        Returns: boolean
+      }
+      teacher_teaches_subject_in_year: {
+        Args: {
+          p_academic_year: string
+          p_class_id: string
+          p_subject_code: string
+        }
         Returns: boolean
       }
       verify_payment: {

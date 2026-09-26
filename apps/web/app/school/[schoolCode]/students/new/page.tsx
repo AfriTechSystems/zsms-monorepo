@@ -42,6 +42,10 @@ import { Button } from '../../../../../components/ui/button'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../../components/ui/field'
 import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
+import {
+  CustomFieldInput,
+  type CustomFieldState,
+} from '../../../../../components/ui/custom-field-input'
 import { formatCount } from '../../school-shared'
 
 interface Structure {
@@ -103,6 +107,23 @@ export default function NewStudentPage({
 
   const complete = firstName.trim() && lastName.trim() && gradeId && classId.trim()
 
+  // The school's own extra fields. Fetched here so enrolment and the pupil
+  // record collect the same things — a field that only appears after a pupil
+  // exists is one nobody fills in.
+  const customApi = useApi<{ fields: CustomFieldState[] }>('/api/school/custom-fields')
+  const [customEntries, setCustomEntries] = useState<Record<string, string>>({})
+
+  // Sensitive fields are omitted from enrolment on purpose. They are restricted
+  // to the head teacher, and a medical note belongs on a considered record
+  // rather than in the rush of adding a pupil.
+  const customFields = useMemo(
+    () =>
+      (customApi.data?.fields ?? []).filter(
+        (f) => f.is_active !== false && f.sensitivity === 'standard',
+      ),
+    [customApi.data],
+  )
+
   const submit = useCallback(
     async (event: FormEvent) => {
       event.preventDefault()
@@ -133,9 +154,38 @@ export default function NewStudentPage({
         return
       }
 
-      router.push(`${base}/students/${result.data?.id ?? ''}`)
+      const newId = result.data?.id ?? ''
+
+      // Custom values are a second request, because they are a second table with
+      // its own policies. Written after the pupil exists — they have nothing to
+      // attach to before that.
+      //
+      // A failure here does NOT discard the enrolment: the pupil is already on
+      // the roll, and throwing that away to report a missing house colour would
+      // be the worse outcome. The operator lands on the record with the standard
+      // details saved and can fill the rest in there.
+      const filled = Object.entries(customEntries).filter(([, v]) => v.trim() !== '')
+      if (newId && filled.length > 0) {
+        await apiSend(`/api/school/students/${newId}/custom-values`, 'PUT', {
+          values: Object.fromEntries(filled),
+        })
+      }
+
+      router.push(`${base}/students/${newId}`)
     },
-    [firstName, lastName, gradeId, classId, dateOfBirth, gender, enrolmentDate, isBoarding, router, base],
+    [
+      firstName,
+      lastName,
+      gradeId,
+      classId,
+      dateOfBirth,
+      gender,
+      enrolmentDate,
+      isBoarding,
+      customEntries,
+      router,
+      base,
+    ],
   )
 
   return (
@@ -332,6 +382,24 @@ export default function NewStudentPage({
                       rather than replaced with a generic line. */}
                   {submitError}
                 </Alert>
+              )}
+
+              {customFields.length > 0 && (
+                <div className="mt-stack space-y-stack border-t border-border pt-stack">
+                  <h4 className="text-sm font-medium text-foreground">Additional details</h4>
+                  <FormGrid columns={2}>
+                    {customFields.map((f) => (
+                      <CustomFieldInput
+                        key={f.id}
+                        field={f}
+                        value={customEntries[f.field_key] ?? ''}
+                        onChange={(v) =>
+                          setCustomEntries((prev) => ({ ...prev, [f.field_key]: v }))
+                        }
+                      />
+                    ))}
+                  </FormGrid>
+                </div>
               )}
 
               <FormActions>

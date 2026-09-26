@@ -39,6 +39,7 @@ import { Badge } from '../../../../../components/ui/badge'
 import { Button } from '../../../../../components/ui/button'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
+import { CustomFieldsPanel } from './custom-fields-panel'
 import { Field, Input, Select } from '../../../../../components/ui/field'
 import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
 import {
@@ -375,6 +376,10 @@ export default function StudentDetailPage({
                 </FormActions>
               </FormSection>
             </form>
+
+            {/* Renders nothing when the school has defined no extra fields — an
+                empty "Additional details" heading reads as a broken section. */}
+            <CustomFieldsPanel studentId={id} />
 
             <Alert variant="info" title="Pupil records are never deleted">
               A pupil who leaves is given a status of transferred, graduated, or withdrawn. The

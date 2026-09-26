@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -2611,10 +2611,12 @@ export type Database = {
         Returns: string
       }
       current_school_uuid: { Args: never; Returns: string }
-      current_subject_scale_version: {
-        Args: { p_school_id: string; p_subject_code: string }
-        Returns: string
-      }
+      current_subject_scale_version:
+        | {
+            Args: { p_school_id: string; p_subject_code: string }
+            Returns: string
+          }
+        | { Args: { p_subject_code: string }; Returns: string }
       fee_statement: {
         Args: { p_from?: string; p_student_id: string; p_to?: string }
         Returns: {
@@ -2794,6 +2796,21 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      save_exam_marks: {
+        Args: {
+          p_academic_year: string
+          p_class_id: string
+          p_marks: Json
+          p_marks_total: number
+          p_subject_code: string
+          p_subject_name: string
+          p_term_number: number
+        }
+        Returns: {
+          graded_count: number
+          saved_count: number
+        }[]
       }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_has_feature: {

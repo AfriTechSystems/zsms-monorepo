@@ -570,12 +570,14 @@ A teacher may hold any number of rows of either scope, including both at once. B
 
 ---
 
-### `public.lesson_plans`
+### `public.teaching_resources` (was `lesson_plans`)
 **What it is:** Generated lesson plans created by the AI lesson planner for both school-linked teachers and standalone teacher account holders. `school_id` is NULL for standalone teachers — they own their content regardless of school affiliation.
 
 **Key columns:** `school_id` (nullable), `created_by` (Clerk user ID — org:teacher or platform:teacher), `title`, `grade_level`, `subject`, `topic`, `curriculum_type`, `duration_minutes`, `lesson_type`, `content` (JSONB — full structured lesson plan: objectives, outline, activities, assessment, homework, differentiation), `knowledge_sources` (which knowledge_base chunks were retrieved — for transparency), `is_shared` (teacher can share publicly), `teacher_notes`.
 
-**Relates to:** `public.schools` (nullable), `public.standalone_teacher_accounts`.
+**Relates to:** `public.schools` (nullable, **provenance only — not an access path**), `public.standalone_teacher_accounts`.
+
+**Implemented in `0130` as `teaching_resources`**, one table for all three Hub generators with a `resource_kind` discriminator. Owner-scoped on `get_user_id()`, not school-scoped: a school cannot read its teachers' resources. Carries `generator_name`/`generator_version` so a scaffold stays distinguishable from later model output, and `is_deleted` because there is no DELETE grant.
 
 ---
 
@@ -591,7 +593,9 @@ A teacher may hold any number of rows of either scope, including both at once. B
 ### `public.standalone_teacher_accounts`
 **What it is:** Platform-level B2C accounts for teachers using the lesson planner independently of any school. Has no access to school operational data. Free trial: 5 lesson plans. After trial, monthly subscription required. Can optionally be linked to a ZSMS school when the school registers — lesson plans carry over on linking.
 
-**Key columns:** `clerk_user_id`, `full_name`, `email`, `curriculum_types` (TEXT array), `subjects` (TEXT array), `subscription_status` (trial / active / cancelled / suspended), `trial_plans_used`, `trial_plans_limit` (default 5), `lesson_plans_count`, `linked_school_id` (nullable — set when teacher links to a registered school).
+**Key columns (as applied in `0130`):** `clerk_user_id`, `full_name`, `email`, `curriculum_types`, `subjects`, `grade_levels`, `plan_code` (FK to `afritech.teacher_hub_plans`), `subscription_status` (trial / active / cancelled / suspended), `trial_resources_used` (monotonic, **not writable by the account holder**), `trial_allowance_override`, `resources_created`, `subscription_started_at`, `subscription_ends_at`.
+
+**`linked_school_id` and `trial_plans_limit` do not exist.** The first contradicted the documented multi-school rule and is answered by `my_schools()`; the second became `afritech.teacher_hub_plans.included_resources`, because a trial cap is configuration.
 
 **Relates to:** `public.schools` (nullable via linked_school_id), `public.lesson_plans`.
 

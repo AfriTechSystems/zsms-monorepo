@@ -2295,6 +2295,69 @@ export type Database = {
           },
         ]
       }
+      standalone_teacher_accounts: {
+        Row: {
+          clerk_user_id: string
+          country_code: string
+          created_at: string
+          curriculum_types: string[]
+          email: string
+          full_name: string
+          grade_levels: string[]
+          id: string
+          phone_e164: string | null
+          plan_code: string
+          resources_created: number
+          subjects: string[]
+          subscription_ends_at: string | null
+          subscription_started_at: string | null
+          subscription_status: string
+          trial_allowance_override: number | null
+          trial_resources_used: number
+          updated_at: string
+        }
+        Insert: {
+          clerk_user_id: string
+          country_code?: string
+          created_at?: string
+          curriculum_types?: string[]
+          email: string
+          full_name: string
+          grade_levels?: string[]
+          id?: string
+          phone_e164?: string | null
+          plan_code?: string
+          resources_created?: number
+          subjects?: string[]
+          subscription_ends_at?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string
+          trial_allowance_override?: number | null
+          trial_resources_used?: number
+          updated_at?: string
+        }
+        Update: {
+          clerk_user_id?: string
+          country_code?: string
+          created_at?: string
+          curriculum_types?: string[]
+          email?: string
+          full_name?: string
+          grade_levels?: string[]
+          id?: string
+          phone_e164?: string | null
+          plan_code?: string
+          resources_created?: number
+          subjects?: string[]
+          subscription_ends_at?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string
+          trial_allowance_override?: number | null
+          trial_resources_used?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       student_custom_values: {
         Row: {
           created_at: string
@@ -2570,6 +2633,93 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "school_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teaching_resources: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string
+          curriculum_type: string
+          duration_minutes: number | null
+          generation_params: Json
+          generator_name: string
+          generator_version: string
+          grade_level: string
+          id: string
+          is_deleted: boolean
+          is_shared: boolean
+          knowledge_sources: Json | null
+          lesson_type: string | null
+          resource_kind: string
+          school_id: string | null
+          subject: string
+          teacher_notes: string | null
+          title: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          content: Json
+          created_at?: string
+          created_by: string
+          curriculum_type: string
+          duration_minutes?: number | null
+          generation_params?: Json
+          generator_name: string
+          generator_version: string
+          grade_level: string
+          id?: string
+          is_deleted?: boolean
+          is_shared?: boolean
+          knowledge_sources?: Json | null
+          lesson_type?: string | null
+          resource_kind: string
+          school_id?: string | null
+          subject: string
+          teacher_notes?: string | null
+          title: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string
+          curriculum_type?: string
+          duration_minutes?: number | null
+          generation_params?: Json
+          generator_name?: string
+          generator_version?: string
+          grade_level?: string
+          id?: string
+          is_deleted?: boolean
+          is_shared?: boolean
+          knowledge_sources?: Json | null
+          lesson_type?: string | null
+          resource_kind?: string
+          school_id?: string | null
+          subject?: string
+          teacher_notes?: string | null
+          title?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teaching_resources_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "teaching_resources_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -3119,6 +3269,25 @@ export type Database = {
           out_reason: string
         }[]
       }
+      create_teaching_resource: {
+        Args: {
+          p_content: Json
+          p_curriculum_type: string
+          p_duration_minutes?: number
+          p_generation_params?: Json
+          p_generator_name: string
+          p_generator_version: string
+          p_grade_level: string
+          p_knowledge_sources?: Json
+          p_lesson_type?: string
+          p_resource_kind: string
+          p_school_id?: string
+          p_subject: string
+          p_title: string
+          p_topic: string
+        }
+        Returns: string
+      }
       current_grading_scale_version: {
         Args: { p_scale_id: string }
         Returns: string
@@ -3247,6 +3416,14 @@ export type Database = {
           out_school_code: string
           out_school_name: string
           out_school_uuid: string
+        }[]
+      }
+      my_teacher_hub: {
+        Args: never
+        Returns: {
+          account: Json
+          entitlement: Json
+          plans: Json
         }[]
       }
       network_billing_summary: {
@@ -3540,6 +3717,28 @@ export type Database = {
           outstanding: number
           suggested: number
           term_number: number
+        }[]
+      }
+      teacher_hub_activate_subscription: {
+        Args: {
+          p_clerk_user_id: string
+          p_paid_until?: string
+          p_plan_code: string
+        }
+        Returns: string
+      }
+      teacher_hub_cancel_subscription: { Args: never; Returns: string }
+      teacher_hub_entitlement: {
+        Args: { p_clerk_user_id?: string }
+        Returns: {
+          allowance: number
+          may_generate: boolean
+          plan_code: string
+          reason: string
+          remaining: number
+          subscription_ends_at: string
+          subscription_status: string
+          used: number
         }[]
       }
       teacher_reaches_class: { Args: { p_class_id: string }; Returns: boolean }

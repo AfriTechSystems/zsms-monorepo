@@ -154,6 +154,14 @@ RAILWAY_DATABASE_URL=postgresql://...
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
+# Which teaching-resource generator the Teacher Hub uses. Unset or `template` gives the
+# deterministic scaffold, which is the only provider that exists today.
+#
+# `resolveGenerator()` reads THIS and deliberately ignores ANTHROPIC_API_KEY: a key
+# appearing in an environment is not the same as a curriculum knowledge base having been
+# ingested and a prompt reviewed, and a generator that switches itself on when a variable
+# appears is how an untested path reaches a paying teacher.
+AI_GENERATOR=template
 # Used for AI assistant (System 2) and lesson plan generation (System 3)
 OPENAI_API_KEY=sk-...
 # Used for text-embedding-3-small in the lesson planner RAG pipeline

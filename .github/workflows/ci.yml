@@ -12,11 +12,16 @@
 #
 # ## The database job tests something never tested before
 #
-# Every one of the 81 migrations has only ever been applied INCREMENTALLY to
-# `zsms-dev`. Nobody has ever run the full sequence against an empty database. A
+# Every one of the 82 migrations had only ever been applied INCREMENTALLY to
+# `zsms-dev`. Nobody had ever run the full sequence against an empty database. A
 # migration that depends on something a later migration creates, or on data that only
 # exists on dev, would have gone unnoticed indefinitely — `supabase db reset` here is
 # the first time that is checked, on every push.
+#
+# **It earned its cost on the first complete run**, finding three defects nothing on a
+# developer machine could: a NOT NULL column added in `0114` that broke every existing
+# writer of `announcements` INCLUDING a live API route, and two DELETE grants that
+# violated invariants two older suites already asserted. See `0129`.
 #
 # ## What this deliberately does NOT do
 #
@@ -117,7 +122,7 @@ jobs:
         run: npx supabase start
 
       - name: Apply every migration to an empty database
-        # THE CHECK NOBODY HAS RUN. `db reset` drops and replays 0001 → 0128 in order.
+        # `db reset` drops and replays 0001 → 0129 in order.
         # A migration that silently depended on dev's existing data, or on another
         # migration applied out of order, fails here and only here.
         run: npx supabase db reset

@@ -4,6 +4,186 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-09-27 — The Teacher Hub: the first owner-scoped tables, and a product whose core is honestly absent
+
+Branch `feature/phase-4-design-foundation`. Migration `0130`, `packages/ai`, five API routes, five screens, and
+`teacher_hub_test.sql` — **23 assertions, all passing**, taking the suite total to **22 suites / 531 assertions**.
+`npm run ci:checks` is green end to end. This was the last unbuilt product surface.
+
+### Every existing policy denies for this user, and that is the foundation rather than a problem
+
+All 32 `public` tables built so far are school-scoped: they carry `school_id` and their policies filter through
+`current_school_uuid()`, which reads the Clerk organisation claim. **75 of the 150 policies depend on that one
+function.** A standalone `platform:teacher` has no organisation at all, so `current_school_uuid()` is NULL for them and
+every one of those policies fails to match.
+
+That is exactly the property the product needs — no school data can leak into the Hub by construction — but it
+also means none of the established tenancy machinery applies. These three tables filter on `public.get_user_id()`, the
+Clerk `sub` claim, and **the unit of isolation is a person, not a school.** The suite asserts the NULL case directly
+(`a standalone teacher reads no pupils`) rather than assuming it, because it is the whole basis of the design.
+
+The consequence that inverts every other table here:
+
+> **A school cannot read its own teacher's lesson plans.**
+
+`teaching_resources.school_id` is *provenance only* — where a resource was made — and deliberately not an access
+path. Business rule 2 says plans belong to the teacher and survive their leaving a school, which is only true if the
+school never had access in the first place. The headline assertion is that the **principal of the school a plan was
+created at reads none of it**. On any other table that principal sees everything carrying their `school_id`.
+
+### The documented DDL contradicted the documented business rules, twice
+
+Found by implementing against it, which is the only way this ever gets found:
+
+- **`standalone_teacher_accounts.linked_school_id` was a single UUID**, while business rule 4 in the *same document*
+  says a teacher may be linked to several schools. One column cannot hold two schools. `my_schools()` (`0117`) already
+  answers "which schools is this user in", self-scoped on `get_user_id()`, for any number of them — so the column is
+  **omitted rather than faked**, the same call `0124` made about the module-subscription step. A second source of truth
+  that can disagree with Clerk is worse than none.
+- **`trial_plans_limit INT DEFAULT 5`** put a product decision in a column default, and K300/K3,000 lived in prose.
+  Prohibition: never hardcode a price or a limit. `afritech.teacher_hub_plans` holds all three — and the trial *is* a
+  plan, priced zero with a lifetime cap, which is what it actually is. The allowance resolves **account override →
+  plan**, the same order and the same NULL-means-unlimited convention as `school_student_limit()`.
+
+Also: the doc specifies a `lesson_plans` table and three generators. Lesson plans, quizzes and homework take the same
+inputs and produce the same shape, so three tables would triple the policy surface for no behavioural difference, and one
+table called `lesson_plans` holding quizzes is a name that lies. One `teaching_resources` with `resource_kind`; nine docs
+updated rather than left describing something that does not exist.
+
+`0058` and `0060` were the planned numbers for these tables. **Both are in the void range**, so they could never have
+applied.
+
+### Column-level grants, which is the whole defence of the meter
+
+`trial_resources_used` decides whether a teacher gets the product free. A plain `GRANT UPDATE` on their own row —
+which is what every other self-service table here has — would let them set it back to zero and take the trial
+forever.
+
+So the grants are **column-level**: the teacher may write `full_name`, `phone_e164`, `country_code`, `curriculum_types`,
+`subjects` and `grade_levels`, and holds no privilege at all on `subscription_status`, `plan_code`, or either counter.
+The same for INSERT, so self-registration cannot supply a status. It is a rarely-reached-for Postgres feature and it is
+exactly the right tool: the restriction is precise rather than blanket, and `has_column_privilege` makes it assertable.
+
+Three more things the suite pins, each a way the product could have been given away:
+
+- **The check and the increment are in one row lock.** `create_teaching_resource()` re-resolves entitlement *inside*
+  `SELECT … FOR UPDATE` and increments in the same statement. Checking first and then inserting leaves a gap where two
+  simultaneous requests both see four-of-five used and both proceed. The cost is that a teacher who double-submits their
+  last resource has one generation discarded after the fact — the right way round.
+- **Nobody activates their own subscription.** Payment is manual, so a teacher-callable activation would make the paid
+  product free to anyone who found the endpoint. `teacher_hub_activate_subscription()` raises `42501` for anybody who is
+  not AfriTech, and the account screen shows payment instructions rather than a button that cannot take money.
+- **Five free resources, ever.** Subscribing does not reset the counter, so subscribe-then-cancel is not an infinite
+  supply. Asserted explicitly, because the natural implementation of "activate a subscription" resets the trial.
+
+### The part that is honestly missing
+
+The Hub's documented core is AI lesson planning using RAG over a Zambian curriculum knowledge base. **Neither half
+exists.** No Anthropic SDK, no `ANTHROPIC_API_KEY`, and no syllabus content has ever been ingested —
+`supabase/functions/` is still empty and there is no `knowledge_base` table. Neither gap closes by writing more
+TypeScript.
+
+So this took the Phase 3 communications decision: build the whole flow against a provider seam with a working stand-in,
+so entitlement metering, saving, the library and print are all real and exercised, and the model is one adapter.
+`packages/ai` is that seam, and nothing outside it imports a model SDK — ADR-032's rule applied to a third
+dependency, after Clerk and BullMQ.
+
+Two choices worth recording:
+
+- **It does not pretend.** `modelGenerated: false` travels with every result, every row stores
+  `generator_name`/`generator_version`, and the screens say in words that this is a structured plan rather than an
+  AI-written one. A teacher paying K300 for AI lesson planning and handed an unlabelled template has been misled, which
+  is worse than an empty state. The label disappears on its own when `isModelBacked()` becomes true.
+- **`resolveGenerator()` reads `AI_GENERATOR` and deliberately ignores `ANTHROPIC_API_KEY`.** A key appearing in an
+  environment is not the same as a knowledge base being ingested and a prompt being reviewed. A generator that switches
+  itself on when a variable appears is how an untested path reaches a paying teacher.
+
+The scaffold does real work rather than emitting filler: `distribute()` splits the lesson duration across phase weights
+so the parts are whole minutes **summing to exactly the requested length**. Rounding each weight independently does not
+— four phases of a 40-minute lesson easily come to 39 or 41 — and a plan whose phases do not add up to its own
+duration is the first thing a head of department notices.
+
+### Two small things worth not relearning
+
+- **`.js` extensions in relative imports type-check and then fail the build.** `tsc` resolves
+  `./providers/template.js` to the `.ts` file; webpack does not, and the error surfaces as `Module not found` pointing at
+  a route rather than at the package. Every sibling package omits the extension. Matched them.
+- **`noUncheckedIndexedAccess` makes a `Record<string, T>` lookup `T | undefined` — including the fallback.**
+  `PHASE_WEIGHTS[type] ?? PHASE_WEIGHTS.core` does not help, because `.core` is also widened. `as const satisfies
+  Record<LessonType, …>` makes the lookup total and needs no guard.
+
+### What the Hub deliberately does not have
+
+Community Library, PDF/Word export, and an invitation-code box. The first is Phase 3 in its own spec, and there is
+**no broad SELECT policy on `teaching_resources`** by design: admitting `is_shared = TRUE` rows to other teachers would
+expose `created_by`, when the documented design says a shared plan shows a first name and a subject and never an
+identity. When it is built it gets a SECURITY DEFINER function returning the non-identifying columns. Export is browser
+print; wiring `packages/documents` is a job of its own. And there is no code to redeem — ZSMS invites staff
+server-side through the Backend API — so the dashboard says to ask the school to invite you rather than offering a
+box that cannot work.
+
+---
+
+## 2026-09-27 — CI exists, and its first complete run found three defects including a live broken route
+
+Branch `feature/phase-4-design-foundation`, pushed to `integration`. **Both CI jobs green** (run `36305510617`): `Types, lint, build` 2m58s, `Migrations and RLS suites` 4m31s. This closes Layer 7, which `THIRTEEN_LAYER_COMPLIANCE.md` has listed as **Thin** since the repository was created.
+
+### `supabase db reset` ran the whole sequence against an empty database for the first time
+
+All 82 migrations had only ever been applied *incrementally* to `zsms-dev`. The full replay from nothing had never once been done, which meant a migration silently depending on dev's existing data would have been discovered during the staging cutover — the worst possible place. It replayed clean. That is the single most useful thing CI has told us, and it de-risks staging directly.
+
+### What it found, and why the shape of all three is the same mistake
+
+**1. `0114` had broken `/api/announcements`, in live application code, since the day it was applied.** It added `target_audience` and `target_scope` as NOT NULL with no default, and derived `target_type` *from* them. Every caller that inserted `target_type` — the only way to do it before — now failed a not-null violation. Two pgTAP suites written before `0114` failed and told me; the route had no test and would have failed for a user.
+
+The fix in `0129` makes the derivation **bidirectional** rather than editing the callers. Editing the two suites to supply the new columns would have turned CI green and left the route broken — the tests were right and the schema change was wrong, and it would have been very easy to conclude the reverse, because the tests were what was visibly failing.
+
+**2 and 3. Two DELETE grants against invariants this repository already asserts.** `tenant_isolation_test` asserts no DELETE exists anywhere in `public` for end-user roles; `communications_test` asserts the same for `afritech` configuration. I granted DELETE in `0110` (`student_custom_values`) and again in `0128` (`tier_student_price_bands`). Both operations are legitimate; both are now named `SECURITY DEFINER` functions instead.
+
+**The common root cause, stated plainly: reasoning about one migration in isolation without re-running the suites that already covered the ground it touched.** `npm run db:test:plans` counts `plan(N)` against the assertion count *without executing anything*, so a suite that errors on its first line still passes the plan check. Only a real database running every suite finds this class of problem, and this machine has no Docker. **Push before assuming a migration is safe** is now the rule, and it is written into CLAUDE.md.
+
+### `npm run lint` had never linted anything
+
+The script was `next lint` with no config present, which **prompts interactively** for one. Under turbo that surfaced as an opaque non-zero exit, and in CI it would have hung on a question nobody could answer. A lint script that has never run is worse than none, because it implies coverage that does not exist.
+
+`eslint-config-next` could not be used: npm hoists it to the repository root while `next` stays in `apps/web/node_modules`, so it cannot resolve its own parser. The plugins are wired directly in `apps/web/eslint.config.mjs`, with rules chosen rather than defaulted — the bar for `error` is *would a human reviewer stop a pull request over it*. It immediately found nine dead imports.
+
+### The first run failed on something that looked nothing like its cause
+
+A malformed Clerk publishable key. `pk_test_placeholder` is not base64-decodable, and Clerk parses its domain out of the key while *compiling the middleware*, so the build failed with no mention of Clerk in the error. It passes locally only because `.env.local` holds a real key. Ruled out first, in order: a dirty tree, a gitignored file, import casing across all 632 relative imports (Linux is case-sensitive, Windows is not), and a missing `globalEnv` in `turbo.json`. The fix was a syntactically valid placeholder.
+
+Also removed: `-x` service exclusions I had invented for `supabase start`. The service names are version-specific and one wrong name fails `start` outright.
+
+### Reading CI without guessing
+
+`gh` is installed and authenticated as `afritech-systems`, but not on PATH in a Git Bash session — it is at `"/c/Program Files/GitHub CLI/gh.exe"`. Before that, every annotation had to be pasted by hand and diagnosed by inference, which is how the Clerk key took three rounds.
+
+### Carried forward
+
+`integration` now holds ~61 commits that have never been through `main`, all of them green. That wants a single pull request so `main` is gated as a unit — a release decision, not an engineering one.
+
+---
+
+## 2026-09-26 — Phase 4 completion: results, custom fields, announcements, parent portal, networks, billing
+
+Branch `feature/phase-4-design-foundation`. Migrations `0106`–`0128`, ten new pgTAP suites (**21 suites, 508 assertions**), and the portals that were missing. Recorded compactly here because CI's arrival is the more consequential event of the two sessions; each migration header carries the full reasoning.
+
+**ADR-041 closed — `0106`–`0108`.** A grade letter was stored without the scale that produced it, so a mid-year scale revision made every historical grade unexplainable. `exam_results` now carries `grading_scale_version_id`; `revise_grading_scale()` creates a new version rather than editing bands in place, and two AFTER triggers freeze a version once it has been used. The guard is phrased as *"must agree with the current version"* rather than as a flag, because `ALTER TABLE ... DISABLE TRIGGER` needs table ownership and a flag would have been bypassable. `0106` backfilled existing scales and left **new** ones versionless — found by probing rather than by reasoning, fixed in `0107`.
+
+**One real bug, fixed in `0109`.** The teacher-scope check compared academic years wrongly, so *nobody could enter marks at all*. Both `teacher_reaches_class()` and `teacher_teaches_subject()` were affected.
+
+**Configurable pupil fields with bulk import — `0110`–`0112`.** `school_custom_fields` + `student_custom_values`, with `sensitivity` driving RLS so a medical note stays with the owner and principal. `import_students()` is atomic. `next_student_sequence()` uses **MAX, not COUNT**: I had claimed the old code reused identifiers after a soft delete and **I was wrong** — there is no `is_deleted` filter — but the real defect was worse, a permanent collision once numbering has any gap at all.
+
+**Announcement audience — `0113`–`0116`.** Split into `target_audience` × `target_scope` with `target_type` as a trigger-derived mirror, so individual recipients work regardless of role and grade→class filters cascade. This is the change that broke a live route; see the `0129` entry above.
+
+**School Networks — `0119`–`0123`.** Named by the user, deliberately not "groups". Schools attach one at a time; permissions are **rows in `school_network_roles`, not code**. `network_school_summary()` does five grouped scans regardless of network size, built for the stated 100-school case. Two lessons: `is_afritech_admin()` returned **NULL, not FALSE**, so my attach guard silently skipped for network members — unexploitable only by accident, and caught only because the assertion pinned `42501` and saw `P0002`. And the two-gate trap, hit twice (`0122`, `0128`): a `SECURITY INVOKER` function or a `security_invoker` view runs as the caller and needs *table privileges as well as* a policy.
+
+**Per-student pricing and invoicing — `0124`–`0128`.** Priced per pupil at an admin-set rate via `afritech.tier_student_price_bands`, with an overlap-rejection trigger. Each school is invoiced separately, with a consolidated network view. `school_subscription_charge()` returns **NULL and a reason** rather than zero, because zero is a real price and "unknown" must not look like "free". Invoices freeze tier, count, unit price and tax rate — the same *a derived value must carry its basis* rule as ADR-041. `0125` dropped the hardcoded `tier_name` CHECKs for a foreign key: tiers are data. Manual payment recording per the user's decision, with gateway idempotency already in place (`idx_invoice_payments_gateway_ref`).
+
+**Also:** the parent portal across multiple schools and children (`0117`, `0118`); and `route.ts` may only export handlers — an illegal `resolveFeeCaller` export **built successfully**, and only `tsc` against the generated `.next/types` caught it. It now lives in `lib/fee-context.ts`.
+
+---
+
 ## 2026-08-23 — All seven suites run; three defects in the tests themselves
 
 Branch `feature/phase-4-design-foundation`. **307 assertions, all passing.** Docker is still not installed, so each suite was mechanically rewritten to collect its TAP lines into a temp table and run through the MCP as a single transaction. Three real defects surfaced — none of them regressions from `0103` or `0105`, and all three in the test apparatus rather than the product.

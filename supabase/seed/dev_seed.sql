@@ -330,24 +330,115 @@ CROSS JOIN generate_series(CURRENT_DATE - 12, CURRENT_DATE - 1, INTERVAL '1 day'
 WHERE extract(isodow FROM d) < 6
 ON CONFLICT DO NOTHING;
 
+-- ---------------------------------------------------------------------------
+-- Grading scales and subjects — so marks have something that explains them
+--
+-- The seed used to write `exam_results` with a hardcoded CASE computing the
+-- grade letter, and no grading scale anywhere in the fixture. Two consequences,
+-- both found after ADR-041 was closed:
+--
+--   * every seeded grade was UNEXPLAINABLE — `grading_scale_version_id` was
+--     NULL for all 95 rows, which is exactly the defect ADR-041 exists to
+--     prevent, sitting in the fixture used to demonstrate the product;
+--   * the CASE was a second implementation of a grade boundary, disagreeing with
+--     the school's own scale by construction, because there was no scale.
+--
+-- Now the scale is real, the subject points at it, and the letters below come
+-- from `grade_from_scale_version()` — the same function the marks screen uses.
+-- A fixture that does not exercise the write path it is meant to represent is a
+-- fixture that hides bugs.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO public.school_grading_scales
+  (school_id, scale_name, scale_type, grade_bands, pass_mark, credit_mark, applies_to_levels)
+SELECT s.id, 'ECZ Traditional', 'letter',
+       '[{"letter":"A","min":75,"max":100,"points":1,"descriptor":"Distinction"},
+         {"letter":"B","min":65,"max":74.99,"points":2,"descriptor":"Merit"},
+         {"letter":"C","min":50,"max":64.99,"points":3,"descriptor":"Credit"},
+         {"letter":"D","min":40,"max":49.99,"points":7,"descriptor":"Pass"},
+         {"letter":"F","min":0,"max":39.99,"points":9,"descriptor":"Fail"}]'::JSONB,
+       40, 50, ARRAY['primary','secondary']
+FROM public.schools s
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.school_grading_scales g
+  WHERE g.school_id = s.id AND g.scale_name = 'ECZ Traditional'
+);
+
+-- Version 1 is created automatically by the trigger in migration 0107, so the
+-- seed does not write it — and if that trigger regressed, the marks below would
+-- come back ungraded, which is a useful thing for a fixture to notice.
+
+INSERT INTO public.school_subjects
+  (school_id, subject_code, subject_name, level_type, is_core, grading_scale_id)
+SELECT s.id, v.code, v.name, 'secondary', v.core,
+       (SELECT g.id FROM public.school_grading_scales g
+         WHERE g.school_id = s.id AND g.scale_name = 'ECZ Traditional')
+FROM public.schools s
+CROSS JOIN (VALUES
+  ('MATH', 'Mathematics', TRUE),
+  ('ENG',  'English',     TRUE),
+  ('SCI',  'Science',     TRUE),
+  ('CIVIC','Civic Education', FALSE)
+) AS v(code, name, core)
+ON CONFLICT (school_id, subject_code, level_type) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- Exam results — graded by the school's own scale, with the version recorded
+-- ---------------------------------------------------------------------------
+
 INSERT INTO public.exam_results
   (school_id, student_id, class_id, academic_year, term_number, subject_code, subject_name,
-   marks_obtained, marks_total, grade_letter, entered_by_user_id, results_published, published_at)
+   marks_obtained, marks_total, grade_letter, grade_points, grading_scale_version_id,
+   entered_by_user_id, results_published, published_at)
 SELECT st.school_id, st.id, st.class_id, '2026', 1, 'MATH', 'Mathematics',
-       40 + (st.rn * 7) % 55, 100,
-       CASE WHEN 40 + (st.rn * 7) % 55 >= 75 THEN 'A'
-            WHEN 40 + (st.rn * 7) % 55 >= 65 THEN 'B'
-            WHEN 40 + (st.rn * 7) % 55 >= 50 THEN 'C'
-            ELSE 'D' END,
-       -- `exam_results_published_has_timestamp` requires published_at whenever
-       -- results_published is true. Publication is an event, not a flag.
+       st.mark, 100,
+       g.grade_letter, g.grade_points,
+       -- The whole point: the grade and the version that explains it, together.
+       public.current_subject_scale_version(st.school_id, 'MATH'),
        'user_test_staff_a4', TRUE, NOW() - INTERVAL '6 days'
 FROM (
-  SELECT id, school_id, class_id, row_number() OVER (ORDER BY student_id) AS rn
+  SELECT id, school_id, class_id,
+         (40 + (row_number() OVER (ORDER BY student_id) * 7) % 55)::NUMERIC AS mark
   FROM public.students WHERE school_id = 'a0000000-0000-4000-8000-000000000001'
   LIMIT 95
 ) st
+-- LEFT JOIN, not JOIN: if a school somehow has no scale the marks still seed with
+-- a NULL letter rather than the whole fixture silently losing 95 rows.
+LEFT JOIN LATERAL public.grade_from_scale_version(
+  public.current_subject_scale_version(st.school_id, 'MATH'), st.mark, 100
+) g ON TRUE
 ON CONFLICT DO NOTHING;
+
+-- Re-grade any result this seed created BEFORE grading scales existed.
+--
+-- `ON CONFLICT DO NOTHING` above is what makes the seed re-runnable, and it is
+-- also why the INSERT alone could not fix this: on a database seeded earlier the
+-- 95 rows already exist, so the new grading path never ran and every row kept its
+-- NULL version. The distribution looked correct, because the old hardcoded CASE
+-- happened to use the same boundaries as the scale — which is exactly how an
+-- unexplainable grade hides.
+--
+-- So the seed repairs what it previously wrote. Scoped to rows with no version,
+-- so it is a no-op once healthy, and to seeded schools only.
+-- Scalar subqueries rather than `FROM LATERAL`: a LATERAL in an UPDATE's FROM
+-- clause cannot reference the target table (42P10), which is what the first
+-- attempt at this did.
+UPDATE public.exam_results r
+SET    grade_letter = (
+         SELECT g.grade_letter FROM public.grade_from_scale_version(
+           public.current_subject_scale_version(r.school_id, r.subject_code),
+           r.marks_obtained, r.marks_total) g
+       ),
+       grade_points = (
+         SELECT g.grade_points FROM public.grade_from_scale_version(
+           public.current_subject_scale_version(r.school_id, r.subject_code),
+           r.marks_obtained, r.marks_total) g
+       ),
+       grading_scale_version_id =
+         public.current_subject_scale_version(r.school_id, r.subject_code)
+WHERE  r.grading_scale_version_id IS NULL
+  AND  r.marks_obtained IS NOT NULL
+  AND  public.current_subject_scale_version(r.school_id, r.subject_code) IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- Message dispatches — the second engagement input

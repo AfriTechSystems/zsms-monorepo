@@ -123,11 +123,44 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (input.enrolmentDate !== undefined) row['enrolment_date'] = input.enrolmentDate
     if (input.photoUrl !== undefined) row['photo_url'] = input.photoUrl
 
-    const { data, error } = await client
-      .from('students')
-      .insert(row)
-      .select('id, student_id, school_id, first_name, last_name, grade_id, class_id, status, created_at')
-      .maybeSingle()
+    /**
+     * Insert, retrying once per attempt on an identifier collision.
+     *
+     * `nextStudentId()` reads the highest sequence and adds one, which two
+     * simultaneous enrolments can do at the same moment. The UNIQUE constraint on
+     * `student_id` refuses the loser — correctly, no duplicate is created — but
+     * without this loop the registrar sees a conflict for an enrolment that would
+     * succeed if simply tried again a moment later.
+     *
+     * Three attempts, not unbounded: a collision that survives three fresh reads
+     * of MAX is not contention, it is something structurally wrong, and looping on
+     * it would hide the real fault behind a hung request. STUDENT_ID.md's per-school
+     * sequence in an Edge Function removes the race outright; this makes the
+     * present implementation behave well in the meantime.
+     */
+    let data: Record<string, unknown> | null = null
+    let error: { code?: string; message: string } | null = null
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) {
+        // Re-read the sequence. Retrying with the same taken number would fail
+        // identically three times.
+        row['student_id'] = await nextStudentId(client, school)
+      }
+
+      const res = await client
+        .from('students')
+        .insert(row)
+        .select('id, student_id, school_id, first_name, last_name, grade_id, class_id, status, created_at')
+        .maybeSingle()
+
+      data = (res.data as Record<string, unknown> | null) ?? null
+      error = res.error
+
+      // 23505 — unique_violation on student_id. The only error worth retrying:
+      // a full roll (ZS001) or a permission failure will not change on a retry.
+      if (!error || error.code !== '23505') break
+    }
 
     if (error) return fromPostgrestError(error)
     if (!data) {

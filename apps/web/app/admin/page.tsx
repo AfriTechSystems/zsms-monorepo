@@ -26,7 +26,6 @@ import {
 } from 'lucide-react'
 
 import { useApi } from '../../lib/use-api'
-import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/empty-state'

@@ -1,0 +1,129 @@
+# CI for the ZSMS monorepo.
+#
+# `THIRTEEN_LAYER_COMPLIANCE.md` has listed Layer 7 as **Thin** since the repository
+# was created, with the note "no CI exists, so no test blocks a merge". This is that
+# gap closed.
+#
+# ## Two jobs, split by whether they need Docker
+#
+# `checks` is fast and needs nothing but Node, so it fails in about two minutes on the
+# common mistakes. `database` starts a real Postgres and is the slower, more valuable
+# half — see below.
+#
+# ## The database job tests something never tested before
+#
+# Every one of the 81 migrations has only ever been applied INCREMENTALLY to
+# `zsms-dev`. Nobody has ever run the full sequence against an empty database. A
+# migration that depends on something a later migration creates, or on data that only
+# exists on dev, would have gone unnoticed indefinitely — `supabase db reset` here is
+# the first time that is checked, on every push.
+#
+# ## What this deliberately does NOT do
+#
+# It does not touch `zsms-dev`, staging or production. No Supabase access token is
+# used and none is needed: the database job runs an entirely local Postgres in the
+# runner. Prohibition 10 — a migration reaching production requires explicit human
+# approval — is untouched by anything here.
+
+name: CI
+
+on:
+  push:
+    branches: [main, integration]
+  pull_request:
+    branches: [main, integration]
+
+# A second push to the same branch makes the first run's answer irrelevant. Cancel it
+# rather than paying for both and reading the stale one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Types, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # `.nvmrc` is the single source of the Node version, so CI and a developer
+          # machine cannot drift apart.
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci` not `install`: it installs exactly the lockfile and fails if
+      # package.json and the lock have diverged, which is itself worth catching.
+      - run: npm ci
+
+      # Cheapest checks first, so an obvious mistake fails in seconds rather than
+      # after a four-minute build.
+      - name: Migration sequence
+        run: npm run db:check:migrations
+
+      - name: pgTAP plan counts
+        # Every `plan(N)` must match the real assertion count in its file. pg_prove
+        # fails a mismatch, and this catches it without needing a database — it has
+        # already caught two in development.
+        run: npm run db:test:plans
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          # The build must not need real credentials. These are syntactically valid
+          # placeholders: a Next build evaluates module-level code, so a missing
+          # variable can fail the build even where no request is made. If a real
+          # secret is ever genuinely required to BUILD, that is a design problem to
+          # fix rather than a secret to add here.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          CLERK_SECRET_KEY: sk_test_placeholder
+
+  database:
+    name: Migrations and RLS suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Start local Supabase
+        # The CLI is a devDependency (never a global), so CI and a developer machine
+        # run the same version. Only the database is needed — skipping the rest saves
+        # several minutes of image pulls per run.
+        run: npx supabase start -x studio,realtime,storage-api,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor
+
+      - name: Apply every migration to an empty database
+        # THE CHECK NOBODY HAS RUN. `db reset` drops and replays 0001 → 0128 in order.
+        # A migration that silently depended on dev's existing data, or on another
+        # migration applied out of order, fails here and only here.
+        run: npx supabase db reset
+
+      - name: RLS and behaviour suites
+        # 21 pgTAP suites, 508 assertions. These are the tests that actually prove
+        # tenant isolation, the fee controls, grading-scale versioning and the network
+        # boundary — the things a type checker cannot see.
+        run: npx supabase test db
+
+      - name: Stop Supabase
+        # `always()` so a failed suite still tears down; a leaked container would make
+        # the next run on a self-hosted runner fail for an unrelated reason.
+        if: always()
+        run: npx supabase stop --no-backup

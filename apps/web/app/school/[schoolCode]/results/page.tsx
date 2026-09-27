@@ -33,7 +33,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
-import { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ClipboardList, Loader2, Lock, Save, Send } from 'lucide-react'
 
@@ -78,7 +78,7 @@ interface Structure {
   subjects: Array<{ code: string; name: string; hasScale: boolean }>
 }
 
-function MarkSheet({ base }: { base: string }): JSX.Element {
+function MarkSheet(): JSX.Element {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
@@ -467,15 +467,10 @@ function MarkSheet({ base }: { base: string }): JSX.Element {
   )
 }
 
-export default function ResultsPage({
-  params,
-}: {
-  params: Promise<{ schoolCode: string }>
-}): JSX.Element {
-  const { schoolCode } = use(params)
+export default function ResultsPage(): JSX.Element {
   return (
     <Suspense fallback={<TableSkeleton rows={8} columns={3} />}>
-      <MarkSheet base={`/school/${schoolCode}`} />
+      <MarkSheet />
     </Suspense>
   )
 }

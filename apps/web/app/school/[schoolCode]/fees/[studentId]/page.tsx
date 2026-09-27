@@ -34,7 +34,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, Receipt, Wallet } from 'lucide-react'
+import { Loader2, Receipt } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'

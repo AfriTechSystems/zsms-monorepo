@@ -30,7 +30,6 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
 import { Loader2, Save, UserMinus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'

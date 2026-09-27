@@ -48,20 +48,28 @@ import {
 export const dynamic = 'force-dynamic'
 
 /**
- * `platform` is excluded deliberately — it is an AfriTech-wide announcement with
- * a NULL `school_id`, and the table's CHECK refuses it from a school context.
- * Offering it here would produce a constraint error for an action a school is
- * never allowed to take.
+ * Audience and scope are independent (migration `0114`), which is what makes
+ * "Grade 7 pupils" expressible — the old flattened `target_type` could only say
+ * "grade", and meant parents by accident of implementation.
+ *
+ * `everyone`/`platform` is excluded: a platform notice has a NULL `school_id` and
+ * the table's CHECK refuses it from a school context, so offering it here would
+ * produce a constraint error for an action a school may never take.
  */
-const TARGETS = ['all_parents', 'all_students', 'all_staff', 'grade', 'class'] as const
+const AUDIENCES = ['parents', 'students', 'staff', 'individuals'] as const
+const SCOPES = ['school', 'grade', 'class', 'individual'] as const
 
 const createSchema = z
   .object({
     title: z.string().trim().min(1).max(160),
     body: z.string().trim().min(1).max(4000),
     importance: z.enum(['regular', 'important']).default('regular'),
-    targetType: z.enum(TARGETS),
-    targetIds: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
+    targetAudience: z.enum(AUDIENCES),
+    targetScope: z.enum(SCOPES),
+    // Grade ids, class ids, or Clerk user ids depending on scope. 500 rather than
+    // 50: an individual send to a whole year group's worth of named people is a
+    // legitimate use, and the old cap was sized for grade ids only.
+    targetIds: z.array(z.string().trim().min(1).max(60)).max(500).optional(),
     // 'draft' saves without sending. 'now' and 'schedule' both hand it to the
     // worker; the only difference is when it becomes claimable.
     action: z.enum(['draft', 'now', 'schedule']),
@@ -71,8 +79,27 @@ const createSchema = z
     message: 'Choose when it should go out.',
     path: ['scheduledAt'],
   })
-  .refine((v) => !['grade', 'class'].includes(v.targetType) || (v.targetIds?.length ?? 0) > 0, {
-    message: 'Choose at least one grade or class.',
+  // Mirrors the table's `announcements_audience_scope_shape` CHECK. Caught here so
+  // the message names the control rather than quoting a constraint.
+  .refine(
+    (v) =>
+      (v.targetAudience === 'individuals') === (v.targetScope === 'individual'),
+    {
+      message: 'Addressing named people is its own audience — choose Individuals.',
+      path: ['targetScope'],
+    },
+  )
+  .refine(
+    (v) =>
+      !['grade', 'class', 'individual'].includes(v.targetScope) ||
+      (v.targetIds?.length ?? 0) > 0,
+    {
+      message: 'Choose at least one grade, class, or person.',
+      path: ['targetIds'],
+    },
+  )
+  .refine((v) => ['grade', 'class', 'individual'].includes(v.targetScope) || (v.targetIds?.length ?? 0) === 0, {
+    message: 'A whole-school notice takes no grades, classes, or people.',
     path: ['targetIds'],
   })
 
@@ -96,8 +123,8 @@ export async function GET(): Promise<Response> {
       client
         .from('announcements')
         .select(
-          'id, title, body, importance, target_type, target_ids, status, ' +
-            'scheduled_at, sent_at, whatsapp_jobs_queued, created_at',
+          'id, title, body, importance, target_audience, target_scope, ' +
+            'target_ids, status, scheduled_at, sent_at, whatsapp_jobs_queued, created_at',
         )
         .order('created_at', { ascending: false })
         .limit(100),
@@ -186,7 +213,11 @@ export async function POST(request: NextRequest): Promise<Response> {
         title: v.title,
         body: v.body,
         importance: v.importance,
-        target_type: v.targetType,
+        // `target_type` is NOT set: a trigger derives it from these two (0114).
+        // Writing it here would create the second source of truth the derived
+        // column exists to avoid.
+        target_audience: v.targetAudience,
+        target_scope: v.targetScope,
         target_ids: v.targetIds ?? [],
         created_by: caller.userId,
         // 'sending' and 'sent' are the worker's to set. An API that wrote 'sent'
@@ -194,7 +225,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         status: v.action === 'draft' ? 'draft' : 'scheduled',
         scheduled_at: scheduledAt,
       })
-      .select('id, title, status, scheduled_at, target_type, created_at')
+      .select('id, title, status, scheduled_at, target_audience, target_scope, created_at')
       .maybeSingle()
 
     if (error) return fromPostgrestError(error)

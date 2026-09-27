@@ -45,6 +45,7 @@ import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { useToast } from '../../../../components/ui/toast'
+import { RecipientPicker } from './recipient-picker'
 import { formatCount, formatDate } from '../school-shared'
 
 interface Announcement {
@@ -52,7 +53,8 @@ interface Announcement {
   title: string
   body: string
   importance: string
-  target_type: string
+  target_audience: string
+  target_scope: string
   target_ids: string[]
   status: string
   scheduled_at: string | null
@@ -74,13 +76,30 @@ interface Structure {
   classesByGrade: Record<string, string[]>
 }
 
-const TARGET_LABEL: Record<string, string> = {
-  all_parents: 'All parents',
-  all_students: 'All pupils',
-  all_staff: 'All staff',
-  grade: 'Chosen grades',
-  class: 'Chosen classes',
-  platform: 'Platform-wide',
+const AUDIENCE_LABEL: Record<string, string> = {
+  parents: 'Parents',
+  students: 'Pupils',
+  staff: 'Staff',
+  individuals: 'Named people',
+  everyone: 'Everyone',
+}
+
+/**
+ * The audience and the scope, read together.
+ *
+ * Rendering the derived `target_type` alone would show "Chosen grades" for both a
+ * pupil notice and a parent notice to the same grade — losing in the list exactly
+ * the distinction the two columns exist to make.
+ */
+function describeTarget(audience: string, scope: string, ids: string[]): string {
+  const who = AUDIENCE_LABEL[audience] ?? audience
+  if (scope === 'individual') {
+    return `${who} — ${ids.length} chosen`
+  }
+  if (scope === 'school') return `${who} — whole school`
+  if (scope === 'grade') return `${who} — ${ids.join(', ')}`
+  if (scope === 'class') return `${who} — ${ids.join(', ')}`
+  return who
 }
 
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
@@ -101,30 +120,43 @@ export default function AnnouncementsPage(): JSX.Element {
   const [title, setTitle] = useState('')
   const [bodyText, setBodyText] = useState('')
   const [importance, setImportance] = useState('regular')
-  const [targetType, setTargetType] = useState('all_parents')
+  const [targetAudience, setTargetAudience] = useState('parents')
+  const [targetScope, setTargetScope] = useState('school')
   const [targetIds, setTargetIds] = useState<string[]>([])
   const [scheduledAt, setScheduledAt] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const classes = useMemo(
-    () => Object.values(structure.data?.classesByGrade ?? {}).flat().sort(),
-    [structure.data],
-  )
   const grades = structure.data?.gradeLevels ?? []
 
-  const needsTargets = targetType === 'grade' || targetType === 'class'
+  const isIndividual = targetAudience === 'individuals'
+  const needsGradeOrClass = !isIndividual && (targetScope === 'grade' || targetScope === 'class')
+
+  // The cascade: choosing a grade narrows the class list to that grade's classes.
+  // Without it a "class" notice offers every class in the school, which at a
+  // combined primary-and-secondary school is a list nobody can scan.
+  const [narrowGrade, setNarrowGrade] = useState('')
+  const classesForScope = useMemo(() => {
+    const byGrade = structure.data?.classesByGrade ?? {}
+    if (narrowGrade) return (byGrade[narrowGrade] ?? []).slice().sort()
+    return Object.values(byGrade).flat().sort()
+  }, [structure.data, narrowGrade])
 
   // How many people this would reach. For a grade or class selection the exact
   // number needs a per-class roll, which this screen does not have — so it says
   // what it knows rather than inventing a figure.
   const reach = useMemo(() => {
     if (!data) return null
-    if (targetType === 'all_parents') return data.audience.all_parents
-    if (targetType === 'all_students') return data.audience.all_students
-    if (targetType === 'all_staff') return data.audience.all_staff
+    if (isIndividual) return targetIds.length
+    // Only for a whole-school send. A grade or class figure needs a per-class roll
+    // this screen does not have, and a guess next to a WhatsApp cost is worse than
+    // no number at all.
+    if (targetScope !== 'school') return null
+    if (targetAudience === 'parents') return data.audience.all_parents
+    if (targetAudience === 'students') return data.audience.all_students
+    if (targetAudience === 'staff') return data.audience.all_staff
     return null
-  }, [data, targetType])
+  }, [data, targetAudience, targetScope, isIndividual, targetIds.length])
 
   const submit = useCallback(
     async (action: 'draft' | 'now' | 'schedule', event?: FormEvent) => {
@@ -136,8 +168,9 @@ export default function AnnouncementsPage(): JSX.Element {
         title,
         body: bodyText,
         importance,
-        targetType,
-        targetIds: needsTargets ? targetIds : undefined,
+        targetAudience,
+        targetScope: isIndividual ? 'individual' : targetScope,
+        targetIds: isIndividual || needsGradeOrClass ? targetIds : undefined,
         action,
         scheduledAt:
           action === 'schedule' && scheduledAt
@@ -171,9 +204,11 @@ export default function AnnouncementsPage(): JSX.Element {
       title,
       bodyText,
       importance,
-      targetType,
+      targetAudience,
+      targetScope,
+      isIndividual,
+      needsGradeOrClass,
       targetIds,
-      needsTargets,
       scheduledAt,
       data?.deliveryConfigured,
       toast,
@@ -242,39 +277,99 @@ export default function AnnouncementsPage(): JSX.Element {
                     )}
                   </Field>
 
-                  <Field id="a-target" label="Who it goes to" required>
+                  <Field id="a-audience" label="Who it goes to" required>
                     {(props) => (
                       <Select
                         {...props}
-                        value={targetType}
+                        value={targetAudience}
                         onChange={(e) => {
-                          setTargetType(e.target.value)
+                          setTargetAudience(e.target.value)
+                          // Audience and scope are independent, but changing the
+                          // audience invalidates any chosen ids — grade ids and
+                          // user ids are not interchangeable.
                           setTargetIds([])
+                          setNarrowGrade('')
+                          if (e.target.value === 'individuals') setTargetScope('individual')
+                          else if (targetScope === 'individual') setTargetScope('school')
                         }}
                       >
-                        {Object.entries(TARGET_LABEL)
-                          .filter(([k]) => k !== 'platform')
-                          .map(([v, l]) => (
-                            <option key={v} value={v}>
-                              {l}
-                            </option>
-                          ))}
+                        <option value="parents">Parents</option>
+                        <option value="students">Pupils</option>
+                        <option value="staff">Staff</option>
+                        <option value="individuals">Named people</option>
                       </Select>
                     )}
                   </Field>
                 </FormGrid>
 
+                {!isIndividual && (
+                  <div className="mt-stack">
+                    <FormGrid columns={3}>
+                      <Field id="a-scope" label="How much of the school" required>
+                        {(props) => (
+                          <Select
+                            {...props}
+                            value={targetScope}
+                            onChange={(e) => {
+                              setTargetScope(e.target.value)
+                              setTargetIds([])
+                              setNarrowGrade('')
+                            }}
+                          >
+                            <option value="school">The whole school</option>
+                            <option value="grade">Chosen grades</option>
+                            <option value="class">Chosen classes</option>
+                          </Select>
+                        )}
+                      </Field>
+
+                      {/* The cascade. Choosing a grade narrows the class list — at
+                          a combined primary-and-secondary school the full list is
+                          not scannable. */}
+                      {targetScope === 'class' && (
+                        <Field
+                          id="a-narrow"
+                          label="Narrow by grade"
+                          hint="Optional. Leave blank to see every class."
+                        >
+                          {(props) => (
+                            <Select
+                              {...props}
+                              value={narrowGrade}
+                              onChange={(e) => {
+                                setNarrowGrade(e.target.value)
+                                setTargetIds([])
+                              }}
+                            >
+                              <option value="">All grades</option>
+                              {grades.map((g) => (
+                                <option key={g.level_id} value={g.level_id}>
+                                  {g.display_name}
+                                </option>
+                              ))}
+                            </Select>
+                          )}
+                        </Field>
+                      )}
+                    </FormGrid>
+                  </div>
+                )}
+
                 {reach !== null && (
                   <p className="mt-stack text-sm text-muted-foreground">
                     This would reach{' '}
                     <strong className="text-foreground">{formatCount(reach)}</strong>{' '}
-                    {targetType === 'all_parents'
-                      ? 'parents'
-                      : targetType === 'all_students'
-                        ? 'pupils'
-                        : 'staff'}
+                    {isIndividual
+                      ? reach === 1
+                        ? 'person'
+                        : 'people'
+                      : targetAudience === 'parents'
+                        ? 'parents'
+                        : targetAudience === 'students'
+                          ? 'pupils'
+                          : 'staff'}
                     .{' '}
-                    {targetType === 'all_parents' && (
+                    {targetAudience === 'parents' && !isIndividual && (
                       <InfoHint label="how parents are counted">
                         A parent with three children is counted once. WhatsApp is charged per
                         message, so this is the number that matters for your plan rather than the
@@ -284,16 +379,23 @@ export default function AnnouncementsPage(): JSX.Element {
                   </p>
                 )}
 
-                {needsTargets && (
+                {isIndividual && (
+                  <div className="mt-stack">
+                    <RecipientPicker selected={targetIds} onChange={setTargetIds} />
+                  </div>
+                )}
+
+                {needsGradeOrClass && (
                   <fieldset className="mt-stack flex flex-col gap-1.5">
                     <legend className="text-sm font-medium text-foreground">
-                      {targetType === 'grade' ? 'Which grades' : 'Which classes'}
+                      {targetScope === 'grade' ? 'Which grades' : 'Which classes'}
                       <span aria-hidden="true" className="text-danger"> *</span>
                     </legend>
                     <div className="flex flex-wrap gap-3 pt-1">
-                      {(targetType === 'grade'
+                      {(targetScope === 'grade'
                         ? grades.map((g) => ({ id: g.level_id, label: g.display_name }))
-                        : classes.map((c) => ({ id: c, label: c }))
+                        : // Narrowed by the chosen grade when one is set.
+                          classesForScope.map((c) => ({ id: c, label: c }))
                       ).map((opt) => {
                         const on = targetIds.includes(opt.id)
                         return (
@@ -430,8 +532,7 @@ export default function AnnouncementsPage(): JSX.Element {
                           </Badge>
                         )}
                         <span className="block text-xs text-muted-foreground">
-                          {TARGET_LABEL[a.target_type] ?? a.target_type}
-                          {a.target_ids.length > 0 && ` — ${a.target_ids.join(', ')}`}
+                          {describeTarget(a.target_audience, a.target_scope, a.target_ids)}
                         </span>
                       </>
                     ),

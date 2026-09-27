@@ -34,6 +34,7 @@ import { ROLE_LABEL } from '../../../lib/roles'
 import { AccountMenu } from '../../../components/ui/account-menu'
 import { ThemeToggle } from '../../../components/ui/theme-toggle'
 import { SchoolNav } from './school-nav'
+import { SchoolSwitcher } from '../../../components/ui/school-switcher'
 
 export const metadata = {
   title: 'School portal · ZSMS',
@@ -107,6 +108,10 @@ export default async function SchoolLayout({
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              {/* Renders nothing for the common case of one school, so a single-
+                  school head teacher never sees a control implying there is
+                  somewhere else to be. */}
+              <SchoolSwitcher />
               <ThemeToggle />
               <AccountMenu />
             </div>

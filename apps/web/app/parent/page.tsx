@@ -30,9 +30,9 @@
  */
 
 import type { JSX } from 'react'
-import { Suspense, useCallback } from 'react'
+import { Suspense } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { CalendarCheck, ClipboardList, Megaphone, Wallet } from 'lucide-react'
 
 import { useApi } from '../../lib/use-api'
@@ -44,12 +44,15 @@ import { EmptyState } from '../../components/ui/empty-state'
 import { ErrorState, StatSkeleton } from '../../components/ui/data-states'
 import { Field, Select } from '../../components/ui/field'
 import { StatCard } from '../../components/ui/stat-card'
+import { ChildPicker } from './parent-shared'
 
 interface Child {
   id: string
   studentId: string
   firstName: string
   lastName: string
+  schoolId: string
+  schoolName: string | null
 }
 
 interface Payload {
@@ -117,22 +120,11 @@ const shortDate = (iso: string | null): string =>
     : '—'
 
 function ParentHome(): JSX.Element {
-  const router = useRouter()
-  const pathname = usePathname()
   const params = useSearchParams()
   const childId = params.get('childId')
 
   const url = childId ? `/api/parent/overview?childId=${childId}` : '/api/parent/overview'
   const { data, loading, error, code, reload } = useApi<Payload>(url)
-
-  const switchChild = useCallback(
-    (id: string) => {
-      const s = new URLSearchParams(params.toString())
-      s.set('childId', id)
-      router.replace(`${pathname}?${s.toString()}`, { scroll: false })
-    },
-    [params, pathname, router],
-  )
 
   if (error) return <ErrorState message={error} code={code} onRetry={reload} />
   if (loading && !data) return <StatSkeleton count={3} />
@@ -171,24 +163,9 @@ function ParentHome(): JSX.Element {
           </p>
         </div>
 
-        {/* Only when there is a choice to make. A select with one option is a
-            control that does nothing, which makes a parent wonder what they are
-            missing. */}
-        {data.children.length > 1 && (
-          <div className="w-full sm:w-56">
-            <Field id="child" label="Child">
-              {(props) => (
-                <Select {...props} value={child.id} onChange={(e) => switchChild(e.target.value)}>
-                  {data.children.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.firstName} {c.lastName}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
-        )}
+        {/* The shared picker: groups by school when the family spans more than
+            one, and renders nothing when there is no choice to make. */}
+        <ChildPicker children={data.children} selectedId={child.id} />
       </div>
 
       <div className="grid grid-cols-1 gap-cards sm:grid-cols-3">

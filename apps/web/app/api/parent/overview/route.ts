@@ -58,7 +58,13 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-    const [balance, attendance, results, announcements, payments, school] = await Promise.all([
+    // School names for every child, not only the selected one. A parent with
+    // Alice at Alpha and Ben at Beta needs both labelled in the picker — and the
+    // parent policies already span schools, so the data is there.
+    const schoolIds = [...new Set(children.map((c) => c.school_id))]
+
+    const [balance, attendance, results, announcements, payments, school, allSchools] =
+      await Promise.all([
       client.from('student_fee_balance').select('*').eq('student_id', child.id).maybeSingle(),
       client
         .from('attendance_records')
@@ -86,6 +92,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         .order('created_at', { ascending: false })
         .limit(10),
       client.from('schools').select('school_id, name').eq('id', child.school_id).maybeSingle(),
+      client.from('schools').select('id, school_id, name').in('id', schoolIds),
     ])
 
     if (balance.error) return fromPostgrestError(balance.error)
@@ -105,12 +112,21 @@ export async function GET(request: NextRequest): Promise<Response> {
     const present = schoolDays.filter((m) => m.status === 'present' || m.status === 'late').length
 
     return ok({
-      children: children.map((c) => ({
-        id: c.id,
-        studentId: c.student_id,
-        firstName: c.first_name,
-        lastName: c.last_name,
-      })),
+      children: children.map((c) => {
+        const s = ((allSchools.data ?? []) as Array<{ id: string; name: string }>).find(
+          (x) => x.id === c.school_id,
+        )
+        return {
+          id: c.id,
+          studentId: c.student_id,
+          firstName: c.first_name,
+          lastName: c.last_name,
+          schoolId: c.school_id,
+          // Used to group the picker. Only shown when a family spans schools —
+          // a single-school parent does not need to be told which school.
+          schoolName: s?.name ?? null,
+        }
+      }),
       selected: {
         id: child.id,
         studentId: child.student_id,

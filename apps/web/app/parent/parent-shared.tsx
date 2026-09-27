@@ -21,6 +21,8 @@ export interface ChildOption {
   id: string
   firstName: string
   lastName: string
+  /** Present when the parent has children at more than one school. */
+  schoolName?: string | null
 }
 
 export const num = (v: unknown): number => {
@@ -74,18 +76,41 @@ export function ChildPicker({
 
   if (children.length <= 1) return null
 
+  // Grouped by school only when the family actually spans schools. A parent with
+  // three children at one school does not need a heading repeating its name three
+  // times — and a parent with children at two schools very much needs to know
+  // which Ben they are looking at.
+  const schools = [...new Set(children.map((c) => c.schoolName).filter(Boolean))] as string[]
+  const spansSchools = schools.length > 1
+
   return (
-    <div className="w-full sm:w-56">
+    <div className="w-full sm:w-64">
       <Field id="child" label="Child">
-        {(props) => (
-          <Select {...props} value={selectedId} onChange={(e) => switchChild(e.target.value)}>
-            {children.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.firstName} {c.lastName}
-              </option>
-            ))}
-          </Select>
-        )}
+        {(props) =>
+          spansSchools ? (
+            <Select {...props} value={selectedId} onChange={(e) => switchChild(e.target.value)}>
+              {schools.map((school) => (
+                <optgroup key={school} label={school}>
+                  {children
+                    .filter((c) => c.schoolName === school)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.firstName} {c.lastName}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </Select>
+          ) : (
+            <Select {...props} value={selectedId} onChange={(e) => switchChild(e.target.value)}>
+              {children.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.firstName} {c.lastName}
+                </option>
+              ))}
+            </Select>
+          )
+        }
       </Field>
     </div>
   )

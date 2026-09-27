@@ -2084,7 +2084,15 @@ export type Database = {
           updated_at?: string
           whatsapp_enabled?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_schools_subscription_tier"
+            columns: ["subscription_tier"]
+            isOneToOne: false
+            referencedRelation: "subscription_tier_catalogue"
+            referencedColumns: ["tier_name"]
+          },
+        ]
       }
       staff_members: {
         Row: {
@@ -3345,6 +3353,18 @@ export type Database = {
           is_unlimited: boolean
           source: string
           student_limit: number
+        }[]
+      }
+      school_subscription_charge: {
+        Args: { p_currency?: string; p_school_id: string }
+        Returns: {
+          out_amount: number
+          out_currency: string
+          out_pricing_model: string
+          out_reason: string
+          out_student_count: number
+          out_tier: string
+          out_unit_price: number
         }[]
       }
       srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }

@@ -49,7 +49,9 @@ const LINKS: readonly NavLink[] = [
   { path: '', label: 'Dashboard', icon: LayoutDashboard, exact: true, needs: null },
   { path: '/students', label: 'Pupils', icon: Users, exact: false, needs: 'students:read' },
   { path: '/staff', label: 'Staff', icon: UserCog, exact: false, needs: 'staff:read' },
-  { path: '/teaching', label: 'Teaching', icon: GraduationCap, exact: false, needs: 'assignments:read' },
+  // A teacher's own view comes first in the list for the role that has only it.
+  { path: '/teaching/my', label: 'My teaching', icon: GraduationCap, exact: false, needs: 'teaching:own' },
+  { path: '/teaching', label: 'Teaching', icon: UserCog, exact: true, needs: 'assignments:read' },
   { path: '/fees', label: 'Fees', icon: Wallet, exact: false, needs: 'fees:read' },
   { path: '/attendance', label: 'Attendance', icon: CalendarCheck, exact: false, needs: 'attendance:read' },
   { path: '/results', label: 'Results', icon: ClipboardList, exact: false, needs: 'results:read' },

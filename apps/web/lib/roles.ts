@@ -78,8 +78,18 @@ export type Capability =
    * is a head's decision, not a marker's.
    */
   | 'results:publish'
-  /** See who teaches what. `management_read_teacher_assignments`. */
+  /** See who teaches what, across the school. `management_read_teacher_assignments`. */
   | 'assignments:read'
+  /**
+   * See one's OWN teaching — classes, today's registers, marks outstanding.
+   *
+   * Distinct from `assignments:read`, which is the management view of everybody's
+   * scope. Granted to anyone who might hold a class, including a head who teaches:
+   * withholding a teaching view from a principal because of their title would be
+   * the product deciding what their job is. `teacher_read_own_teacher_assignments`
+   * scopes the rows either way.
+   */
+  | 'teaching:own'
   /** Assign a teacher to a class or subject. `management_write_teacher_assignments` — owner and principal only. */
   | 'assignments:write'
   /** Compose and send announcements. `management_write_announcements`. */
@@ -109,6 +119,7 @@ const CAPABILITIES: Record<Capability, readonly Role[]> = {
   // capability, so it is not listed here — the teaching screen is a management
   // screen, and a teacher sees their scope on the screens it governs instead.
   'assignments:read': MANAGEMENT,
+  'teaching:own': ['org:owner', 'org:principal', 'org:teacher'],
   'assignments:write': ['org:owner', 'org:principal'],
 
   'announcements:write': MANAGEMENT,

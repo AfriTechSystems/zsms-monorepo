@@ -488,6 +488,37 @@ async function PricingPage() {
 
 ---
 
+## School Network Pricing — Open
+
+A **School Network** (migrations `0119`–`0123`) is one owner running several
+separately-onboarded schools, with a single aggregated dashboard. Some networks are
+expected to reach 100 schools.
+
+**Today every school in a network is priced and counted independently.** Each carries
+its own `subscription_tier`, its own student ceiling and its own WhatsApp quota.
+`school_networks.billing_mode` records the intent — `per_school` (the default, and
+current behaviour) or `consolidated` — and **nothing reads it yet**.
+
+That is not an oversight in the network feature. **ZSMS has no invoicing at all:**
+`afritech.subscription_tiers` is a price list, `schools.subscription_tier` is a
+column, and no code anywhere generates an invoice or collects money from a school.
+There is nothing to consolidate until billing exists.
+
+Two decisions are therefore open, and both are commercial rather than technical:
+
+| Question | Why it matters |
+|---|---|
+| Does a 100-school network pay 100 × tier? | A network is the customer a volume discount exists for. Charging full rate per school is defensible but will be negotiated, and the negotiation will happen whether or not the system supports it. |
+| Is quota pooled or per school? | A 100-school network with per-school WhatsApp quotas has 100 separate allowances it cannot move between schools. Pooling is what an owner will expect; it is also a change to `consume_message_quota()`, which is per-school today. |
+
+**Recommendation when billing is built:** price on the network where `billing_mode`
+is `consolidated`, sum the student ceilings rather than enforcing each school's
+separately, and pool the WhatsApp quota. Whether a discount applies, and how much,
+is a pricing decision this document should record once it is taken — not something
+the schema should imply.
+
+---
+
 ## Change Log
 
 | Date | Change | Reason |

@@ -42,13 +42,13 @@ concurrency:
 jobs:
   checks:
     name: Types, lint, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # `.nvmrc` is the single source of the Node version, so CI and a developer
           # machine cannot drift apart.
@@ -86,18 +86,21 @@ jobs:
           # fix rather than a secret to add here.
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          # Must be a DECODABLE key: Clerk parses the base64 domain out of it and
+          # throws on a malformed one while compiling the middleware. A literal
+          # "placeholder" passes locally only because .env.local holds a real key.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
           CLERK_SECRET_KEY: sk_test_placeholder
 
   database:
     name: Migrations and RLS suites
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -108,13 +111,21 @@ jobs:
         # The CLI is a devDependency (never a global), so CI and a developer machine
         # run the same version. Only the database is needed — skipping the rest saves
         # several minutes of image pulls per run.
-        run: npx supabase start -x studio,realtime,storage-api,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor
+        # No `-x` exclusions: the service names are version-specific and one wrong
+        # name fails `start` outright. A slower start is worth a run that works; trim
+        # it later against `supabase start --help` for the pinned CLI version.
+        run: npx supabase start
 
       - name: Apply every migration to an empty database
         # THE CHECK NOBODY HAS RUN. `db reset` drops and replays 0001 → 0128 in order.
         # A migration that silently depended on dev's existing data, or on another
         # migration applied out of order, fails here and only here.
         run: npx supabase db reset
+
+      - name: Show migration status
+        # So a failed reset is diagnosable from the log rather than needing a rerun.
+        if: always()
+        run: npx supabase migration list --local || true
 
       - name: RLS and behaviour suites
         # 21 pgTAP suites, 508 assertions. These are the tests that actually prove

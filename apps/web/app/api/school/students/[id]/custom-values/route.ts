@@ -188,15 +188,27 @@ export async function PUT(request: NextRequest, context: Ctx): Promise<Response>
     }
 
     if (clears.length > 0) {
-      const del = await client
-        .from('student_custom_values')
-        .delete()
-        .eq('student_id', id)
-        .in('field_id', clears)
-      // A sensitive field the caller may not write is refused by RLS, which
-      // deletes nothing rather than erroring. That is the correct outcome and
-      // needs no special case — the value they could not see is still there.
-      if (del.error) return fromPostgrestError(del.error)
+      /**
+       * Through a named function, not `.delete()`.
+       *
+       * `authenticated` holds no DELETE on this table: a repository-wide invariant —
+       * asserted by `tenant_isolation_test.sql` — is that no end-user role has DELETE
+       * anywhere in `public`. Migration 0110 granted it anyway and CI caught that;
+       * 0129 revoked it and added `clear_student_custom_values()`, which enforces the
+       * same role and sensitivity rules the write policy does.
+       *
+       * A sensitive field the caller may not write is simply not cleared, and the
+       * function reports how many rows it removed rather than failing — the value
+       * they could not see is still there, which is the correct outcome.
+       */
+      const del = await client.rpc('clear_student_custom_values', {
+        p_student_id: id,
+        p_field_ids: clears,
+      })
+      if (del.error) {
+        if (del.error.code === '42501') return fail('FORBIDDEN', del.error.message)
+        return fromPostgrestError(del.error)
+      }
     }
 
     if (upserts.length > 0) {

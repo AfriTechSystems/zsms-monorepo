@@ -3090,6 +3090,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      clear_student_custom_values: {
+        Args: { p_field_ids: string[]; p_student_id: string }
+        Returns: number
+      }
       complete_generated_document: {
         Args: {
           p_byte_size?: number

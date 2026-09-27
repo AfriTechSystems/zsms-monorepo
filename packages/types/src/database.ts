@@ -1799,6 +1799,9 @@ export type Database = {
           id: string
           is_active: boolean
           network_id: string
+          owner_access_granted_at: string | null
+          owner_access_granted_by: string | null
+          owner_access_invited_email: string | null
           school_id: string
         }
         Insert: {
@@ -1809,6 +1812,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           network_id: string
+          owner_access_granted_at?: string | null
+          owner_access_granted_by?: string | null
+          owner_access_invited_email?: string | null
           school_id: string
         }
         Update: {
@@ -1819,6 +1825,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           network_id?: string
+          owner_access_granted_at?: string | null
+          owner_access_granted_by?: string | null
+          owner_access_invited_email?: string | null
           school_id?: string
         }
         Relationships: [
@@ -1847,6 +1856,7 @@ export type Database = {
       }
       school_networks: {
         Row: {
+          billing_mode: string
           created_at: string
           data_scope: string
           id: string
@@ -1857,6 +1867,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_mode?: string
           created_at?: string
           data_scope?: string
           id?: string
@@ -1867,6 +1878,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_mode?: string
           created_at?: string
           data_scope?: string
           id?: string
@@ -2938,6 +2950,9 @@ export type Database = {
           id: string
           is_active: boolean
           network_id: string
+          owner_access_granted_at: string | null
+          owner_access_granted_by: string | null
+          owner_access_invited_email: string | null
           school_id: string
         }
         SetofOptions: {
@@ -3195,6 +3210,28 @@ export type Database = {
           p_variables?: Json
         }
         Returns: string
+      }
+      record_network_school_access: {
+        Args: { p_email: string; p_school_id: string }
+        Returns: {
+          attached_at: string
+          attached_by: string | null
+          created_at: string
+          detached_at: string | null
+          id: string
+          is_active: boolean
+          network_id: string
+          owner_access_granted_at: string | null
+          owner_access_granted_by: string | null
+          owner_access_invited_email: string | null
+          school_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "school_network_schools"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       resolve_notification_template: {
         Args: {

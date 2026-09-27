@@ -15,13 +15,14 @@
 import type { JSX } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, Gauge, HeartPulse, ToggleRight, Wallet } from 'lucide-react'
+import { Building2, Gauge, HeartPulse, ToggleRight, Wallet, Network } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 
 const LINKS = [
   { href: '/admin', label: 'Overview', icon: Gauge, exact: true },
   { href: '/admin/schools', label: 'Schools', icon: Building2, exact: false },
+  { href: '/admin/networks', label: 'Networks', icon: Network, exact: false },
   { href: '/admin/health', label: 'Health', icon: HeartPulse, exact: false },
   { href: '/admin/features', label: 'Features', icon: ToggleRight, exact: false },
   { href: '/admin/pricing', label: 'Pricing', icon: Wallet, exact: false },

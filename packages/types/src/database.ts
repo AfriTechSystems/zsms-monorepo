@@ -1700,6 +1700,184 @@ export type Database = {
           },
         ]
       }
+      school_network_members: {
+        Row: {
+          added_by: string | null
+          clerk_user_id: string
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_active: boolean
+          network_id: string
+          network_role: string
+          updated_at: string
+        }
+        Insert: {
+          added_by?: string | null
+          clerk_user_id: string
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean
+          network_id: string
+          network_role: string
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string | null
+          clerk_user_id?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean
+          network_id?: string
+          network_role?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_network_members_network_id_fkey"
+            columns: ["network_id"]
+            isOneToOne: false
+            referencedRelation: "school_networks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_network_members_network_role_fkey"
+            columns: ["network_role"]
+            isOneToOne: false
+            referencedRelation: "school_network_roles"
+            referencedColumns: ["role_key"]
+          },
+        ]
+      }
+      school_network_roles: {
+        Row: {
+          can_attach_schools: boolean
+          can_manage_members: boolean
+          can_view_financial: boolean
+          can_view_network: boolean
+          created_at: string
+          description: string | null
+          display_order: number
+          label: string
+          role_key: string
+        }
+        Insert: {
+          can_attach_schools?: boolean
+          can_manage_members?: boolean
+          can_view_financial?: boolean
+          can_view_network?: boolean
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          label: string
+          role_key: string
+        }
+        Update: {
+          can_attach_schools?: boolean
+          can_manage_members?: boolean
+          can_view_financial?: boolean
+          can_view_network?: boolean
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          label?: string
+          role_key?: string
+        }
+        Relationships: []
+      }
+      school_network_schools: {
+        Row: {
+          attached_at: string
+          attached_by: string | null
+          created_at: string
+          detached_at: string | null
+          id: string
+          is_active: boolean
+          network_id: string
+          school_id: string
+        }
+        Insert: {
+          attached_at?: string
+          attached_by?: string | null
+          created_at?: string
+          detached_at?: string | null
+          id?: string
+          is_active?: boolean
+          network_id: string
+          school_id: string
+        }
+        Update: {
+          attached_at?: string
+          attached_by?: string | null
+          created_at?: string
+          detached_at?: string | null
+          id?: string
+          is_active?: boolean
+          network_id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_network_schools_network_id_fkey"
+            columns: ["network_id"]
+            isOneToOne: false
+            referencedRelation: "school_networks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_network_schools_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_network_schools_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_networks: {
+        Row: {
+          created_at: string
+          data_scope: string
+          id: string
+          name: string
+          notes: string | null
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_scope?: string
+          id?: string
+          name: string
+          notes?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_scope?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       school_permissions: {
         Row: {
           can_create: boolean
@@ -2750,6 +2928,25 @@ export type Database = {
             }
             Returns: boolean
           }
+      attach_school_to_network: {
+        Args: { p_network_id: string; p_school_id: string }
+        Returns: {
+          attached_at: string
+          attached_by: string | null
+          created_at: string
+          detached_at: string | null
+          id: string
+          is_active: boolean
+          network_id: string
+          school_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "school_network_schools"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       complete_generated_document: {
         Args: {
           p_byte_size?: number
@@ -2786,6 +2983,10 @@ export type Database = {
             Returns: string
           }
         | { Args: { p_subject_code: string }; Returns: string }
+      detach_school_from_network: {
+        Args: { p_school_id: string }
+        Returns: boolean
+      }
       fee_statement: {
         Args: { p_from?: string; p_student_id: string; p_to?: string }
         Returns: {
@@ -2840,6 +3041,85 @@ export type Database = {
       is_own_student_record: {
         Args: { p_student_id: string }
         Returns: boolean
+      }
+      my_children: {
+        Args: never
+        Returns: {
+          out_clerk_org_id: string
+          out_first_name: string
+          out_last_name: string
+          out_school_code: string
+          out_school_name: string
+          out_school_uuid: string
+          out_student_code: string
+          out_student_uuid: string
+        }[]
+      }
+      my_network_access: {
+        Args: never
+        Returns: {
+          out_can_attach: boolean
+          out_can_manage: boolean
+          out_can_see_academic: boolean
+          out_can_see_money: boolean
+          out_data_scope: string
+          out_network_id: string
+          out_network_name: string
+          out_network_slug: string
+          out_role: string
+          out_role_label: string
+        }[]
+      }
+      my_network_id: { Args: never; Returns: string }
+      my_schools: {
+        Args: never
+        Returns: {
+          out_clerk_org_id: string
+          out_relationship: string
+          out_school_code: string
+          out_school_name: string
+          out_school_uuid: string
+        }[]
+      }
+      network_overview: {
+        Args: never
+        Returns: {
+          out_attendance_rate: number
+          out_collection_rate: number
+          out_fees_billed: number
+          out_fees_collected: number
+          out_fees_outstanding: number
+          out_pupils: number
+          out_schools: number
+          out_schools_at_capacity: number
+          out_staff: number
+        }[]
+      }
+      network_reaches_school: {
+        Args: { p_school_id: string }
+        Returns: boolean
+      }
+      network_school_summary: {
+        Args: never
+        Returns: {
+          out_at_capacity: boolean
+          out_attendance_rate: number
+          out_capacity: number
+          out_city_code: string
+          out_clerk_org_id: string
+          out_collection_rate: number
+          out_fees_billed: number
+          out_fees_collected: number
+          out_fees_outstanding: number
+          out_pupils: number
+          out_results_published: number
+          out_school_code: string
+          out_school_name: string
+          out_school_uuid: string
+          out_staff: number
+          out_status: string
+          out_tier: string
+        }[]
       }
       next_student_sequence: { Args: { p_school_id: string }; Returns: number }
       parent_can_access_fee_record: {

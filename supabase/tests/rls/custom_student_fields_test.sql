@@ -35,6 +35,16 @@
 
 BEGIN;
 
+-- pgTAP lives in the `extensions` schema (migration 0001), never in `public`. A
+-- direct connection — which is what `pg_prove` makes, as `postgres` — has a
+-- search_path of `"$user", public`, so `plan()` and `is()` would not resolve and this
+-- suite would fail on its first line. `extra_search_path` in config.toml only covers
+-- PostgREST, not psql or pg_prove.
+--
+-- `public` stays FIRST so every unqualified table name resolves exactly as before;
+-- `extensions` is appended only so the assertion functions are found.
+SET search_path TO public, extensions;
+
 SELECT plan(18);
 
 INSERT INTO public.schools (id, school_id, clerk_org_id, name, type, level, city_code, status) VALUES

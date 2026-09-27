@@ -1213,7 +1213,17 @@ CREATE INDEX idx_doc_templates_school ON public.document_templates(school_id);
 
 ### `public.audit_logs`
 
-Immutable append-only record of every significant action in the system. Written exclusively by Edge Functions using the service role key. No user-facing INSERT policy. No UPDATE or DELETE policy for any user including AfriTech super admin.
+Immutable append-only record of every significant action in the system.
+
+**Implemented in `0131`, and three things differ from the paragraph this one replaced.**
+
+It said audit rows are *"written exclusively by Edge Functions using the service role key"*. There are no Edge Functions in this project, and the acts worth auditing happen inside SQL functions like `verify_payment()`. But the real problem is the word **every**: if auditing depends on each function remembering to call a logger, the first function that forgets is silently unaudited and nobody finds out until an investigation needs the row that was never written. **A trigger cannot forget.** So the record of what *changed* comes from AFTER triggers on the tables themselves — `payments`, `fee_records`, `fee_structures`, `exam_results`, `students`, `staff_members`, `teacher_assignments`, `standalone_teacher_accounts` — which no route, PostgREST call or future function can bypass. `log_audit_event()` records **intent** a trigger cannot infer: a publish, a verification decision, a bulk import, the start of an impersonation session.
+
+It also said *"no UPDATE or DELETE policy for any user"*, which is not sufficient. **`service_role` bypasses RLS entirely**, so every policy on this table is invisible to a worker or Edge Function holding that key. Immutability is therefore a trigger that raises `42501` on UPDATE, DELETE or TRUNCATE **for every caller, including the table owner**. The pgTAP suite asserts each of those refusals.
+
+And an UPDATE records **only the columns that changed**, with `mask_audit_values()` redacting `nrc_or_birth_cert` plus anything matching `%encrypted%`, `%secret%`, `%password%` or `%api_key%` — by pattern, so a column added later following the convention is covered without anyone remembering. The key is kept and only the value replaced: *that the identity number changed* is what an investigation needs; *what it changed to* is what the trail must not hold. A school owner can read this table, so without redaction it would be a second, less-protected copy of the PII it describes.
+
+**Read access is the owner and principal only.** An accountant generates most of the financial rows here and can read none of them — deliberate separation of duties, asserted in the suite: the person who performs a financial act cannot inspect the record of it.
 
 ```sql
 CREATE TABLE public.audit_logs (
@@ -2386,6 +2396,7 @@ CREATE INDEX idx_standalone_teachers_school ON public.standalone_teacher_account
 | 2026-04-26 | Added lesson_plans | Store generated lesson plans for school and standalone teachers |
 | 2026-04-26 | Added ai_conversations | AI assistant conversation history for context continuity |
 | 2026-04-26 | Added standalone_teacher_accounts | B2C lesson planner product — teachers independent of schools |
+| 2026-09-27 | **`0131` applied: `audit_logs` built at last** | Two BUILD_SEQUENCE gates could not pass and payments had no immutable record. Triggers rather than Edge Functions, because a trigger cannot forget; immutability by trigger rather than policy, because `service_role` bypasses RLS; changed-columns-only with pattern-based redaction, so the trail is not a second copy of the PII. |
 | 2026-09-27 | **`0130` applied: `teaching_resources` replaces `lesson_plans`, `standalone_teacher_accounts` built, `afritech.teacher_hub_plans` added** | Three tools share one shape, so one table with `resource_kind`. `linked_school_id` dropped as self-contradictory. Prices and the trial cap became rows. Counters moved behind column-level grants, because the meter must not be writable by the person it meters. |
 | 2026-08-13 | Corrected schema count from two to three (`public` 46, `private` 4, `afritech` 8 = 58 tables) | The document referenced `afritech.` 14 times in its own body while its overview claimed two schemas |
 | 2026-08-13 | Attendance trigger description made queue-provider-neutral | ADR-035 — BullMQ is the default, not QStash |

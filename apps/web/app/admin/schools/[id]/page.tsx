@@ -26,7 +26,6 @@
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useState } from 'react'
 import { use } from 'react'
-import Link from 'next/link'
 import {
   Check,
   KeyRound,

@@ -36,7 +36,6 @@ import { EmptyState } from '../../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
-import { InfoHint } from '../../../../../components/ui/info-hint'
 import { useToast } from '../../../../../components/ui/toast'
 import { formatKwacha, formatLevel } from '../../school-shared'
 

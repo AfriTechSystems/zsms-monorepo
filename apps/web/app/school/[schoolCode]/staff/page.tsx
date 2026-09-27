@@ -26,7 +26,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useState } from 'react'
-import { Loader2, MailPlus, ShieldOff, UserCog, UserPlus, X } from 'lucide-react'
+import { Loader2, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { ROLE_LABEL } from '../../../../lib/roles'

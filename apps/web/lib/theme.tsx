@@ -102,7 +102,7 @@ export function ThemeStyle({ theme }: { theme: ResolvedTheme }): JSX.Element {
   return (
     <style
       id="zsms-theme"
-      // eslint-disable-next-line react/no-danger
+       
       dangerouslySetInnerHTML={{ __html: themeToStyleSheet(theme) }}
     />
   )

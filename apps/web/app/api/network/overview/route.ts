@@ -54,10 +54,14 @@ export async function GET(): Promise<Response> {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
 
-    const [access, schools, totals] = await Promise.all([
+    const [access, schools, totals, billing] = await Promise.all([
       client.rpc('my_network_access'),
       client.rpc('network_school_summary'),
       client.rpc('network_overview'),
+      // The consolidated ZSMS bill. Per the agreed model each school is invoiced
+      // separately and the network merely SUMS them — so this is a read, exactly as
+      // the dashboard aggregates are, and there is no network-level billing logic.
+      client.rpc('network_billing_summary'),
     ])
 
     if (access.error) return fromPostgrestError(access.error)
@@ -105,6 +109,17 @@ export async function GET(): Promise<Response> {
         collectionRate: r['out_collection_rate'],
         attendanceRate: r['out_attendance_rate'],
         resultsPublished: r['out_results_published'],
+      })),
+      // Per school, so an owner can see which one is behind rather than only a total.
+      billing: ((billing.data ?? []) as unknown as Array<Record<string, unknown>>).map((b) => ({
+        schoolId: b['out_school_uuid'],
+        schoolCode: b['out_school_code'],
+        schoolName: b['out_school_name'],
+        invoices: b['out_invoices'],
+        billed: b['out_billed'],
+        paid: b['out_paid'],
+        outstanding: b['out_outstanding'],
+        overdue: b['out_overdue'],
       })),
       totals: t
         ? {

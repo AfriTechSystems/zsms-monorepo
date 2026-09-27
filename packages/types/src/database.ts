@@ -2084,7 +2084,15 @@ export type Database = {
           updated_at?: string
           whatsapp_enabled?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_schools_subscription_tier"
+            columns: ["subscription_tier"]
+            isOneToOne: false
+            referencedRelation: "subscription_tier_catalogue"
+            referencedColumns: ["tier_name"]
+          },
+        ]
       }
       staff_members: {
         Row: {
@@ -2686,6 +2694,123 @@ export type Database = {
           },
         ]
       }
+      invoice_lines: {
+        Row: {
+          amount: number | null
+          description: string | null
+          display_order: number | null
+          feature_key: string | null
+          id: string | null
+          invoice_id: string | null
+          line_type: string | null
+          quantity: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          amount?: number | null
+          description?: string | null
+          display_order?: number | null
+          feature_key?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          line_type?: string | null
+          quantity?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          amount?: number | null
+          description?: string | null
+          display_order?: number | null
+          feature_key?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          line_type?: string | null
+          quantity?: number | null
+          unit_price?: number | null
+        }
+        Relationships: []
+      }
+      invoice_payments: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          currency: string | null
+          gateway_name: string | null
+          gateway_reference: string | null
+          id: string | null
+          invoice_id: string | null
+          method: string | null
+          notes: string | null
+          received_at: string | null
+          recorded_by: string | null
+          reference: string | null
+          status: string | null
+          webhook_verified: boolean | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          gateway_name?: string | null
+          gateway_reference?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          method?: string | null
+          notes?: string | null
+          received_at?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+          status?: string | null
+          webhook_verified?: boolean | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          gateway_name?: string | null
+          gateway_reference?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          method?: string | null
+          notes?: string | null
+          received_at?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+          status?: string | null
+          webhook_verified?: boolean | null
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          amount_paid: number | null
+          created_at: string | null
+          currency: string | null
+          due_at: string | null
+          id: string | null
+          invoice_number: string | null
+          issued_at: string | null
+          notes: string | null
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          pricing_model: string | null
+          school_code: string | null
+          school_id: string | null
+          school_name: string | null
+          status: string | null
+          student_count: number | null
+          subtotal: number | null
+          tax_amount: number | null
+          tax_rate: number | null
+          tier_name: string | null
+          total: number | null
+          unit_price: number | null
+          void_reason: string | null
+          voided_at: string | null
+        }
+        Relationships: []
+      }
       school_capacity: {
         Row: {
           at_capacity: boolean | null
@@ -2793,42 +2918,45 @@ export type Database = {
       }
       subscription_tier_catalogue: {
         Row: {
+          annual_price_usd: number | null
           annual_price_zmw: number | null
           display_name: string | null
           display_order: number | null
           is_publicly_listed: boolean | null
           monthly_price_usd: number | null
           monthly_price_zmw: number | null
+          price_bands: Json | null
+          pricing_model: string | null
           student_limit: number | null
           tier_name: string | null
-          updated_at: string | null
-          updated_by: string | null
           whatsapp_quota: number | null
         }
         Insert: {
+          annual_price_usd?: number | null
           annual_price_zmw?: number | null
           display_name?: string | null
           display_order?: number | null
           is_publicly_listed?: boolean | null
           monthly_price_usd?: number | null
           monthly_price_zmw?: number | null
+          price_bands?: never
+          pricing_model?: string | null
           student_limit?: number | null
           tier_name?: string | null
-          updated_at?: string | null
-          updated_by?: string | null
           whatsapp_quota?: number | null
         }
         Update: {
+          annual_price_usd?: number | null
           annual_price_zmw?: number | null
           display_name?: string | null
           display_order?: number | null
           is_publicly_listed?: boolean | null
           monthly_price_usd?: number | null
           monthly_price_zmw?: number | null
+          price_bands?: never
+          pricing_model?: string | null
           student_limit?: number | null
           tier_name?: string | null
-          updated_at?: string | null
-          updated_by?: string | null
           whatsapp_quota?: number | null
         }
         Relationships: []
@@ -3086,11 +3214,45 @@ export type Database = {
         }[]
       }
       my_network_id: { Args: never; Returns: string }
+      my_school_invoices: {
+        Args: never
+        Returns: {
+          out_amount_paid: number
+          out_currency: string
+          out_due_at: string
+          out_id: string
+          out_invoice_number: string
+          out_issued_at: string
+          out_period_end: string
+          out_period_start: string
+          out_pricing_model: string
+          out_status: string
+          out_student_count: number
+          out_subtotal: number
+          out_tax_amount: number
+          out_tier_name: string
+          out_total: number
+          out_unit_price: number
+        }[]
+      }
       my_schools: {
         Args: never
         Returns: {
           out_clerk_org_id: string
           out_relationship: string
+          out_school_code: string
+          out_school_name: string
+          out_school_uuid: string
+        }[]
+      }
+      network_billing_summary: {
+        Args: never
+        Returns: {
+          out_billed: number
+          out_invoices: number
+          out_outstanding: number
+          out_overdue: number
+          out_paid: number
           out_school_code: string
           out_school_name: string
           out_school_uuid: string
@@ -3345,6 +3507,18 @@ export type Database = {
           is_unlimited: boolean
           source: string
           student_limit: number
+        }[]
+      }
+      school_subscription_charge: {
+        Args: { p_currency?: string; p_school_id: string }
+        Returns: {
+          out_amount: number
+          out_currency: string
+          out_pricing_model: string
+          out_reason: string
+          out_student_count: number
+          out_tier: string
+          out_unit_price: number
         }[]
       }
       srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }

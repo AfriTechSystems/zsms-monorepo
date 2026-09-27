@@ -36,7 +36,7 @@ import { Building2, TrendingDown, Users, Wallet } from 'lucide-react'
 import { useApi } from '../../lib/use-api'
 import { Alert } from '../../components/ui/alert'
 import { Badge } from '../../components/ui/badge'
-import { Card, CardContent } from '../../components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { DataTable } from '../../components/ui/data-table'
 import { EmptyState } from '../../components/ui/empty-state'
 import { ErrorState, StatSkeleton } from '../../components/ui/data-states'
@@ -62,6 +62,17 @@ interface NetworkSchool {
   resultsPublished: number
 }
 
+interface NetworkBillingRow {
+  schoolId: string
+  schoolCode: string
+  schoolName: string
+  invoices: number
+  billed: string | number
+  paid: string | number
+  outstanding: string | number
+  overdue: number
+}
+
 interface Payload {
   hasNetwork: boolean
   network: {
@@ -71,6 +82,7 @@ interface Payload {
     canSeeMoney: boolean
   } | null
   schools: NetworkSchool[]
+  billing: NetworkBillingRow[]
   totals: {
     schools: number
     pupils: number
@@ -254,6 +266,62 @@ export default function NetworkDashboardPage(): JSX.Element {
           </Field>
         </FormGrid>
       </FormSection>
+
+      {/* The consolidated ZSMS bill. Each school is invoiced separately — this is a
+          sum, which is why there is no network-level billing logic anywhere. */}
+      {data.billing.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>What your schools owe ZSMS</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Each school is invoiced separately. This is the total across the network — the
+              invoices themselves sit in each school&apos;s own subscription page.
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              caption="Consolidated subscription billing"
+              rows={data.billing}
+              rowKey={(b) => b.schoolId}
+              columns={[
+                {
+                  key: 'school',
+                  header: 'School',
+                  primary: true,
+                  cell: (b) => (
+                    <>
+                      <span className="font-medium text-foreground">{b.schoolName}</span>
+                      <span className="block font-mono text-xs text-subtle">{b.schoolCode}</span>
+                    </>
+                  ),
+                },
+                { key: 'inv', header: 'Invoices', numeric: true, cell: (b) => b.invoices },
+                { key: 'billed', header: 'Billed', numeric: true, cell: (b) => kwachaOrDash(b.billed) },
+                { key: 'paid', header: 'Paid', numeric: true, cell: (b) => kwachaOrDash(b.paid) },
+                {
+                  key: 'out',
+                  header: 'Outstanding',
+                  numeric: true,
+                  cell: (b) =>
+                    num(b.outstanding) > 0 ? (
+                      <span className="text-warning-text">{kwachaOrDash(b.outstanding)}</span>
+                    ) : (
+                      <span className="text-success-text">—</span>
+                    ),
+                },
+                {
+                  key: 'overdue',
+                  header: '',
+                  cell: (b) =>
+                    b.overdue > 0 ? (
+                      <Badge variant="danger">{b.overdue} overdue</Badge>
+                    ) : null,
+                },
+              ]}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-0">

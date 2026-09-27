@@ -74,7 +74,9 @@ export type Database = {
           school_id: string | null
           sent_at: string | null
           status: string
+          target_audience: string
           target_ids: string[]
+          target_scope: string
           target_type: string
           title: string
           updated_at: string
@@ -90,7 +92,9 @@ export type Database = {
           school_id?: string | null
           sent_at?: string | null
           status?: string
+          target_audience: string
           target_ids?: string[]
+          target_scope: string
           target_type: string
           title: string
           updated_at?: string
@@ -106,7 +110,9 @@ export type Database = {
           school_id?: string | null
           sent_at?: string | null
           status?: string
+          target_audience?: string
           target_ids?: string[]
+          target_scope?: string
           target_type?: string
           title?: string
           updated_at?: string
@@ -2726,6 +2732,24 @@ export type Database = {
           out_receipt_number: string
         }[]
       }
+      announcement_addressed_to_me:
+        | {
+            Args: {
+              p_audience: string
+              p_school_id: string
+              p_scope: string
+              p_target_ids: string[]
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_school_id: string
+              p_target_ids: string[]
+              p_target_type: string
+            }
+            Returns: boolean
+          }
       complete_generated_document: {
         Args: {
           p_byte_size?: number

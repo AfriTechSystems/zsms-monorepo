@@ -175,15 +175,25 @@ export async function POST(request: Request): Promise<Response> {
       },
       p_knowledge_sources: result.knowledgeSources as unknown as Record<string, unknown> | null,
       p_school_id: body.schoolId ?? null,
+      /**
+       * The cost side, recorded on the credit ledger row by `ai_credit_consume()` inside the
+       * RPC. Absent for the scaffold, which costs nothing to run; a model adapter fills it in
+       * and nothing here changes.
+       */
+      p_model_name: result.usage?.modelName ?? null,
+      p_input_tokens: result.usage?.inputTokens ?? null,
+      p_output_tokens: result.usage?.outputTokens ?? null,
+      p_cost_usd: result.usage?.costUsd ?? null,
+      p_idempotency_key: null,
     })
 
     if (error) {
       /**
-       * `42501` covers every refusal the function raises: trial exhausted, subscription
-       * lapsed, account suspended, or a school the caller is not in. The message is
-       * written for a teacher to read, so it is passed through rather than replaced with
-       * something generic — "The free trial of 5 resources is used up" tells them what to
-       * do and a bare "Forbidden" does not.
+       * `42501` covers every refusal: out of AI credits, subscription lapsed, account
+       * suspended, a school the caller is not in, or a personal monthly cap reached. The
+       * message is written for a teacher to read, so it is passed through rather than
+       * replaced with something generic — "Not enough AI credits: 1 needed, 0 available"
+       * tells them what to do and a bare "Forbidden" does not.
        */
       if (error.code === '42501') return fail('FORBIDDEN', error.message)
       if (error.code === 'P0002') {

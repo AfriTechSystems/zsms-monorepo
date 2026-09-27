@@ -14,6 +14,159 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_credit_accounts: {
+        Row: {
+          created_at: string
+          id: string
+          owner_user_id: string | null
+          school_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_user_id?: string | null
+          school_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_user_id?: string | null
+          school_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credit_accounts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "ai_credit_accounts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_credit_caps: {
+        Row: {
+          account_id: string
+          clerk_user_id: string
+          created_at: string
+          monthly_credit_cap: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          clerk_user_id: string
+          created_at?: string
+          monthly_credit_cap: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          clerk_user_id?: string
+          created_at?: string
+          monthly_credit_cap?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credit_caps_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ai_credit_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_credit_ledger: {
+        Row: {
+          account_id: string
+          actor_user_id: string
+          cost_usd: number | null
+          created_at: string
+          credits: number
+          expires_at: string | null
+          feature_key: string | null
+          funded_from: string | null
+          id: string
+          idempotency_key: string | null
+          input_tokens: number | null
+          lot_id: string | null
+          metadata: Json
+          model_name: string | null
+          output_tokens: number | null
+          reason: string
+          reservation_id: string | null
+        }
+        Insert: {
+          account_id: string
+          actor_user_id: string
+          cost_usd?: number | null
+          created_at?: string
+          credits: number
+          expires_at?: string | null
+          feature_key?: string | null
+          funded_from?: string | null
+          id?: string
+          idempotency_key?: string | null
+          input_tokens?: number | null
+          lot_id?: string | null
+          metadata?: Json
+          model_name?: string | null
+          output_tokens?: number | null
+          reason: string
+          reservation_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          actor_user_id?: string
+          cost_usd?: number | null
+          created_at?: string
+          credits?: number
+          expires_at?: string | null
+          feature_key?: string | null
+          funded_from?: string | null
+          id?: string
+          idempotency_key?: string | null
+          input_tokens?: number | null
+          lot_id?: string | null
+          metadata?: Json
+          model_name?: string | null
+          output_tokens?: number | null
+          reason?: string
+          reservation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credit_ledger_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ai_credit_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_credit_ledger_feature_key_fkey"
+            columns: ["feature_key"]
+            isOneToOne: false
+            referencedRelation: "feature_catalogue"
+            referencedColumns: ["feature_key"]
+          },
+          {
+            foreignKeyName: "ai_credit_ledger_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "ai_credit_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcement_reads: {
         Row: {
           announcement_id: string
@@ -213,6 +366,69 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          impersonated_user_id: string | null
+          ip_address: string | null
+          metadata: Json
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          school_id: string | null
+          table_name: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          id?: string
+          impersonated_user_id?: string | null
+          ip_address?: string | null
+          metadata?: Json
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          school_id?: string | null
+          table_name: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          id?: string
+          impersonated_user_id?: string | null
+          ip_address?: string | null
+          metadata?: Json
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          school_id?: string | null
+          table_name?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "audit_logs_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -3184,6 +3400,54 @@ export type Database = {
         }
         Returns: boolean
       }
+      ai_allowance_for_account: {
+        Args: { p_account_id: string }
+        Returns: {
+          allowance_credits: number
+          allowance_period: string
+        }[]
+      }
+      ai_credit_account_for_caller: { Args: never; Returns: string }
+      ai_credit_balance: {
+        Args: { p_account_id: string }
+        Returns: {
+          allowance_credits: number
+          allowance_period: string
+          allowance_remaining: number
+          allowance_used: number
+          purchased_available: number
+          purchased_expired: number
+          purchased_expiring_90d: number
+          total_available: number
+        }[]
+      }
+      ai_credit_consume: {
+        Args: {
+          p_cost_usd?: number
+          p_feature_key: string
+          p_idempotency_key?: string
+          p_input_tokens?: number
+          p_metadata?: Json
+          p_model_name?: string
+          p_output_tokens?: number
+          p_units?: number
+        }
+        Returns: {
+          credits_charged: number
+          funded_allowance: number
+          funded_purchased: number
+        }[]
+      }
+      ai_credit_topup: {
+        Args: {
+          p_account_id: string
+          p_credits?: number
+          p_metadata?: Json
+          p_pack_code?: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       allocate_payment: {
         Args: {
           p_allocations?: Json
@@ -3272,14 +3536,19 @@ export type Database = {
       create_teaching_resource: {
         Args: {
           p_content: Json
+          p_cost_usd?: number
           p_curriculum_type: string
           p_duration_minutes?: number
           p_generation_params?: Json
           p_generator_name: string
           p_generator_version: string
           p_grade_level: string
+          p_idempotency_key?: string
+          p_input_tokens?: number
           p_knowledge_sources?: Json
           p_lesson_type?: string
+          p_model_name?: string
+          p_output_tokens?: number
           p_resource_kind: string
           p_school_id?: string
           p_subject: string
@@ -3358,6 +3627,20 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: boolean
       }
+      log_audit_event: {
+        Args: {
+          p_action: string
+          p_ip_address?: string
+          p_metadata?: Json
+          p_record_id?: string
+          p_school_id?: string
+          p_table_name: string
+          p_user_agent?: string
+        }
+        Returns: string
+      }
+      mask_audit_values: { Args: { p_values: Json }; Returns: Json }
+      my_ai_credits: { Args: never; Returns: Json }
       my_children: {
         Args: never
         Returns: {
@@ -3753,6 +4036,10 @@ export type Database = {
           p_subject_code: string
         }
         Returns: boolean
+      }
+      teaching_resource_feature_key: {
+        Args: { p_resource_kind: string }
+        Returns: string
       }
       verify_payment: {
         Args: { p_decision: string; p_payment_id: string; p_reason?: string }

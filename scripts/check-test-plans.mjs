@@ -27,13 +27,20 @@ const DIR = 'supabase/tests/rls'
 // same position. JS backtracks and gets it right either way, but the ordering
 // makes that independent of the engine.
 const ASSERTIONS = [
-  'is_empty', 'isnt', 'is',
+  'isnt_empty', 'is_empty', 'isnt', 'is',
   'throws_ok', 'lives_ok', 'results_eq', 'set_eq',
   // `matches` was missing and cost exactly what this script exists to prevent:
   // fees_attendance_results_test.sql carried 45 assertions under plan(44) and
   // was reported clean. An under-counting checker is worse than none, because
   // it is trusted. Longer names stay ahead of shorter prefixes.
   'matches', 'imatches', 'alike', 'ialike', 'cmp_ok',
+  // And it happened a SECOND time, in ai_credits_test.sql on 2026-09-27: the
+  // throws_* family beyond `throws_ok` was absent, so a suite with 29 assertions
+  // was reported clean under plan(28) and pg_prove would have failed it in CI.
+  // The whole family is listed now rather than the one that was needed, because
+  // the lesson is plainly that adding them one incident at a time does not work.
+  'throws_matching', 'throws_imatching', 'throws_ilike', 'throws_like',
+  'row_eq', 'bag_eq', 'isa_ok',
   'ok',
 ]
 

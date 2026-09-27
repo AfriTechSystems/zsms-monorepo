@@ -220,6 +220,27 @@ The two changes noted earlier — an added `sync_source` value and an optional `
 
 ## Pricing — credit-based, because each capture has a real cost
 
+> **Built 2026-09-27 as `0132`, and generalised in the process.** The tables are
+> `public.ai_credit_accounts` / `ai_credit_ledger` / `ai_credit_caps` with
+> `afritech.ai_credit_prices` / `ai_credit_packs` / `tier_ai_allowances` — **not** the
+> `capture_credit_*` names sketched below. Capture is one AI feature among several, and a
+> capture-specific wallet would have meant a second wallet for the Teacher Hub, a third for
+> the assistant, and three implementations of one rule about money. Everything this section
+> specifies is implemented: ledger-derived balances, charge-on-success, school-or-user
+> wallets, per-capture rates as configuration, and a zero rate for spreadsheet imports.
+>
+> **What changed beyond the names.** Purchased credits expire after 12 months (decided
+> 2026-09-27), held as lots drained soonest-expiry-first. Tiers carry an included monthly
+> allowance, which is deliberately **never deposited** into the wallet — otherwise an unused
+> allowance would roll over and "resets monthly" would be false. Neither expiry nor reset
+> needs a scheduled job. Every row records `model_name`, `input_tokens`, `output_tokens` and
+> `cost_usd`, which is what makes the margin monitoring this document demands possible.
+>
+> **Still to build with capture:** `reserve`/`settle`/`release`. The ledger admits the
+> reasons and carries `reservation_id`; only synchronous `ai_credit_consume()` exists, and
+> synchronous generation does not need a reservation. Queued offline capture does.
+
+
 Every capture is a vision-API call against the Anthropic API, so the cost is per use, not per seat. Charging for it inside a flat subscription tier would mean either subsidising heavy users or capping the feature so tightly it is not worth having.
 
 **The model is credits.** All four elements below are configuration, never code:

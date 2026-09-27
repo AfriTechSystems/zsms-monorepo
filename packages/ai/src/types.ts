@@ -90,6 +90,19 @@ export interface GenerationResult {
    * would misrepresent the product to a paying teacher.
    */
   modelGenerated: boolean
+  /**
+   * What the call actually cost, recorded on the credit ledger row so margin per feature is a
+   * measured number rather than a hope.
+   *
+   * Absent for the scaffold, which costs nothing to run — and `undefined` rather than zero,
+   * because zero is a real cost and "not applicable" is not the same claim.
+   */
+  usage?: {
+    modelName: string
+    inputTokens: number
+    outputTokens: number
+    costUsd: number
+  }
 }
 
 export interface Generator {

@@ -142,19 +142,34 @@ SELECT is(
 -- ---------------------------------------------------------------------------
 -- Prompts: versioned, exactly one live, immutable.
 -- ---------------------------------------------------------------------------
+/**
+ * Version numbers are asserted RELATIVE to whatever is already there, not as 1 and 2.
+ *
+ * An earlier draft asserted the absolute numbers and passed — until `0137` seeded version 1 of
+ * the real prompts, at which point publishing returned 2 and 3 and CI failed. The test had a
+ * hidden dependency on the table being empty for this feature, which is not a property any
+ * migration promised to preserve.
+ *
+ * The relative form tests the behaviour that actually matters — each publish takes the next
+ * number, and exactly one version is live — and survives the next default prompt being seeded.
+ */
+CREATE TEMP TABLE _prompt_base AS
+SELECT COALESCE(MAX(version), 0) AS v
+  FROM afritech.ai_prompt_templates WHERE feature_key = 'ai_lesson_planner';
+
 SELECT is(
   afritech.publish_prompt_template(
     'ai_lesson_planner', 'You are a Zambian curriculum planner.',
     'Plan {{topic}} for {{grade_level}}.', '{"temperature":0.4}'::jsonb, 'first'),
-  1,
-  'the first published prompt is version 1'
+  (SELECT v + 1 FROM _prompt_base),
+  'publishing takes the next version number'
 );
 
 SELECT is(
   afritech.publish_prompt_template(
     'ai_lesson_planner', 'Revised.', 'Plan {{topic}}.', '{}'::jsonb, 'second'),
-  2,
-  'publishing again creates version 2 rather than editing version 1'
+  (SELECT v + 2 FROM _prompt_base),
+  'publishing again takes the one after it, rather than editing what is live'
 );
 
 SELECT is(

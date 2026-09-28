@@ -55,8 +55,20 @@ SELECT is(
   (SELECT credits_per_action FROM afritech.ai_credit_prices
     WHERE feature_key = 'ai_lesson_planner'),
   1,
-  'the price of a lesson plan is a row in afritech.ai_credit_prices'
+  'a lesson plan costs ONE credit — every arithmetic assertion below assumes it'
 );
+
+/**
+ * That assertion is deliberately coupled to the seeded price, and pinned here rather than derived.
+ *
+ * Deriving it would let a price change pass silently while the behaviour it is supposed to prove
+ * went untested. Pinning it means changing the seed fails HERE, with a message that explains
+ * itself, instead of as a confusing off-by-N fifteen assertions later.
+ *
+ * `platform_incidents_test.sql` learned the same lesson the expensive way: it asserted a prompt
+ * version of 1, `0137` seeded a prompt, and CI failed on a hidden assumption that the table was
+ * empty. A test coupled to seeded data is fine — a test coupled to it *by accident* is not.
+ */
 
 -- A CSV import consumes no vision call, so charging a vision-priced credit for it would be
 -- charging for a cost not incurred — stated as data rather than as a code branch.

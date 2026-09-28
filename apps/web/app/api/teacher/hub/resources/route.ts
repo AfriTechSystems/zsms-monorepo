@@ -36,7 +36,14 @@ import {
   ok,
   validationFailed,
 } from '../../../../../lib/api-response'
-import { generateTeachingResource, isModelBacked } from '@zsms/ai'
+import {
+  AllProvidersFailedError,
+  generateTeachingResource,
+  isModelBacked,
+  liveGenerationEnabled,
+  type IncidentReport,
+  type LiveGeneratorConfig,
+} from '@zsms/ai'
 import { generateSchema, resourceKindSchema } from '../../../../../lib/teacher-hub'
 
 export const dynamic = 'force-dynamic'
@@ -139,6 +146,59 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) return validationFailed(parsed.error)
     const body = parsed.data
 
+    /**
+     * The model chain, the active prompt and the credit price, in one round trip. Absent or
+     * incomplete, `generateTeachingResource()` falls back to the scaffold rather than failing —
+     * a school with no published prompt gets a working lesson structure, not a 500.
+     */
+    const feature =
+      body.kind === 'quiz'
+        ? 'ai_quiz_generator'
+        : body.kind === 'homework'
+          ? 'ai_homework_creator'
+          : 'ai_lesson_planner'
+
+    let liveConfig: LiveGeneratorConfig | null = null
+
+    if (liveGenerationEnabled()) {
+      const cfg = await client.rpc('ai_generation_config', { p_feature_key: feature })
+      const config = cfg.data as {
+        models?: LiveGeneratorConfig['models']
+        prompt?: LiveGeneratorConfig['prompt']
+      } | null
+
+      if (config?.prompt && config.models && config.models.length > 0) {
+        liveConfig = {
+          models: config.models,
+          prompt: config.prompt,
+          /**
+           * How a provider failure reaches AfriTech. `@zsms/ai` never imports Supabase, so the
+           * chain hands the report back and this closure persists it.
+           *
+           * Deliberately not awaited into the failure path: `record_platform_incident()` is an
+           * UPSERT on `dedupe_key`, so two hundred failures of one dead key become one incident
+           * with a count of two hundred rather than two hundred rows.
+           */
+          onFailure: async (report: IncidentReport) => {
+            await client.rpc('record_platform_incident', {
+              p_source: report.source,
+              p_kind: report.kind,
+              p_title: report.title,
+              p_dedupe_key: report.dedupeKey,
+              p_severity: report.severity,
+              p_detail: report.detail,
+              p_school_id: null,
+              p_feature_key: feature,
+              // AfriTech's plumbing. A school does not need to know its lesson plan came from
+              // the second provider in the chain.
+              p_is_school_visible: false,
+              p_metadata: report.metadata,
+            })
+          },
+        }
+      }
+    }
+
     const result = await generateTeachingResource({
       kind: body.kind,
       subject: body.subject,
@@ -151,7 +211,23 @@ export async function POST(request: Request): Promise<Response> {
       questionStyle: body.questionStyle,
       difficulty: body.difficulty,
       context: body.context,
+    }, liveConfig).catch((error: unknown) => {
+      /**
+       * Every provider failed. The chain has already raised the incident, so the teacher is
+       * told the one thing that matters to them: nothing was generated and nothing was charged.
+       * The charge happens after this point, so "not charged" is a fact rather than a promise.
+       */
+      if (error instanceof AllProvidersFailedError) return null
+      throw error
     })
+
+    if (result === null) {
+      return fail(
+        'SERVER_ERROR',
+        'The AI service is unavailable right now. You have not been charged — please try again '
+          + 'in a few minutes.',
+      )
+    }
 
     const { data, error } = await client.rpc('create_teaching_resource', {
       p_resource_kind: body.kind,
@@ -185,6 +261,8 @@ export async function POST(request: Request): Promise<Response> {
       p_output_tokens: result.usage?.outputTokens ?? null,
       p_cost_usd: result.usage?.costUsd ?? null,
       p_idempotency_key: null,
+      // Which prompt produced this. NULL for the scaffold, which has no prompt — ADR-041.
+      p_prompt_version: liveConfig?.prompt.version ?? null,
     })
 
     if (error) {
@@ -212,9 +290,11 @@ export async function POST(request: Request): Promise<Response> {
 
     return created({
       resource: row,
-      // Travels with the result so the screen can label a scaffold honestly at the moment
-      // the teacher first sees it, not only in a settings page.
-      modelBacked: isModelBacked(),
+      // Travels with the result so the screen can label a scaffold honestly at the moment the
+      // teacher first sees it, not only in a settings page. Per-request rather than global: a
+      // school whose prompt row is missing gets a scaffold and is told so, even while another
+      // request is model-backed.
+      modelBacked: isModelBacked(liveConfig),
     })
   })
 }

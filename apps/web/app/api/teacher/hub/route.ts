@@ -34,7 +34,7 @@ import {
   ok,
   validationFailed,
 } from '../../../../lib/api-response'
-import { isModelBacked } from '@zsms/ai'
+import { liveGenerationEnabled } from '@zsms/ai'
 import {
   ENTITLEMENT_MESSAGES,
   profileSchema,
@@ -69,11 +69,13 @@ export async function GET(): Promise<Response> {
         ? (ENTITLEMENT_MESSAGES[payload.entitlement.reason] ?? null)
         : null,
       /**
-       * Whether a real model is behind the generator. The screens say this out loud: a
-       * teacher paying for AI lesson planning who receives a structured scaffold has been
-       * misled, and an honest label is the difference.
+       * Whether live generation is PERMITTED — which is all this route can honestly say, since
+       * the per-request answer also depends on a prompt row that the generate endpoint
+       * resolves. The screens use it to decide whether to show the "structured plans, not
+       * AI-written" notice, because a teacher paying for AI planning who is handed a scaffold
+       * unlabelled has been misled.
        */
-      modelBacked: isModelBacked(),
+      modelBacked: liveGenerationEnabled(),
     })
   })
 }

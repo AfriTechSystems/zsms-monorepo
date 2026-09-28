@@ -1420,6 +1420,103 @@ export type Database = {
           },
         ]
       }
+      platform_incidents: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          created_at: string
+          dedupe_key: string
+          detail: string | null
+          feature_key: string | null
+          first_seen_at: string
+          id: string
+          is_school_visible: boolean
+          kind: string
+          last_seen_at: string
+          metadata: Json
+          occurrence_count: number
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          school_id: string | null
+          severity: string
+          source: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          dedupe_key: string
+          detail?: string | null
+          feature_key?: string | null
+          first_seen_at?: string
+          id?: string
+          is_school_visible?: boolean
+          kind: string
+          last_seen_at?: string
+          metadata?: Json
+          occurrence_count?: number
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          school_id?: string | null
+          severity?: string
+          source: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          dedupe_key?: string
+          detail?: string | null
+          feature_key?: string | null
+          first_seen_at?: string
+          id?: string
+          is_school_visible?: boolean
+          kind?: string
+          last_seen_at?: string
+          metadata?: Json
+          occurrence_count?: number
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          school_id?: string | null
+          severity?: string
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_incidents_feature_key_fkey"
+            columns: ["feature_key"]
+            isOneToOne: false
+            referencedRelation: "feature_catalogue"
+            referencedColumns: ["feature_key"]
+          },
+          {
+            foreignKeyName: "platform_incidents_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "platform_incidents_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reference_subjects_zm: {
         Row: {
           country_code: string
@@ -2869,6 +2966,7 @@ export type Database = {
           is_shared: boolean
           knowledge_sources: Json | null
           lesson_type: string | null
+          prompt_template_version: number | null
           resource_kind: string
           school_id: string | null
           subject: string
@@ -2892,6 +2990,7 @@ export type Database = {
           is_shared?: boolean
           knowledge_sources?: Json | null
           lesson_type?: string | null
+          prompt_template_version?: number | null
           resource_kind: string
           school_id?: string | null
           subject: string
@@ -2915,6 +3014,7 @@ export type Database = {
           is_shared?: boolean
           knowledge_sources?: Json | null
           lesson_type?: string | null
+          prompt_template_version?: number | null
           resource_kind?: string
           school_id?: string | null
           subject?: string
@@ -3448,6 +3548,7 @@ export type Database = {
         }
         Returns: string
       }
+      ai_generation_config: { Args: { p_feature_key: string }; Returns: Json }
       allocate_payment: {
         Args: {
           p_allocations?: Json
@@ -3549,6 +3650,7 @@ export type Database = {
           p_lesson_type?: string
           p_model_name?: string
           p_output_tokens?: number
+          p_prompt_version?: number
           p_resource_kind: string
           p_school_id?: string
           p_subject: string
@@ -3859,6 +3961,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_platform_incident: {
+        Args: {
+          p_dedupe_key: string
+          p_detail?: string
+          p_feature_key?: string
+          p_is_school_visible?: boolean
+          p_kind: string
+          p_metadata?: Json
+          p_school_id?: string
+          p_severity?: string
+          p_source: string
+          p_title: string
+        }
+        Returns: string
+      }
       resolve_notification_template: {
         Args: {
           p_channel: string
@@ -3984,6 +4101,10 @@ export type Database = {
           out_tier: string
           out_unit_price: number
         }[]
+      }
+      set_incident_status: {
+        Args: { p_incident_id: string; p_note?: string; p_status: string }
+        Returns: boolean
       }
       srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }
       student_in_current_school: {

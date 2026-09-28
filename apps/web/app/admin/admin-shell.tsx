@@ -21,6 +21,7 @@
 import type { JSX, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import {
+  BookMarked,
   Building2,
   Gauge,
   HeartPulse,
@@ -90,6 +91,14 @@ export function AdminShell({
         // The badge is why this group is above Commercial: an open incident is the only thing
         // here that is actively going wrong.
         { path: '/incidents', label: 'Incidents', icon: Siren, badge: openIncidents },
+      ],
+    },
+    {
+      // The AI's grounding. Under Operations rather than Commercial because an empty curriculum
+      // store is an operational problem — generation still runs, ungrounded and uncited.
+      label: 'AI',
+      items: [
+        { path: '/curriculum', label: 'Curriculum', icon: BookMarked },
       ],
     },
     {

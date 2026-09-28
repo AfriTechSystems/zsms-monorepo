@@ -488,6 +488,66 @@ export type Database = {
           },
         ]
       }
+      curriculum_topics: {
+        Row: {
+          country_code: string
+          created_at: string
+          curriculum_type: string
+          display_order: number
+          grade_level: string
+          id: string
+          is_active: boolean
+          learning_outcomes: string[]
+          source: string
+          source_url: string | null
+          sub_topics: string[]
+          subject: string
+          suggested_periods: number | null
+          syllabus_year: number | null
+          topic_code: string
+          topic_name: string
+          updated_at: string
+        }
+        Insert: {
+          country_code?: string
+          created_at?: string
+          curriculum_type: string
+          display_order?: number
+          grade_level: string
+          id?: string
+          is_active?: boolean
+          learning_outcomes?: string[]
+          source: string
+          source_url?: string | null
+          sub_topics?: string[]
+          subject: string
+          suggested_periods?: number | null
+          syllabus_year?: number | null
+          topic_code: string
+          topic_name: string
+          updated_at?: string
+        }
+        Update: {
+          country_code?: string
+          created_at?: string
+          curriculum_type?: string
+          display_order?: number
+          grade_level?: string
+          id?: string
+          is_active?: boolean
+          learning_outcomes?: string[]
+          source?: string
+          source_url?: string | null
+          sub_topics?: string[]
+          subject?: string
+          suggested_periods?: number | null
+          syllabus_year?: number | null
+          topic_code?: string
+          topic_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       exam_results: {
         Row: {
           academic_year: string
@@ -3670,6 +3730,36 @@ export type Database = {
             Returns: string
           }
         | { Args: { p_subject_code: string }; Returns: string }
+      curriculum_coverage: {
+        Args: never
+        Returns: {
+          country_code: string
+          curriculum_type: string
+          grade_level: string
+          last_updated: string
+          outcome_count: number
+          sources: string[]
+          subject: string
+          topic_count: number
+        }[]
+      }
+      curriculum_slice: {
+        Args: {
+          p_country_code?: string
+          p_curriculum_type: string
+          p_grade_level: string
+          p_subject: string
+        }
+        Returns: {
+          learning_outcomes: string[]
+          source: string
+          sub_topics: string[]
+          suggested_periods: number
+          syllabus_year: number
+          topic_code: string
+          topic_name: string
+        }[]
+      }
       detach_school_from_network: {
         Args: { p_school_id: string }
         Returns: boolean
@@ -3715,6 +3805,15 @@ export type Database = {
       has_permission_grant: {
         Args: { p_action: string; p_module: string }
         Returns: boolean
+      }
+      import_curriculum_topics: {
+        Args: { p_rows: Json }
+        Returns: {
+          errors: Json
+          inserted: number
+          skipped: number
+          updated: number
+        }[]
       }
       import_students: {
         Args: { p_rows: Json }

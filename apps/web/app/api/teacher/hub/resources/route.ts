@@ -168,9 +168,43 @@ export async function POST(request: Request): Promise<Response> {
       } | null
 
       if (config?.prompt && config.models && config.models.length > 0) {
+        /**
+         * The syllabus slice for this subject and grade — the WHOLE slice, not a matched topic.
+         *
+         * Ten to thirty rows, a few hundred tokens. Passing all of them means the model does the
+         * topic matching (so a teacher typing "Simultaneous Eqns" still lands correctly) and,
+         * more importantly, **it cannot cite a code that was not in front of it**. An invented
+         * ECZ reference is the worst output this product could produce, because the teacher
+         * repeats it in good faith and is blamed for it.
+         *
+         * Empty is a normal state, not an error: the prompt is told explicitly that none were
+         * supplied and to cite nothing at all.
+         */
+        const slice = await client.rpc('curriculum_slice', {
+          p_curriculum_type: body.curriculumType,
+          p_subject: body.subject,
+          p_grade_level: body.gradeLevel,
+        })
+
+        const outcomes = ((slice.data ?? []) as Array<{
+          topic_code: string
+          topic_name: string
+          learning_outcomes: string[] | null
+          suggested_periods: number | null
+          source: string
+        }>).flatMap((t) =>
+          (t.learning_outcomes ?? []).map(
+            (o) =>
+              `[${t.topic_code}] ${t.topic_name} — ${o}`
+              + (t.suggested_periods ? ` (${t.suggested_periods} periods)` : '')
+              + ` · ${t.source}`,
+          ),
+        )
+
         liveConfig = {
           models: config.models,
           prompt: config.prompt,
+          curriculumOutcomes: outcomes,
           /**
            * How a provider failure reaches AfriTech. `@zsms/ai` never imports Supabase, so the
            * chain hands the report back and this closure persists it.

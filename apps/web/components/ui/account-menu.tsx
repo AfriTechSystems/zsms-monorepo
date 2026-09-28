@@ -52,6 +52,7 @@ import { Loader2, LogOut } from 'lucide-react'
 import { SignOutButton, useAuth, useOrganizationList } from '@zsms/auth-provider/react'
 
 import { cn } from '../../lib/utils'
+import { clearAllDrafts } from '../../lib/use-form-draft'
 
 export function AccountMenu({ className }: { className?: string }): JSX.Element | null {
   // The ACTIVE organisation, which is what the select must show as selected.
@@ -117,6 +118,16 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
       <SignOutButton redirectUrl="/sign-in">
         <button
           type="button"
+          /**
+           * Drafts are wiped before the session ends.
+           *
+           * They are already namespaced by Clerk user id, so the next person to sign in on this
+           * machine could not restore someone else's work into their own form. But a school
+           * office computer is shared, `localStorage` survives sign-out, and leaving a
+           * colleague's half-written announcement sitting in the browser is not something to
+           * defend on a technicality. Signing out clears it.
+           */
+          onClick={() => clearAllDrafts()}
           className={cn(
             'inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-md border border-border',
             'px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground',

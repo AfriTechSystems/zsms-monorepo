@@ -396,10 +396,44 @@ under the iPhone home indicator. Five destinations do not deserve a hidden menu.
 
 ---
 
+## Unfinished-form drafts
+
+**Added 2026-09-28.** `lib/use-form-draft.ts` keeps a half-finished form in `localStorage` so
+leaving the page, losing signal or closing the tab does not throw the work away. Wired into the
+announcement composer, the Teacher Hub generator, and the Hub profile step.
+
+**The rule that shapes it: an ALLOWLIST, never a denylist.** `fields` names exactly what is
+written. The tempting alternative — save everything, strip the sensitive parts — fails in the one
+direction that matters: with a denylist, a field added next year is persisted **by default** and
+nobody finds out. The failure mode of an allowlist is a draft that does not restore one box. The
+failure mode of a denylist is a pupil's identity number sitting in a browser on a school office
+computer.
+
+**A shared office machine is the normal case here, not the edge case**, and `localStorage`
+survives sign-out. So every key is namespaced by Clerk user id, `clearAllDrafts()` runs on
+sign-out, and a draft older than seven days is discarded on read.
+
+**Forms deliberately NOT wired**, and this list is a rule rather than a backlog:
+
+| Form | Why not |
+|---|---|
+| Pupil enrolment | Holds `nrc_or_birth_cert`. No allowlist makes that acceptable. |
+| Payment recording | Holds a payment reference and an amount. |
+| Any sensitive custom field | `sensitivity = 'sensitive'` exists precisely to keep this data narrow. |
+| **Bulk-import column mapping** | Found during implementation: the mapping describes columns of a CSV held **in memory only**. The file is never persisted, so a restored mapping would refer to a file the user no longer has — a draft that cannot be used. Dropped rather than built. |
+
+**Restoring is offered, never automatic.** Silently refilling a form means somebody who abandoned
+a draft deliberately comes back, types, and submits something half-old without noticing — on an
+announcement reaching every parent in a school, that is a real mistake rather than an
+inconvenience.
+
+---
+
 ## Change Log
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-09-28 | **Unfinished-form drafts, on an allowlist** | Intermittent connectivity is a real constraint in Zambian schools. Allowlist rather than denylist because a denylist persists a newly added sensitive field by default; enrolment and payment forms excluded outright; import mapping dropped because the CSV it describes is never persisted. |
 | 2026-09-28 | **Sidebar shell replaces the top navigation on every staff portal** | Nine sections in a scrolling row gave no grouping and hid items past the fold. Groups named for the job; brand colour demoted to an accent so a dark brand cannot make the nav fail the contrast audit; parent portal kept phone-first with bottom tabs. |
 | 2026-08-16 | Initial version — token layer, colour hierarchy, typography, component rules | Layer 1 (Frontend) had no foundation document; Phase 4 needed one before any screen |
 | 2026-08-16 | Documented the derived-scale approach and the measured brand-palette contrast failures | Five of six brand colours fail AA as text; recording the measurements prevents the decision being relitigated by eye |

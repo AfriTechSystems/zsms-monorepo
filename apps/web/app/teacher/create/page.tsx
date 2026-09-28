@@ -31,6 +31,9 @@ import { Button } from '../../../components/ui/button'
 import { Card, CardContent } from '../../../components/ui/card'
 import { Field, Input, Select, Textarea } from '../../../components/ui/field'
 import { ErrorState, PageHeader, StatSkeleton } from '../../../components/ui/data-states'
+import { DraftNotice } from '../../../components/ui/draft-notice'
+import { draftAge, useFormDraft } from '../../../lib/use-form-draft'
+import { useAuth } from '@zsms/auth-provider/react'
 import { useToast } from '../../../components/ui/toast'
 import {
   CURRICULUM_LABELS,
@@ -103,6 +106,26 @@ function CreateForm(): JSX.Element {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  /**
+   * `context` is the field worth protecting: a teacher describing what their class already knows
+   * and where they struggle writes a paragraph, and losing it to a dropped connection is exactly
+   * the moment they stop trusting the tool.
+   *
+   * Scoped by `kind`, so a half-written quiz and a half-written lesson plan do not overwrite each
+   * other — the two are reached from different cards on the dashboard and a teacher may well have
+   * started both.
+   */
+  const { userId } = useAuth()
+  const draft = useFormDraft({
+    formId: 'hub-generate',
+    userId,
+    scopeId: kind,
+    values: { subject, grade, topic, curriculum, context, lessonType, questionStyle, difficulty },
+    fields: ['subject', 'grade', 'topic', 'curriculum', 'context', 'lessonType',
+             'questionStyle', 'difficulty'],
+    enabled: !submitting,
+  })
+
   const load = useCallback(async () => {
     setLoading(true)
     const { data, error } = await hubFetch<HubPayload>('/api/teacher/hub')
@@ -162,6 +185,9 @@ function CreateForm(): JSX.Element {
     }
 
     toast('Saved to your library.', 'success')
+    // Generated is not unfinished — otherwise returning to this form would offer to restore the
+    // request that has already produced a saved resource.
+    draft.clear()
     if (data?.resource.id) router.push(`/teacher/library/${data.resource.id}`)
   }
 
@@ -214,6 +240,25 @@ function CreateForm(): JSX.Element {
         />
 
         <GeneratorNotice modelBacked={hub?.modelBacked ?? false} />
+
+        {draft.pending && (
+          <DraftNotice
+            savedAgo={draftAge(draft.savedAt)}
+            onRestore={() => {
+              const d = draft.restore()
+              if (!d) return
+              if (typeof d.subject === 'string') setSubject(d.subject)
+              if (typeof d.grade === 'string') setGrade(d.grade)
+              if (typeof d.topic === 'string') setTopic(d.topic)
+              if (typeof d.curriculum === 'string') setCurriculum(d.curriculum)
+              if (typeof d.context === 'string') setContext(d.context)
+              if (typeof d.lessonType === 'string') setLessonType(d.lessonType)
+              if (typeof d.questionStyle === 'string') setQuestionStyle(d.questionStyle)
+              if (typeof d.difficulty === 'string') setDifficulty(d.difficulty)
+            }}
+            onDiscard={draft.discard}
+          />
+        )}
 
         <Card>
           <CardContent className="space-y-5 pt-6">

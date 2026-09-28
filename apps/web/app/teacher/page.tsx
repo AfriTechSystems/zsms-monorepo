@@ -26,6 +26,9 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Field, Input, Select } from '../../components/ui/field'
 import { PageHeader, ErrorState, StatSkeleton } from '../../components/ui/data-states'
+import { DraftNotice } from '../../components/ui/draft-notice'
+import { draftAge, useFormDraft } from '../../lib/use-form-draft'
+import { useAuth } from '@zsms/auth-provider/react'
 import { useToast } from '../../components/ui/toast'
 import {
   CURRICULUM_LABELS,
@@ -278,6 +281,23 @@ function ProfileSetup({ onDone }: { onDone: () => void }): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  /**
+   * Ticking through twelve subjects and eighteen grades is the longest part of joining the Hub,
+   * and a teacher who loses it to a dropped connection is unlikely to start again.
+   *
+   * `phone` is deliberately absent from the allowlist. It is a personal contact number, this form
+   * is completed once, and there is no version of "helpful" that justifies leaving it in a browser
+   * on a machine that may not be theirs.
+   */
+  const { userId } = useAuth()
+  const draft = useFormDraft({
+    formId: 'hub-profile',
+    userId,
+    values: { fullName, email, curriculum, subjects, grades },
+    fields: ['fullName', 'email', 'curriculum', 'subjects', 'grades'],
+    enabled: !saving,
+  })
+
   const toggle = (list: string[], value: string): string[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
 
@@ -303,6 +323,7 @@ function ProfileSetup({ onDone }: { onDone: () => void }): JSX.Element {
       return
     }
     toast('Welcome to the Teacher Hub.', 'success')
+    draft.clear()
     onDone()
   }
 
@@ -315,6 +336,22 @@ function ProfileSetup({ onDone }: { onDone: () => void }): JSX.Element {
 
       <Card>
         <CardContent className="space-y-5 pt-6">
+          {draft.pending && (
+            <DraftNotice
+              savedAgo={draftAge(draft.savedAt)}
+              onRestore={() => {
+                const d = draft.restore()
+                if (!d) return
+                if (typeof d.fullName === 'string') setFullName(d.fullName)
+                if (typeof d.email === 'string') setEmail(d.email)
+                if (typeof d.curriculum === 'string') setCurriculum(d.curriculum)
+                if (Array.isArray(d.subjects)) setSubjects(d.subjects as string[])
+                if (Array.isArray(d.grades)) setGrades(d.grades as string[])
+              }}
+              onDiscard={draft.discard}
+            />
+          )}
+
           {formError && (
             <p role="alert" className="text-sm font-medium text-danger-text">
               {formError}

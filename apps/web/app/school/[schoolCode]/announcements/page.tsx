@@ -41,6 +41,9 @@ import { Card, CardContent } from '../../../../components/ui/card'
 import { DataTable } from '../../../../components/ui/data-table'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
+import { DraftNotice } from '../../../../components/ui/draft-notice'
+import { draftAge, useFormDraft } from '../../../../lib/use-form-draft'
+import { useAuth } from '@zsms/auth-provider/react'
 import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
@@ -127,6 +130,32 @@ export default function AnnouncementsPage(): JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
+  /**
+   * An announcement is the longest thing anybody types in this product and the one most likely to
+   * be interrupted — a head teacher drafting a fee-deadline notice gets called away mid-sentence.
+   *
+   * `targetIds` is deliberately NOT in the allowlist. It holds pupil and staff identifiers, which
+   * is a list of who a notice was going to be about; a draft restoring stale recipients silently
+   * is worse than retyping them, and it is data with no business sitting in a browser on a shared
+   * office machine.
+   */
+  const { userId } = useAuth()
+  const draft = useFormDraft({
+    formId: 'announcement',
+    userId,
+    values: { title, bodyText, importance, targetAudience, targetScope, scheduledAt },
+    fields: ['title', 'bodyText', 'importance', 'targetAudience', 'targetScope', 'scheduledAt'],
+    enabled: busy === null,
+  })
+
+  /**
+   * Destructured because `draft` is a fresh object each render, so depending on it would rebuild
+   * the submit callback every keystroke. `clear` is useCallback-wrapped inside the hook and is
+   * therefore a stable reference — which is what `exhaustive-deps` wants, and it is right to want
+   * it: a missing dependency here is a stale closure holding an old storage key.
+   */
+  const { clear: clearDraft } = draft
+
   const grades = structure.data?.gradeLevels ?? []
 
   const isIndividual = targetAudience === 'individuals'
@@ -198,9 +227,13 @@ export default function AnnouncementsPage(): JSX.Element {
       setBodyText('')
       setTargetIds([])
       setScheduledAt('')
+      // Sent is not unfinished. Without this the form would offer to restore what was just
+      // delivered to every parent in the school.
+      clearDraft()
       reload()
     },
     [
+      clearDraft,
       title,
       bodyText,
       importance,
@@ -253,6 +286,23 @@ export default function AnnouncementsPage(): JSX.Element {
               email need provider credentials and a running queue, which arrive with the live
               deployment. Treat “queued” as exactly that.
             </Alert>
+          )}
+
+          {draft.pending && (
+            <DraftNotice
+              savedAgo={draftAge(draft.savedAt)}
+              onRestore={() => {
+                const d = draft.restore()
+                if (!d) return
+                if (typeof d.title === 'string') setTitle(d.title)
+                if (typeof d.bodyText === 'string') setBodyText(d.bodyText)
+                if (typeof d.importance === 'string') setImportance(d.importance)
+                if (typeof d.targetAudience === 'string') setTargetAudience(d.targetAudience)
+                if (typeof d.targetScope === 'string') setTargetScope(d.targetScope)
+                if (typeof d.scheduledAt === 'string') setScheduledAt(d.scheduledAt)
+              }}
+              onDiscard={draft.discard}
+            />
           )}
 
           {formError && (

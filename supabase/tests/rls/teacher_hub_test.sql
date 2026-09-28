@@ -37,7 +37,7 @@ BEGIN;
 -- names resolve as normal; `extensions` is appended only for the assertion functions.
 SET search_path TO public, extensions;
 
-SELECT plan(23);
+SELECT plan(24);
 
 -- ---------------------------------------------------------------------------
 -- Fixture. A school, its principal, and a teacher who is on its staff — so the
@@ -262,13 +262,40 @@ SELECT lives_ok(
   'AfriTech can record a received payment and activate the subscription'
 );
 
--- 14. FIVE FREE RESOURCES EVER. Subscribing must not hand the trial back — otherwise
---     subscribe-then-cancel is an infinite supply of free ones.
+/**
+ * 14. FIVE FREE RESOURCES EVER — asserted through the LEDGER, not the counter.
+ *
+ * This assertion used to read `trial_resources_used` and expect 5. `0133` retired that column:
+ * the AI credit ledger is the single meter, and `create_teaching_resource()` no longer writes
+ * the counter at all. CI caught the stale assertion on the first run after that change.
+ *
+ * The rule itself is unchanged and is now enforced more strongly than a counter could. The five
+ * trial spends are allowance-funded rows in an append-only ledger, so they cannot be reset —
+ * and the assertions below prove the consequence: even if an account were put back onto the
+ * trial plan, the allowance reads as already spent.
+ */
 SELECT is(
-  (SELECT trial_resources_used FROM public.standalone_teacher_accounts
-    WHERE clerk_user_id = 'user_hub_teacher'),
+  (SELECT allowance_used FROM public.ai_credit_balance(
+     (SELECT id FROM public.ai_credit_accounts WHERE owner_user_id = 'user_hub_teacher'))),
   5,
-  'subscribing does not reset the trial counter — five free resources ever'
+  'the five trial spends are still recorded after subscribing — an append-only ledger cannot be reset'
+);
+
+-- Forced back onto the trial plan as postgres. Not a product path — there is no code that does
+-- this — which is exactly why it is the right way to test the rule: it is the strongest attack
+-- available, and the allowance still reads as spent.
+RESET ROLE;
+UPDATE public.standalone_teacher_accounts
+   SET plan_code = 'trial', subscription_status = 'trial', subscription_ends_at = NULL
+ WHERE clerk_user_id = 'user_hub_teacher';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims TO '{"sub": "user_hub_teacher", "role": "authenticated"}';
+
+SELECT is(
+  (SELECT remaining FROM public.teacher_hub_entitlement()),
+  0,
+  'and putting the account back on the trial plan grants nothing — five free resources EVER'
 );
 
 SELECT * FROM finish();

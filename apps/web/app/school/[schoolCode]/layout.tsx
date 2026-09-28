@@ -1,31 +1,26 @@
 /**
  * School portal shell.
  *
- * Spec: `Official Documentation/06 School and Tenant Module/SCHOOL.md`
+ * Spec: `Official Documentation/06 School and Tenant Management/SCHOOL_SETUP.md`
  *       `Official Documentation/01 Foundation Layer/DESIGN_SYSTEM.md`
- *       `Official Documentation/01 Foundation Layer/DECISIONS.md` — ADR-043
  *
- * ## This surface IS themed, and that is the point of the exclusion
+ * ## A server layout wrapping a client shell
  *
- * The admin shell is deliberately never themed, so an operator always knows
- * whose system they are in. Here the opposite holds: a school's staff should see
- * their own school. The theme is resolved on the server and emitted as CSS
- * custom properties in the first response — no client fetch, no flash of ZSMS
- * blue before the school's colours arrive, and no JavaScript required to render
- * them. That matters more on this portal than on admin: an accountant opening
- * the fee list on a phone over a slow connection is the normal case.
+ * The session resolution, the redirect and the 404 happen here on the server, so no screen below
+ * has to remember to check. The sidebar is a client component: it holds collapse state, remembers
+ * which groups are closed, and carries icon references that cannot cross the RSC boundary as
+ * props. `session.role` is a string and crosses fine, which is what lets the permission filter
+ * stay in the shell.
  *
- * ## The impersonation banner is not decoration
+ * ## The school's brand is an accent, not the chrome
  *
- * When an AfriTech operator is signed in *as* a school user, every action they
- * take is attributed to that user in the audit trail. A permanent, unmissable
- * band across the top is the only thing standing between "I looked" and "I
- * changed something while I was looking". It is rendered above the header so it
- * survives scrolling to the top of any screen.
+ * `ThemeStyle` still writes the school's palette, and the sidebar still uses it — but only on the
+ * active item and the logo. Painting the whole sidebar in a school's colour looks appealing until
+ * a school whose brand is near-black submits their logo, at which point the surface the reader
+ * uses most becomes the one that fails `/design`'s contrast audit.
  */
 
 import type { JSX, ReactNode } from 'react'
-import Link from 'next/link'
 import { ShieldAlert } from 'lucide-react'
 
 import { ThemeStyle } from '../../../lib/theme'
@@ -33,8 +28,8 @@ import { requireSchoolSession } from '../../../lib/school-session'
 import { ROLE_LABEL } from '../../../lib/roles'
 import { AccountMenu } from '../../../components/ui/account-menu'
 import { ThemeToggle } from '../../../components/ui/theme-toggle'
-import { SchoolNav } from './school-nav'
 import { SchoolSwitcher } from '../../../components/ui/school-switcher'
+import { SchoolShell } from './school-shell'
 
 export const metadata = {
   title: 'School portal · ZSMS',
@@ -49,11 +44,10 @@ export default async function SchoolLayout({
 }): Promise<JSX.Element> {
   const { schoolCode } = await params
 
-  // Redirects when signed out, 404s when the URL names a school this session is
-  // not in. Both exits happen here so no screen below has to remember to check.
-  // One resolution for the whole tree — `requireSchoolSession` is memoised per
-  // request, and it now returns the theme alongside the school so the shell does
-  // not make a second round trip for branding.
+  // Redirects when signed out, 404s when the URL names a school this session is not in. Both
+  // exits happen here so no screen below has to remember to check. One resolution for the whole
+  // tree — `requireSchoolSession` is memoised per request, and returns the theme alongside the
+  // school so the shell does not make a second round trip for branding.
   const session = await requireSchoolSession(schoolCode)
   const theme = session.theme
   const base = `/school/${session.slug}`
@@ -61,72 +55,45 @@ export default async function SchoolLayout({
   return (
     <>
       <ThemeStyle theme={theme} />
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
 
-      <div className="min-h-screen bg-background">
-        <a href="#main" className="skip-link">
-          Skip to content
-        </a>
+      {/*
+        Above the shell rather than inside it, and deliberately so: an impersonation warning that
+        scrolled away with the content, or sat inside a collapsible sidebar, would be a warning
+        somebody could miss while acting as another person.
+      */}
+      {session.isImpersonating && (
+        <div
+          role="status"
+          className="flex items-center justify-center gap-2 bg-warning-fill px-gutter py-2 text-center text-sm font-medium text-white"
+        >
+          <ShieldAlert aria-hidden="true" className="size-4 shrink-0" />
+          <span>
+            You are signed in as a user at {session.school.name}. Everything you do is recorded
+            against them.
+          </span>
+        </div>
+      )}
 
-        {session.isImpersonating && (
-          <div
-            role="status"
-            className="flex items-center justify-center gap-2 bg-warning-fill px-gutter py-2 text-center text-sm font-medium text-white"
-          >
-            <ShieldAlert aria-hidden="true" className="size-4 shrink-0" />
-            <span>
-              You are signed in as a user at {session.school.name}. Everything you do is recorded
-              against them.
-            </span>
-          </div>
-        )}
-
-        <header className="sticky top-0 z-30 border-b border-border bg-card">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-gutter py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              {/* The school's own mark when it has one, the ZSMS icon otherwise.
-                  eslint-disable because next/image cannot serve an arbitrary
-                  R2 URL without a configured remote pattern per school. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={theme.iconUrl ?? '/brand/zsms-icon-192.png'}
-                alt=""
-                width={36}
-                height={36}
-                className="size-9 shrink-0 rounded object-contain"
-              />
-              <div className="min-w-0">
-                <Link
-                  href={base}
-                  className="block truncate text-base font-semibold text-foreground hover:underline"
-                >
-                  {session.school.name}
-                </Link>
-                <p className="truncate text-xs text-muted-foreground">
-                  {session.school.schoolCode} · {ROLE_LABEL[session.role] ?? session.role}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {/* Renders nothing for the common case of one school, so a single-
-                  school head teacher never sees a control implying there is
-                  somewhere else to be. */}
-              <SchoolSwitcher />
-              <ThemeToggle />
-              <AccountMenu />
-            </div>
-          </div>
-
-          {/* The nav is built from the session's role on the server, so a link
-              a role cannot use is never rendered — not rendered and disabled,
-              which would still tell them it exists. */}
-          <SchoolNav base={base} role={session.role} />
-        </header>
-
-        <main id="main" className="mx-auto max-w-7xl px-gutter py-6">
-          {children}
-        </main>
-      </div>
+      <SchoolShell
+        base={base}
+        schoolName={session.school.name}
+        roleLabel={`${session.school.schoolCode} · ${ROLE_LABEL[session.role] ?? session.role}`}
+        role={session.role}
+        headerActions={
+          <>
+            {/* Renders nothing for the common case of one school, so a single-school head
+                teacher never sees a control implying there is somewhere else to be. */}
+            <SchoolSwitcher />
+            <ThemeToggle />
+            <AccountMenu />
+          </>
+        }
+      >
+        {children}
+      </SchoolShell>
     </>
   )
 }

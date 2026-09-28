@@ -357,10 +357,50 @@ No logo is the normal state for a new school. The fallback is the school's initi
 
 ---
 
+## Navigation shell
+
+**Added 2026-09-28.** Every staff-facing portal — admin, school, network, Teacher Hub — renders
+inside `components/layout/app-shell.tsx`. The parent portal does not; see below.
+
+**Why a sidebar replaced the top row.** The school portal had nine sections and the admin panel
+seven, both in a horizontally scrolling row. A scrolling nav degrades as a product grows in two
+ways: sections past the fold are invisible rather than merely further away, and a flat list gives
+the reader no way to tell which three of nine concern money. A vertical sidebar has room for
+headings, and headings are what turn a list into a map.
+
+**Groups are named for the job, not the table.** "Money", "People", "Teaching" — an administrator
+chasing arrears looks in one place. `Fees & Payments & Invoices` is three words for one job.
+
+**The school's brand colour is an accent, never the chrome.** Per-school theming is supported, and
+painting the sidebar in a school's colour is the obvious move and a trap: a school whose brand is
+near-black gets an unreadable nav, and the live WCAG audit on `/design` would fail the surface the
+reader uses most. The brand appears on the active indicator and the logo — recognisable, and
+legible at any brand colour.
+
+**A group whose items are all filtered out renders nothing**, heading included. An empty "Money"
+heading is a worse signal than absence: it says something is here that you cannot have.
+
+**Collapsed state and closed groups persist** in `localStorage`, read after mount rather than
+during render — reading storage while rendering makes server and client markup disagree and
+produces a hydration error. Every access is wrapped in try/catch, because `localStorage` throws
+outright in a private window rather than returning null.
+
+**Badges are the reason a sidebar earns its width.** A count of open incidents beside the link is
+the difference between a menu and a dashboard: three unverified payments is work, and seeing it
+without navigating is the point.
+
+**The parent portal is the deliberate exception.** It is read on a phone almost exclusively, and
+240px of sidebar on a 375px screen is most of the screen. It gets thumb-reachable bottom tabs, a
+sidebar only at desktop widths, and `env(safe-area-inset-bottom)` padding so the last tab is not
+under the iPhone home indicator. Five destinations do not deserve a hidden menu.
+
+---
+
 ## Change Log
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-09-28 | **Sidebar shell replaces the top navigation on every staff portal** | Nine sections in a scrolling row gave no grouping and hid items past the fold. Groups named for the job; brand colour demoted to an accent so a dark brand cannot make the nav fail the contrast audit; parent portal kept phone-first with bottom tabs. |
 | 2026-08-16 | Initial version — token layer, colour hierarchy, typography, component rules | Layer 1 (Frontend) had no foundation document; Phase 4 needed one before any screen |
 | 2026-08-16 | Documented the derived-scale approach and the measured brand-palette contrast failures | Five of six brand colours fail AA as text; recording the measurements prevents the decision being relitigated by eye |
 | 2026-08-16 | Per-school theming defined — scope, propagation, guardrail, logo fallback | ADR-043 |

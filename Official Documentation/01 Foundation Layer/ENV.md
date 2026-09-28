@@ -72,6 +72,37 @@ SENTRY_PROJECT=zsms-web
 
 ---
 
+### AI generators (`packages/ai`)
+
+```bash
+# WHICH generator runs. `template` (or unset) = the deterministic scaffold; `claude` =
+# Anthropic. Separate from the keys ON PURPOSE: `resolveGenerator()` deliberately ignores
+# ANTHROPIC_API_KEY, because a key appearing in an environment is not the same as a
+# curriculum knowledge base having been ingested and a prompt reviewed. A generator that
+# switches itself on when a variable appears is how an untested path reaches a paying teacher.
+AI_GENERATOR=template
+
+# Anthropic — generation: lesson plans, quizzes, homework, and later the AI assistant.
+ANTHROPIC_API_KEY=sk-ant-...
+
+# OpenAI — embeddings (`text-embedding-3-small`) for the lesson-planner RAG pipeline, and a
+# fallback generator if Anthropic is unavailable. Not required for `AI_GENERATOR=claude`:
+# the first curriculum store is relational, because subject + grade + topic are exact
+# lookups and similarity search is the wrong tool for a question with a known key.
+OPENAI_API_KEY=sk-...
+```
+
+**Local development puts these in the repo-root `.env.local`, not `apps/web/.env.local`** —
+Turborepo reads root env for everything in `turbo.json`'s `globalEnv`, and all three names are
+listed there. `env.local.template` section 7 is the committed reference.
+
+**A key here cannot produce an unbounded bill.** Every generation is metered against the AI
+credit ledger (`0132`), each row recording the model, token counts and real USD cost. An empty
+wallet is refused with the shortfall stated *before* the model is invoked, and the prices and
+allowances are configuration rows rather than code.
+
+---
+
 ## Supabase Edge Function Secrets
 
 Set via: `supabase secrets set KEY=value`
@@ -152,20 +183,15 @@ RAILWAY_DATABASE_URL=postgresql://...
 
 ### AI / Claude API
 
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-# Which teaching-resource generator the Teacher Hub uses. Unset or `template` gives the
-# deterministic scaffold, which is the only provider that exists today.
-#
-# `resolveGenerator()` reads THIS and deliberately ignores ANTHROPIC_API_KEY: a key
-# appearing in an environment is not the same as a curriculum knowledge base having been
-# ingested and a prompt reviewed, and a generator that switches itself on when a variable
-# appears is how an untested path reaches a paying teacher.
-AI_GENERATOR=template
-# Used for AI assistant (System 2) and lesson plan generation (System 3)
-OPENAI_API_KEY=sk-...
-# Used for text-embedding-3-small in the lesson planner RAG pipeline
-```
+> **These are NOT Edge Function secrets, despite this section's placement.** Corrected
+> 2026-09-28. `packages/ai` runs inside `apps/web`'s API routes — `supabase/functions/` is
+> still empty — so they belong with the **Web App** variables above, and that is where the
+> canonical listing now lives. Kept here because the AI module documents reference this
+> section.
+>
+> They must also appear in **`turbo.json`'s `globalEnv`**, or Turborepo neither passes them
+> to the build nor invalidates its cache when they change — so flipping `AI_GENERATOR` would
+> appear to do nothing against a warm cache.
 
 ### Integration Connectors OAuth
 
@@ -256,6 +282,7 @@ The following are stored in the database per school, not in environment variable
 |---|---|---|
 | 2026-04-26 | Initial complete draft | Environment reference |
 | 2026-04-26 | Added ANTHROPIC_API_KEY and OPENAI_API_KEY | AI module — Claude API and embeddings |
+| 2026-09-28 | **Moved the AI variables to the Web App section and added `AI_GENERATOR`** | They were filed under Edge Function secrets, but `packages/ai` runs in `apps/web`'s API routes and `supabase/functions/` is empty. Also added all three to `turbo.json`'s `globalEnv`, without which Turborepo neither passes them to the build nor invalidates its cache when they change. |
 | 2026-04-26 | Added integration connector OAuth client credentials | Accounting and CRM connectors |
 | 2026-04-26 | Added META_APP_SECRET and HMAC variables | WhatsApp webhook signature verification |
 | 2026-04-26 | Added FIELD_ENCRYPTION_KEY | Loan module sensitive field encryption |

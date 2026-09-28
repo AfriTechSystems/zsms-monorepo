@@ -21,7 +21,10 @@
     "CLERK_SECRET_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
     "JOB_QUEUE_PROVIDER",
-    "BULLMQ_REDIS_URL"
+    "BULLMQ_REDIS_URL",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "AI_GENERATOR"
   ],
   "tasks": {
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", "!.next/cache/**"] },

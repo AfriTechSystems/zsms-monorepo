@@ -578,7 +578,7 @@ GRANT EXECUTE ON FUNCTION public.admin_discard_unprovisioned_school(UUID) TO aut
 
 COMMENT ON FUNCTION public.admin_discard_unprovisioned_school(UUID) IS
   'Removes a school whose Clerk organisation was never created. Refuses once one is attached — a '
-  'provisioned school may hold records prohibition 8 protects. The identifier IS reused — it was
+  'provisioned school may hold records prohibition 8 protects. The identifier IS reused — it was '
   'never issued to anybody.';
 
 -- === MIGRATION END ===

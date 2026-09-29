@@ -24,7 +24,7 @@
 import type { JSX, ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Printer, Trash2 } from 'lucide-react'
+import { Download, Printer, Trash2 } from 'lucide-react'
 
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
@@ -94,6 +94,19 @@ export default function ResourcePage(): JSX.Element {
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [format, setFormat] = useState('pdf')
+
+  /**
+   * A plain navigation rather than a fetch-and-blob.
+   *
+   * The endpoint sets `Content-Disposition: attachment`, so the browser downloads it and stays on
+   * this page. Fetching it into memory to build an object URL would double the memory for a file
+   * the browser can stream, and would lose the server's filename — which carries the subject,
+   * grade and topic, and is the whole reason the download is recognisable in a crowded folder.
+   */
+  const download = (): void => {
+    window.location.href = `/api/teacher/hub/resources/${params.id}/export?format=${format}`
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -169,9 +182,27 @@ export default function ResourcePage(): JSX.Element {
         backTo="/teacher/library"
         backLabel="My library"
         actions={
-          <div className="flex items-center gap-2 print:hidden">
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
             <Badge variant="neutral">{KIND_LABELS[resource.resource_kind] ?? resource.resource_kind}</Badge>
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
+            {/*
+              A plain select rather than a styled menu: it is three options on a screen a teacher
+              visits to read, and the native control is keyboard- and screen-reader-correct on every
+              device without any work.
+            */}
+            <select
+              aria-label="Download format"
+              value={format}
+              onChange={(e) => setFormat(e.target.value)}
+              className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text"
+            >
+              <option value="pdf">PDF</option>
+              <option value="docx">Word (.docx)</option>
+            </select>
+            <Button variant="outline" size="sm" onClick={() => download()}>
+              <Download className="size-4" aria-hidden />
+              Download
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => window.print()}>
               <Printer className="size-4" aria-hidden />
               Print
             </Button>

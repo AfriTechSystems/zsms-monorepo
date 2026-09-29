@@ -18,6 +18,7 @@
     "@zsms/auth-provider": "*",
     "@zsms/config": "*",
     "@zsms/design-tokens": "*",
+    "@zsms/documents": "*",
     "@zsms/queue": "*",
     "@zsms/storage": "*",
     "@zsms/types": "*",

@@ -86,6 +86,84 @@ export function text(
   })
 }
 
+/**
+ * Wrapped, paginating body text — the counterpart to `text()`, which truncates.
+ *
+ * Truncation is correct for a receipt: a payer's name running across the amount column is worse
+ * than one ending in an ellipsis. It is wrong for a lesson plan, where the words ARE the document
+ * and a clipped learning outcome is a wrong learning outcome.
+ *
+ * Breaking on spaces means a very long unbroken token (a URL, say) still overflows rather than
+ * being chopped mid-word. That is the better failure: a visibly overflowing URL is obviously
+ * wrong, while a silently chopped one looks like a real address and is not.
+ */
+const NEWLINE = '\n'
+
+export function paragraph(
+  doc: Doc,
+  value: string,
+  opts: {
+    x?: number
+    size?: number
+    bold?: boolean
+    color?: ReturnType<typeof rgb>
+    width?: number
+    leading?: number
+  } = {},
+): void {
+  const size = opts.size ?? 10
+  const font = opts.bold ? doc.bold : doc.font
+  const x = opts.x ?? MARGIN
+  const width = opts.width ?? A4.width - MARGIN * 2 - (x - MARGIN)
+  const leading = opts.leading ?? size * 1.45
+
+  const lines: string[] = []
+  // Explicit newline rather than a literal, so a generator emitting multi-line prose keeps its
+  // paragraph breaks instead of having them collapsed into one run of words.
+  for (const rawLine of value.split(NEWLINE)) {
+    let current = ''
+    for (const word of rawLine.split(/\s+/)) {
+      if (word === '') continue
+      const candidate = current === '' ? word : `${current} ${word}`
+      if (font.widthOfTextAtSize(candidate, size) > width && current !== '') {
+        lines.push(current)
+        current = word
+      } else {
+        current = candidate
+      }
+    }
+    lines.push(current)
+  }
+
+  for (const line of lines) {
+    // Checked per LINE, not per paragraph: a long paragraph starting near the foot of a page must
+    // break across it rather than run off the bottom.
+    if (needsPage(doc, leading)) newPage(doc)
+    doc.page.drawText(line, { x, y: doc.y, size, font, color: opts.color ?? INK })
+    doc.y -= leading
+  }
+}
+
+/** A bulleted list. The bullet hangs, so wrapped lines align under the text rather than the dot. */
+export function bullets(
+  doc: Doc,
+  items: string[],
+  opts: { x?: number; size?: number; width?: number } = {},
+): void {
+  const x = opts.x ?? MARGIN
+  const size = opts.size ?? 10
+  for (const item of items) {
+    if (needsPage(doc, size * 1.45)) newPage(doc)
+    doc.page.drawText('•', { x, y: doc.y, size, font: doc.font, color: MUTED })
+    paragraph(doc, item, {
+      x: x + 14,
+      size,
+      width: (opts.width ?? A4.width - MARGIN * 2) - 14,
+    })
+    move(doc, 2)
+  }
+}
+
 /** Right-aligns at `right`. Money columns must align on the decimal, and a
  *  left-drawn amount column does not. */
 export function textRight(

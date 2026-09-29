@@ -135,8 +135,19 @@ export function fromPostgrestError(error: { code?: string; message: string }): N
   }
 }
 
-/** Wraps a handler so an unexpected throw becomes a clean 500, never a stack trace. */
-export async function guard(handler: () => Promise<NextResponse>): Promise<NextResponse> {
+/**
+ * Wraps a handler so an unexpected throw becomes a clean 500, never a stack trace.
+ *
+ * Generic over the success type rather than fixed to `NextResponse`, because the job this does —
+ * catching a throw and answering with a safe error — has nothing to do with the response format. A
+ * route returning a PDF or a `.docx` needs exactly the same protection, and the alternative was a
+ * second near-identical `guardBinary()` that would drift from this one.
+ *
+ * Existing callers are unaffected: a handler returning `NextResponse` still yields `NextResponse`.
+ */
+export async function guard<T extends Response>(
+  handler: () => Promise<T>,
+): Promise<T | NextResponse> {
   try {
     return await handler()
   } catch (err) {

@@ -111,6 +111,13 @@ export interface ReportCardData {
 
 export interface RenderedDocument {
   bytes: Uint8Array
-  contentType: 'application/pdf'
+  /**
+   * Widened from the PDF literal when Word export arrived. The exact Office string matters: a
+   * `.docx` served as `application/octet-stream` downloads as an unnamed blob on some Android
+   * browsers rather than opening in Word.
+   */
+  contentType:
+    | 'application/pdf'
+    | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   suggestedFilename: string
 }

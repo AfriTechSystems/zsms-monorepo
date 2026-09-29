@@ -218,6 +218,12 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
   return finish(doc, `report-${data.studentCode}-${data.academicYear}-T${data.termNumber}.pdf`)
 }
 
+export type { TeachingResourceDocument } from './teaching-resource'
+export {
+  renderTeachingResourcePdf,
+  renderTeachingResourceDocx,
+} from './teaching-resource'
+
 export type {
   DocType,
   ReceiptData,

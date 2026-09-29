@@ -70,43 +70,50 @@ export function AdminShell({
     }
   }, [])
 
+  /**
+   * Grouped by what AfriTech is DOING, not by which table a screen reads.
+   *
+   * "Commercial" became "Revenue" because it said what the group was about rather than what it
+   * was for, and per-student pricing now has a home a person would look in — it had none at all,
+   * so the pricing model intended for most schools was configurable only by SQL.
+   */
   const groups: NavGroup[] = [
     {
       label: null,
       items: [{ path: '', label: 'Overview', icon: Gauge, exact: true }],
     },
     {
-      // What AfriTech sells to, which is the thing most sessions start by looking up.
+      // Who AfriTech sells to. The thing most sessions start by looking up.
       label: 'Customers',
       items: [
         { path: '/schools', label: 'Schools', icon: Building2 },
-        { path: '/networks', label: 'Networks', icon: Network },
+        { path: '/networks', label: 'School networks', icon: Network },
         { path: '/teacher-hub', label: 'Teacher Hub', icon: Sparkles },
       ],
     },
     {
+      // What is actively going wrong. Above Revenue because an open incident is urgent and an
+      // invoice is not.
       label: 'Operations',
       items: [
         { path: '/health', label: 'School health', icon: HeartPulse },
-        // The badge is why this group is above Commercial: an open incident is the only thing
-        // here that is actively going wrong.
         { path: '/incidents', label: 'Incidents', icon: Siren, badge: openIncidents },
       ],
     },
     {
-      // The AI's grounding. Under Operations rather than Commercial because an empty curriculum
-      // store is an operational problem — generation still runs, ungrounded and uncited.
-      label: 'AI',
+      label: 'Revenue',
       items: [
-        { path: '/curriculum', label: 'Curriculum', icon: BookMarked },
+        { path: '/billing', label: 'Invoices & billing', icon: Receipt },
+        { path: '/pricing', label: 'Plans & pricing', icon: Wallet },
+        { path: '/features', label: 'Feature matrix', icon: ToggleRight },
       ],
     },
     {
-      label: 'Commercial',
+      // The AI's grounding and its running cost. Operational rather than commercial: an empty
+      // curriculum store does not stop generation, it makes it ungrounded and uncited.
+      label: 'AI',
       items: [
-        { path: '/pricing', label: 'Pricing & tiers', icon: Wallet },
-        { path: '/features', label: 'Features', icon: ToggleRight },
-        { path: '/billing', label: 'Billing', icon: Receipt },
+        { path: '/curriculum', label: 'Curriculum', icon: BookMarked },
       ],
     },
   ]

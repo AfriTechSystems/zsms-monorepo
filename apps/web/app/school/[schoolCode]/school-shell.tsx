@@ -57,15 +57,38 @@ export function SchoolShell({
   children: ReactNode
   headerActions?: ReactNode
 }): JSX.Element {
+  /**
+   * Grouped by the JOB, not by the data type — which is the correction this file is on its second
+   * attempt at.
+   *
+   * The first version had a "Money" group holding both **Fees** and **Subscription**, on the
+   * reasoning that both concern money. That is a data-model grouping, and it puts two different
+   * people's work in one drawer: the bursar chases a parent's arrears, the owner pays AfriTech.
+   * They are different jobs, different permissions, and different frequencies — daily against a
+   * few times a year.
+   *
+   * So **Finance means student money and nothing else**, and the school's own subscription sits in
+   * Settings with the rest of the account administration. `SCHOOL_CONFIG.md` draws the same line:
+   * its Settings panel holds fee *configuration* while the fees module stays operational.
+   *
+   * Bulk import moved to Students for the same reason. Importing a roll is a pupil job somebody
+   * does at the start of a term; it was under Settings only because it happens rarely.
+   */
   const groups: NavGroup[] = [
     {
       label: null,
       items: [{ path: '', label: 'Dashboard', icon: LayoutDashboard, exact: true }],
     },
     {
-      label: 'People',
+      label: 'Students',
       items: [
         { path: '/students', label: 'Pupils', icon: Users, needs: 'students:read' },
+        { path: '/students/import', label: 'Bulk import', icon: FileSpreadsheet, needs: 'students:write' },
+      ],
+    },
+    {
+      label: 'Staff',
+      items: [
         { path: '/staff', label: 'Staff', icon: UserCog, needs: 'staff:read' },
         {
           path: '/teaching',
@@ -79,42 +102,32 @@ export function SchoolShell({
     {
       label: 'Teaching',
       items: [
-        // A teacher's own scope, first in the group they will use daily.
-        { path: '/teaching/my', label: 'My teaching', icon: GraduationCap, needs: 'teaching:own' },
+        // A teacher's own scope, first in the group they open every morning.
+        { path: '/teaching/my', label: 'My classes', icon: GraduationCap, needs: 'teaching:own' },
         { path: '/attendance', label: 'Attendance', icon: CalendarCheck, needs: 'attendance:read' },
         { path: '/results', label: 'Results', icon: ClipboardList, needs: 'results:read' },
       ],
     },
     {
-      // Named for what it is, not for the tables under it. "Fees & Payments & Invoices" is
-      // three words for one job.
-      label: 'Money',
+      // Student money. Nothing else belongs here.
+      label: 'Finance',
       items: [
-        { path: '/fees', label: 'Fees', icon: Wallet, needs: 'fees:read' },
-        /**
-         * Gated on `fees:read` rather than an administrative capability, because there is no
-         * `school:manage` in `lib/roles` — an earlier draft of this file invented one and did
-         * not compile. The school's own subscription is money, so the money capability is the
-         * honest gate rather than the nearest-sounding one.
-         */
-        { path: '/settings/subscription', label: 'Subscription', icon: Receipt, needs: 'fees:read' },
+        { path: '/fees', label: 'Fees & payments', icon: Wallet, needs: 'fees:read' },
       ],
     },
     {
-      label: 'Communicate',
+      label: 'Communication',
       items: [
         { path: '/announcements', label: 'Announcements', icon: Megaphone },
       ],
     },
     {
+      // Account administration. Collapsed by default: set up once, visited rarely.
       label: 'Settings',
-      // Collapsed by default: configuration is set up once and visited rarely, so it should not
-      // occupy the reader's attention every day.
       defaultCollapsed: true,
       items: [
-        // Defining what is recorded about a pupil is a pupil-write act.
         { path: '/settings/fields', label: 'Pupil fields', icon: SlidersHorizontal, needs: 'students:write' },
-        { path: '/students/import', label: 'Bulk import', icon: FileSpreadsheet, needs: 'students:write' },
+        { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
       ],
     },
   ]

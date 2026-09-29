@@ -368,8 +368,20 @@ ways: sections past the fold are invisible rather than merely further away, and 
 the reader no way to tell which three of nine concern money. A vertical sidebar has room for
 headings, and headings are what turn a list into a map.
 
-**Groups are named for the job, not the table.** "Money", "People", "Teaching" — an administrator
-chasing arrears looks in one place. `Fees & Payments & Invoices` is three words for one job.
+**Groups are named for the job, not the data type** — and the first attempt got this wrong in an
+instructive way.
+
+It had a **Money** group holding both *Fees* and *Subscription*, reasoning that both concern money.
+That is a data-model grouping. It puts two different people's work in one drawer: the bursar chases
+a parent's arrears daily, the owner pays AfriTech a few times a year. Different jobs, different
+permissions, different frequency.
+
+So **Finance means student money and nothing else**, and the school's own subscription sits in
+Settings with the rest of the account administration. `SCHOOL_CONFIG.md` draws the same line — its
+Settings panel holds fee *configuration* while the fees module stays operational.
+
+The test for a group name: could two people with different roles both say "that is my section"? If
+so, it is the wrong grouping.
 
 **The school's brand colour is an accent, never the chrome.** Per-school theming is supported, and
 painting the sidebar in a school's colour is the obvious move and a trap: a school whose brand is
@@ -434,6 +446,7 @@ inconvenience.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-09-28 | **Unfinished-form drafts, on an allowlist** | Intermittent connectivity is a real constraint in Zambian schools. Allowlist rather than denylist because a denylist persists a newly added sensitive field by default; enrolment and payment forms excluded outright; import mapping dropped because the CSV it describes is never persisted. |
+| 2026-09-29 | **Regrouped: Finance means student money only; Subscription moved to Settings** | The first grouping put Fees and Subscription together because both concern money — a data-model grouping that puts the bursar's daily work and the owner's occasional work in one drawer. AfriTech admin regrouped to Customers / Operations / Revenue / AI, and per-student pricing finally has a home a person would look in. |
 | 2026-09-28 | **Sidebar shell replaces the top navigation on every staff portal** | Nine sections in a scrolling row gave no grouping and hid items past the fold. Groups named for the job; brand colour demoted to an accent so a dark brand cannot make the nav fail the contrast audit; parent portal kept phone-first with bottom tabs. |
 | 2026-08-16 | Initial version — token layer, colour hierarchy, typography, component rules | Layer 1 (Frontend) had no foundation document; Phase 4 needed one before any screen |
 | 2026-08-16 | Documented the derived-scale approach and the measured brand-palette contrast failures | Five of six brand colours fail AA as text; recording the measurements prevents the decision being relitigated by eye |

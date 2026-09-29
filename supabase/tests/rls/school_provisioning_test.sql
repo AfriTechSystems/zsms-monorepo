@@ -154,7 +154,7 @@ SELECT is(
 SELECT is(
   (SELECT owner_email || ' / ' || owner_first_name || ' ' || owner_last_name
      FROM public.school_onboarding
-    WHERE school_id = (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002')),
+    WHERE school_id = (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
   'grace@sunrise.example / Grace Mwale',
   'the invited owner is recorded — staff_members cannot hold them until they accept'
 );
@@ -193,7 +193,7 @@ SELECT is(
 
 SELECT is(
   (SELECT completion_pct FROM public.school_onboarding_completion(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002'))),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'))),
   0,
   'so completion starts at 0%'
 );
@@ -245,7 +245,7 @@ SELECT throws_ok(
 -- ---------------------------------------------------------------------------
 SELECT throws_ok(
   format($$ SELECT public.admin_attach_clerk_org(%L, 'not-a-clerk-id') $$,
-         (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002')),
+         (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
   '22023',
   NULL,
   'a value that is not a Clerk organisation id is refused'
@@ -253,7 +253,7 @@ SELECT throws_ok(
 
 SELECT ok(
   (SELECT public.admin_attach_clerk_org(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002'), 'org_sunrise')),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'), 'org_sunrise')),
   'the real organisation id attaches'
 );
 
@@ -272,7 +272,7 @@ SELECT is(
  */
 SELECT throws_ok(
   format($$ SELECT public.admin_attach_clerk_org(%L, 'org_somebody_else') $$,
-         (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002')),
+         (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
   '42710',
   NULL,
   'a second attach is refused — repointing clerk_org_id transfers the whole tenant'
@@ -283,7 +283,7 @@ SELECT throws_ok(
 -- ---------------------------------------------------------------------------
 SELECT throws_ok(
   format($$ SELECT * FROM public.admin_activate_school(%L, '   ') $$,
-         (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002')),
+         (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
   '22023',
   NULL,
   'activation with a blank note is refused — the note IS the verification record'
@@ -291,7 +291,7 @@ SELECT throws_ok(
 
 SELECT throws_ok(
   format($$ SELECT * FROM public.admin_activate_school(%L, 'Spoke to the head teacher.') $$,
-         (SELECT id FROM public.schools WHERE school_id = 'ZM-NDL-0001')),
+         (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-NDL-0001')),
   '55000',
   NULL,
   'and a school with no Clerk organisation cannot be activated at all'
@@ -299,7 +299,7 @@ SELECT throws_ok(
 
 SELECT is(
   (SELECT status FROM public.admin_activate_school(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002'),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'),
      'Spoke to Grace Mwale on +260977123456. Confirmed the address and the ministry number.')),
   'active',
   'with an organisation and a note, the school activates'
@@ -308,7 +308,7 @@ SELECT is(
 SELECT ok(
   (SELECT verification_note IS NOT NULL AND activated_at IS NOT NULL
      FROM public.school_onboarding
-    WHERE school_id = (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002')),
+    WHERE school_id = (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
   '...and the call is recorded against the onboarding row'
 );
 
@@ -317,7 +317,7 @@ SELECT ok(
 -- ---------------------------------------------------------------------------
 SELECT throws_ok(
   format($$ SELECT public.admin_discard_unprovisioned_school(%L) $$,
-         (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002')),
+         (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
   '55000',
   NULL,
   'a provisioned school cannot be discarded — it may hold records prohibition 8 protects'
@@ -325,7 +325,7 @@ SELECT throws_ok(
 
 SELECT ok(
   (SELECT public.admin_discard_unprovisioned_school(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-NDL-0001'))),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-NDL-0001'))),
   'one whose organisation was never created can be'
 );
 
@@ -358,26 +358,26 @@ SELECT is(
 -- ---------------------------------------------------------------------------
 UPDATE public.onboarding_checklists
    SET is_complete = TRUE, completed_at = NOW()
- WHERE school_id = (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002')
+ WHERE school_id = (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')
    AND item_key IN ('school_profile', 'grade_structure');
 
 SELECT is(
   (SELECT completion_pct FROM public.school_onboarding_completion(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002'))),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'))),
   20,
   'school_profile (8) + grade_structure (12) = 20% of a 100-weight catalogue'
 );
 
 SELECT is(
   (SELECT critical_pct FROM public.school_onboarding_completion(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002'))),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'))),
   33,
   '...and 20 of the 60 critical weight, which rounds to 33%'
 );
 
 SELECT is(
   (SELECT items_complete FROM public.school_onboarding_completion(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002'))),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'))),
   2,
   'with two of fourteen steps done'
 );
@@ -422,7 +422,7 @@ SELECT is(
 
 SELECT is(
   (SELECT completion_pct FROM public.school_onboarding_completion(
-     (SELECT id FROM public.schools WHERE school_id = 'ZM-LSK-0002'))),
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'))),
   20,
   '...and their own completion, through the same invoker-rights function AfriTech uses'
 );

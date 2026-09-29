@@ -4324,6 +4324,7 @@ export type Database = {
           students_total: number
         }[]
       }
+      province_for_city: { Args: { p_city_code: string }; Returns: string }
       publish_results: {
         Args: {
           p_academic_year: string

@@ -142,28 +142,46 @@ export async function PATCH(
     if (!parsed.success) return validationFailed(parsed.error)
 
     const input = parsed.data
-    const patch: Record<string, unknown> = {}
-    if (input.status !== undefined) patch['status'] = input.status
-    if (input.subscriptionTier !== undefined) patch['subscription_tier'] = input.subscriptionTier
-    if (input.financeModuleEnabled !== undefined) patch['finance_module_enabled'] = input.financeModuleEnabled
-    if (input.whatsappEnabled !== undefined) patch['whatsapp_enabled'] = input.whatsappEnabled
 
+    /**
+     * A named function rather than a table write, since `0140`.
+     *
+     * `authenticated` no longer holds UPDATE on `schools.subscription_tier`, `status`,
+     * `trial_ends_at` or the module flags — because before `0140` it did, on every column, and a
+     * school OWNER could therefore set their own tier to enterprise and extend their own trial by
+     * a decade. The table grant is now the profile columns only, and every commercial term moves
+     * through `admin_update_school_commercial()`, which checks AfriTech itself.
+     *
+     * NULL means "leave it alone", so sending one field does not blank the rest.
+     */
     const { data, error } = await client
-      .from('schools')
-      .update(patch)
-      .eq('id', id)
-      .select('id, school_id, name, status, subscription_tier, finance_module_enabled, whatsapp_enabled, updated_at')
+      .rpc('admin_update_school_commercial', {
+        p_school_id: id,
+        p_status: input.status ?? null,
+        p_subscription_tier: input.subscriptionTier ?? null,
+        p_finance_module_enabled: input.financeModuleEnabled ?? null,
+        p_whatsapp_enabled: input.whatsappEnabled ?? null,
+        p_trial_ends_at: null,
+        p_subscription_ends_at: null,
+      })
+      .maybeSingle()
 
-    if (error) return fromPostgrestError(error)
-
-    // Zero rows means the policy matched nothing. For a school-scoped route that
-    // would mean "not the owner"; here it means the caller is not an AfriTech
-    // admin after all, so the courtesy check above and the policy disagree —
-    // worth surfacing as FORBIDDEN rather than as an empty success.
-    if (!data || data.length === 0) {
-      return fail('FORBIDDEN', 'This change was refused. Platform administrator rights are required.')
+    if (error) {
+      if (error.code === '42501') return fail('FORBIDDEN', error.message)
+      if (error.code === 'P0002') return fail('NOT_FOUND', error.message)
+      return fromPostgrestError(error)
     }
 
-    return ok(data[0])
+    /**
+     * The function returns one row rather than a set, so this is a null check rather than the
+     * length check it used to be. A refusal now arrives as the `42501` handled above — the
+     * function raises rather than matching no rows — which is a clearer signal than an empty
+     * result that could equally have meant "no such school".
+     */
+    if (!data) {
+      return fail('NOT_FOUND', 'No school with that id.')
+    }
+
+    return ok(data)
   })
 }

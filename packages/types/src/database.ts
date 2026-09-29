@@ -3602,6 +3602,29 @@ export type Database = {
           tier_name: string
         }[]
       }
+      admin_update_school_commercial: {
+        Args: {
+          p_finance_module_enabled?: boolean
+          p_school_id: string
+          p_status?: string
+          p_subscription_ends_at?: string
+          p_subscription_tier?: string
+          p_trial_ends_at?: string
+          p_whatsapp_enabled?: boolean
+        }
+        Returns: {
+          finance_module_enabled: boolean
+          id: string
+          name: string
+          school_id: string
+          status: string
+          subscription_ends_at: string
+          subscription_tier: string
+          trial_ends_at: string
+          updated_at: string
+          whatsapp_enabled: boolean
+        }[]
+      }
       admin_update_tier: {
         Args: {
           p_actor?: string

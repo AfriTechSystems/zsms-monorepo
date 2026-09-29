@@ -3732,6 +3732,14 @@ export type Database = {
         Args: { p_left: string; p_right: string }
         Returns: boolean
       }
+      admin_abandon_unprovisioned_school: {
+        Args: { p_reason?: string; p_school_id: string }
+        Returns: {
+          out_id: string
+          out_school_id: string
+          out_status: string
+        }[]
+      }
       admin_activate_school: {
         Args: { p_school_id: string; p_verification_note: string }
         Returns: {
@@ -3787,10 +3795,6 @@ export type Database = {
       }
       admin_delete_tier_price_band: {
         Args: { p_band_id: string }
-        Returns: boolean
-      }
-      admin_discard_unprovisioned_school: {
-        Args: { p_school_id: string }
         Returns: boolean
       }
       admin_publish_prompt_template: {

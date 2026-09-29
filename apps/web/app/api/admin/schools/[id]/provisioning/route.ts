@@ -2,7 +2,7 @@
  * Recovery for a school whose Clerk organisation was never created.
  *
  *   POST   /api/admin/schools/[id]/provisioning — retry: create the organisation and attach it
- *   DELETE /api/admin/schools/[id]/provisioning — discard the reservation entirely
+ *   DELETE /api/admin/schools/[id]/provisioning — abandon the attempt
  *
  * Spec: `Official Documentation/06 School and Tenant Management/SCHOOL_SETUP.md`
  *
@@ -13,16 +13,26 @@
  * so it is reachable by no school user at all, and visible only to AfriTech through
  * `is_afritech_admin()`. There is no window in which it is half-open.
  *
- * That is also what makes DELETE safe here rather than a soft delete. Prohibition 8 protects
- * pupils, fee records, payments and exam results; a school nobody could ever write to has none of
- * those. `admin_discard_unprovisioned_school()` enforces the precondition rather than trusting
- * this file to have checked it — it refuses the moment a real organisation is attached.
+ * ## DELETE does not delete, and cannot
  *
- * ## The identifier is spent either way
+ * The verb is HTTP's; the effect is a status change to `terminated`. `0144` did try to delete the
+ * row, on the reasoning that a school nobody could reach holds nothing worth protecting — true,
+ * and beside the point. Creating a school writes an `audit_logs` row, that table references
+ * `schools` by foreign key, and `0131` makes it immutable by trigger. So the delete is refused,
+ * the FK cannot be made to cascade, and removing the audit row first is the one thing an audit
+ * trail exists to prevent.
  *
- * Discarding `ZM-LSK-0007` does not release the number. The next school gets `0008`. Business
- * rule 1 makes identifiers permanent, and a reused number would mean two different schools held
- * the same one at different times — which is exactly the property that rule exists to prevent.
+ * **A school that was created cannot be erased, because its creation was recorded.** The feature
+ * changed rather than the audit trail.
+ *
+ * `admin_abandon_unprovisioned_school()` enforces the precondition rather than trusting this file
+ * to have checked it — it refuses the moment a real organisation is attached.
+ *
+ * ## The identifier stays spent
+ *
+ * The abandoned row survives, so `get_next_school_sequence()` counts past it and the next school
+ * in that city takes the following number. Which is what business rule 1 wanted, arrived at as a
+ * consequence of the audit trail rather than as a rule anybody had to enforce.
  */
 
 import { createOrganisation } from '@zsms/auth-provider/organisations'
@@ -116,13 +126,16 @@ export async function DELETE(
 
     const { id } = await params
 
-    const { error } = await client.rpc('admin_discard_unprovisioned_school', {
+    const { data, error } = await client.rpc('admin_abandon_unprovisioned_school', {
       p_school_id: id,
     })
 
     if (error) return fromPostgrestError(error)
 
-    return ok({ discarded: true })
+    const row = (data as unknown as Array<{ out_school_id: string; out_status: string }>)[0]
+    if (!row) return fail('NOT_FOUND', 'No such school.')
+
+    return ok({ schoolCode: row.out_school_id, status: row.out_status, abandoned: true })
   })
 }
 

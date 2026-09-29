@@ -127,8 +127,8 @@ export function OnboardingPanel({
           <p className="mt-2 text-muted-foreground">
             The identifier <span className="font-mono">{schoolCode}</span> is reserved and the
             record exists, but provisioning did not finish. Nobody can sign in to it, no invitation
-            can be sent, and it cannot be activated. Retry, or discard it and start again — the
-            identifier is spent either way, so the next school will take the following number.
+            can be sent, and it cannot be activated. Retry, or abandon the attempt — either way the
+            identifier stays spent, so the next school in this city takes the following number.
           </p>
           <div className="mt-stack flex flex-wrap gap-2">
             <Button
@@ -148,20 +148,23 @@ export function OnboardingPanel({
               disabled={busy !== null}
               onClick={() => {
                 const confirmed = window.confirm(
-                  `Discard ${schoolCode}?\n\n` +
-                    'The school record and its checklist are removed. This is only possible ' +
-                    'because nobody has ever been able to write to it. The identifier is not reused.',
+                  `Abandon ${schoolCode}?\n\n` +
+                    'It is marked terminated and kept. It cannot be deleted — creating it wrote ' +
+                    'an audit record, and those cannot be removed. The identifier stays spent.',
                 )
                 if (!confirmed) return
                 void run(
-                  'discard',
+                  'abandon',
                   () => apiSend(`/api/admin/schools/${schoolId}/provisioning`, 'DELETE', {}),
+                  // Back to the list: the school still exists but is terminated, and leaving the
+                  // operator on a page that now describes a dead record invites a second attempt
+                  // at the same button.
                   () => router.push('/admin/schools'),
                 )
               }}
             >
               <Trash2 aria-hidden="true" />
-              {busy === 'discard' ? 'Discarding…' : 'Discard'}
+              {busy === 'abandon' ? 'Abandoning…' : 'Abandon attempt'}
             </Button>
           </div>
         </div>

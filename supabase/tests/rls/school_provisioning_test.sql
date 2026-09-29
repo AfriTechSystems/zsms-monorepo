@@ -316,41 +316,48 @@ SELECT ok(
 -- Discarding.
 -- ---------------------------------------------------------------------------
 SELECT throws_ok(
-  format($$ SELECT public.admin_discard_unprovisioned_school(%L) $$,
+  format($$ SELECT * FROM public.admin_abandon_unprovisioned_school(%L) $$,
          (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
   '55000',
   NULL,
-  'a provisioned school cannot be discarded — it may hold records prohibition 8 protects'
-);
-
-SELECT ok(
-  (SELECT public.admin_discard_unprovisioned_school(
-     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-NDL-0001'))),
-  'one whose organisation was never created can be'
+  'a provisioned school cannot be abandoned — terminating a live school is a commercial decision'
 );
 
 SELECT is(
-  (SELECT COUNT(*)::INT FROM public.schools WHERE school_id = 'ZM-NDL-0001'),
-  0,
-  '...and it is gone, along with its checklist rows'
+  (SELECT out_status FROM public.admin_abandon_unprovisioned_school(
+     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-NDL-0001'))),
+  'terminated',
+  'one whose organisation was never created is marked terminated'
 );
 
 /**
- * The number IS handed out again, which is the opposite of the intuitive guess and is why it is
- * asserted rather than left to be discovered.
+ * NOT deleted, and this is the assertion that records why.
  *
- * `get_next_school_sequence()` is MAX+1 over the rows that exist, and the discard deleted one.
- * That is correct here: the discarded school was never reachable, so `ZM-NDL-0001` was never
- * issued to anybody, never printed on a receipt and never embedded in a pupil number. Business
- * rule 1 makes an identifier permanent for the school that HOLDS it — it does not reserve a
- * number nobody ever used.
+ * `0144` tried to delete it, on the reasoning that a school nobody could reach holds nothing worth
+ * protecting. True, and irrelevant: creating it wrote an `audit_logs` row, that table references
+ * `schools` by foreign key, and `0131` makes it immutable by trigger — so the row cannot be
+ * deleted, cannot be updated, and the FK cannot be made to cascade. A school that was created
+ * cannot be erased, because its creation was recorded.
+ */
+SELECT is(
+  (SELECT COUNT(*)::INT FROM public.schools WHERE school_id = 'ZM-NDL-0001'),
+  1,
+  '...and still exists, because the audit row from its creation cannot be removed'
+);
+
+/**
+ * And the identifier stays spent, which follows directly from the row surviving.
+ *
+ * `get_next_school_sequence()` is MAX+1 over the rows that exist; the abandoned row is still one
+ * of them, so the next school in Ndola takes `0002`. This is what business rule 1 wanted — and it
+ * arrives as a consequence of the audit trail rather than as a rule anybody had to write.
  */
 SELECT is(
   (SELECT school_id FROM public.admin_create_school(
      'Second Ndola School', 'day', 'primary', 'CBR', 'NDL',
      'Mary', 'Phiri', 'mary@ndola.example')),
-  'ZM-NDL-0001',
-  'and the number is reused — it was never issued to anybody'
+  'ZM-NDL-0002',
+  'and the abandoned identifier is not handed out again'
 );
 
 -- ---------------------------------------------------------------------------

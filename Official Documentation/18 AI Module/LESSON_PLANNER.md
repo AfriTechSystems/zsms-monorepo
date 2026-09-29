@@ -406,6 +406,7 @@ This transparency builds teacher trust and provides a quality signal — if a ge
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-09-29 | **Syllabus ingestion by document upload, with a verification step** | Hand-writing JSON was the only way in. Now: choose curriculum, subject and grade, upload a PDF or .docx, and the model proposes topic rows that a person checks and corrects before anything is written. The pattern is AI_CAPTURE.md's — extract, verify, then write — for the same reason: a misread topic code does not look misread. Codes the document did not supply are marked as inferred, because an invented code must never be shown to a teacher as a syllabus reference. Not metered against AI credits: an AfriTech admin has no wallet, and curriculum ingestion is platform work rather than a customer action. |
 | 2026-04-26 | Initial complete draft | AI module — Phase 3 feature with B2C product |
 | 2026-04-26 | RAG pipeline with pgvector | Knowledge base is the moat — generic LLM not sufficient |
 | 2026-04-26 | Standalone teacher account type confirmed | B2C lesson planner as independent revenue stream |

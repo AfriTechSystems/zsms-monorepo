@@ -46,6 +46,12 @@ export type { ModelSpec } from './providers/model-client'
 export type { LiveGeneratorConfig, PromptTemplate } from './providers/live'
 export { createLiveGenerator } from './providers/live'
 export { TEACHING_PACK_SCHEMA } from './schema'
+export type { CurriculumExtraction, ExtractedTopic } from './curriculum'
+export {
+  CURRICULUM_EXTRACTION_SCHEMA,
+  CURRICULUM_EXTRACTION_SYSTEM_PROMPT,
+  curriculumExtractionPrompt,
+} from './curriculum'
 
 import type { GenerationRequest, GenerationResult, Generator } from './types'
 import { templateGenerator } from './providers/template'

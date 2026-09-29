@@ -33,6 +33,7 @@ import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { StatCard } from '../../../components/ui/stat-card'
 import { useToast } from '../../../components/ui/toast'
+import { ExtractPanel } from './extract-panel'
 
 interface CoverageRow {
   country_code: string
@@ -202,13 +203,28 @@ export default function CurriculumPage(): JSX.Element {
               honest, but it is not the product.
             </p>
             <p className="mt-2">
-              ECZ syllabuses are published by the Examinations Council of Zambia and can be
-              transcribed into the format below. Start with one subject and grade — Grade 9
-              Mathematics is a good first slice — and check the output before doing more.
+              ECZ syllabuses are published by the Examinations Council of Zambia. Upload one below,
+              choose the subject and grade, and check what comes out before importing. Start with
+              a single slice — Grade 9 Mathematics is a good first one — and judge a generated
+              lesson plan against it before transcribing more.
             </p>
           </Alert>
         )}
 
+        <ExtractPanel onImported={() => void load()} />
+
+        {/*
+          The JSON path stays as a secondary route rather than the primary one it used to be.
+          It earns its place in two cases the upload cannot serve: correcting a handful of rows
+          without re-running an extraction, and importing at all when AI_GENERATOR is not `live`.
+          It is collapsed because asking an administrator to hand-write JSON as the FIRST option
+          was the complaint that prompted this screen.
+        */}
+        <details className="rounded-lg border border-border bg-surface">
+          <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-text">
+            Paste rows directly instead
+          </summary>
+          <div className="border-t border-border">
         <Card>
           <CardHeader>
             <CardTitle>Import syllabus topics</CardTitle>
@@ -252,6 +268,9 @@ export default function CurriculumPage(): JSX.Element {
             )}
           </CardContent>
         </Card>
+
+          </div>
+        </details>
 
         {loading ? (
           <TableSkeleton rows={5} columns={4} />

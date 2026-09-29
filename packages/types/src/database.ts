@@ -2387,6 +2387,54 @@ export type Database = {
           },
         ]
       }
+      school_term_dates: {
+        Row: {
+          academic_year: string
+          created_at: string
+          ends_on: string
+          id: string
+          school_id: string
+          starts_on: string
+          term_number: number
+          updated_at: string
+        }
+        Insert: {
+          academic_year: string
+          created_at?: string
+          ends_on: string
+          id?: string
+          school_id: string
+          starts_on: string
+          term_number: number
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string
+          created_at?: string
+          ends_on?: string
+          id?: string
+          school_id?: string
+          starts_on?: string
+          term_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_term_dates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_term_dates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           address: string | null
@@ -2394,12 +2442,14 @@ export type Database = {
           clerk_org_id: string
           country_code: string
           created_at: string
+          display_name: string | null
           email: string | null
           finance_module_enabled: boolean
           id: string
           level: string
           logo_url: string | null
           max_students: number | null
+          ministry_reg_number: string | null
           name: string
           phone: string | null
           school_id: string
@@ -2417,12 +2467,14 @@ export type Database = {
           clerk_org_id: string
           country_code?: string
           created_at?: string
+          display_name?: string | null
           email?: string | null
           finance_module_enabled?: boolean
           id?: string
           level: string
           logo_url?: string | null
           max_students?: number | null
+          ministry_reg_number?: string | null
           name: string
           phone?: string | null
           school_id: string
@@ -2440,12 +2492,14 @@ export type Database = {
           clerk_org_id?: string
           country_code?: string
           created_at?: string
+          display_name?: string | null
           email?: string | null
           finance_module_enabled?: boolean
           id?: string
           level?: string
           logo_url?: string | null
           max_students?: number | null
+          ministry_reg_number?: string | null
           name?: string
           phone?: string | null
           school_id?: string
@@ -3819,6 +3873,16 @@ export type Database = {
             Returns: string
           }
         | { Args: { p_subject_code: string }; Returns: string }
+      current_term: {
+        Args: { p_on_date?: string; p_school_id?: string }
+        Returns: {
+          academic_year: string
+          ends_on: string
+          is_between: boolean
+          starts_on: string
+          term_number: number
+        }[]
+      }
       curriculum_coverage: {
         Args: never
         Returns: {

@@ -30,6 +30,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Receipt,
+  Cog,
   SlidersHorizontal,
   UserCog,
   Users,
@@ -126,6 +127,14 @@ export function SchoolShell({
       label: 'Settings',
       defaultCollapsed: true,
       items: [
+        /**
+         * First in the group, and ungated: every member of staff can READ the school profile and
+         * the term calendar. The page renders what a role cannot change as disabled rather than
+         * hiding it — a teacher seeing the term dates is useful, and seeing that leadership sets
+         * them is informative rather than a dead end.
+         */
+        { path: '/settings', label: 'School settings', icon: Cog, exact: true },
+        // Defining what is recorded about a pupil is a pupil-write act.
         { path: '/settings/fields', label: 'Pupil fields', icon: SlidersHorizontal, needs: 'students:write' },
         { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
       ],

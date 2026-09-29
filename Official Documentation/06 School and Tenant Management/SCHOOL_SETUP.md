@@ -328,9 +328,32 @@ Each school card in the admin panel shows a "Contact" button that opens a quick 
 *Added 2026-09-29, when Path 1 was implemented. Everything above this section was written before
 development; this section is written from the applied schema.*
 
-**Path 1 is built. Path 2 is not.** A school is created through `POST /api/admin/schools/provision`
-and the *Add school* screen at `/admin/schools/new`. Self-registration has no route, no page and no
-public entry point.
+**Both paths are built.** AfriTech creates a school through `POST /api/admin/schools/provision` and
+the *Add school* screen at `/admin/schools/new`. A school owner registers their own at `/register`
+through `POST /api/register/school`.
+
+### Path 2's two halves are deliberately swapped
+
+This document describes a fully public form that creates the school and *then* the Clerk account.
+Built in that order, the endpoint mints a school identifier and a Clerk organisation for anybody
+with `curl`, and there is no rate limiter to put in front of it — Upstash Redis does not exist yet.
+
+So the visitor signs up with Clerk **first** (email OTP, which Clerk verifies and rate-limits), and
+`register_school()` is granted to `authenticated` only, never `anon`. The end state is identical to
+the one described below; the verification that was going to happen anyway happens before anything is
+created rather than after. It also removes a step — the registrant *becomes* the owner rather than
+being emailed an invitation to a school they created ten seconds earlier.
+
+Two further limits this document does not specify, both added because a public tenant-creating
+endpoint needs them:
+
+- **One open trial per person**, against `school_onboarding.created_by`. Narrow on purpose: a
+  genuine multi-school owner converts the first trial, or AfriTech creates the second.
+- **An account already belonging to a school is refused.** Somebody signed in as a teacher
+  elsewhere cannot spawn a school from that session.
+
+Terms and privacy acceptance are stored as timestamps on `school_onboarding`, because a checkbox
+that gates a button and leaves no row behind is not consent anybody could later evidence.
 
 ### Four differences from the flow described above
 
@@ -393,3 +416,4 @@ and correct; making it binding touches every policy in the database and is its o
 | 2026-04-26 | Added custom role template on onboarding | Custom roles feature confirmed |
 | 2026-04-26 | Added school status lifecycle table | Clarity on what each status permits |
 | 2026-09-29 | Added *What Is Built, and Where It Differs* | Path 1 implemented in `0142`–`0144`. Four deviations recorded with reasons, plus the province addition and the explicit note that status effects are not enforced. |
+| 2026-09-30 | Path 2 implemented in `0150`/`0151` | Self-registration built, with the account-first reversal, the one-open-trial limit and timestamped consent all recorded above. |

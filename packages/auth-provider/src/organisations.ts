@@ -137,6 +137,39 @@ export async function createOrganisation(params: {
   return { id: org.id, name: org.name, slug: org.slug ?? null }
 }
 
+/**
+ * Adds an existing user to an organisation directly, with no invitation.
+ *
+ * ## Why this is not `inviteToOrganisation`
+ *
+ * Self-registration (`SCHOOL_SETUP.md` Path 2) has the owner already signed in and standing in
+ * front of the screen. Emailing them an invitation to a school they created ten seconds ago, and
+ * then asking them to leave the page and open their inbox, is a worse flow than simply making them
+ * a member — and it is the same end state.
+ *
+ * Invitations remain right for everybody else: an AfriTech-created school's owner and every teacher
+ * a school adds are people who are **not** here yet, and an invitation is how you reach them.
+ *
+ * ## The authorisation is the caller's, as always
+ *
+ * Nothing here checks anything, in keeping with the rest of this file. The route must already have
+ * established that this user is entitled to be this organisation's owner — which for registration
+ * means the database confirmed they are the one who registered it.
+ */
+export async function addOrganisationMember(params: {
+  organisationId: string
+  userId: string
+  role: OrgRole
+}): Promise<void> {
+  await client().organizations.createOrganizationMembership({
+    organizationId: params.organisationId,
+    userId: params.userId,
+    // Qualified, for the reason `inviteToOrganisation` gives: Clerk stores the key verbatim and
+    // every ZSMS policy compares against the `org:` form.
+    role: params.role,
+  })
+}
+
 /** Everyone currently in the organisation, with the role they hold. */
 export async function listOrganisationMembers(organisationId: string): Promise<OrgMember[]> {
   const page = await client().organizations.getOrganizationMembershipList({

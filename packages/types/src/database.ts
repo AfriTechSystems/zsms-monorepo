@@ -2284,9 +2284,11 @@ export type Database = {
           owner_invited_at: string | null
           owner_last_name: string
           owner_phone_e164: string | null
+          privacy_accepted_at: string | null
           referral_source: string | null
           school_id: string
           source: string
+          terms_accepted_at: string | null
           updated_at: string
           verification_note: string | null
           verified_at: string | null
@@ -2305,9 +2307,11 @@ export type Database = {
           owner_invited_at?: string | null
           owner_last_name: string
           owner_phone_e164?: string | null
+          privacy_accepted_at?: string | null
           referral_source?: string | null
           school_id: string
           source: string
+          terms_accepted_at?: string | null
           updated_at?: string
           verification_note?: string | null
           verified_at?: string | null
@@ -2326,9 +2330,11 @@ export type Database = {
           owner_invited_at?: string | null
           owner_last_name?: string
           owner_phone_e164?: string | null
+          privacy_accepted_at?: string | null
           referral_source?: string | null
           school_id?: string
           source?: string
+          terms_accepted_at?: string | null
           updated_at?: string
           verification_note?: string | null
           verified_at?: string | null
@@ -3962,6 +3968,10 @@ export type Database = {
             }
             Returns: boolean
           }
+      attach_own_registered_school: {
+        Args: { p_clerk_org_id: string; p_school_id: string }
+        Returns: boolean
+      }
       attach_school_to_network: {
         Args: { p_network_id: string; p_school_id: string }
         Returns: {
@@ -4413,6 +4423,27 @@ export type Database = {
         }
         Returns: string
       }
+      register_school: {
+        Args: {
+          p_city_code: string
+          p_country_code?: string
+          p_level: string
+          p_name: string
+          p_owner_email: string
+          p_owner_first_name: string
+          p_owner_last_name: string
+          p_owner_phone_e164?: string
+          p_province_code: string
+          p_referral_source?: string
+          p_type: string
+        }
+        Returns: {
+          out_clerk_slug: string
+          out_id: string
+          out_school_id: string
+          out_trial_ends_at: string
+        }[]
+      }
       resolve_notification_template: {
         Args: {
           p_channel: string
@@ -4486,6 +4517,7 @@ export type Database = {
         }[]
       }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
+      school_can_write: { Args: { p_school_id: string }; Returns: boolean }
       school_has_feature: {
         Args: { p_feature_key: string; p_school_id: string }
         Returns: boolean

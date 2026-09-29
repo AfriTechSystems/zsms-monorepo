@@ -151,7 +151,15 @@ export function CheckboxField({
   className,
 }: {
   id: string
-  label: string
+  /**
+   * `ReactNode`, not `string`, so a consent checkbox can link to the policy it is consenting to —
+   * which is the difference between meaningful consent and a tick box. Rendered inside a `<span>`,
+   * so any inline content works.
+   *
+   * A link inside a `<label>` needs `stopPropagation` on its click, or following it also toggles
+   * the control. The caller owns that, because the caller owns the link.
+   */
+  label: ReactNode
   hint?: string
   checked: boolean
   onChange: (checked: boolean) => void

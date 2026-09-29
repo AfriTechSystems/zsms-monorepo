@@ -27,6 +27,7 @@ import {
   HeartPulse,
   Network,
   Receipt,
+  PhoneCall,
   Siren,
   Sparkles,
   ToggleRight,
@@ -44,6 +45,7 @@ export function AdminShell({
   headerActions?: ReactNode
 }): JSX.Element {
   const [openIncidents, setOpenIncidents] = useState<number | null>(null)
+  const [overdueOutreach, setOverdueOutreach] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -53,6 +55,21 @@ export function AdminShell({
         if (!response.ok) return
         const body = (await response.json()) as { meta?: { total?: number } }
         if (!cancelled) setOpenIncidents(body.meta?.total ?? 0)
+
+        /**
+         * The overdue-outreach count, on the same timer. Fetched here rather than on the screen
+         * itself because the point of the badge is to be seen from anywhere in the panel — a
+         * school going past its window while somebody is reading an invoice is exactly the case
+         * the rule exists for.
+         *
+         * Null when the request fails, which renders nothing. A nav that breaks because a count
+         * did is worse than a nav with no count.
+         */
+        const outreach = await fetch('/api/admin/onboarding?view=overdue')
+        if (outreach.ok) {
+          const rows = (await outreach.json()) as { data?: unknown[] }
+          if (!cancelled) setOverdueOutreach(rows.data?.length ?? 0)
+        }
       } catch {
         // A nav that refuses to render because a badge count failed is worse than a nav with
         // no badge. Left null, which renders nothing.
@@ -87,6 +104,10 @@ export function AdminShell({
       label: 'Customers',
       items: [
         { path: '/schools', label: 'Schools', icon: Building2 },
+        // Above networks and the Hub because it is the only row here with a clock on it: the
+        // 24-hour outreach rule is the difference between a school that converts and one that
+        // lets its trial lapse.
+        { path: '/onboarding', label: 'Onboarding', icon: PhoneCall, badge: overdueOutreach },
         { path: '/networks', label: 'School networks', icon: Network },
         { path: '/teacher-hub', label: 'Teacher Hub', icon: Sparkles },
       ],

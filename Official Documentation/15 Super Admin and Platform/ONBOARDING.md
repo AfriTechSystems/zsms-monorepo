@@ -313,11 +313,29 @@ nothing ever read the table. Adding a fifteenth item is now an INSERT plus
 Business rule 4 is satisfied: `0143` backfills every school. In practice that meant creating all
 fourteen items for every school, not just `whatsapp_configured`, since no school had any rows.
 
-**The task queue is not built.** No table holds the nine task states, assignment, or recorded
-contacts. The 24-hour rule is therefore visible nowhere yet. When it is built the *overdue*
-calculation is derived in SQL from registration time versus recorded contacts — the admin panel
-then needs no scheduler at all, and only the escalation *push* waits on Redis, which does not exist
-(see `CREDENTIALS_CHECKLIST.md`).
+**The task queue is built** — `public.onboarding_queue`, `/admin/onboarding`, and
+`school_onboarding_contacts`. Four differences from the description above, all deliberate:
+
+*The 24-hour rule is computed, not scheduled.* `outreach_overdue` and `outreach_escalated` are
+derived from the first recorded contact against registration time, so the panel is correct with no
+scheduler at all. Only the escalation *push* waits on Redis, which does not exist
+(`CREDENTIALS_CHECKLIST.md`); `platform_incidents` already exists for it to land in. This is the
+better decomposition rather than a workaround — a derived flag cannot drift from reality, and
+changing the window from 24 hours to 12 needs no backfill.
+
+*Four of the nine task states are computed and five are stored.* New, Converted, Expired and the
+percentage behind Complete are facts about the world. Assigned, In Progress, Not Interested and
+Complete are judgements a person makes, and business rule 2 says a task is never closed
+automatically — so a self-closing state machine would contradict it.
+
+*The window applies to self-registered schools only.* An AfriTech-created school was created by
+somebody who was already talking to it; a countdown on calling them back measures nothing, and a red
+row against it would train an operator to ignore red rows.
+
+*A recorded contact cannot be edited or deleted by anybody.* The escalation rules below hand
+consequences to a super admin on the strength of these rows. A mistaken entry is corrected by adding
+another. A note is required for every outcome except "no answer" and "wrong number", where there was
+nobody to quote.
 
 **Pilot onboarding is built; self-registration is not.** `POST /api/admin/schools/provision`
 creates the school, its Clerk organisation and its checklist, and invites the owner. Activation
@@ -344,3 +362,4 @@ records a verification call — see `SCHOOL_SETUP.md`.
 | 2026-04-26 | Added pilot school onboarding process | September 2026 pilot launch approach |
 | 2026-04-26 | Added 24h escalation via the queue | Enforcement of outreach requirement |
 | 2026-09-29 | Added *What Is Built* | Checklist implemented as data in `0143` with the documented weights; the four missing items added and backfilled per business rule 4. Task queue and 24-hour escalation still unbuilt, with the no-Redis design recorded. |
+| 2026-09-30 | Task queue implemented in `0152` | The 24-hour rule is derived in SQL rather than scheduled, since Redis does not exist. Four task states computed, five stored. Contact log append-only. |

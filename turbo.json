@@ -13,15 +13,38 @@
   // `"//key": "…"` convention used in package.json is a parse error here.
   "ui": "stream",
   "globalDependencies": [".env", ".env.local"],
+  // Turbo 2 defaults to `envMode: strict` — confirm with `turbo build --dry=json`. A variable
+  // absent from this list is STRIPPED from the task environment and takes no part in the cache
+  // key, so setting it appears to do nothing. Two things soften that locally (each app loads the
+  // root `.env.local` itself, and `globalDependencies` above busts the cache when that file
+  // changes), but neither covers a value supplied by Vercel or Railway rather than by the file.
+  // So: every variable our own code reads belongs here, whether or not it is set yet.
+  //
+  // Wildcards are deliberate for the provider groups. Meta, Twilio, Resend and R2 each carry
+  // several keys that arrive together, and enumerating them is how one gets forgotten.
   "globalEnv": [
     "NEXT_PUBLIC_COUNTRY_CODE",
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_ZSMS_URL",
+    "ZSMS_PUBLIC_URL",
     "CLERK_SECRET_KEY",
+    "AUTH_PROVIDER",
     "SUPABASE_SERVICE_ROLE_KEY",
     "JOB_QUEUE_PROVIDER",
     "BULLMQ_REDIS_URL",
+    "REDIS_URL",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "QSTASH_TOKEN",
+    "NOTIFICATION_PROVIDER",
+    "NOTIFICATION_MOCK_FAIL",
+    "META_*",
+    "TWILIO_*",
+    "RESEND_*",
+    "R2_*",
+    "SENTRY_DSN",
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "AI_GENERATOR"

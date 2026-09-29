@@ -5,11 +5,12 @@
   "type": "module",
   "main": "./src/worker.ts",
   "//dev:worker": "Named 'dev:worker', not 'dev', so `turbo dev` does not start it. A worker needs Redis and provider credentials that a UI session has no reason to hold, and a worker crash must never take the web app down with it. Run it explicitly with `npm run dev:workers` from the root.",
+  "//env": "The worker loads the monorepo-root `.env.local` itself. `apps/web` does the same thing in next.config.mjs, and this package has no equivalent hook — so before this flag, `npm run dev:workers` threw 'NEXT_PUBLIC_SUPABASE_URL is not set' against a fully populated root env file, which reads as a missing variable rather than a file nothing loaded. `--env-file-if-exists` rather than `--env-file` because Railway supplies the environment directly and has no such file; the strict form would exit 9 there. Precedence matches next.config.mjs: a variable already in the real environment wins.",
   "//runner": "tsx, not `node --experimental-strip-types`. Node's type stripping is an ESM loader and requires explicit '.ts' on every relative import; this package writes `from './db'` throughout, which that runner cannot resolve. tsx is the root devDependency already used for the e2e script.",
   "scripts": {
     "type-check": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "dev:worker": "tsx src/worker.ts"
+    "dev:worker": "node --env-file-if-exists=../../.env.local --import tsx src/worker.ts"
   },
   "dependencies": {
     "@zsms/documents": "*",

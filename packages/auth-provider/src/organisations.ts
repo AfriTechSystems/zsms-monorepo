@@ -86,6 +86,57 @@ function client(): ReturnType<typeof createClerkClient> {
   return cached
 }
 
+export interface CreatedOrganisation {
+  /** Clerk organisation id, `org_…`. This becomes `schools.clerk_org_id`. */
+  id: string
+  name: string
+  slug: string | null
+}
+
+/**
+ * Creates the organisation that backs a school.
+ *
+ * ## `createdBy` is omitted, and that is the important part
+ *
+ * Clerk's create endpoint takes an optional `createdBy`, and passing it adds that user to the new
+ * organisation as its administrator. The only user available at this point is the **AfriTech**
+ * administrator doing the provisioning — so passing it would quietly make an AfriTech employee a
+ * member of the school's organisation, appearing in its staff list and satisfying
+ * `clerk_org_id = get_school_id()` in every tenant policy in the database.
+ *
+ * That is a tenancy breach dressed up as a convenience. The organisation is created empty and the
+ * school owner is invited into it, which is also what `SCHOOL_SETUP.md` describes.
+ *
+ * (AfriTech reaches a school through `is_afritech_admin()` and, once built, impersonation — never
+ * by holding a membership.)
+ *
+ * ## `maxAllowedMemberships: 0`
+ *
+ * Zero means unlimited. Staff are not a priced dimension — decided 2026-08-23 — so no school can
+ * ever be blocked from adding a teacher by a seat count. Set explicitly rather than left to the
+ * instance default, because the default is a Clerk setting nothing in this repository controls and
+ * a school silently capped at five teachers would surface as "invitations stopped working".
+ */
+export async function createOrganisation(params: {
+  name: string
+  /** Lowercased school identifier, e.g. `zm-lsk-0001`. */
+  slug: string
+  /** ZSMS school identifier, stored on the organisation for support lookups. */
+  schoolCode: string
+}): Promise<CreatedOrganisation> {
+  const org = await client().organizations.createOrganization({
+    name: params.name,
+    slug: params.slug,
+    maxAllowedMemberships: 0,
+    // So somebody staring at Clerk's dashboard can tell which ZSMS school this is without
+    // reverse-engineering the slug. Public rather than private because it is not a secret — it is
+    // printed on every receipt the school issues.
+    publicMetadata: { schoolCode: params.schoolCode },
+  })
+
+  return { id: org.id, name: org.name, slug: org.slug ?? null }
+}
+
 /** Everyone currently in the organisation, with the role they hold. */
 export async function listOrganisationMembers(organisationId: string): Promise<OrgMember[]> {
   const page = await client().organizations.getOrganizationMembershipList({

@@ -54,6 +54,10 @@ export function StatusBadge({ status }: { status: string }): JSX.Element {
   const map: Record<string, { label: string; variant: 'success' | 'primary' | 'warning' | 'danger' | 'neutral' }> = {
     active: { label: 'Active', variant: 'success' },
     trial: { label: 'Trial', variant: 'primary' },
+    // Distinct from `suspended`, and the distinction is the point: a lapsed trial can still read
+    // its data and subscribe, where a suspended school has stopped paying after grace. Rendering
+    // both as "Suspended" would have an operator chasing the wrong conversation.
+    trial_expired: { label: 'Trial ended', variant: 'warning' },
     pending_verification: { label: 'Pending', variant: 'warning' },
     suspended: { label: 'Suspended', variant: 'danger' },
     terminated: { label: 'Terminated', variant: 'neutral' },

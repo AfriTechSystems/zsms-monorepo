@@ -323,6 +323,44 @@ Each school card in the admin panel shows a "Contact" button that opens a quick 
 
 ---
 
+## What Is Built, and Where It Differs From The Above
+
+*Added 2026-09-29, when Path 1 was implemented. Everything above this section was written before
+development; this section is written from the applied schema.*
+
+**Path 1 is built. Path 2 is not.** A school is created through `POST /api/admin/schools/provision`
+and the *Add school* screen at `/admin/schools/new`. Self-registration has no route, no page and no
+public entry point.
+
+### Four differences from the flow described above
+
+| Documented | Built | Why |
+|---|---|---|
+| `school-onboard` Edge Function | `public.admin_create_school()` plus an API route | `supabase/functions/` is empty and PostgREST serves only `public`. A function is testable by pgTAP; an Edge Function is not. |
+| One flow creating school and Clerk org | Three steps: create → create org → attach | Postgres cannot roll back an HTTP call. Between steps the school holds a `pending_` placeholder for `clerk_org_id`, which matches no JWT — so it is reachable by nobody rather than half-open. |
+| "School owner Clerk user account created" | The owner is **invited** | Clerk is email-OTP only, so a created user has no credential to send and must verify anyway. An invitation expires by itself; an orphan user account does not. |
+| `get_next_school_sequence()` as `MAX + 1` | Same, under `pg_advisory_xact_lock` on country+city | The documented form lets two concurrent creations mint the same identifier, and the UNIQUE constraint then fails one rather than giving it the next number. |
+
+### Province
+
+Both forms above require Province; the schema had only `city_code`. `0142` adds
+`schools.province_code` using ZM.md's ten codes. **City codes were not touched** — a city code sits
+inside every school identifier, and every pupil number and receipt number derived from it.
+
+### Verification
+
+Decided 2026-09-29: verification is a **phone call recorded as a note**, not a document check.
+`admin_activate_school()` requires a non-empty note, because the note is the whole of the evidence
+and an activation without one is a tick box pretending to be a control.
+
+### The status effects table is NOT enforced
+
+The lifecycle table above says `trial_expired` and `suspended` schools may read and not write.
+**Nothing in the schema enforces that today, for any status.** `0142` makes the status recordable
+and correct; making it binding touches every policy in the database and is its own migration.
+
+---
+
 ## Business Rules
 
 1. School IDs are permanent and immutable. Once assigned, a school ID never changes regardless of name changes, location changes, or ownership transfers.
@@ -354,3 +392,4 @@ Each school card in the admin panel shows a "Contact" button that opens a quick 
 | 2026-04-26 | Initial complete draft | Stage 6 school module documentation |
 | 2026-04-26 | Added custom role template on onboarding | Custom roles feature confirmed |
 | 2026-04-26 | Added school status lifecycle table | Clarity on what each status permits |
+| 2026-09-29 | Added *What Is Built, and Where It Differs* | Path 1 implemented in `0142`–`0144`. Four deviations recorded with reasons, plus the province addition and the explicit note that status effects are not enforced. |

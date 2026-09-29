@@ -1221,6 +1221,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "onboarding_checklists_item_key_fkey"
+            columns: ["item_key"]
+            isOneToOne: false
+            referencedRelation: "onboarding_checklist_catalogue"
+            referencedColumns: ["item_key"]
+          },
+          {
             foreignKeyName: "onboarding_checklists_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
@@ -2263,6 +2270,87 @@ export type Database = {
         }
         Relationships: []
       }
+      school_onboarding: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          created_at: string
+          created_by: string | null
+          internal_notes: string | null
+          owner_accepted_at: string | null
+          owner_email: string
+          owner_first_name: string
+          owner_invitation_id: string | null
+          owner_invited_at: string | null
+          owner_last_name: string
+          owner_phone_e164: string | null
+          referral_source: string | null
+          school_id: string
+          source: string
+          updated_at: string
+          verification_note: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          internal_notes?: string | null
+          owner_accepted_at?: string | null
+          owner_email: string
+          owner_first_name: string
+          owner_invitation_id?: string | null
+          owner_invited_at?: string | null
+          owner_last_name: string
+          owner_phone_e164?: string | null
+          referral_source?: string | null
+          school_id: string
+          source: string
+          updated_at?: string
+          verification_note?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          internal_notes?: string | null
+          owner_accepted_at?: string | null
+          owner_email?: string
+          owner_first_name?: string
+          owner_invitation_id?: string | null
+          owner_invited_at?: string | null
+          owner_last_name?: string
+          owner_phone_e164?: string | null
+          referral_source?: string | null
+          school_id?: string
+          source?: string
+          updated_at?: string
+          verification_note?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_onboarding_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_onboarding_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_permissions: {
         Row: {
           can_create: boolean
@@ -2452,6 +2540,7 @@ export type Database = {
           ministry_reg_number: string | null
           name: string
           phone: string | null
+          province_code: string
           school_id: string
           status: string
           subscription_ends_at: string | null
@@ -2477,6 +2566,7 @@ export type Database = {
           ministry_reg_number?: string | null
           name: string
           phone?: string | null
+          province_code: string
           school_id: string
           status?: string
           subscription_ends_at?: string | null
@@ -2502,6 +2592,7 @@ export type Database = {
           ministry_reg_number?: string | null
           name?: string
           phone?: string | null
+          province_code?: string
           school_id?: string
           status?: string
           subscription_ends_at?: string | null
@@ -3391,6 +3482,39 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_checklist_catalogue: {
+        Row: {
+          blocks: string | null
+          category: string | null
+          description: string | null
+          is_active: boolean | null
+          item_key: string | null
+          label: string | null
+          sort_order: number | null
+          weight: number | null
+        }
+        Insert: {
+          blocks?: string | null
+          category?: string | null
+          description?: string | null
+          is_active?: boolean | null
+          item_key?: string | null
+          label?: string | null
+          sort_order?: number | null
+          weight?: number | null
+        }
+        Update: {
+          blocks?: string | null
+          category?: string | null
+          description?: string | null
+          is_active?: boolean | null
+          item_key?: string | null
+          label?: string | null
+          sort_order?: number | null
+          weight?: number | null
+        }
+        Relationships: []
+      }
       school_capacity: {
         Row: {
           at_capacity: boolean | null
@@ -3608,6 +3732,19 @@ export type Database = {
         Args: { p_left: string; p_right: string }
         Returns: boolean
       }
+      admin_activate_school: {
+        Args: { p_school_id: string; p_verification_note: string }
+        Returns: {
+          id: string
+          name: string
+          school_id: string
+          status: string
+        }[]
+      }
+      admin_attach_clerk_org: {
+        Args: { p_clerk_org_id: string; p_school_id: string }
+        Returns: boolean
+      }
       admin_create_override: {
         Args: {
           p_actor: string
@@ -3621,8 +3758,39 @@ export type Database = {
         }
         Returns: string
       }
+      admin_create_school: {
+        Args: {
+          p_address?: string
+          p_city_code: string
+          p_country_code?: string
+          p_internal_notes?: string
+          p_level: string
+          p_ministry_reg_number?: string
+          p_name: string
+          p_owner_email: string
+          p_owner_first_name: string
+          p_owner_last_name: string
+          p_owner_phone_e164?: string
+          p_province_code: string
+          p_subscription_tier?: string
+          p_type: string
+        }
+        Returns: {
+          city_code: string
+          clerk_slug: string
+          id: string
+          name: string
+          province_code: string
+          school_id: string
+          status: string
+        }[]
+      }
       admin_delete_tier_price_band: {
         Args: { p_band_id: string }
+        Returns: boolean
+      }
+      admin_discard_unprovisioned_school: {
+        Args: { p_school_id: string }
         Returns: boolean
       }
       admin_publish_prompt_template: {
@@ -3634,6 +3802,10 @@ export type Database = {
           p_user_template: string
         }
         Returns: number
+      }
+      admin_record_owner_invitation: {
+        Args: { p_invitation_id: string; p_school_id: string }
+        Returns: boolean
       }
       admin_revoke_override: {
         Args: { p_actor: string; p_id: string }
@@ -3917,6 +4089,10 @@ export type Database = {
         Args: { p_school_id: string }
         Returns: boolean
       }
+      ensure_onboarding_checklist: {
+        Args: { p_school_id: string }
+        Returns: number
+      }
       fee_statement: {
         Args: { p_from?: string; p_student_id: string; p_to?: string }
         Returns: {
@@ -3941,6 +4117,10 @@ export type Database = {
         }[]
       }
       get_actor_id: { Args: never; Returns: string }
+      get_next_school_sequence: {
+        Args: { p_city_code: string; p_country_code: string }
+        Returns: number
+      }
       get_school_id: { Args: never; Returns: string }
       get_user_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
@@ -4321,6 +4501,17 @@ export type Database = {
           status: string
           students: number
           subscription_tier: string
+        }[]
+      }
+      school_onboarding_completion: {
+        Args: { p_school_id: string }
+        Returns: {
+          completed_weight: number
+          completion_pct: number
+          critical_pct: number
+          items_complete: number
+          items_total: number
+          total_weight: number
         }[]
       }
       school_student_capacity: {

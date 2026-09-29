@@ -15,7 +15,7 @@ import type { JSX } from 'react'
 import { Suspense, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Building2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Building2, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
 
 import { useApi } from '../../../lib/use-api'
 import { Badge } from '../../../components/ui/badge'
@@ -91,6 +91,14 @@ function SchoolsTable(): JSX.Element {
       <PageHeader
         title="Schools"
         description="Every school on the platform. Filters are held in the URL, so a filtered view can be linked."
+        actions={
+          <Button asChild>
+            <Link href="/admin/schools/new">
+              <Plus aria-hidden="true" />
+              Add school
+            </Link>
+          </Button>
+        }
       />
 
       <FormSection className="mb-cards">
@@ -124,6 +132,7 @@ function SchoolsTable(): JSX.Element {
                   <option value="all">All statuses</option>
                   <option value="active">Active</option>
                   <option value="trial">Trial</option>
+                  <option value="trial_expired">Trial ended</option>
                   <option value="pending_verification">Pending verification</option>
                   <option value="suspended">Suspended</option>
                   <option value="terminated">Terminated</option>

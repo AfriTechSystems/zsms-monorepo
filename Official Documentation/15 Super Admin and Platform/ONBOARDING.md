@@ -294,6 +294,37 @@ function calculateOnboardingCompletion(items: OnboardingChecklistItem[]): number
 
 ---
 
+## What Is Built
+
+*Added 2026-09-29.*
+
+**The checklist is real.** `afritech.onboarding_checklist_items` holds all fourteen items with the
+weights given in `calculateOnboardingCompletion()` above, exposed as
+`public.onboarding_checklist_catalogue`. `public.school_onboarding_completion(school_id)` returns
+the weighted percentage, and a critical-only percentage besides — a school at 45% with every
+critical item done is ready to use, and one at 45% that has only uploaded a logo cannot take a
+register.
+
+The items are **data, not a CHECK constraint**. `0010`'s constraint admitted ten keys while this
+document named fourteen, and they drifted for thirteen months without anything noticing — because
+nothing ever read the table. Adding a fifteenth item is now an INSERT plus
+`public.ensure_onboarding_checklist()` per school.
+
+Business rule 4 is satisfied: `0143` backfills every school. In practice that meant creating all
+fourteen items for every school, not just `whatsapp_configured`, since no school had any rows.
+
+**The task queue is not built.** No table holds the nine task states, assignment, or recorded
+contacts. The 24-hour rule is therefore visible nowhere yet. When it is built the *overdue*
+calculation is derived in SQL from registration time versus recorded contacts — the admin panel
+then needs no scheduler at all, and only the escalation *push* waits on Redis, which does not exist
+(see `CREDENTIALS_CHECKLIST.md`).
+
+**Pilot onboarding is built; self-registration is not.** `POST /api/admin/schools/provision`
+creates the school, its Clerk organisation and its checklist, and invites the owner. Activation
+records a verification call — see `SCHOOL_SETUP.md`.
+
+---
+
 ## Business Rules
 
 1. Every self-registered school must receive a contact attempt within 24 hours of registration. The scheduled escalation job enforces this by alerting the super admin if no contact is recorded.
@@ -312,3 +343,4 @@ function calculateOnboardingCompletion(items: OnboardingChecklistItem[]): number
 | 2026-04-26 | Added whatsapp_configured checklist item | School-specific WhatsApp number confirmed |
 | 2026-04-26 | Added pilot school onboarding process | September 2026 pilot launch approach |
 | 2026-04-26 | Added 24h escalation via the queue | Enforcement of outreach requirement |
+| 2026-09-29 | Added *What Is Built* | Checklist implemented as data in `0143` with the documented weights; the four missing items added and backfilled per business rule 4. Task queue and 24-hour escalation still unbuilt, with the no-Redis design recorded. |

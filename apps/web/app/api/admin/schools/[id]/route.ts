@@ -95,6 +95,59 @@ export async function GET(
       client.rpc('school_student_capacity', { p_school_id: id }),
     ])
 
+    /**
+     * Onboarding: the record, the checklist, and the weighted completion.
+     *
+     * Three reads rather than one join, because they answer different questions and two of them
+     * can legitimately come back empty — a school seeded before `0143` has checklist rows only
+     * from that migration's backfill, and a school seeded before `0144` has no onboarding record
+     * at all. Neither is an error, and a join would make an absent onboarding record hide the
+     * checklist too.
+     */
+    const [onboarding, checklist, completion] = await Promise.all([
+      client.from('school_onboarding').select('*').eq('school_id', id).maybeSingle(),
+      client
+        .from('onboarding_checklists')
+        .select('item_key, is_complete, completed_at, completed_by')
+        .eq('school_id', id),
+      client.rpc('school_onboarding_completion', { p_school_id: id }),
+    ])
+
+    const { data: catalogue } = await client
+      .from('onboarding_checklist_catalogue')
+      .select('item_key, label, description, category, weight, blocks, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+
+    const stateByKey = new Map(
+      (checklist.data ?? []).map((c) => [c.item_key as string, c]),
+    )
+
+    // Driven by the catalogue, not by the school's rows: an item added to the catalogue after
+    // this school was created should appear as outstanding rather than vanish from the list.
+    const checklistItems = (catalogue ?? []).map((item) => {
+      const state = stateByKey.get(item.item_key as string)
+      return {
+        ...item,
+        isComplete: state?.is_complete === true,
+        completedAt: state?.completed_at ?? null,
+        // No row at all means the school predates the item. Distinguished from "present and
+        // incomplete" so an operator can tell a stale school from a slow one.
+        hasRow: state !== undefined,
+      }
+    })
+
+    const progress = (Array.isArray(completion.data) ? completion.data[0] : completion.data) as
+      | {
+          completion_pct: number
+          completed_weight: number
+          total_weight: number
+          items_complete: number
+          items_total: number
+          critical_pct: number
+        }
+      | undefined
+
     const cap = (Array.isArray(capacity.data) ? capacity.data[0] : capacity.data) as
       | {
           student_limit: number | null
@@ -114,6 +167,15 @@ export async function GET(
       // Kept for callers that only want the headline number. It is the same
       // count the capacity function took, not a second query that could drift.
       studentCount: cap?.current_count ?? 0,
+      onboarding: onboarding.data ?? null,
+      checklist: checklistItems,
+      progress: progress ?? null,
+      // Whether the Clerk organisation was ever created. `clerk_org_id` is the tenant key, so a
+      // placeholder means no school user can reach this school at all — which the detail screen
+      // must say plainly rather than rendering an ordinary-looking school page.
+      isProvisioned:
+        typeof (school as { clerk_org_id?: unknown }).clerk_org_id === 'string' &&
+        !(school as { clerk_org_id: string }).clerk_org_id.startsWith('pending_'),
     })
   })
 }

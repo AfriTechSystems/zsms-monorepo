@@ -30,4 +30,35 @@ export const ZM_CONFIG: CountryConfig = {
     LVS: 'Livingstone', CHI: 'Chipata', SOL: 'Solwezi', MAZ: 'Mazabuka',
     KAF: 'Kafue', CHO: 'Choma', MKS: 'Mongu', SER: 'Serenje',
   },
+
+  /** `ZM.md` → country configuration. Transcribed, not re-derived. */
+  provinces: {
+    LSK: 'Lusaka Province',
+    CPR: 'Central Province',
+    CBR: 'Copperbelt Province',
+    EPR: 'Eastern Province',
+    LPR: 'Luapula Province',
+    MPR: 'Muchinga Province',
+    NPR: 'Northern Province',
+    NWP: 'North-Western Province',
+    SPR: 'Southern Province',
+    WPR: 'Western Province',
+  },
+
+  /**
+   * City → province. Must match the CASE in migration `0142`.
+   *
+   * `CBE` is the awkward one: "Copperbelt" is a province, listed as a city alongside Ndola and
+   * Kitwe which are both in it. It stays because school identifiers already embed it — see the
+   * note on `cities` in `CountryConfig`.
+   */
+  cityProvince: {
+    LSK: 'LSK', KAF: 'LSK',
+    CBE: 'CBR', NDL: 'CBR', KIT: 'CBR',
+    KWE: 'CPR', SER: 'CPR',
+    LVS: 'SPR', MAZ: 'SPR', CHO: 'SPR',
+    CHI: 'EPR',
+    SOL: 'NWP',
+    MKS: 'WPR',
+  },
 }

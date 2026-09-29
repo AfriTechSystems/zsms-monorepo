@@ -46,6 +46,12 @@ import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
 import { StatusBadge, TIER_LABEL, formatKwacha } from '../../health-shared'
+import {
+  OnboardingPanel,
+  type ChecklistItem,
+  type OnboardingRecord,
+  type Progress,
+} from './onboarding-panel'
 
 interface School {
   id: string
@@ -102,6 +108,10 @@ interface Detail {
   overrides: Override[]
   capacity: CapacityRow | null
   studentCount: number
+  onboarding: OnboardingRecord | null
+  checklist: ChecklistItem[]
+  progress: Progress | null
+  isProvisioned: boolean
 }
 
 /**
@@ -534,6 +544,17 @@ export default function AdminSchoolDetailPage({
                 </dl>
               </CardContent>
             </Card>
+
+            <OnboardingPanel
+              schoolId={data.school.id}
+              schoolCode={data.school.school_id}
+              status={data.school.status}
+              isProvisioned={data.isProvisioned}
+              onboarding={data.onboarding}
+              checklist={data.checklist}
+              progress={data.progress}
+              onChanged={reload}
+            />
 
             <SubscriptionPanel school={data.school} onSaved={reload} />
 

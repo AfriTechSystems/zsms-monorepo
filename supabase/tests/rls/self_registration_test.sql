@@ -27,7 +27,7 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(25);
+SELECT plan(26);
 
 -- ---------------------------------------------------------------------------
 -- An existing school, so the per-city sequence has somewhere to continue from.
@@ -84,89 +84,118 @@ SELECT is(
   'a registering visitor resolves to no school — every tenant policy denies them'
 );
 
-SELECT is(
-  (SELECT out_school_id FROM public.register_school(
+/**
+ * THE REGISTRATION ITSELF, AND WHY ITS RETURN VALUE HAS TO BE CAPTURED.
+ *
+ * `register_school()` returns the new school's id, and that return value is the ONLY way the caller
+ * learns it. They cannot look it up: `clerk_org_id` is still a placeholder, so
+ * `school_staff_read_own_school` matches nothing for them and their own school is invisible. The
+ * API route works for exactly this reason — it uses what the function returned.
+ *
+ * Stashed in a transaction-local GUC because pgTAP assertions are separate statements and this
+ * suite has no temporary table to lean on.
+ */
+SELECT set_config(
+  'zsms.reg_school_id',
+  (SELECT out_id::TEXT FROM public.register_school(
      'Sunrise Academy', 'day', 'secondary', 'LSK', 'LSK',
      'Grace', 'Mwale', 'grace@sunrise.example', '+260977123456', 'word_of_mouth')),
+  TRUE
+);
+
+/**
+ * And that invisibility asserted rather than merely described. It is the reason the route reloads
+ * the whole page on success instead of soft-navigating: the session was minted before the
+ * organisation existed, so it carries no `o` claim and the portal would render correctly empty.
+ */
+SELECT is(
+  (SELECT COUNT(*)::INT FROM public.schools),
+  0,
+  'the registrant cannot yet see the school they just created — the tenant key is a placeholder'
+);
+
+-- Superuser, to check what was actually written.
+RESET ROLE;
+
+SELECT is(
+  (SELECT school_id FROM public.schools
+    WHERE id = current_setting('zsms.reg_school_id')::UUID),
   'ZM-LSK-0002',
-  'they register a school, continuing the per-city sequence'
+  'the identifier continues the per-city sequence'
 );
 
 SELECT is(
-  (SELECT status FROM public.schools WHERE school_id = 'ZM-LSK-0002'),
+  (SELECT status FROM public.schools
+    WHERE id = current_setting('zsms.reg_school_id')::UUID),
   'trial',
   'self-registration produces `trial`, never `pending_verification` (business rule 3)'
 );
 
-/**
- * Thirty days, per TRIAL.md. Asserted as a range rather than an equality because `NOW()` moves and
- * the point is the interval, not the millisecond.
- */
+-- Asserted as a range, not an equality: the point is the interval, not the millisecond.
 SELECT ok(
   (SELECT trial_ends_at > NOW() + INTERVAL '29 days'
              AND trial_ends_at < NOW() + INTERVAL '31 days'
-     FROM public.schools WHERE school_id = 'ZM-LSK-0002'),
-  '...with a thirty-day trial'
+     FROM public.schools WHERE id = current_setting('zsms.reg_school_id')::UUID),
+  '...with a thirty-day trial, per TRIAL.md'
 );
 
 SELECT is(
-  (SELECT subscription_tier FROM public.schools WHERE school_id = 'ZM-LSK-0002'),
+  (SELECT subscription_tier FROM public.schools
+    WHERE id = current_setting('zsms.reg_school_id')::UUID),
   'starter',
   '...on Starter, which is the only tier a trial may take'
 );
 
 SELECT ok(
-  (SELECT clerk_org_id LIKE 'pending\_%' FROM public.schools WHERE school_id = 'ZM-LSK-0002'),
-  'and a placeholder tenant key — so it is reachable by nobody, including its own owner, yet'
+  (SELECT clerk_org_id LIKE 'pending\_%' FROM public.schools
+    WHERE id = current_setting('zsms.reg_school_id')::UUID),
+  'and a placeholder tenant key, which is why the row above was invisible'
 );
 
 SELECT is(
   (SELECT source FROM public.school_onboarding
-    WHERE school_id = (SELECT sch.id FROM public.schools sch
-                        WHERE sch.school_id = 'ZM-LSK-0002')),
+    WHERE school_id = current_setting('zsms.reg_school_id')::UUID),
   'self_registration',
   'the onboarding record knows which path brought this school in'
 );
 
 /**
- * Consent, as data. `SCHOOL_SETUP.md` step 3 requires both checkboxes; a checkbox that gates a
- * button and leaves no row behind is not something anybody could later evidence — and the school is
- * about to become a data controller for several hundred children.
+ * Consent, as data. `SCHOOL_SETUP.md` step 3 requires both checkboxes; one that gates a button and
+ * leaves no row behind is not something anybody could later evidence — and the school is about to
+ * become a data controller for several hundred children.
  */
 SELECT ok(
   (SELECT terms_accepted_at IS NOT NULL AND privacy_accepted_at IS NOT NULL
      FROM public.school_onboarding
-    WHERE school_id = (SELECT sch.id FROM public.schools sch
-                        WHERE sch.school_id = 'ZM-LSK-0002')),
+    WHERE school_id = current_setting('zsms.reg_school_id')::UUID),
   'both consents are timestamped, not merely validated in a form'
 );
 
 SELECT is(
   (SELECT created_by FROM public.school_onboarding
-    WHERE school_id = (SELECT sch.id FROM public.schools sch
-                        WHERE sch.school_id = 'ZM-LSK-0002')),
+    WHERE school_id = current_setting('zsms.reg_school_id')::UUID),
   'user_grace',
   'and the registrant is recorded — which is what the one-trial-per-person guard reads'
 );
 
 SELECT ok(
   (SELECT owner_accepted_at IS NOT NULL FROM public.school_onboarding
-    WHERE school_id = (SELECT sch.id FROM public.schools sch
-                        WHERE sch.school_id = 'ZM-LSK-0002')),
+    WHERE school_id = current_setting('zsms.reg_school_id')::UUID),
   'the owner counts as accepted immediately — they are the caller, not an invitee'
 );
 
 SELECT is(
-  (SELECT COUNT(*)::INT FROM public.onboarding_checklists c
-     JOIN public.schools s ON s.id = c.school_id
-    WHERE s.school_id = 'ZM-LSK-0002'),
+  (SELECT COUNT(*)::INT FROM public.onboarding_checklists
+    WHERE school_id = current_setting('zsms.reg_school_id')::UUID),
   14,
   'and the full checklist is created, same as the AfriTech path'
 );
 
 -- ---------------------------------------------------------------------------
--- One open trial per person.
+-- Back to the registrant.
 -- ---------------------------------------------------------------------------
+SET LOCAL ROLE authenticated;
+
 SELECT throws_ok(
   $$ SELECT * FROM public.register_school(
        'Second Attempt School', 'day', 'primary', 'LSK', 'LSK',
@@ -176,12 +205,9 @@ SELECT throws_ok(
   'the same person cannot open a second trial while the first is running'
 );
 
--- ---------------------------------------------------------------------------
--- Finishing their own provisioning.
--- ---------------------------------------------------------------------------
 SELECT throws_ok(
-  format($$ SELECT public.attach_own_registered_school(%L, 'not-a-clerk-id') $$,
-         (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
+  $$ SELECT public.attach_own_registered_school(
+       current_setting('zsms.reg_school_id')::UUID, 'not-a-clerk-id') $$,
   '22023',
   NULL,
   'a value that is not a Clerk organisation id is refused'
@@ -191,9 +217,9 @@ SELECT throws_ok(
  * THE CROSS-TENANT ASSERTION. `clerk_org_id` is what every RLS policy in this database resolves
  * through, so attaching one to somebody else's school would hand over that school's entire tenant.
  *
- * The error is P0002 — "no school of yours is awaiting an organisation" — deliberately
- * indistinguishable from the school not existing. A distinct message would confirm that another
- * tenant exists, which is the thing the scoping is for.
+ * P0002 — "no school of yours is awaiting an organisation" — is deliberately indistinguishable from
+ * the school not existing. A distinct message would confirm another tenant exists, which is the
+ * thing the scoping is for.
  */
 SELECT throws_ok(
   $$ SELECT public.attach_own_registered_school(
@@ -205,20 +231,13 @@ SELECT throws_ok(
 
 SELECT ok(
   (SELECT public.attach_own_registered_school(
-     (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002'),
-     'org_sunrise')),
+     current_setting('zsms.reg_school_id')::UUID, 'org_sunrise')),
   'their own school attaches'
 );
 
-SELECT is(
-  (SELECT clerk_org_id FROM public.schools WHERE school_id = 'ZM-LSK-0002'),
-  'org_sunrise',
-  '...and becomes the tenant key'
-);
-
 SELECT throws_ok(
-  format($$ SELECT public.attach_own_registered_school(%L, 'org_somebody_else') $$,
-         (SELECT sch.id FROM public.schools sch WHERE sch.school_id = 'ZM-LSK-0002')),
+  $$ SELECT public.attach_own_registered_school(
+       current_setting('zsms.reg_school_id')::UUID, 'org_somebody_else') $$,
   '42710',
   NULL,
   'the window closes after one use — a second attach is refused'
@@ -231,6 +250,12 @@ SET LOCAL request.jwt.claims TO '{
   "sub": "user_grace", "role": "authenticated",
   "o": {"id": "org_sunrise", "rol": "owner", "slg": "zm-lsk-0002"}
 }';
+
+SELECT is(
+  (SELECT clerk_org_id FROM public.schools WHERE clerk_org_id = 'org_sunrise'),
+  'org_sunrise',
+  'with the organisation attached and the claim present, the owner finally sees their own school'
+);
 
 SELECT throws_ok(
   $$ UPDATE public.schools SET subscription_tier = 'enterprise'

@@ -55,12 +55,26 @@ INSERT INTO public.schools (id, school_id, clerk_org_id, name, type, level, city
 VALUES
   ('11111111-1111-1111-1111-111111111111','ZM-LSK-0001','org_school_a','Alpha Academy','day','combined','LSK','active','starter', NULL),
   ('22222222-2222-2222-2222-222222222222','ZM-NDL-0002','org_school_b','Beta School','day','combined','NDL','active','growth','https://cdn.example.test/legacy-beta.png'),
-  ('33333333-3333-3333-3333-333333333333','ZM-KIT-0003','org_school_c','Gamma College','day','combined','KIT','terminated','starter', NULL);
+  ('33333333-3333-3333-3333-333333333333','ZM-KIT-0003','org_school_c','Gamma College','day','combined','KIT','active','starter', NULL);
 
 INSERT INTO public.school_branding (school_id, anchor_color, primary_color, logo_url, updated_by)
 VALUES
   ('11111111-1111-1111-1111-111111111111','#5B1A1A','#B02E2E','https://cdn.example.test/alpha.png','user_owner_a'),
   ('33333333-3333-3333-3333-333333333333','#1A3A5B','#2E6EB0','https://cdn.example.test/gamma.png','user_owner_c');
+
+/**
+ * Gamma is terminated only AFTER its branding exists, which is both realistic and now necessary.
+ *
+ * `0149` attaches an AFTER STATEMENT trigger to every school-scoped table refusing writes to a
+ * school that is `trial_expired`, `suspended` or `terminated` — and it fires for every seat,
+ * including the superuser this fixture runs as, because a rule that SECURITY DEFINER functions and
+ * workers can sail past is not a rule. Creating Gamma terminated and then giving it branding would
+ * be writing to a dead school, which is exactly what the trigger exists to stop.
+ *
+ * A real school reaches `terminated` after it has data, never before.
+ */
+UPDATE public.schools SET status = 'terminated'
+ WHERE id = '33333333-3333-3333-3333-333333333333';
 
 -- Beta deliberately has no school_branding row at all. An absent row is the
 -- normal state for a school that has not been through the branding step, and

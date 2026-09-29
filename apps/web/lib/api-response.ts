@@ -112,6 +112,15 @@ export function fromPostgrestError(error: { code?: string; message: string }): N
       // students, and nothing about their permissions would change the outcome.
       // The school's state is what refuses it.
       return fail('CONFLICT', error.message)
+    case 'ZS002':
+      // The school lifecycle (migration 0149). Raised when a school that is trial_expired,
+      // suspended or terminated tries to write anything. The message names the status and says
+      // reading still works, which is the difference between "your account has a problem" and
+      // "your data is gone" — and for a school mid-term that distinction is the whole message.
+      //
+      // CONFLICT, for the same reason as ZS001: nothing about the caller's permissions would
+      // change the outcome. It is the school's standing that refuses, not their role.
+      return fail('CONFLICT', error.message)
     case 'PGRST116':
       return fail('NOT_FOUND', 'Record not found.')
     case 'PGRST301':

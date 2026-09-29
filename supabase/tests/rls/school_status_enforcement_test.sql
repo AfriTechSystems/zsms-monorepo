@@ -56,14 +56,15 @@ VALUES
   ('22222222-2222-2222-2222-222222222222','grade_9','Grade 9',9,'junior_secondary','internal',TRUE),
   ('33333333-3333-3333-3333-333333333333','grade_9','Grade 9',9,'junior_secondary','internal',TRUE);
 
-INSERT INTO public.students (id, student_id, school_id, first_name, last_name, grade_id)
+INSERT INTO public.students
+  (id, student_id, school_id, first_name, last_name, grade_id, class_id)
 VALUES
   ('aaaa0000-0000-0000-0000-000000000001','STU-ZM-LSK-0001-00001',
-   '11111111-1111-1111-1111-111111111111','Alice','Live','grade_9'),
+   '11111111-1111-1111-1111-111111111111','Alice','Live','grade_9','grade_9a'),
   ('aaaa0000-0000-0000-0000-000000000002','STU-ZM-LSK-0002-00001',
-   '22222222-2222-2222-2222-222222222222','Bruce','Lapsed','grade_9'),
+   '22222222-2222-2222-2222-222222222222','Bruce','Lapsed','grade_9','grade_9a'),
   ('aaaa0000-0000-0000-0000-000000000003','STU-ZM-NDL-0001-00001',
-   '33333333-3333-3333-3333-333333333333','Carol','Susp','grade_9');
+   '33333333-3333-3333-3333-333333333333','Carol','Susp','grade_9','grade_9a');
 
 -- Now the statuses move, which is the order a real school reaches them in.
 UPDATE public.schools SET status = 'trial_expired'
@@ -115,25 +116,28 @@ SELECT ok(
 -- The guard itself, from the seat that would bypass a policy.
 -- ---------------------------------------------------------------------------
 SELECT lives_ok(
-  $$ INSERT INTO public.students (student_id, school_id, first_name, last_name, grade_id)
+  $$ INSERT INTO public.students
+       (student_id, school_id, first_name, last_name, grade_id, class_id)
      VALUES ('STU-ZM-LSK-0001-00002','11111111-1111-1111-1111-111111111111',
-             'Dara','Live','grade_9') $$,
+             'Dara','Live','grade_9','grade_9a') $$,
   'the active school enrols a pupil'
 );
 
 SELECT throws_ok(
-  $$ INSERT INTO public.students (student_id, school_id, first_name, last_name, grade_id)
+  $$ INSERT INTO public.students
+       (student_id, school_id, first_name, last_name, grade_id, class_id)
      VALUES ('STU-ZM-LSK-0002-00002','22222222-2222-2222-2222-222222222222',
-             'Eve','Lapsed','grade_9') $$,
+             'Eve','Lapsed','grade_9','grade_9a') $$,
   'ZS002',
   NULL,
   'the lapsed-trial school cannot — and this session is a superuser, so no policy is involved'
 );
 
 SELECT throws_ok(
-  $$ INSERT INTO public.students (student_id, school_id, first_name, last_name, grade_id)
+  $$ INSERT INTO public.students
+       (student_id, school_id, first_name, last_name, grade_id, class_id)
      VALUES ('STU-ZM-NDL-0001-00002','33333333-3333-3333-3333-333333333333',
-             'Femi','Susp','grade_9') $$,
+             'Femi','Susp','grade_9','grade_9a') $$,
   'ZS002',
   NULL,
   'nor the suspended one'

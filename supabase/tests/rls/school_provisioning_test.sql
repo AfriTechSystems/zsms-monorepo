@@ -409,16 +409,17 @@ SELECT is(
 );
 
 /**
- * And cannot write one. Counted rather than thrown: an UPDATE blocked by RLS matches zero rows and
- * reports success, so `throws_ok` here would fail against correct behaviour.
+ * And cannot write one. The attempt is made here and checked at the end of the file, from the
+ * AfriTech session that can actually see the row.
+ *
+ * It is not an assertion in its own right, for two reasons. An UPDATE blocked by RLS **raises
+ * nothing** — it matches zero rows and reports success — so `throws_ok` would fail against correct
+ * behaviour. And counting the affected rows needs a data-modifying CTE, which PostgreSQL permits
+ * only at the top level of a statement, never inside the subquery `is()` requires.
+ *
+ * So the only honest check is the one below: did the value change.
  */
-SELECT is(
-  (WITH attempted AS (
-     UPDATE public.school_onboarding SET verification_note = 'Verified by me' RETURNING 1
-   ) SELECT COUNT(*)::INT FROM attempted),
-  0,
-  '...and an UPDATE touches nothing — RLS denies by matching no rows, silently'
-);
+UPDATE public.school_onboarding SET verification_note = 'Verified by me';
 
 -- Their own checklist, however, IS theirs — 0010 already said so, and the setup screen needs it.
 SELECT is(
@@ -438,6 +439,22 @@ SELECT lives_ok(
   $$ UPDATE public.onboarding_checklists SET is_complete = TRUE
       WHERE item_key = 'logo' $$,
   'and an owner ticks their own items — management_write_onboarding (0010) permits it'
+);
+
+-- ---------------------------------------------------------------------------
+-- Back to AfriTech, to see what the school owner's write did. Which is nothing.
+-- ---------------------------------------------------------------------------
+SET LOCAL request.jwt.claims TO '{
+  "sub": "user_afritech", "role": "authenticated",
+  "o": {"id": "org_afritech", "rol": "afritech:super_admin", "slg": "afritech-systems-admin"}
+}';
+
+SELECT is(
+  (SELECT verification_note FROM public.school_onboarding
+    WHERE school_id = (SELECT sch.id FROM public.schools sch
+                        WHERE sch.school_id = 'ZM-LSK-0002')),
+  'Spoke to Grace Mwale on +260977123456. Confirmed the address and the ministry number.',
+  'the owner''s UPDATE changed nothing — RLS denied it by matching no rows, silently'
 );
 
 SELECT * FROM finish();

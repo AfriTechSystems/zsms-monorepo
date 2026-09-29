@@ -41,6 +41,18 @@ const ASSERTIONS = [
   // the lesson is plainly that adding them one incident at a time does not work.
   'throws_matching', 'throws_imatching', 'throws_ilike', 'throws_like',
   'row_eq', 'bag_eq', 'isa_ok',
+  // Third incident, 2026-09-29: the SCHEMA-testing family was absent, so price_bands_test
+  // reported 13 assertions under plan(17) and pg_prove would have failed it in CI. The pattern
+  // across all three is the same — the list grows one incident at a time, and each incident is
+  // discovered by a suite that happens to use a function nobody added yet.
+  //
+  // So this block is the whole family rather than the four that were needed. `hasnt_*` variants
+  // stay ahead of their `has_*` prefixes, and longer names ahead of shorter ones.
+  'hasnt_function', 'hasnt_table', 'hasnt_view', 'hasnt_column', 'hasnt_index',
+  'has_function', 'has_table', 'has_view', 'has_column', 'has_index',
+  'has_pk', 'has_fk', 'has_check', 'has_unique', 'has_trigger', 'has_role', 'has_schema',
+  'col_is_pk', 'col_is_fk', 'col_not_null', 'col_is_null', 'col_has_default', 'col_type_is',
+  'table_privs_are', 'function_privs_are', 'schema_privs_are',
   'ok',
 ]
 

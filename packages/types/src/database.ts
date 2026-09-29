@@ -3511,6 +3511,39 @@ export type Database = {
         }
         Relationships: []
       }
+      tier_price_bands: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          max_students: number | null
+          min_students: number | null
+          price_per_student_usd: number | null
+          price_per_student_zmw: number | null
+          tier_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          max_students?: number | null
+          min_students?: number | null
+          price_per_student_usd?: number | null
+          price_per_student_zmw?: number | null
+          tier_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          max_students?: number | null
+          min_students?: number | null
+          price_per_student_usd?: number | null
+          price_per_student_zmw?: number | null
+          tier_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       academic_year_is_current: {
@@ -3534,6 +3567,20 @@ export type Database = {
         }
         Returns: string
       }
+      admin_delete_tier_price_band: {
+        Args: { p_band_id: string }
+        Returns: boolean
+      }
+      admin_publish_prompt_template: {
+        Args: {
+          p_change_note?: string
+          p_feature_key: string
+          p_model_params?: Json
+          p_system_prompt: string
+          p_user_template: string
+        }
+        Returns: number
+      }
       admin_revoke_override: {
         Args: { p_actor: string; p_id: string }
         Returns: boolean
@@ -3547,6 +3594,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      admin_set_tier_pricing_model: {
+        Args: { p_pricing_model: string; p_tier_name: string }
+        Returns: {
+          band_count: number
+          pricing_model: string
+          tier_name: string
+        }[]
+      }
       admin_update_tier: {
         Args: {
           p_actor?: string
@@ -3559,6 +3614,17 @@ export type Database = {
           p_whatsapp_quota?: number
         }
         Returns: boolean
+      }
+      admin_upsert_tier_price_band: {
+        Args: {
+          p_band_id?: string
+          p_max_students: number
+          p_min_students: number
+          p_price_usd: number
+          p_price_zmw: number
+          p_tier_name: string
+        }
+        Returns: string
       }
       ai_allowance_for_account: {
         Args: { p_account_id: string }

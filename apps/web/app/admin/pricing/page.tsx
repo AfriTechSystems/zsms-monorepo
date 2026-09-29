@@ -41,6 +41,7 @@ import { useCallback, useState } from 'react'
 import { Loader2, Wallet } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
+import { PriceBands, usePriceBands } from './price-bands'
 import { Alert } from '../../../components/ui/alert'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
@@ -58,6 +59,11 @@ interface Tier {
   annual_price_zmw: string | number | null
   student_limit: number | null
   whatsapp_quota: number | null
+  /**
+   * Both come from `subscription_tier_catalogue` and were being fetched and ignored — which is
+   * why per-student pricing was invisible here despite existing in the database since `0124`.
+   */
+  pricing_model: string | null
   is_publicly_listed: boolean
   display_order: number
   updated_at: string | null
@@ -305,12 +311,14 @@ function TierEditor({
 
 export default function AdminPricingPage(): JSX.Element {
   const { data, loading, error, code, reload } = useApi<PricingPayload>('/api/admin/tiers')
+  const { byTier, reload: reloadBands } = usePriceBands()
 
   return (
     <>
       <PageHeader
         title="Pricing"
         description="Subscription tiers, their prices, and their limits. Nothing here is compiled into the application — these rows are the price list."
+        note="A tier is billed EITHER at a flat monthly price OR per pupil, never both. Switching a tier to per-pupil needs at least one band before a school on it can be invoiced — until then ZSMS reports such a school as unpriced rather than billing it nothing."
       />
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
@@ -326,12 +334,27 @@ export default function AdminPricingPage(): JSX.Element {
             />
           ) : (
             data.tiers.map((tier) => (
-              <TierEditor
-                key={tier.tier_name}
-                tier={tier}
-                billing={data.billingPerTier[tier.tier_name] ?? 0}
-                onSaved={reload}
-              />
+              <div key={tier.tier_name} className="space-y-3">
+                <TierEditor
+                  tier={tier}
+                  billing={data.billingPerTier[tier.tier_name] ?? 0}
+                  onSaved={reload}
+                />
+                {/*
+                  Beneath the tier rather than inside it: the flat price and the per-pupil bands
+                  are alternatives, and nesting one in the other would suggest they combine.
+                */}
+                <PriceBands
+                  tierName={tier.tier_name}
+                  displayName={tier.display_name}
+                  pricingModel={tier.pricing_model ?? 'flat'}
+                  bands={byTier[tier.tier_name] ?? []}
+                  onChanged={() => {
+                    reloadBands()
+                    reload()
+                  }}
+                />
+              </div>
             ))
           )}
         </div>

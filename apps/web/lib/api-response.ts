@@ -121,6 +121,10 @@ export function fromPostgrestError(error: { code?: string; message: string }): N
       // CONFLICT, for the same reason as ZS001: nothing about the caller's permissions would
       // change the outcome. It is the school's standing that refuses, not their role.
       return fail('CONFLICT', error.message)
+    case 'ZS003':
+      // An unverified school trying to enrol a pupil (migration 0153). The message names what they
+      // CAN do meanwhile, which is the difference between a blocked screen and a next step.
+      return fail('CONFLICT', error.message)
     case 'PGRST116':
       return fail('NOT_FOUND', 'Record not found.')
     case 'PGRST301':

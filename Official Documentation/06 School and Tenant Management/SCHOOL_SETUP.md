@@ -376,11 +376,24 @@ Decided 2026-09-29: verification is a **phone call recorded as a note**, not a d
 `admin_activate_school()` requires a non-empty note, because the note is the whole of the evidence
 and an activation without one is a tick box pretending to be a control.
 
-### The status effects table is NOT enforced
+### The status effects table IS enforced, as of `0149` and `0153`
 
-The lifecycle table above says `trial_expired` and `suspended` schools may read and not write.
-**Nothing in the schema enforces that today, for any status.** `0142` makes the status recordable
-and correct; making it binding touches every policy in the database and is its own migration.
+`trial_expired`, `suspended` and `terminated` schools cannot write anything. Enforced by an AFTER
+STATEMENT trigger on every school-scoped table rather than by RLS, because on Supabase the `postgres`
+role carries BYPASSRLS and every `SECURITY DEFINER` function here is owned by it — a policy would be
+invisible to `import_students()`, `save_exam_marks()` and `verify_payment()`, and to every worker.
+
+**`pending_verification`'s "limited" write is resolved as: configuration yes, pupils no.** This
+document's business rule 4 and `ONBOARDING.md`'s pilot process contradicted each other; `0153` takes
+the stricter reading, because an unverified school loading children's personal data makes AfriTech
+their ZDPA processor before anybody has confirmed the school exists. Grade levels, subjects, grading
+scales, term dates and fee structures stay open — which is the whole point of admitting an unverified
+school, since it sets itself up while AfriTech verifies it. `ONBOARDING.md`'s pilot sequence has been
+amended to activate before importing.
+
+**Reads are not restricted for any status**, including `terminated`. `TRIAL.md` business rule 6
+preserves a school's ability to see and export its own data, and blocking reads is a data-retention
+decision with a legal clock on it rather than a subscription one.
 
 ---
 
@@ -417,3 +430,4 @@ and correct; making it binding touches every policy in the database and is its o
 | 2026-04-26 | Added school status lifecycle table | Clarity on what each status permits |
 | 2026-09-29 | Added *What Is Built, and Where It Differs* | Path 1 implemented in `0142`–`0144`. Four deviations recorded with reasons, plus the province addition and the explicit note that status effects are not enforced. |
 | 2026-09-30 | Path 2 implemented in `0150`/`0151` | Self-registration built, with the account-first reversal, the one-open-trial limit and timestamped consent all recorded above. |
+| 2026-09-30 | Status effects enforced; `pending_verification` resolved | `0149` blocks writes for lapsed statuses; `0153` blocks pupil enrolment for unverified schools while leaving configuration open. ONBOARDING.md's pilot sequence amended to match. |

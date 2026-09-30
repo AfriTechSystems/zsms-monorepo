@@ -30,7 +30,7 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(21);
+SELECT plan(25);
 
 -- ---------------------------------------------------------------------------
 -- Four schools, one per interesting status. All created writable, because a
@@ -82,7 +82,28 @@ SELECT ok(
 
 SELECT ok(
   public.school_can_write('44444444-4444-4444-4444-444444444444'),
-  'so may one awaiting verification — "limited" is documented contradictorily and not enforced'
+  'so may one awaiting verification — its configuration is open, which is the point of letting it in'
+);
+
+/**
+ * THE "LIMITED" WRITE, RESOLVED IN 0153.
+ *
+ * `SCHOOL_SETUP.md` and `ONBOARDING.md` contradicted each other about what limited means. Settled in
+ * favour of the stricter reading, and not because one document is older: `pending_verification` means
+ * AfriTech has not yet confirmed the school is real, and letting it load pupil records means
+ * accepting several hundred children's names and dates of birth from a party nobody has checked.
+ * AfriTech is the processor for that data under the ZDPA from the moment it lands.
+ *
+ * So `school_can_enrol()` is stricter than `school_can_write()` by exactly one status.
+ */
+SELECT ok(
+  NOT public.school_can_enrol('44444444-4444-4444-4444-444444444444'),
+  'but an unverified school may NOT enrol a pupil — it holds no verified claim to that data'
+);
+
+SELECT ok(
+  public.school_can_enrol('11111111-1111-1111-1111-111111111111'),
+  '...while an active school may'
 );
 
 SELECT ok(
@@ -157,6 +178,27 @@ SELECT throws_ok(
   'ZS002',
   NULL,
   '...and so is a DELETE'
+);
+
+/**
+ * Configuration stays open to the unverified school, and that is the whole reason for admitting it:
+ * it sets itself up while AfriTech verifies it, which is what makes the verification call short.
+ */
+SELECT lives_ok(
+  $$ INSERT INTO public.school_grade_levels
+       (school_id, level_id, display_name, level_order, level_type, examination_type, is_active)
+     VALUES ('44444444-4444-4444-4444-444444444444','grade_1','Grade 1',1,'primary','internal',TRUE) $$,
+  'an unverified school configures its grade levels freely — no personal data is involved'
+);
+
+SELECT throws_ok(
+  $$ INSERT INTO public.students
+       (student_id, school_id, first_name, last_name, grade_id, class_id)
+     VALUES ('STU-ZM-KIT-0001-00001','44444444-4444-4444-4444-444444444444',
+             'Unverified','Pupil','grade_1','grade_1a') $$,
+  'ZS003',
+  NULL,
+  '...but enrolling a child is refused until AfriTech has activated it'
 );
 
 -- Reads are untouched, deliberately. A school must be able to see and export its own records

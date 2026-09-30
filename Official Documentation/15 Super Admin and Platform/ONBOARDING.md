@@ -238,9 +238,16 @@ For pilot schools during the September 2026 launch, AfriTech creates accounts ma
 3. AfriTech sets up a 2-hour guided onboarding session:
    - Screen share with school owner
    - Walk through every configuration step together
-   - Import student data together (AfriTech helps format the spreadsheet)
    - Set up at least one fee structure and generate fee records
    - Invite at least 2 teachers and confirm they can log in
+
+   **AMENDED 2026-09-30 — activate before importing pupils.** This step used to import student
+   data during the session, with activation at step 5 afterwards. Migration `0153` makes that
+   impossible, deliberately: `pending_verification` means AfriTech has not yet confirmed the school
+   is real, and accepting several hundred children's names and dates of birth from an unverified
+   party makes AfriTech their processor under the ZDPA before anybody has established there is a
+   school behind it. Activate at the point in the call where the details are confirmed, then import.
+   It reorders two steps and changes nothing about how long the call takes.
 
 4. Post-session follow-up:
    - Email with everything configured, what to do next
@@ -363,3 +370,4 @@ records a verification call — see `SCHOOL_SETUP.md`.
 | 2026-04-26 | Added 24h escalation via the queue | Enforcement of outreach requirement |
 | 2026-09-29 | Added *What Is Built* | Checklist implemented as data in `0143` with the documented weights; the four missing items added and backfilled per business rule 4. Task queue and 24-hour escalation still unbuilt, with the no-Redis design recorded. |
 | 2026-09-30 | Task queue implemented in `0152` | The 24-hour rule is derived in SQL rather than scheduled, since Redis does not exist. Four task states computed, five stored. Contact log append-only. |
+| 2026-09-30 | Pilot sequence amended: activate before importing pupils | Resolved the contradiction with SCHOOL_SETUP.md business rule 4 in favour of the stricter reading. An unverified school cannot create pupil records (`0153`); its configuration stays open. |

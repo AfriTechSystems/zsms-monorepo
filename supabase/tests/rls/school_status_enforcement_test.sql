@@ -214,12 +214,21 @@ SELECT throws_ok(
  * future third guard on this table cannot quietly take the sentence back.
  */
 SELECT ok(
-  (SELECT COUNT(*) FROM pg_trigger t
-     JOIN pg_class c ON c.oid = t.tgrelid
-    WHERE c.relname = 'students'
-      AND NOT t.tgisinternal
-      AND t.tgname LIKE 'enforce_school_%') = 4,
-  'students carries both guards — two for enrolment, two for writability — and they do not overlap'
+  (SELECT bool_and(present) FROM (
+     SELECT EXISTS (
+       SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+        WHERE c.relname = 'students' AND NOT t.tgisinternal AND t.tgname = expected
+     ) AS present
+       FROM unnest(ARRAY[
+         'enforce_school_can_enrol_on_insert_on_students',
+         'enforce_school_can_enrol_on_update_on_students',
+         'enforce_school_writable_on_insert_on_students',
+         'enforce_school_writable_on_update_on_students',
+         'enforce_school_writable_on_delete_on_students'
+       ]) AS expected
+   ) checks),
+  'students carries both guards by name — asserted individually, not counted, since the count also '
+  'catches the pupil-ceiling trigger and would move whenever anything else is added'
 );
 
 -- Reads are untouched, deliberately. A school must be able to see and export its own records

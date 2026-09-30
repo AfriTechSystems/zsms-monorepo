@@ -1,81 +1,67 @@
 /**
- * Sign-up — where an invited colleague lands.
+ * Create an account — for an invited colleague, a head teacher, or a teacher joining the Hub.
  *
  * Spec: `Official Documentation/02 Authentication and Identity/AUTH.md`
  *       `Official Documentation/03 Infrastructure Services/CLERK.md`
  *       `Official Documentation/15 Super Admin and Platform/ONBOARDING.md`
  *
- * ## Why its absence sent invited staff to a Clerk page
+ * ## Why its absence once sent invited staff to a Clerk page
  *
- * An organisation invitation email links to a Clerk *ticket* URL. Clerk consumes
- * the ticket and then redirects — to `redirect_url` if the invitation carried
- * one, and otherwise to the instance's **Account Portal**, which is Clerk's own
- * hosted page on `*.accounts.dev`.
+ * An organisation invitation links to a Clerk *ticket* URL. Clerk consumes the ticket and redirects —
+ * to `redirect_url` if the invitation carried one, and otherwise to the instance's Account Portal,
+ * which is Clerk's own hosted page on `*.accounts.dev`. ZSMS had no `/sign-up` route at all and its
+ * invitations named no redirect, so every invited teacher accepted, saw the school appear, and landed
+ * on a Clerk-branded page with no way into the product.
  *
- * ZSMS had no `/sign-up` route at all, and its invitations named no redirect. So
- * every invited teacher accepted their invitation, saw the school appear, and
- * landed on a Clerk-branded page with no way into the product. The account was
- * created correctly; there was simply nowhere to send them.
+ * The ticket is read from the URL rather than passed in: Clerk's `<SignUp>` picks up `__clerk_ticket`
+ * from the query string itself and switches into accept-invitation mode, pre-filling the address and
+ * joining the organisation on completion.
  *
- * This route is that destination. The catch-all segment matters for the same
- * reason it does on sign-in: the flow navigates to sub-paths of its own
- * (`/sign-up/verify-email-address`, `/sign-up/continue`) and each must render
- * this component rather than 404.
+ * ## It is no longer only for invited staff
  *
- * ## The ticket is read from the URL, not passed in
+ * This page's copy used to tell every visitor their school administrator had invited them. It is now
+ * also where a head teacher registering their own school arrives, and where a standalone teacher
+ * creating a Hub account arrives — so it no longer promises a school, and `/welcome` works out where
+ * the account belongs once it exists.
  *
- * Clerk's `<SignUp>` picks up `__clerk_ticket` from the query string itself and
- * switches into "accept invitation" mode — pre-filling the address, skipping the
- * parts already settled, and joining the organisation on completion. Nothing has
- * to be threaded through, which is why this file is short and why the fix was in
- * the invitation's `redirectUrl` rather than here.
+ * ## The phone field
+ *
+ * Clerk's sign-up form can ask for a phone number and should not here: ZSMS is **email OTP only, SMS
+ * OTP deliberately disabled** (`CLAUDE.md`, `AUTH.md`), so a number collected at this point is one
+ * Clerk will never use — while our own forms collect `+260…` with our own validation and store it
+ * where the fee reminders actually read it. Asking twice for one thing, and using the wrong copy for
+ * it.
+ *
+ * That switch is Clerk instance configuration and cannot be set from this repository —
+ * **Dashboard → Configure → Email, Phone, Username → Phone number → off**. It belongs with the other
+ * undocumented instance settings `CLERK.md` tracks.
  */
 
 import type { JSX } from 'react'
-import Image from 'next/image'
 
 import { SignUp } from '@zsms/auth-provider/react'
 
+import { AuthShell, loadAuthBranding } from '../../../components/ui/auth-shell'
 import { authAppearance } from '../../../components/ui/auth-appearance'
 
 export const metadata = { title: 'Create your account · ZSMS' }
 
-export default function SignUpPage(): JSX.Element {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ school_id?: string }>
+}): Promise<JSX.Element> {
+  const { school_id: schoolId } = await searchParams
+  const branding = await loadAuthBranding(schoolId)
+
   return (
-    <main
-      id="main"
-      className="flex min-h-dvh flex-col items-center justify-center gap-cards bg-background px-gutter py-10"
+    <AuthShell
+      title="Create your ZSMS account"
+      subtitle={branding ? undefined : 'One account for your school, the Teacher Hub, or both.'}
+      branding={branding}
+      footnote="ZSMS is a product of AfriTech Systems Limited."
     >
-      <div className="flex w-full max-w-md flex-col items-center gap-3 text-center">
-        <Image
-          src="/brand/zsms-lockup.png"
-          alt="ZSMS — school management by AfriTech Systems"
-          width={200}
-          height={64}
-          priority
-          className="h-auto w-[150px] sm:w-[180px]"
-        />
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          Create your ZSMS account
-        </h1>
-        {/*
-          This page was written for an invited colleague and says so. It is now also where a head
-          teacher registering a school and a teacher joining the Hub arrive, so the copy no longer
-          promises a school — `/welcome` works out where they belong once the account exists.
-        */}
-        <p className="text-sm text-muted-foreground">
-          One account for your school, the Teacher Hub, or both.
-        </p>
-      </div>
-
-      {/* `signInUrl` so the "already have an account?" link stays inside ZSMS.
-          Without it Clerk points at its own hosted portal, which is the same
-          class of problem this page exists to fix. */}
       <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/welcome" appearance={authAppearance} />
-
-      <p className="max-w-md text-center text-xs text-subtle">
-        ZSMS is a product of AfriTech Systems Limited.
-      </p>
-    </main>
+    </AuthShell>
   )
 }

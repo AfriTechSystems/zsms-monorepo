@@ -1,78 +1,62 @@
 /**
- * Sign-in.
+ * Sign in — one door for every audience.
  *
  * Spec: `Official Documentation/02 Authentication and Identity/AUTH.md`
- *       `Official Documentation/01 Foundation Layer/DESIGN_SYSTEM.md`
+ *       `Official Documentation/06 School and Tenant Management/PUBLIC_DIRECTORY.md`
  *
- * A catch-all segment because the hosted flow navigates to sub-paths of its own
- * (`/sign-in/factor-one`, `/sign-in/sso-callback`) and each must render this
- * component rather than a 404.
+ * ## One page, not four
  *
- * Email OTP only — SMS OTP is disabled platform-wide per AUTH.md. That is a
- * Clerk dashboard setting, not something this file can enforce, so a second
- * factor appearing here means the dashboard drifted.
+ * `AUTH.md` lists an entry point per audience — `/login`, `/portal/login`, `/teacher/login`,
+ * `/admin/login`. ZSMS has a single Clerk instance and one session shape, so four URLs would be four
+ * doors onto the same lock: whichever you arrive at, the email and the OTP are identical and so is the
+ * session that comes out. What differs is where you belong afterwards, and that is decided by the
+ * account rather than by the door — so routing happens once, at `/welcome`.
  *
- * ## The page is ZSMS, not a provider's page with a logo on it
+ * ## `?school_id=` finally does something
  *
- * This is the first screen anyone sees, and until now it was a Clerk-branded
- * card floating on a blank background. The layout below is ours: the lockup, a
- * line saying what this is, the form, and a footer naming AfriTech. The form
- * itself is skinned through `authAppearance`, whose every rule resolves to a
- * `--zsms-*` variable — so it inherits light and dark, the type scale, and the
- * 44px tap floor rather than restating them.
- *
- * `min-h-dvh` rather than `min-h-screen`: on mobile Safari `100vh` is the height
- * of the viewport *without* the address bar, so a centred form sits a browser
- * chrome's worth too low and the submit button lands under it.
+ * The directory links a parent through as `/sign-in?school_id=ZM-LSK-0001`, per `PUBLIC_DIRECTORY.md`,
+ * and until now nothing read it. The shell resolves it to the school's name and crest, so a parent who
+ * has never heard of ZSMS sees their own school on the page. That reassurance is most of the reason the
+ * parameter exists.
  */
 
 import type { JSX } from 'react'
-import Image from 'next/image'
 
 import { SignIn } from '@zsms/auth-provider/react'
 
+import { AuthShell, loadAuthBranding } from '../../../components/ui/auth-shell'
 import { authAppearance } from '../../../components/ui/auth-appearance'
 
 export const metadata = { title: 'Sign in · ZSMS' }
 
-export default function SignInPage(): JSX.Element {
-  return (
-    <main
-      id="main"
-      className="flex min-h-dvh flex-col items-center justify-center gap-cards bg-background px-gutter py-10"
-    >
-      <div className="flex w-full max-w-md flex-col items-center gap-3 text-center">
-        <Image
-          src="/brand/zsms-lockup.png"
-          alt="ZSMS — school management by AfriTech Systems"
-          width={200}
-          height={64}
-          priority
-          className="h-auto w-[150px] sm:w-[180px]"
-        />
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          Sign in to your school
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          School management for Zambian schools.
-        </p>
-      </div>
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ school_id?: string }>
+}): Promise<JSX.Element> {
+  const { school_id: schoolId } = await searchParams
+  const branding = await loadAuthBranding(schoolId)
 
-      {/* `signUpUrl` keeps the "create an account" link inside ZSMS. Left to
-          itself Clerk links to its hosted portal on `*.accounts.dev`, which is
-          how invited staff ended up outside the product. */}
+  return (
+    <AuthShell
+      title="Sign in to ZSMS"
+      subtitle={branding ? undefined : 'School management for Zambian schools.'}
+      branding={branding}
+      footnote={
+        branding
+          ? `Use the email ${branding.schoolName} has on file for you. If it does not work, ask the school to check it.`
+          : 'Trouble signing in? Ask your school administrator, who can re-send your invitation.'
+      }
+    >
       {/*
-        `/welcome` rather than `/school`. Landing every sign-in on the staff portal presumed everybody
-        is school staff, and there was no branch for anybody else — see the comment in
-        `app/welcome/page.tsx` for the lockout that produced. `/welcome` reads the session and routes
-        by what the account IS, which is the only thing that can decide it.
+        `signUpUrl` keeps "create an account" inside ZSMS — left alone, Clerk links to its hosted
+        portal on `*.accounts.dev`, which is how invited staff ended up outside the product.
+
+        `fallbackRedirectUrl` is `/welcome`, not `/school`. Landing every sign-in on the staff portal
+        presumed everybody is school staff and had no branch for anybody else, which locked out every
+        account with no organisation — see the header of `app/welcome/page.tsx`.
       */}
       <SignIn signUpUrl="/sign-up" fallbackRedirectUrl="/welcome" appearance={authAppearance} />
-
-      <p className="max-w-md text-center text-xs text-subtle">
-        ZSMS is a product of AfriTech Systems Limited. Trouble signing in? Ask your school
-        administrator, who can re-send your invitation.
-      </p>
-    </main>
+    </AuthShell>
   )
 }

@@ -28,8 +28,9 @@ import { Field, Input, Select } from '../../components/ui/field'
 import { PageHeader, ErrorState, StatSkeleton } from '../../components/ui/data-states'
 import { DraftNotice } from '../../components/ui/draft-notice'
 import { draftAge, useFormDraft } from '../../lib/use-form-draft'
-import { useAuth } from '@zsms/auth-provider/react'
+import { SignedIn, SignedOut, useAuth } from '@zsms/auth-provider/react'
 import { useToast } from '../../components/ui/toast'
+import { HubSignIn } from './hub-sign-in'
 import {
   CURRICULUM_LABELS,
   EntitlementNotice,
@@ -70,6 +71,30 @@ const COMMON_SUBJECTS = [
 ]
 
 export default function TeacherHubPage(): JSX.Element {
+  /**
+   * The signed-out branch, which this page did not have.
+   *
+   * Without it the page mounted, called `/api/teacher/hub`, received 401 and rendered
+   * "Authentication required." — a fault report at the Hub's front door, shown to every first-time
+   * visitor the homepage and the directory send here.
+   *
+   * `SignedOut` and `SignedIn` rather than a redirect, for the reason this file's header already
+   * gives about `needsRegistration`: a redirect that has to be undone is more moving parts than a
+   * branch, and one of the two states is always correct.
+   */
+  return (
+    <>
+      <SignedOut>
+        <HubSignIn />
+      </SignedOut>
+      <SignedIn>
+        <TeacherHubDashboard />
+      </SignedIn>
+    </>
+  )
+}
+
+function TeacherHubDashboard(): JSX.Element {
   const [hub, setHub] = useState<HubPayload | null>(null)
   const [recent, setRecent] = useState<ResourceRow[]>([])
   const [error, setError] = useState<string | null>(null)

@@ -30,7 +30,7 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(25);
+SELECT plan(26);
 
 -- ---------------------------------------------------------------------------
 -- Four schools, one per interesting status. All created writable, because a
@@ -199,6 +199,27 @@ SELECT throws_ok(
   'ZS003',
   NULL,
   '...but enrolling a child is refused until AfriTech has activated it'
+);
+
+/**
+ * AND THE TWO GUARDS MUST NOT SPEAK OVER EACH OTHER.
+ *
+ * `students` carries both `0149`'s write guard (ZS002) and `0153`'s enrolment guard (ZS003).
+ * PostgreSQL fires same-event triggers in NAME order, and `can_enrol` sorts before `writable` — so
+ * `0153` reached a suspended school first and told it to await a verification call that was never
+ * going to happen, when what it needed to hear was that its subscription had lapsed.
+ *
+ * `0154` narrows the enrolment message to `pending_verification` alone. The assertions above for the
+ * lapsed and suspended schools expect ZS002 and are what caught this; this one pins the reason, so a
+ * future third guard on this table cannot quietly take the sentence back.
+ */
+SELECT ok(
+  (SELECT COUNT(*) FROM pg_trigger t
+     JOIN pg_class c ON c.oid = t.tgrelid
+    WHERE c.relname = 'students'
+      AND NOT t.tgisinternal
+      AND t.tgname LIKE 'enforce_school_%') = 4,
+  'students carries both guards — two for enrolment, two for writability — and they do not overlap'
 );
 
 -- Reads are untouched, deliberately. A school must be able to see and export its own records

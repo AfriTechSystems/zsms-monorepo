@@ -26,6 +26,7 @@ import {
   CalendarCheck,
   ClipboardList,
   FileSpreadsheet,
+  Globe,
   GraduationCap,
   LayoutDashboard,
   Megaphone,
@@ -136,6 +137,10 @@ export function SchoolShell({
         { path: '/settings', label: 'School settings', icon: Cog, exact: true },
         // Defining what is recorded about a pupil is a pupil-write act.
         { path: '/settings/fields', label: 'Pupil fields', icon: SlidersHorizontal, needs: 'students:write' },
+        // Outward-facing rather than internal configuration, and the only settings row a
+        // parent ever sees the result of. Kept beside the others because that is where a head
+        // teacher looks for it, not because it is the same kind of thing.
+        { path: '/settings/public-profile', label: 'Public listing', icon: Globe },
         { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
       ],
     },

@@ -178,6 +178,91 @@ The student ID lookup is stricter (10 requests/minute) to prevent enumeration of
 
 ---
 
+## What Is Built, and Where It Differs From The Above
+
+*Added 2026-09-30, when the directory was implemented. Everything above was written pre-development.*
+
+Built: `/schools` (search), `/schools/[code]` (profile, server-rendered for SEO), `/for-schools`, the
+four-door homepage at `/`, and the school's own control at
+`/school/[code]/settings/public-profile`. Behind them: `public.school_public_profiles`,
+`public.school_verified_metrics()`, and two SECURITY DEFINER functions granted to `anon` —
+`search_schools()` and `school_public_profile()` (migration `0155`).
+
+### The public read path is two functions, not a policy
+
+`public.schools` keeps its RLS with no `anon` policy. RLS decides which **rows** a caller sees, and
+what a public directory needs is a restriction on **columns** — so the disclosure boundary is the
+`RETURNS TABLE` list of those two functions. A single `GRANT SELECT ON public.schools TO anon` would
+publish owner emails and trial end dates. `0156` asserts that `anon` holds EXECUTE on exactly the
+functions intended and nothing beneath them.
+
+### Verified metrics, added to the "shown" list
+
+Not in the original table. A school may publish, each behind its own switch:
+
+| Field | Verified? | Note |
+|---|---|---|
+| Pupils per teacher | ✅ computed | Teachers counted from `teacher_assignments`, **not** `staff_members` — a staff list includes the bursar, the matron and the driver, and counting them would flatter every school with a large office |
+| Average class size | ✅ computed | Over classes that have pupils in them |
+| Fee band | ❌ school's claim | See below |
+
+**The raw counts are never published.** `school_verified_metrics()` returns pupil, teacher and class
+counts and is **not** granted to `anon`, because publishing a teacher count beside a 1:22 ratio lets
+anybody multiply and recover the roll — the number this document withholds as competitively sensitive,
+reconstructed from two published ones. The school's own settings screen is the only place the counts
+appear.
+
+### Fees: amends the "NOT shown" table
+
+Decided 2026-09-30. A school may publish a **stated band** ("K1,500–3,000 a term"), and parents can
+filter on it — affordability is the thing parents actually search on. It is **not derived from
+`fee_structures`**: a derived figure would leak the real fee table, and would also be wrong, since a
+term's structure carries optional lines many parents never pay. Labelled as the school's own
+statement, not badged as verified.
+
+### No ranking, and the reason is worth keeping
+
+The obvious thing to publish is the school health score. It must not be. `SCHOOL_HEALTH_SCORES.md`
+answers *"is this school genuinely using ZSMS?"* from attendance-marking compliance, marks-entry
+completion, staff logins, **fee collection rate** and payment verification speed. Published, that
+would rank a good school badly for a slow bursar, broadcast how many of each school's parents are in
+arrears, and hand every school outside the top three a reason to churn.
+
+What a competitor cannot copy is not a score — it is that ZSMS can say a figure was computed from the
+school's live records. That makes the badge something a school wants rather than fears, and leaves the
+health score pointing inward where it belongs.
+
+### Absence is never a no
+
+A facility filter narrows to a **confirmed yes**. A school that has not answered whether it has
+boarding is not excluded by a boarding filter, because otherwise the directory quietly becomes a
+form-completeness contest and penalises schools in search for not having filled one in.
+
+### `pending_verification` is excluded, as business rule 1 says
+
+And the reason is stronger than the rule: AfriTech has not confirmed the school exists, so listing it
+would lend ZSMS's name to that claim.
+
+### Rate limiting is NOT implemented
+
+The limits below need Upstash Redis, which does not exist (`CREDENTIALS_CHECKLIST.md`). What stands in
+for it: the page size is capped **inside the SQL function** so a hand-rolled request cannot raise it,
+and both endpoints send `Cache-Control: public, s-maxage=300, stale-while-revalidate=600` so repeated
+traffic is served at the edge and never reaches Postgres. The real mitigation is that nothing sensitive
+is behind them — a scraper gets a list of school names and towns, which is a list of schools.
+
+**The student-ID lookup is deliberately not built.** At 10 requests a minute it is safe; with no
+limiter at all it is an enumeration oracle for valid pupil identifiers, which is a different category
+of thing to leave open. It waits for Redis.
+
+### A profile returns NOT_FOUND for three different reasons
+
+No such school, suspended or terminated, and awaiting verification all report identically.
+Distinguishing them would make the endpoint a status oracle — anyone could learn that a named school
+had been suspended, which is commercially damaging information about a customer.
+
+---
+
 ## Business Rules
 
 1. Only schools with status `active` or `trial` appear in the directory. Suspended, terminated, and pending_verification schools are not listed.
@@ -194,3 +279,4 @@ The student ID lookup is stricter (10 requests/minute) to prevent enumeration of
 | Date | Change | Reason |
 |---|---|---|
 | 2026-04-26 | Initial complete draft | Stage 6 school module documentation |
+| 2026-09-30 | Implemented; verified metrics and an opt-in fee band added; no ranking | Built in `0155`/`0156`. Pupils-per-teacher and average class size are computed and publishable per switch; the raw counts stay private because a count beside a ratio reconstructs the roll. Fee band amends the NOT-shown table as the school's stated range. Ranking rejected — the only score ZSMS could publish measures software usage, not school quality. Rate limiting and the student-ID lookup both wait for Redis. |

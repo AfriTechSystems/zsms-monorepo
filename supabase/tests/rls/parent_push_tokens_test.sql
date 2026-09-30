@@ -30,7 +30,7 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(20);
+SELECT plan(22);
 
 -- ---------------------------------------------------------------------------
 -- Shape and privileges.
@@ -172,10 +172,48 @@ SELECT is(
  */
 
 -- ---------------------------------------------------------------------------
+-- AfriTech's seat. The only one that may read the table across families.
+-- ---------------------------------------------------------------------------
+SET LOCAL request.jwt.claims TO '{
+  "sub": "user_afritech", "role": "authenticated",
+  "o": {"id": "org_afritech", "rol": "afritech:super_admin", "slg": "afritech-systems-admin"}
+}';
+
+/**
+ * The handover is visible afterwards rather than overwritten. `0158` made the unique key partial over
+ * active rows precisely so this row survives — a handset changing hands is the case two people are
+ * most likely to disagree about later, because both expect the alerts.
+ *
+ * Read from AfriTech's seat rather than the worker's, and that distinction is the point: `service_role`
+ * has **no table grant at all** on this table. A worker reads through `worker_parent_push_tokens()`,
+ * per prohibition 1 — the first version of this assertion read the table directly from the worker's
+ * role and failed with "permission denied", which was the boundary working and the test breaking the
+ * rule it exists to check.
+ */
+SELECT is(
+  (SELECT retired_reason FROM public.parent_push_tokens
+    WHERE push_token = 'ExponentPushToken[mother-phone]'
+      AND parent_user_id = 'user_parent_grace'),
+  'device_reassigned',
+  'the previous owner''s claim is retired with a reason, not erased'
+);
+
+SELECT is(
+  (SELECT COUNT(*)::INT FROM public.parent_push_tokens),
+  3,
+  '...and AfriTech sees every row across both families — two retired, one live'
+);
+
+-- ---------------------------------------------------------------------------
 -- The worker's seat. A different role, so a separate section.
 -- ---------------------------------------------------------------------------
 RESET ROLE;
 SET LOCAL ROLE service_role;
+
+SELECT ok(
+  NOT has_table_privilege('service_role', 'public.parent_push_tokens', 'SELECT'),
+  'the worker cannot read the table at all — only the worker_ function that names its columns'
+);
 
 SELECT is(
   (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_john'])),
@@ -200,14 +238,6 @@ SELECT ok(
      WHERE out_push_token = 'ExponentPushToken[father-phone]'
   ),
   'a retired token is never handed to the worker, whoever asks'
-);
-
-SELECT is(
-  (SELECT retired_reason FROM public.parent_push_tokens
-    WHERE push_token = 'ExponentPushToken[mother-phone]'
-      AND parent_user_id = 'user_parent_grace'),
-  'device_reassigned',
-  'and the previous owner''s claim is retired with a reason, not erased'
 );
 
 /**

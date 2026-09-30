@@ -2687,6 +2687,100 @@ export type Database = {
           },
         ]
       }
+      school_public_profiles: {
+        Row: {
+          about: string | null
+          created_at: string
+          established_year: number | null
+          fee_band_max: number | null
+          fee_band_min: number | null
+          has_boarding: boolean
+          has_computer_lab: boolean
+          has_feeding: boolean
+          has_library: boolean
+          has_science_lab: boolean
+          has_special_needs: boolean
+          has_sports: boolean
+          has_transport: boolean
+          is_published: boolean
+          publish_class_sizes: boolean
+          publish_fee_band: boolean
+          publish_ratio: boolean
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+          website_url: string | null
+        }
+        Insert: {
+          about?: string | null
+          created_at?: string
+          established_year?: number | null
+          fee_band_max?: number | null
+          fee_band_min?: number | null
+          has_boarding?: boolean
+          has_computer_lab?: boolean
+          has_feeding?: boolean
+          has_library?: boolean
+          has_science_lab?: boolean
+          has_special_needs?: boolean
+          has_sports?: boolean
+          has_transport?: boolean
+          is_published?: boolean
+          publish_class_sizes?: boolean
+          publish_fee_band?: boolean
+          publish_ratio?: boolean
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          about?: string | null
+          created_at?: string
+          established_year?: number | null
+          fee_band_max?: number | null
+          fee_band_min?: number | null
+          has_boarding?: boolean
+          has_computer_lab?: boolean
+          has_feeding?: boolean
+          has_library?: boolean
+          has_science_lab?: boolean
+          has_special_needs?: boolean
+          has_sports?: boolean
+          has_transport?: boolean
+          is_published?: boolean
+          publish_class_sizes?: boolean
+          publish_fee_band?: boolean
+          publish_ratio?: boolean
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_public_profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_public_profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_public_profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_subjects: {
         Row: {
           created_at: string
@@ -4931,6 +5025,7 @@ export type Database = {
         }[]
       }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
+      school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }
       school_has_feature: {
         Args: { p_feature_key: string; p_school_id: string }
@@ -4965,6 +5060,35 @@ export type Database = {
           total_weight: number
         }[]
       }
+      school_public_profile: {
+        Args: { p_school_code: string }
+        Returns: {
+          out_about: string
+          out_avg_class_size: number
+          out_city_code: string
+          out_established_year: number
+          out_fee_band_max: number
+          out_fee_band_min: number
+          out_grade_levels: string[]
+          out_has_boarding: boolean
+          out_has_computer_lab: boolean
+          out_has_feeding: boolean
+          out_has_library: boolean
+          out_has_science_lab: boolean
+          out_has_special_needs: boolean
+          out_has_sports: boolean
+          out_has_transport: boolean
+          out_level: string
+          out_logo_url: string
+          out_name: string
+          out_province_code: string
+          out_pupils_per_teacher: number
+          out_school_code: string
+          out_status: string
+          out_type: string
+          out_website_url: string
+        }[]
+      }
       school_student_capacity: {
         Args: { p_school_id: string }
         Returns: {
@@ -4996,9 +5120,102 @@ export type Database = {
           out_unit_price: number
         }[]
       }
+      school_verified_metrics: {
+        Args: { p_school_id: string }
+        Returns: {
+          out_avg_class_size: number
+          out_classes: number
+          out_pupils: number
+          out_pupils_per_teacher: number
+          out_teachers: number
+        }[]
+      }
+      search_schools: {
+        Args: {
+          p_boarding?: boolean
+          p_city?: string
+          p_country_code?: string
+          p_fee_max?: number
+          p_level?: string
+          p_limit?: number
+          p_offset?: number
+          p_province?: string
+          p_search?: string
+          p_transport?: boolean
+          p_type?: string
+        }
+        Returns: {
+          out_about: string
+          out_avg_class_size: number
+          out_city_code: string
+          out_fee_band_max: number
+          out_fee_band_min: number
+          out_has_boarding: boolean
+          out_has_transport: boolean
+          out_level: string
+          out_logo_url: string
+          out_name: string
+          out_province_code: string
+          out_pupils_per_teacher: number
+          out_school_code: string
+          out_status: string
+          out_total: number
+          out_type: string
+        }[]
+      }
       set_incident_status: {
         Args: { p_incident_id: string; p_note?: string; p_status: string }
         Returns: boolean
+      }
+      set_school_public_profile: {
+        Args: {
+          p_about?: string
+          p_established_year?: number
+          p_fee_band_max?: number
+          p_fee_band_min?: number
+          p_has_boarding?: boolean
+          p_has_computer_lab?: boolean
+          p_has_feeding?: boolean
+          p_has_library?: boolean
+          p_has_science_lab?: boolean
+          p_has_special_needs?: boolean
+          p_has_sports?: boolean
+          p_has_transport?: boolean
+          p_is_published?: boolean
+          p_publish_class_sizes?: boolean
+          p_publish_fee_band?: boolean
+          p_publish_ratio?: boolean
+          p_website_url?: string
+        }
+        Returns: {
+          about: string | null
+          created_at: string
+          established_year: number | null
+          fee_band_max: number | null
+          fee_band_min: number | null
+          has_boarding: boolean
+          has_computer_lab: boolean
+          has_feeding: boolean
+          has_library: boolean
+          has_science_lab: boolean
+          has_special_needs: boolean
+          has_sports: boolean
+          has_transport: boolean
+          is_published: boolean
+          publish_class_sizes: boolean
+          publish_fee_band: boolean
+          publish_ratio: boolean
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+          website_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "school_public_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }
       student_in_current_school: {

@@ -33,6 +33,10 @@ import Link from 'next/link'
 import { BadgeCheck, ExternalLink, Eye, EyeOff } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
+import {
+  formatClassSize,
+  formatPupilTeacherRatio,
+} from '../../../../../lib/directory-format'
 import { Badge } from '../../../../../components/ui/badge'
 import { Button } from '../../../../../components/ui/button'
 import { Field, Input, Textarea } from '../../../../../components/ui/field'
@@ -200,9 +204,9 @@ export default function PublicProfileSettingsPage({
             <div className="space-y-stack">
               <div className="rounded-md border border-border p-card">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="font-medium">Pupils per teacher</p>
+                  <p className="font-medium">Teacher to pupils</p>
                   <p data-numeric className="text-xl font-semibold">
-                    {data.metrics?.pupilsPerTeacher ?? '—'}
+                    {formatPupilTeacherRatio(data.metrics?.pupilsPerTeacher ?? null) ?? '—'}
                   </p>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -233,7 +237,7 @@ export default function PublicProfileSettingsPage({
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <p className="font-medium">Average class size</p>
                   <p data-numeric className="text-xl font-semibold">
-                    {data.metrics?.avgClassSize ?? '—'}
+                    {formatClassSize(data.metrics?.avgClassSize ?? null) ?? '—'}
                   </p>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">

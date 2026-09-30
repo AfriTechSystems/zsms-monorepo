@@ -61,7 +61,13 @@ export default function SignInPage(): JSX.Element {
       {/* `signUpUrl` keeps the "create an account" link inside ZSMS. Left to
           itself Clerk links to its hosted portal on `*.accounts.dev`, which is
           how invited staff ended up outside the product. */}
-      <SignIn signUpUrl="/sign-up" fallbackRedirectUrl="/school" appearance={authAppearance} />
+      {/*
+        `/welcome` rather than `/school`. Landing every sign-in on the staff portal presumed everybody
+        is school staff, and there was no branch for anybody else — see the comment in
+        `app/welcome/page.tsx` for the lockout that produced. `/welcome` reads the session and routes
+        by what the account IS, which is the only thing that can decide it.
+      */}
+      <SignIn signUpUrl="/sign-up" fallbackRedirectUrl="/welcome" appearance={authAppearance} />
 
       <p className="max-w-md text-center text-xs text-subtle">
         ZSMS is a product of AfriTech Systems Limited. Trouble signing in? Ask your school

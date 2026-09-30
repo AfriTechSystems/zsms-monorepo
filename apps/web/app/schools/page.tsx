@@ -39,6 +39,7 @@ import { BadgeCheck, Bus, School, Search, SlidersHorizontal, Users } from 'lucid
 import { getCountryConfig } from '@zsms/config'
 
 import { useApi } from '../../lib/use-api'
+import { formatClassSize, formatFeeBand, formatPupilTeacherRatio } from '../../lib/directory-format'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
@@ -345,28 +346,28 @@ function Directory(): JSX.Element {
                       s.avgClassSize !== null ||
                       s.feeBandMin !== null) && (
                       <dl className="flex flex-wrap gap-x-cards gap-y-1 text-sm">
-                        {s.pupilsPerTeacher !== null && (
+                        {formatPupilTeacherRatio(s.pupilsPerTeacher) && (
                           <div className="flex items-center gap-1.5">
                             <Users aria-hidden="true" className="size-3.5 text-muted-foreground" />
-                            <dt className="text-muted-foreground">Pupils per teacher</dt>
+                            <dt className="text-muted-foreground">Teacher to pupils</dt>
                             <dd data-numeric className="font-medium">
-                              {s.pupilsPerTeacher}
+                              {formatPupilTeacherRatio(s.pupilsPerTeacher)}
                             </dd>
                           </div>
                         )}
-                        {s.avgClassSize !== null && (
+                        {formatClassSize(s.avgClassSize) && (
                           <div className="flex items-center gap-1.5">
                             <dt className="text-muted-foreground">Average class</dt>
                             <dd data-numeric className="font-medium">
-                              {s.avgClassSize}
+                              {formatClassSize(s.avgClassSize)}
                             </dd>
                           </div>
                         )}
-                        {s.feeBandMin !== null && s.feeBandMax !== null && (
+                        {formatFeeBand(s.feeBandMin, s.feeBandMax) && (
                           <div className="flex items-center gap-1.5">
-                            <dt className="text-muted-foreground">Fees</dt>
+                            <dt className="text-muted-foreground">Fees a term</dt>
                             <dd data-numeric className="font-medium">
-                              K{s.feeBandMin.toLocaleString()}–{s.feeBandMax.toLocaleString()}
+                              {formatFeeBand(s.feeBandMin, s.feeBandMax)}
                             </dd>
                           </div>
                         )}

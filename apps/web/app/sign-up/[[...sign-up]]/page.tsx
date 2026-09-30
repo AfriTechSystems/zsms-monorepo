@@ -56,21 +56,25 @@ export default function SignUpPage(): JSX.Element {
           className="h-auto w-[150px] sm:w-[180px]"
         />
         <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          Set up your account
+          Create your ZSMS account
         </h1>
+        {/*
+          This page was written for an invited colleague and says so. It is now also where a head
+          teacher registering a school and a teacher joining the Hub arrive, so the copy no longer
+          promises a school — `/welcome` works out where they belong once the account exists.
+        */}
         <p className="text-sm text-muted-foreground">
-          Choose a password and you will be taken straight into your school.
+          One account for your school, the Teacher Hub, or both.
         </p>
       </div>
 
       {/* `signInUrl` so the "already have an account?" link stays inside ZSMS.
           Without it Clerk points at its own hosted portal, which is the same
           class of problem this page exists to fix. */}
-      <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/school" appearance={authAppearance} />
+      <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/welcome" appearance={authAppearance} />
 
       <p className="max-w-md text-center text-xs text-subtle">
-        ZSMS is a product of AfriTech Systems Limited. Your school administrator invited you; if
-        anything looks wrong, ask them before continuing.
+        ZSMS is a product of AfriTech Systems Limited.
       </p>
     </main>
   )

@@ -46,6 +46,11 @@ import {
 import { getCountryConfig } from '@zsms/config'
 
 import { createAnonClient } from '../../../lib/supabase'
+import {
+  formatClassSize,
+  formatFeeBand,
+  formatPupilTeacherRatio,
+} from '../../../lib/directory-format'
 
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
@@ -355,27 +360,33 @@ export default async function SchoolProfilePage({
             school. Updated nightly.
           </p>
           <dl className="mt-stack grid grid-cols-1 gap-stack sm:grid-cols-3">
-            {school.pupilsPerTeacher !== null && (
+            {formatPupilTeacherRatio(school.pupilsPerTeacher) && (
               <div className="rounded-lg border border-border p-card">
-                <dt className="text-sm text-muted-foreground">Pupils per teacher</dt>
+                <dt className="text-sm text-muted-foreground">Teacher to pupils</dt>
                 <dd data-numeric className="text-2xl font-semibold">
-                  {school.pupilsPerTeacher}
+                  {formatPupilTeacherRatio(school.pupilsPerTeacher)}
                 </dd>
+                {/* Spelled out underneath, because a ratio is the one number people read backwards.
+                    The figure itself used to render as "10.1", which asked a parent to work out both
+                    what it was a ratio of and what a tenth of a teacher meant. */}
+                <p className="mt-1 text-sm text-muted-foreground">
+                  One teacher for every {Math.round(school.pupilsPerTeacher ?? 0)} pupils.
+                </p>
               </div>
             )}
-            {school.avgClassSize !== null && (
+            {formatClassSize(school.avgClassSize) && (
               <div className="rounded-lg border border-border p-card">
                 <dt className="text-sm text-muted-foreground">Average class size</dt>
                 <dd data-numeric className="text-2xl font-semibold">
-                  {school.avgClassSize}
+                  {formatClassSize(school.avgClassSize)}
                 </dd>
               </div>
             )}
-            {school.feeBandMin !== null && school.feeBandMax !== null && (
+            {formatFeeBand(school.feeBandMin, school.feeBandMax) && (
               <div className="rounded-lg border border-border p-card">
                 <dt className="text-sm text-muted-foreground">Fees per term</dt>
                 <dd data-numeric className="text-2xl font-semibold">
-                  K{school.feeBandMin.toLocaleString()}–{school.feeBandMax.toLocaleString()}
+                  {formatFeeBand(school.feeBandMin, school.feeBandMax)}
                 </dd>
                 {/* The one figure on this page ZSMS has NOT verified. Said plainly rather than
                     left to sit under a heading that claims otherwise. */}

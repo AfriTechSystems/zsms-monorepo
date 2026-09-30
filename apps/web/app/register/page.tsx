@@ -55,8 +55,8 @@ export default function RegisterPage(): JSX.Element {
         <Image
           src="/brand/zsms-lockup.png"
           alt="ZSMS — school management by AfriTech Systems"
-          width={200}
-          height={64}
+          width={640}
+          height={524}
           priority
           className="h-auto w-[150px] sm:w-[180px]"
         />

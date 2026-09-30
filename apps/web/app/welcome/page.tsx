@@ -101,8 +101,8 @@ export default async function WelcomePage(): Promise<JSX.Element> {
           <Image
             src="/brand/zsms-lockup.png"
             alt="ZSMS"
-            width={200}
-            height={64}
+            width={640}
+            height={524}
             priority
             className="h-auto w-[150px]"
           />

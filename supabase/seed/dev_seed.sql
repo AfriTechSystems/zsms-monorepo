@@ -77,6 +77,26 @@ VALUES ('a0000000-0000-4000-8000-000000000002','#1A3A5B','#2E6EB0','seed')
 ON CONFLICT (school_id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
+-- Logos, so the directory renders against something logo-shaped
+-- ---------------------------------------------------------------------------
+--
+-- Local SVGs under `apps/web/public/sample-logos/`, not `cdn.example.test`. The
+-- placeholder host does not resolve, so every school in the directory fell back
+-- to the same generic icon — which meant the listing was being designed against
+-- a case that will almost never occur in production, and the layout problems
+-- that only show up with real marks stayed invisible.
+--
+-- Three of five schools, deliberately. A school with no logo is a normal state
+-- and the cards have to look right in both.
+-- ---------------------------------------------------------------------------
+UPDATE public.schools SET logo_url = '/sample-logos/alpha.svg'
+ WHERE id = 'a0000000-0000-4000-8000-000000000001';
+UPDATE public.schools SET logo_url = '/sample-logos/copper.svg'
+ WHERE id = 'a0000000-0000-4000-8000-000000000002';
+UPDATE public.schools SET logo_url = '/sample-logos/kabulonga.svg'
+ WHERE id = 'a0000000-0000-4000-8000-000000000003';
+
+-- ---------------------------------------------------------------------------
 -- Grade levels — School A on ECZ, School B on Cambridge forms
 -- ---------------------------------------------------------------------------
 INSERT INTO public.school_grade_levels

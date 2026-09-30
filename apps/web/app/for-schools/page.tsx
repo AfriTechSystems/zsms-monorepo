@@ -31,7 +31,6 @@
 import type { JSX } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import type { LucideIcon } from 'lucide-react'
 import {
   ArrowRight,
@@ -59,6 +58,7 @@ import {
 
 import { getCountryConfig } from '@zsms/config'
 
+import { PublicShell } from '../../components/public/public-shell'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { FEATURES, STATUS_COPY, type FeatureStatus } from './features'
@@ -102,19 +102,7 @@ export default function ForSchoolsPage(): JSX.Element {
   const country = getCountryConfig()
 
   return (
-    <main id="main" className="mx-auto w-full max-w-3xl px-gutter py-10">
-      <nav aria-label="Breadcrumb" className="mb-cards">
-        <Link href="/">
-          <Image
-            src="/brand/zsms-lockup.png"
-            alt="ZSMS"
-            width={200}
-            height={64}
-            priority
-            className="h-auto w-[130px]"
-          />
-        </Link>
-      </nav>
+    <PublicShell width="narrow">
 
       <header className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -254,8 +242,8 @@ export default function ForSchoolsPage(): JSX.Element {
         </p>
       </section>
 
-      <footer className="mt-cards flex flex-wrap items-center gap-3 border-t border-border pt-cards">
-        <Button asChild>
+      <div className="mt-cards flex flex-wrap items-center gap-3 border-t border-border pt-cards">
+        <Button asChild size="lg">
           <Link href="/register">
             Start 30 days free
             <ArrowRight aria-hidden="true" />
@@ -267,7 +255,7 @@ export default function ForSchoolsPage(): JSX.Element {
             Sign in
           </Link>
         </span>
-      </footer>
-    </main>
+      </div>
+    </PublicShell>
   )
 }

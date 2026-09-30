@@ -36,6 +36,7 @@
  */
 
 import { execSync, spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { rmSync } from 'node:fs'
 import { networkInterfaces } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -186,7 +187,19 @@ console.log('')
 // `-H 0.0.0.0` explicitly rather than relying on the default: it is what makes
 // the Network addresses above true. `-p` pins the port, so a port somehow still
 // held becomes a loud failure instead of a quiet move to 3001.
-const NEXT_CLI = join(WEB, 'node_modules', 'next', 'dist', 'bin', 'next')
+//
+// The path is RESOLVED, not assembled. `join(WEB, 'node_modules', 'next', …)` was hardcoded here and
+// broke the moment npm hoisted `next` to the root — which it did after `@sentry/nextjs` was added to
+// `apps/web`, since adding a dependency re-runs the whole hoist calculation. The failure was
+// `MODULE_NOT_FOUND` on a path that reads as if it should obviously exist, and `next build` kept
+// working throughout because turbo goes through npm's own bin resolution rather than a literal path.
+//
+// `createRequire` from inside `apps/web` follows Node's real resolution: it finds `next` whether npm
+// nested it there or hoisted it to the root, and it will keep finding it after the next dependency
+// change rearranges things again. `package.json`'s `//react` note already documents how sensitive this
+// tree's hoisting is; a script should not be one of the things that depends on the outcome.
+const require = createRequire(join(WEB, 'package.json'))
+const NEXT_CLI = require.resolve('next/dist/bin/next')
 
 const child = spawn(process.execPath, [NEXT_CLI, 'dev', '-p', PORT, '-H', '0.0.0.0'], {
   cwd: WEB,

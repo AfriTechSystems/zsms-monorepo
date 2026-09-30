@@ -25,6 +25,8 @@ import type { JSX } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
+import { PublicShell } from '../../../components/public/public-shell'
+
 const DOCUMENTS = {
   terms: {
     title: 'Terms of Service',
@@ -57,10 +59,8 @@ export default async function LegalPage({
   const doc = DOCUMENTS[document as DocumentKey]
 
   return (
-    <main
-      id="main"
-      className="mx-auto flex w-full max-w-2xl flex-col gap-cards px-gutter py-10"
-    >
+    <PublicShell width="narrow">
+      <div className="flex flex-col gap-cards">
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{doc.title}</h1>
         <p className="text-sm text-muted-foreground">{doc.intent}</p>
@@ -130,6 +130,7 @@ export default async function LegalPage({
       <Link href="/register" className="text-sm underline">
         Back to registration
       </Link>
-    </main>
+      </div>
+    </PublicShell>
   )
 }

@@ -43,8 +43,8 @@ export default function SchoolNotFound(): JSX.Element {
         <Image
           src="/brand/zsms-lockup.png"
           alt="ZSMS"
-          width={200}
-          height={64}
+          width={640}
+          height={524}
           className="h-auto w-[140px]"
         />
       </Link>

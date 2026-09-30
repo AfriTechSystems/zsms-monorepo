@@ -24,10 +24,11 @@
 import type { JSX } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import { ArrowRight, GraduationCap, Search, Sparkles, Users } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
+
+import { PublicShell } from '../components/public/public-shell'
 
 export const metadata: Metadata = {
   title: 'ZSMS — school management for Zambian schools',
@@ -94,16 +95,8 @@ export default function HomePage(): JSX.Element {
   const country = getCountryConfig()
 
   return (
-    <main id="main" className="mx-auto w-full max-w-4xl px-gutter py-10">
+    <PublicShell>
       <header className="flex flex-col items-center gap-4 text-center">
-        <Image
-          src="/brand/zsms-lockup.png"
-          alt="ZSMS — school management by AfriTech Systems"
-          width={200}
-          height={64}
-          priority
-          className="h-auto w-[170px] sm:w-[200px]"
-        />
         <h1 className="max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
           School management built for {country.name}
         </h1>
@@ -160,18 +153,6 @@ export default function HomePage(): JSX.Element {
         </p>
       </section>
 
-      <footer className="mt-cards flex flex-wrap items-center gap-x-cards gap-y-2 border-t border-border pt-cards text-sm text-muted-foreground">
-        <span>ZSMS is a product of AfriTech Systems Limited.</span>
-        <Link href="/legal/privacy" className="underline">
-          Privacy
-        </Link>
-        <Link href="/legal/terms" className="underline">
-          Terms
-        </Link>
-        <Link href="/register" className="underline">
-          Register a school
-        </Link>
-      </footer>
-    </main>
+    </PublicShell>
   )
 }

@@ -32,17 +32,16 @@
 import type { JSX } from 'react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BadgeCheck, Bus, School, Search, SlidersHorizontal, Users } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Bus, School, Search, SlidersHorizontal, Users } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 
+import { PublicShell } from '../../components/public/public-shell'
 import { useApi } from '../../lib/use-api'
 import { formatClassSize, formatFeeBand, formatPupilTeacherRatio } from '../../lib/directory-format'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/empty-state'
 import { ErrorState, TableSkeleton } from '../../components/ui/data-states'
 import { Field, Input, Select } from '../../components/ui/field'
@@ -301,10 +300,24 @@ function Directory(): JSX.Element {
           </p>
 
           <ul className="grid grid-cols-1 gap-cards sm:grid-cols-2">
-            {data.map((s) => (
-              <li key={s.schoolCode}>
-                <Card className="h-full">
-                  <CardContent className="flex h-full flex-col gap-stack pt-card">
+            {data.map((s) => {
+              const ratio = formatPupilTeacherRatio(s.pupilsPerTeacher)
+              const classSize = formatClassSize(s.avgClassSize)
+              const fees = formatFeeBand(s.feeBandMin, s.feeBandMax)
+              const hasFacts = Boolean(ratio || classSize || fees)
+
+              return (
+                <li key={s.schoolCode}>
+                  {/*
+                    THE WHOLE CARD IS THE LINK.
+                    A card with a small link inside it makes the obvious gesture — tapping the card —
+                    do nothing, which on a phone reads as a broken page. The "View school" button is
+                    gone for the same reason: it was a second target for the one thing this card does.
+                  */}
+                  <Link
+                    href={`/schools/${s.schoolCode}`}
+                    className="group flex h-full flex-col gap-stack rounded-lg border border-border bg-card p-card transition-all hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <div className="flex items-start gap-3">
                       {s.logoUrl ? (
                         /* A school's logo is an arbitrary external URL on R2, so next/image
@@ -313,20 +326,18 @@ function Directory(): JSX.Element {
                         <img
                           src={s.logoUrl}
                           alt=""
-                          width={44}
-                          height={44}
-                          className="size-11 shrink-0 rounded-md object-contain"
+                          width={48}
+                          height={48}
+                          className="size-12 shrink-0 rounded-md object-contain"
                         />
                       ) : (
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted">
-                          <School aria-hidden="true" className="size-5 text-muted-foreground" />
+                        <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-muted">
+                          <School aria-hidden="true" className="size-6 text-muted-foreground" />
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <h2 className="font-semibold leading-tight">
-                          <Link href={`/schools/${s.schoolCode}`} className="hover:underline">
-                            {s.name}
-                          </Link>
+                        <h2 className="font-semibold leading-tight group-hover:underline">
+                          {s.name}
                         </h2>
                         <p className="text-sm text-muted-foreground">
                           {country.cities[s.cityCode] ?? s.cityCode} ·{' '}
@@ -340,51 +351,65 @@ function Directory(): JSX.Element {
                       <p className="line-clamp-2 text-sm text-muted-foreground">{s.about}</p>
                     )}
 
-                    {/* Only what the school published. An absent metric shows nothing at all —
-                        never a dash and never a zero, either of which would read as an answer. */}
-                    {(s.pupilsPerTeacher !== null ||
-                      s.avgClassSize !== null ||
-                      s.feeBandMin !== null) && (
-                      <dl className="flex flex-wrap gap-x-cards gap-y-1 text-sm">
-                        {formatPupilTeacherRatio(s.pupilsPerTeacher) && (
-                          <div className="flex items-center gap-1.5">
-                            <Users aria-hidden="true" className="size-3.5 text-muted-foreground" />
-                            <dt className="text-muted-foreground">Teacher to pupils</dt>
-                            <dd data-numeric className="font-medium">
-                              {formatPupilTeacherRatio(s.pupilsPerTeacher)}
+                    {hasFacts ? (
+                      <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3 text-sm">
+                        {ratio && (
+                          <div>
+                            <dt className="flex items-center gap-1.5 text-muted-foreground">
+                              <Users aria-hidden="true" className="size-3.5" />
+                              Teacher to pupils
+                            </dt>
+                            <dd data-numeric className="font-semibold">
+                              {ratio}
                             </dd>
                           </div>
                         )}
-                        {formatClassSize(s.avgClassSize) && (
-                          <div className="flex items-center gap-1.5">
+                        {classSize && (
+                          <div>
                             <dt className="text-muted-foreground">Average class</dt>
-                            <dd data-numeric className="font-medium">
-                              {formatClassSize(s.avgClassSize)}
+                            <dd data-numeric className="font-semibold">
+                              {classSize}
                             </dd>
                           </div>
                         )}
-                        {formatFeeBand(s.feeBandMin, s.feeBandMax) && (
-                          <div className="flex items-center gap-1.5">
+                        {fees && (
+                          <div className="col-span-2">
                             <dt className="text-muted-foreground">Fees a term</dt>
-                            <dd data-numeric className="font-medium">
-                              {formatFeeBand(s.feeBandMin, s.feeBandMax)}
+                            <dd data-numeric className="font-semibold">
+                              {fees}
                             </dd>
                           </div>
                         )}
                       </dl>
+                    ) : (
+                      /*
+                        Fills the gap that made these rows look ragged, and says something true while
+                        doing it. Seen in the browser: a school publishing nothing rendered as a name,
+                        a wide band of dead space, and a lone button — the grid stretches every row to
+                        its tallest card, so one detailed listing left its neighbour looking broken.
+                        An absence with a reason reads as a choice; an absence with nothing reads as a
+                        fault in the page.
+                      */
+                      <p className="flex flex-1 items-center rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                        This school hasn&rsquo;t published class sizes or fees yet.
+                      </p>
                     )}
 
-                    <div className="mt-auto flex flex-wrap items-center gap-2">
+                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                       {s.hasBoarding && <Badge variant="neutral">Boarding</Badge>}
                       {s.hasTransport && <Badge variant="neutral">Transport</Badge>}
-                      <Button asChild size="sm" variant="outline" className="ml-auto">
-                        <Link href={`/schools/${s.schoolCode}`}>View school</Link>
-                      </Button>
+                      <span className="ml-auto flex items-center gap-1 text-sm font-medium text-foreground">
+                        View school
+                        <ArrowRight
+                          aria-hidden="true"
+                          className="size-4 transition-transform group-hover:translate-x-0.5"
+                        />
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
+                  </Link>
+                </li>
+              )
+            })}
           </ul>
 
           {lastPage > 1 && (
@@ -418,31 +443,22 @@ function Directory(): JSX.Element {
 
 export default function SchoolsDirectoryPage(): JSX.Element {
   return (
-    <main id="main" className="mx-auto w-full max-w-4xl px-gutter py-10">
-      <header className="mb-cards flex flex-col gap-3">
-        <Link href="/" className="w-fit">
-          <Image
-            src="/brand/zsms-lockup.png"
-            alt="ZSMS — school management by AfriTech Systems"
-            width={200}
-            height={64}
-            priority
-            className="h-auto w-[130px]"
-          />
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Find a school</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Every school here runs on ZSMS, so the numbers below come from their own records rather than
-          a brochure.
+    <PublicShell>
+      <header className="mb-cards flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Find a school</h1>
+        <p className="max-w-2xl text-muted-foreground">
+          Every school here runs on ZSMS, so the numbers come from their own records rather than a
+          brochure.
         </p>
-        <p className="flex items-start gap-2 text-sm text-muted-foreground">
-          <BadgeCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success" />
-          <span>
-            <strong className="font-medium text-foreground">Verified by ZSMS</strong> means we
-            calculated the figure from the school&rsquo;s live pupil and staff records. Schools choose
-            what to publish — a blank means they have not published it, not that the answer is zero.
-            We do not rank or score schools.
-          </span>
+        {/*
+          One line, not three. The explainer used to be a paragraph above the search box, so the first
+          thing a parent met was an essay about our methodology — before they had seen a single school
+          or had any reason to care how the numbers were produced. The detail lives on each school's
+          page, at the point where somebody is actually reading a figure.
+        */}
+        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <BadgeCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
+          Figures are calculated from each school&rsquo;s own records. We don&rsquo;t rank schools.
         </p>
       </header>
 
@@ -450,16 +466,6 @@ export default function SchoolsDirectoryPage(): JSX.Element {
       <Suspense fallback={<TableSkeleton rows={5} columns={3} />}>
         <Directory />
       </Suspense>
-
-      <footer className="mt-cards border-t border-border pt-cards text-sm text-muted-foreground">
-        <p>
-          Is your school not listed?{' '}
-          <Link href="/for-schools" className="underline">
-            See what ZSMS does for schools
-          </Link>
-          .
-        </p>
-      </footer>
-    </main>
+    </PublicShell>
   )
 }

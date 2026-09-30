@@ -29,7 +29,6 @@
 import type { JSX } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import {
   BadgeCheck,
@@ -45,6 +44,7 @@ import {
 
 import { getCountryConfig } from '@zsms/config'
 
+import { PublicShell } from '../../../components/public/public-shell'
 import { createAnonClient } from '../../../lib/supabase'
 import {
   formatClassSize,
@@ -273,20 +273,13 @@ export default async function SchoolProfilePage({
     school.pupilsPerTeacher !== null || school.avgClassSize !== null || school.feeBandMin !== null
 
   return (
-    <main id="main" className="mx-auto w-full max-w-3xl px-gutter py-10">
-      <nav aria-label="Breadcrumb" className="mb-cards flex items-center gap-2 text-sm">
-        <Link href="/" className="shrink-0">
-          <Image
-            src="/brand/zsms-lockup.png"
-            alt="ZSMS"
-            width={200}
-            height={64}
-            className="h-auto w-[110px]"
-          />
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <Link href="/schools" className="underline">
-          Schools
+    <PublicShell width="narrow">
+      {/* The lockup and the links live in the shell's header now. What remains is the one crumb that
+          is specific to this page — where "back" goes for somebody who arrived from a search engine
+          and has never seen the directory. */}
+      <nav aria-label="Breadcrumb" className="mb-cards text-sm">
+        <Link href="/schools" className="text-muted-foreground hover:text-foreground hover:underline">
+          &larr; All schools
         </Link>
       </nav>
 
@@ -426,22 +419,18 @@ export default async function SchoolProfilePage({
         </section>
       )}
 
-      <footer className="mt-cards border-t border-border pt-cards text-sm text-muted-foreground">
+      <section className="mt-cards rounded-lg border border-border bg-muted/30 p-card text-sm text-muted-foreground">
         <p>
           {school.name} manages its pupils, fees and results with ZSMS.{' '}
-          <Link href="/for-schools" className="underline">
-            ZSMS for schools
-          </Link>
-          {' · '}
-          <Link href="/schools" className="underline">
-            Browse other schools
+          <Link href="/for-schools" className="font-medium text-foreground hover:underline">
+            See what that means for a school
           </Link>
         </p>
         <p className="mt-2">
           Contact details are not published here. Reach the school directly or through its own
           website.
         </p>
-      </footer>
-    </main>
+      </section>
+    </PublicShell>
   )
 }

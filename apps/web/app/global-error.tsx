@@ -105,6 +105,13 @@ export default function GlobalError({
             >
               Try again
             </button>
+            {/*
+              A plain anchor, not `next/link`, and the lint rule is wrong here specifically. `Link`
+              navigates through the client router — which is part of what may have just failed, since
+              this boundary exists for errors thrown in the root itself. A full document load is the
+              one navigation guaranteed to work from a broken app.
+            */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{

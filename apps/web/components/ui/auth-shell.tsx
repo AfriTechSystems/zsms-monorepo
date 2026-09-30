@@ -103,8 +103,8 @@ export function AuthShell({
           <Image
             src="/brand/zsms-lockup.png"
             alt="ZSMS — school management by AfriTech Systems"
-            width={200}
-            height={64}
+            width={640}
+            height={524}
             priority
             className="h-auto w-[112px] sm:w-[160px]"
           />

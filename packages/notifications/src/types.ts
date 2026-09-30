@@ -33,7 +33,7 @@ export type Channel = (typeof CHANNELS)[number]
  */
 export const FALLBACK_CHAIN: readonly Channel[] = ['whatsapp', 'email', 'sms'] as const
 
-export type ProviderName = 'meta' | 'resend' | 'twilio' | 'mock'
+export type ProviderName = 'meta' | 'resend' | 'twilio' | 'expo' | 'mock'
 
 export interface Recipient {
   /** E.164. Required for whatsapp and sms. */
@@ -42,6 +42,15 @@ export interface Recipient {
   email?: string
   /** Clerk user ID, recorded on the message log. */
   userId?: string
+  /**
+   * Expo push tokens — every device this person has registered. Required for `push`.
+   *
+   * A list rather than one token, because a parent account is routinely shared: a mother and a father
+   * on two handsets is the normal case in a Zambian household, and `0157` keys the token table on the
+   * token for exactly that reason. Sending to one of the two would look like working software to
+   * whoever happened to get it.
+   */
+  pushTokens?: string[]
 }
 
 /**

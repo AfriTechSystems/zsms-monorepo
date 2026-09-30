@@ -1348,6 +1348,45 @@ export type Database = {
           },
         ]
       }
+      parent_push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_seen_at: string
+          parent_user_id: string
+          platform: string
+          push_token: string
+          retired_at: string | null
+          retired_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          parent_user_id: string
+          platform: string
+          push_token: string
+          retired_at?: string | null
+          retired_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          parent_user_id?: string
+          platform?: string
+          push_token?: string
+          retired_at?: string | null
+          retired_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       parents: {
         Row: {
           clerk_user_id: string | null
@@ -4931,6 +4970,27 @@ export type Database = {
         }
         Returns: string
       }
+      register_push_token: {
+        Args: { p_platform: string; p_push_token: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_seen_at: string
+          parent_user_id: string
+          platform: string
+          push_token: string
+          retired_at: string | null
+          retired_reason: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "parent_push_tokens"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       register_school: {
         Args: {
           p_city_code: string
@@ -4967,6 +5027,7 @@ export type Database = {
           template_id: string
         }[]
       }
+      retire_push_token: { Args: { p_push_token: string }; Returns: boolean }
       revise_fee_records: {
         Args: {
           p_academic_year: string
@@ -5370,6 +5431,14 @@ export type Database = {
         Args: { p_fee_record_id: string }
         Returns: undefined
       }
+      worker_parent_push_tokens: {
+        Args: { p_parent_user_ids: string[] }
+        Returns: {
+          out_parent_user_id: string
+          out_platform: string
+          out_push_token: string
+        }[]
+      }
       worker_payment_context: { Args: { p_payment_id: string }; Returns: Json }
       worker_report_card_batch: {
         Args: {
@@ -5385,6 +5454,10 @@ export type Database = {
           out_student_name: string
           out_subjects: Json
         }[]
+      }
+      worker_retire_push_token: {
+        Args: { p_push_token: string; p_reason?: string }
+        Returns: boolean
       }
       worker_school_branding: { Args: { p_school_id: string }; Returns: Json }
       worker_update_dispatch: {

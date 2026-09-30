@@ -19,6 +19,7 @@ import { FALLBACK_CHAIN } from './types'
 import { MetaWhatsAppChannel } from './providers/meta-whatsapp'
 import { ResendEmailChannel } from './providers/resend-email'
 import { TwilioSmsChannel } from './providers/twilio-sms'
+import { ExpoPushChannel } from './providers/expo-push'
 import { MockChannel } from './providers/mock'
 
 /**
@@ -81,9 +82,21 @@ export function getChannel(channel: Channel): NotificationChannel {
       return new ResendEmailChannel()
     case 'sms':
       return new TwilioSmsChannel()
+    case 'push':
+      /**
+       * Push has a provider as of `0157`, and is still deliberately absent from `FALLBACK_CHAIN`.
+       *
+       * The distinction the old error message collapsed: push is not a *substitute* for reaching a
+       * parent — a notification arrives only if the app is installed and permitted, and a silent
+       * failure looks identical to a parent who did not glance at their phone. What it substitutes
+       * for is **cost**. `NOTIFICATIONS.md` keeps per-absence WhatsApp off by default because each
+       * message spends the school's quota; push is free, so it is what lets a parent hear about
+       * today's absence today. Dispatched alongside the chain, never inside it.
+       */
+      return new ExpoPushChannel()
     default:
       throw new Error(
-        `Channel "${channel}" has no provider. Push and in-app are surfaces, not dispatch channels.`,
+        `Channel "${channel}" has no provider. in_app is a surface, not a dispatch channel.`,
       )
   }
 }
@@ -251,3 +264,4 @@ export type {
 export { mockSentMessages, resetMockMessages } from './providers/mock'
 
 export { renderBrandedEmail, type BrandedEmail, type EmailBranding } from './email-shell'
+export { ExpoPushChannel, type PushOutcome } from './providers/expo-push'

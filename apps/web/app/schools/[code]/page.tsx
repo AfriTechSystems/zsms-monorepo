@@ -45,12 +45,48 @@ import {
 
 import { getCountryConfig } from '@zsms/config'
 
+import { createAnonClient } from '../../../lib/supabase'
+
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent } from '../../../components/ui/card'
 import { CopyCode } from './copy-code'
 
 export const revalidate = 300
+
+/** As `school_public_profile()` returns it. NUMERIC arrives from PostgREST as a string. */
+interface ProfileRow {
+  out_school_code: string
+  out_name: string
+  out_city_code: string
+  out_province_code: string
+  out_type: string
+  out_level: string
+  out_logo_url: string | null
+  out_status: string
+  out_about: string | null
+  out_established_year: number | null
+  out_website_url: string | null
+  out_pupils_per_teacher: string | number | null
+  out_avg_class_size: string | number | null
+  out_fee_band_min: string | number | null
+  out_fee_band_max: string | number | null
+  out_has_boarding: boolean | null
+  out_has_transport: boolean | null
+  out_has_science_lab: boolean | null
+  out_has_computer_lab: boolean | null
+  out_has_library: boolean | null
+  out_has_sports: boolean | null
+  out_has_feeding: boolean | null
+  out_has_special_needs: boolean | null
+  out_grade_levels: string[] | null
+}
+
+function num(value: string | number | null): number | null {
+  if (value === null) return null
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
 
 interface PublicProfile {
   schoolCode: string
@@ -95,25 +131,64 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 /**
- * Fetched through the public API route rather than the database directly.
+ * Reads the database directly, NOT this app's own API route.
  *
- * One source of truth for what is publishable: the route and the SQL function behind it already
- * decide that, and a server component reaching past them would be a second place where the
- * disclosure rules live — which is how the two drift apart.
+ * ## The bug that produced this comment
+ *
+ * It was written the other way first — `fetch('/api/public/schools/…')` — reasoning that the route
+ * and the SQL function behind it are the single place the disclosure rules live. The reasoning was
+ * fine and the implementation was a server component fetching its own server over HTTP, which breaks
+ * in two ways that only show up outside development:
+ *
+ *   * **`next build` hangs.** With no server listening on the base URL, the build-time request retries
+ *     until it gives up. Measured: the build went from twenty seconds to over ten minutes the moment
+ *     the dev server was stopped, then failed collecting page data.
+ *   * **On Vercel there is no localhost.** `NEXT_PUBLIC_ZSMS_URL` is not set today, so the fallback
+ *     would point a production render at nothing.
+ *
+ * The disclosure boundary is not the route. It is `school_public_profile()`'s `RETURNS TABLE`, which
+ * this calls directly — the same function, one hop shorter. The API route stays because the client-side
+ * directory page needs an HTTP endpoint; this page does not.
  */
 async function loadProfile(code: string): Promise<PublicProfile | null> {
-  const base = process.env['NEXT_PUBLIC_ZSMS_URL'] ?? 'http://localhost:3000'
-  try {
-    const response = await fetch(`${base}/api/public/schools/${encodeURIComponent(code)}`, {
-      next: { revalidate: 300 },
-    })
-    if (!response.ok) return null
-    const body = (await response.json()) as { data?: PublicProfile }
-    return body.data ?? null
-  } catch {
-    // A directory page that 500s because the API blipped is worse for search ranking than one that
-    // reports the school as unlisted. Treated as not found and re-fetched on the next revalidation.
-    return null
+  const client = createAnonClient()
+  if (!client) return null
+
+  const { data, error } = await client.rpc('school_public_profile', {
+    p_school_code: code.trim(),
+  })
+  if (error) return null
+
+  const row = (data as unknown as ProfileRow[] | null)?.[0]
+  if (!row) return null
+
+  return {
+    schoolCode: row.out_school_code,
+    name: row.out_name,
+    cityCode: row.out_city_code,
+    provinceCode: row.out_province_code,
+    type: row.out_type,
+    level: row.out_level,
+    logoUrl: row.out_logo_url,
+    status: row.out_status,
+    about: row.out_about,
+    establishedYear: row.out_established_year,
+    websiteUrl: row.out_website_url,
+    pupilsPerTeacher: num(row.out_pupils_per_teacher),
+    avgClassSize: num(row.out_avg_class_size),
+    feeBandMin: num(row.out_fee_band_min),
+    feeBandMax: num(row.out_fee_band_max),
+    gradeLevels: row.out_grade_levels ?? [],
+    facilities: {
+      boarding: row.out_has_boarding,
+      transport: row.out_has_transport,
+      scienceLab: row.out_has_science_lab,
+      computerLab: row.out_has_computer_lab,
+      library: row.out_has_library,
+      sports: row.out_has_sports,
+      feeding: row.out_has_feeding,
+      specialNeeds: row.out_has_special_needs,
+    },
   }
 }
 

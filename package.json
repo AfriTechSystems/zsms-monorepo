@@ -32,6 +32,7 @@
     "db:test": "node scripts/check-test-plans.mjs && supabase test db",
     "db:test:plans": "node scripts/check-test-plans.mjs",
     "ai:smoke": "node --env-file=.env.local --import tsx scripts/ai-smoke.ts",
+    "queue:smoke": "node --env-file=.env.local --import tsx scripts/queue-smoke.ts",
     "db:check:migrations": "node scripts/check-migrations.mjs",
     "ci:checks": "npm run db:check:migrations && npm run db:test:plans && npm run type-check && npm run lint && npm run build"
   },

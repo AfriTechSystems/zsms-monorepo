@@ -112,6 +112,16 @@ jobs:
 
       - run: npm ci
 
+      # Docker Hub rate-limits unauthenticated pulls per IP, and a GitHub runner shares that IP
+      # with every other unauthenticated runner. It cost two red builds on 2026-09-30 —
+      # "toomanyrequests: Rate exceeded", then "Data limit exceeded" on the re-run — and in both
+      # cases the suites never ran at all, which reads as a code failure and is not one.
+      - name: Authenticate to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Start local Supabase
         # The CLI is a devDependency (never a global), so CI and a developer machine
         # run the same version. Only the database is needed — skipping the rest saves

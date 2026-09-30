@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { reportRouteError, routeFromStack } from './report-error'
 import { ZodError } from 'zod'
 
 export type ErrorCode =
@@ -165,6 +166,20 @@ export async function guard<T extends Response>(
     return await handler()
   } catch (err) {
     console.error('[api] unhandled exception', err)
+
+    /**
+     * Reported to Sentry AND recorded as a platform incident — see `lib/report-error.ts` for why those
+     * are two different questions and why one without the other is not much use.
+     *
+     * Awaited rather than fired and forgotten. A serverless function can be frozen the moment it
+     * returns a response, so an un-awaited report is one the platform is free to discard — and the
+     * reports that would be lost are exactly the ones from the routes failing fastest.
+     *
+     * `reportRouteError` never throws, by construction. An exception raised while reporting an
+     * exception would replace a useful 500 with a useless one and lose the original.
+     */
+    await reportRouteError(err, routeFromStack(err))
+
     return fail('SERVER_ERROR', 'An unexpected error occurred.')
   }
 }

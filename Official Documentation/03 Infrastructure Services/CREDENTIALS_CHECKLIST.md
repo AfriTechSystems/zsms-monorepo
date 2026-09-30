@@ -99,6 +99,30 @@ What remains is Anthropic, whose key is configured but has no balance:
 Note that `AI_GENERATOR` is still `template`, so nothing in the product calls a model yet. That is
 deliberate — see business rule 5.
 
+### 1.3b Docker Hub — a free account, for CI
+
+Not a ZSMS dependency. The `database` CI job starts a local Supabase, which pulls roughly a dozen
+container images from Docker Hub, and **unauthenticated pulls from a GitHub runner share a rate limit
+with every other unauthenticated runner on that IP**. Observed twice on 2026-09-30:
+
+```
+Error response from daemon: toomanyrequests: Rate exceeded
+Error response from daemon: toomanyrequests: Data limit exceeded
+```
+
+The suites never ran. It looks exactly like a broken build and is not one, which is the reason it
+belongs on this list — the cost is a re-run and twenty minutes of wondering what changed.
+
+```
+DOCKERHUB_USERNAME      # GitHub Actions secret
+DOCKERHUB_TOKEN         # a read-only access token, not the account password
+```
+
+- **Where:** hub.docker.com → free account → Account Settings → Personal access tokens, scoped
+  *Public Repo Read-only*.
+- **Then:** add a `docker/login-action` step to the `database` job before it starts Supabase.
+- **Alternative:** point the images at a mirror, which needs no account and more configuration.
+
 ### 1.4 Sentry — account **and** installation
 
 `CLAUDE.md` and `ENV.md` both imply Sentry is wired. **It is not installed at all** — no
@@ -291,4 +315,5 @@ a value supplied by the platform rather than the file. This has already caught o
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-09-30 | Added Docker Hub | CI's database job pulls a dozen images per run and hit Docker Hub's unauthenticated rate limit twice in one day. The suites do not run and it reads as a code failure. |
 | 2026-09-29 | Initial document | A single actionable list was needed; `ENV.md` groups by surface rather than by what a human must go and obtain, and lists variables nothing reads. Derived by grepping `process.env` across `apps/` and `packages/`. |

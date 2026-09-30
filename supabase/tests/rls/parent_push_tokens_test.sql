@@ -30,7 +30,7 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(19);
+SELECT plan(20);
 
 -- ---------------------------------------------------------------------------
 -- Shape and privileges.
@@ -162,6 +162,15 @@ SELECT is(
   'a parent sees only their own devices, never another family''s'
 );
 
+/**
+ * And the handover is visible afterwards rather than overwritten. `0158` made the unique key partial
+ * over active rows precisely so this row survives — a handset changing hands is the case two people
+ * are most likely to disagree about later, because both expect the alerts.
+ *
+ * Read from the worker's seat below rather than here: the retired row belongs to the previous owner,
+ * and this session is the new one.
+ */
+
 -- ---------------------------------------------------------------------------
 -- The worker's seat. A different role, so a separate section.
 -- ---------------------------------------------------------------------------
@@ -191,6 +200,14 @@ SELECT ok(
      WHERE out_push_token = 'ExponentPushToken[father-phone]'
   ),
   'a retired token is never handed to the worker, whoever asks'
+);
+
+SELECT is(
+  (SELECT retired_reason FROM public.parent_push_tokens
+    WHERE push_token = 'ExponentPushToken[mother-phone]'
+      AND parent_user_id = 'user_parent_grace'),
+  'device_reassigned',
+  'and the previous owner''s claim is retired with a reason, not erased'
 );
 
 /**

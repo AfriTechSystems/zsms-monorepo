@@ -5,16 +5,21 @@
  *       `Official Documentation/06 School and Tenant Management/TRIAL.md`
  *       `Official Documentation/17 Integration and Pricing/PRICING.md`
  *
- * ## Every claim on this page is something that exists
+ * ## The whole picture, with every item labelled
  *
- * This is the one page in ZSMS whose job is persuasion, which makes it the one page where a sentence
- * can quietly become a lie. So the copy describes only what is built and working: pupils, staff, fees,
- * attendance, results, report cards, announcements, the parent portal, the Teacher Hub.
+ * Asked for on 2026-09-30: this page carries the complete feature set — working, being built, and
+ * planned — so that shipping a feature is not an occasion to rewrite a marketing page.
  *
- * Deliberately absent, because they are not built: WhatsApp delivery (the fallback chain is written and
- * no message has left the building — see the Phase 3 caveat), the mobile app, loans, and the timetable.
- * A school that signs up expecting WhatsApp today would have been mis-sold, and the first thing they
- * would lose faith in is everything else on the list.
+ * That creates the risk this page has to manage. It is the one page in ZSMS whose job is persuasion,
+ * which makes it the one page where a sentence can quietly become a lie. The list therefore lives in
+ * `features.ts` with a status on every item, rendered under headings that say plainly which is which:
+ * *Working today*, *Being built now*, *Planned*. A school can read the roadmap and still know exactly
+ * what it is buying.
+ *
+ * **A feature may say `live` only if a school could use it today, end to end** — not "the code
+ * exists". Parent messaging and AI lesson generation are both `building` for that reason: both are
+ * written and tested, and one has no provider credentials while the other returns a scaffold. Marking
+ * either `live` would be the easiest way to lose a school's trust in everything else on the list.
  *
  * ## No prices
  *
@@ -27,22 +32,64 @@ import type { JSX } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
+import type { LucideIcon } from 'lucide-react'
 import {
   ArrowRight,
   BadgeCheck,
+  Bot,
+  Building2,
   CalendarCheck,
+  CalendarRange,
   ClipboardList,
+  CreditCard,
   FileText,
+  Globe,
+  GraduationCap,
+  HandCoins,
+  Landmark,
   Megaphone,
+  MessageCircle,
+  Plug,
   Smartphone,
   Sparkles,
+  TrendingUp,
   Users,
   Wallet,
 } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 
+import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { FEATURES, STATUS_COPY, type FeatureStatus } from './features'
+
+/**
+ * Icons resolved here so `features.ts` stays free of JSX and can be imported anywhere — including,
+ * later, by the mobile app, which has no lucide-react.
+ */
+const ICONS: Record<string, LucideIcon> = {
+  Bot,
+  Building2,
+  CalendarCheck,
+  CalendarRange,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  Globe,
+  GraduationCap,
+  HandCoins,
+  Landmark,
+  Megaphone,
+  MessageCircle,
+  Plug,
+  Smartphone,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Wallet,
+}
+
+const ORDER: readonly FeatureStatus[] = ['live', 'building', 'planned'] as const
 
 export const metadata: Metadata = {
   title: 'ZSMS for schools — pupils, fees, attendance and results in one place',
@@ -50,68 +97,6 @@ export const metadata: Metadata = {
     'ZSMS is school management software built for Zambian schools. Track pupils, collect and ' +
     'reconcile fees, mark attendance, enter marks and produce report cards. Thirty days free.',
 }
-
-/** What is built and working today. Nothing aspirational on this list. */
-const CAPABILITIES = [
-  {
-    icon: Users,
-    title: 'Pupils and staff',
-    body:
-      'Enrol pupils one at a time or import a whole roll from a spreadsheet — ZSMS maps your columns, ' +
-      'so you do not reformat anything. Add your own fields for whatever your school tracks, with ' +
-      'medical notes visible only to the people who should see them.',
-  },
-  {
-    icon: Wallet,
-    title: 'Fees that reconcile',
-    body:
-      'Build a fee structure once and issue it to a whole grade. Record payments, verify bank ' +
-      'deposits, and see exactly who owes what and for how long. Receipts are generated with your ' +
-      'logo on them.',
-  },
-  {
-    icon: CalendarCheck,
-    title: 'Attendance',
-    body:
-      'A register a teacher can mark in under a minute, per class and per day, with the term’s ' +
-      'record kept for every pupil.',
-  },
-  {
-    icon: ClipboardList,
-    title: 'Marks and results',
-    body:
-      'Enter marks against your own grading scale — ECZ, Cambridge or one you define. Change a grade ' +
-      'boundary next year and last year’s grades still mean what they meant, because ZSMS records ' +
-      'which scale produced each one.',
-  },
-  {
-    icon: FileText,
-    title: 'Report cards',
-    body:
-      'Generated as PDFs with your school’s branding, in batches, for a whole class at a time.',
-  },
-  {
-    icon: Smartphone,
-    title: 'A portal for parents',
-    body:
-      'Parents sign in on a phone and see their child’s attendance, results, fee statement and ' +
-      'your notices. No app to install.',
-  },
-  {
-    icon: Megaphone,
-    title: 'Announcements',
-    body:
-      'Write once and send to a grade, a class, all parents or all staff — with a record of who has ' +
-      'read it.',
-  },
-  {
-    icon: Sparkles,
-    title: 'Lesson planning for your teachers',
-    body:
-      'Your teachers get the ZSMS Teacher Hub: lesson plans, quizzes and homework for the Zambian ' +
-      'curriculum, exported to PDF or Word.',
-  },
-] as const
 
 export default function ForSchoolsPage(): JSX.Element {
   const country = getCountryConfig()
@@ -151,20 +136,54 @@ export default function ForSchoolsPage(): JSX.Element {
         </div>
       </header>
 
-      <section className="mt-cards">
-        <h2 className="text-lg font-semibold tracking-tight">What you get</h2>
-        <ul className="mt-stack grid grid-cols-1 gap-cards sm:grid-cols-2">
-          {CAPABILITIES.map((c) => (
-            <li key={c.title} className="rounded-lg border border-border p-card">
-              <h3 className="flex items-center gap-2 font-medium">
-                <c.icon aria-hidden="true" className="size-4 text-muted-foreground" />
-                {c.title}
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">{c.body}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {ORDER.map((status) => {
+        const items = FEATURES.filter((f) => f.status === status)
+        // An empty bucket renders nothing, so the page reorganises itself as features move between
+        // them and no orphaned heading is left behind.
+        if (items.length === 0) return null
+        const copy = STATUS_COPY[status]
+
+        return (
+          <section key={status} className="mt-cards">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold tracking-tight">{copy.heading}</h2>
+              <Badge variant={copy.tone}>{items.length}</Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{copy.note}</p>
+
+            <ul className="mt-stack grid grid-cols-1 gap-cards sm:grid-cols-2">
+              {items.map((f) => {
+                const Icon = ICONS[f.icon] ?? Sparkles
+                return (
+                  <li
+                    key={f.title}
+                    className={
+                      'rounded-lg border p-card ' +
+                      (status === 'live' ? 'border-border' : 'border-dashed border-border')
+                    }
+                  >
+                    <h3 className="flex flex-wrap items-center gap-2 font-medium">
+                      <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                      {f.title}
+                      {/* The status is repeated on every card, not only in the heading above it.
+                          Somebody skimming on a phone sees one card at a time, and a roadmap item
+                          read out of context is exactly how a school ends up expecting something
+                          that is not there yet. */}
+                      {status !== 'live' && <Badge variant={copy.tone}>{copy.badge}</Badge>}
+                      {f.audience && (
+                        <span className="text-sm font-normal text-muted-foreground">
+                          {f.audience}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">{f.body}</p>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )
+      })}
 
       <section className="mt-cards rounded-lg border border-border bg-muted/30 p-card">
         <h2 className="flex items-center gap-2 font-semibold">
@@ -225,12 +244,13 @@ export default function ForSchoolsPage(): JSX.Element {
         </p>
       </section>
 
-      <section className="mt-cards">
-        <h2 className="text-lg font-semibold tracking-tight">Being built next</h2>
+      <section className="mt-cards rounded-lg border border-border bg-muted/30 p-card">
+        <h2 className="font-semibold">Why we show you the unfinished parts</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          We would rather tell you what is coming than let you assume it is here. WhatsApp messages to
-          parents, an offline app for teachers to mark attendance without signal, timetabling, and
-          school financing are all in progress and not yet available.
+          Most software lists everything and lets you discover which bits work. We would rather you
+          knew, because you are choosing the system that will hold your pupils&rsquo; records for years
+          — and the fastest way for us to lose your trust in the parts that do work is to have oversold
+          one that does not.
         </p>
       </section>
 

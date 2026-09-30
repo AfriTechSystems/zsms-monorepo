@@ -255,6 +255,17 @@ is behind them — a scraper gets a list of school names and towns, which is a l
 limiter at all it is an enumeration oracle for valid pupil identifiers, which is a different category
 of thing to leave open. It waits for Redis.
 
+### An unlisted school renders `noindex`, not a 404
+
+`notFound()` is thrown from an async server component that awaits a fetch, so the response has already
+begun streaming and Next cannot retract the 200 it committed — measured on a clean dev server, the
+not-found UI renders with HTTP 200. The protection against a crawler indexing a stale or mistyped
+school URL is therefore `robots: { index: false }` in `generateMetadata`, not the status line. Worth
+knowing before somebody "fixes" the status and assumes the SEO problem is handled.
+
+The page itself says *"that school is not listed"* rather than *"no such school"*, because the same
+page covers a suspended school and a wrong guess there is one a parent might repeat.
+
 ### A profile returns NOT_FOUND for three different reasons
 
 No such school, suspended or terminated, and awaiting verification all report identically.

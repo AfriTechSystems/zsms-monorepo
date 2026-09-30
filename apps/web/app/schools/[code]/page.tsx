@@ -124,7 +124,21 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { code } = await params
   const school = await loadProfile(code)
-  if (!school) return { title: 'School not found · ZSMS' }
+
+  /**
+   * `noindex` is the real protection here, not the status code.
+   *
+   * `notFound()` is thrown from an async server component that awaits a fetch, so the response has
+   * already begun streaming and Next cannot retract the 200 it committed — measured on a clean dev
+   * server, the not-found UI renders with HTTP 200. Without this, a crawler that followed a stale or
+   * mistyped link would index a "not listed" page as though it were a school.
+   */
+  if (!school) {
+    return {
+      title: 'School not listed · ZSMS',
+      robots: { index: false, follow: true },
+    }
+  }
 
   const country = getCountryConfig()
   const place = country.cities[school.cityCode] ?? school.cityCode
@@ -203,12 +217,12 @@ export default async function SchoolProfilePage({
           <img
             src={school.logoUrl}
             alt=""
-            width={72}
-            height={72}
-            className="size-18 shrink-0 rounded-lg object-contain"
+            width={64}
+            height={64}
+            className="size-16 shrink-0 rounded-lg object-contain"
           />
         ) : (
-          <span className="flex size-18 shrink-0 items-center justify-center rounded-lg bg-muted">
+          <span className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-muted">
             <School aria-hidden="true" className="size-8 text-muted-foreground" />
           </span>
         )}

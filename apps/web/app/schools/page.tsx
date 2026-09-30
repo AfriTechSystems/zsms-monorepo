@@ -30,11 +30,11 @@
  */
 
 import type { JSX } from 'react'
-import { Suspense, useCallback, useMemo } from 'react'
+import { Suspense, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BadgeCheck, Bus, School, Search, Users } from 'lucide-react'
+import { BadgeCheck, Bus, School, Search, SlidersHorizontal, Users } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 
@@ -111,6 +111,21 @@ function Directory(): JSX.Element {
 
   const { data, meta, loading, error, code, reload } = useApi<DirectorySchool[]>(url)
 
+  /**
+   * On a phone the filter block is six stacked dropdowns, and a parent would scroll past all of them
+   * before seeing a single school. So on small screens only the name search stays visible and the
+   * rest sit behind a toggle; from `sm:` up everything is shown and the toggle disappears.
+   *
+   * A CSS-driven `sm:block` rather than a media query in JavaScript, so the desktop layout is correct
+   * in the first paint and there is no hydration mismatch to reconcile.
+   */
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  // How many filters are actually narrowing the list — worth surfacing on the collapsed toggle, or a
+  // parent cannot tell why they are seeing four schools instead of forty.
+  const activeFilters = [province, city, level, type, feeMax].filter(Boolean).length +
+    (boarding ? 1 : 0) + (transport ? 1 : 0)
+
   const setParam = useCallback(
     (key: string, value: string) => {
       const next = new URLSearchParams(params.toString())
@@ -140,19 +155,40 @@ function Directory(): JSX.Element {
   return (
     <>
       <FormSection className="mb-cards">
-        <FormGrid columns={3}>
-          <Field id="q" label="School name" hint="Two letters or more.">
-            {(props) => (
-              <Input
-                {...props}
-                type="search"
-                defaultValue={q}
-                placeholder="Sunrise"
-                onChange={(e) => setParam('q', e.target.value.trim())}
-              />
-            )}
-          </Field>
+        <Field id="q" label="School name" hint="Two letters or more.">
+          {(props) => (
+            <Input
+              {...props}
+              type="search"
+              defaultValue={q}
+              placeholder="Sunrise"
+              onChange={(e) => setParam('q', e.target.value.trim())}
+            />
+          )}
+        </Field>
 
+        {/* Visible only on phones. From `sm:` up the filters below are always shown. */}
+        <div className="mt-stack sm:hidden">
+          <Button
+            variant="outline"
+            className="w-full"
+            aria-expanded={filtersOpen}
+            aria-controls="directory-filters"
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            {filtersOpen ? 'Hide filters' : 'Area, level and fees'}
+            {activeFilters > 0 && !filtersOpen && (
+              <Badge variant="primary">{activeFilters}</Badge>
+            )}
+          </Button>
+        </div>
+
+        <div
+          id="directory-filters"
+          className={(filtersOpen ? 'block' : 'hidden') + ' mt-stack sm:mt-stack sm:block'}
+        >
+        <FormGrid columns={2}>
           <Field id="province" label="Province">
             {(props) => (
               <Select
@@ -241,6 +277,7 @@ function Directory(): JSX.Element {
             <Bus aria-hidden="true" />
             Has transport
           </Button>
+        </div>
         </div>
       </FormSection>
 

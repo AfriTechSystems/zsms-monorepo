@@ -490,6 +490,96 @@ VALUES
    'Suspended for non-payment; outbound messaging withdrawn pending settlement.','ZSMS-131','seed')
 ON CONFLICT DO NOTHING;
 
+-- ---------------------------------------------------------------------------
+-- Teaching assignments — so the directory's verified ratio has something to divide
+-- ---------------------------------------------------------------------------
+--
+-- Deliberately NOT one per staff member. School A has 14 staff of whom 3 are
+-- Administration, and the public ratio must count only the 11 who actually teach —
+-- otherwise hiring a bursar improves a school's listing, which would make the
+-- number a vanity metric rather than a signal. This fixture is what proves that
+-- in the running product rather than only in the pgTAP suite.
+--
+-- One class-scope assignment per teaching staff member, spread round-robin over
+-- the classes their pupils are in.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.teacher_assignments
+  (school_id, class_id, teacher_user_id, academic_year, scope, is_active)
+SELECT
+  'a0000000-0000-4000-8000-000000000001',
+  'grade_' || (1 + (n % 12)) || 'a',
+  'user_test_staff_a' || n,
+  EXTRACT(YEAR FROM NOW())::TEXT,
+  'class',
+  TRUE
+-- n starts at 4: staff 1-3 are Administration in the block above.
+FROM generate_series(4, 14) n
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.teacher_assignments
+  (school_id, class_id, teacher_user_id, academic_year, scope, is_active)
+SELECT
+  'a0000000-0000-4000-8000-000000000002',
+  'form_' || (1 + (n % 6)) || 'a',
+  'user_test_staff_b' || n,
+  EXTRACT(YEAR FROM NOW())::TEXT,
+  'class',
+  TRUE
+-- n starts at 3: staff 1-2 are Administration.
+FROM generate_series(3, 9) n
+ON CONFLICT DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- Public directory listings — three schools, three different choices
+-- ---------------------------------------------------------------------------
+--
+-- The point of this fixture is that the directory has to look right in all three
+-- states, not just the flattering one:
+--
+--   A  publishes everything      — the full verified profile
+--   B  publishes selectively     — ratio yes, class sizes and fees withheld
+--   C  publishes a description   — and none of the numbers
+--   D,E  publish nothing at all  — the mandatory listing only, which is the
+--                                  DEFAULT and therefore the commonest case
+--
+-- D and E are absent from this INSERT on purpose. A school that has never opened
+-- the settings screen has no row at all, and the directory must render that
+-- correctly rather than only handling a row with every flag false.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.school_public_profiles
+  (school_id, is_published, about, established_year, website_url,
+   publish_ratio, publish_class_sizes, publish_fee_band, fee_band_min, fee_band_max,
+   has_boarding, has_transport, has_science_lab, has_computer_lab,
+   has_library, has_sports, has_feeding, has_special_needs, updated_by)
+VALUES
+  -- A: the full picture. A working school with nothing to hide.
+  ('a0000000-0000-4000-8000-000000000001', TRUE,
+   'A day school on Great East Road teaching Grade 1 through Grade 12. We follow the ECZ '
+   || 'curriculum and are transitioning to the 2023 framework, so pupils currently in Grade 8 '
+   || 'and above continue under the old structure. Small classes, a full science block, and a '
+   || 'feeding programme for the primary section.',
+   1998, 'https://example.sch.zm',
+   TRUE, TRUE, TRUE, 1200.00, 2800.00,
+   FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, 'seed'),
+
+  -- B: a boarding school that will show its ratio and not its class sizes or fees.
+  -- The commonest real pattern — proud of one number, private about another.
+  ('a0000000-0000-4000-8000-000000000002', TRUE,
+   'A boarding secondary school outside Ndola, Forms 1 to 6, offering both O-Level and '
+   || 'A-Level pathways. Full boarding with weekend day-release.',
+   1974, NULL,
+   TRUE, FALSE, FALSE, NULL, NULL,
+   TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 'seed'),
+
+  -- C: a school still on trial. Has written a description and published no figures,
+  -- which is exactly what a school does in its first week.
+  ('a0000000-0000-4000-8000-000000000003', TRUE,
+   'A small primary school in Kabulonga, Grade 1 to Grade 7.',
+   2019, NULL,
+   FALSE, FALSE, FALSE, NULL, NULL,
+   FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE, 'seed')
+ON CONFLICT (school_id) DO NOTHING;
+
 COMMIT;
 
 -- ---------------------------------------------------------------------------
@@ -497,6 +587,11 @@ COMMIT;
 -- ---------------------------------------------------------------------------
 SELECT s.school_id, s.name, s.status, s.subscription_tier,
        (SELECT count(*) FROM public.students st WHERE st.school_id = s.id) AS students,
-       (SELECT count(*) FROM public.fee_records f WHERE f.school_id = s.id) AS fee_records
+       (SELECT count(*) FROM public.fee_records f WHERE f.school_id = s.id) AS fee_records,
+       -- What the public directory will show for this school.
+       COALESCE(p.is_published, FALSE) AS listed_extras,
+       (SELECT out_pupils_per_teacher FROM public.school_verified_metrics(s.id)) AS ratio,
+       (SELECT out_avg_class_size     FROM public.school_verified_metrics(s.id)) AS avg_class
 FROM public.schools s
+LEFT JOIN public.school_public_profiles p ON p.school_id = s.id
 ORDER BY s.school_id;

@@ -18,6 +18,11 @@
 --      second. `0157` keys it on the token instead, and the assertions below pin that.
 --   3. **A handset passed to somebody else stops delivering the previous owner's alerts.**
 --
+-- NOTE ON ROLES. The `worker_*` reads are made from a `service_role` block at the end rather than
+-- interleaved. The first version of this suite called them while acting as a parent and failed with
+-- "permission denied" — which was the grant working exactly as intended, and the test being wrong
+-- about who does the reading. A worker is a different seat, so it gets its own section.
+--
 -- Run: npm run db:test
 -- ===========================================================================
 
@@ -25,10 +30,10 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(18);
+SELECT plan(19);
 
 -- ---------------------------------------------------------------------------
--- Shape.
+-- Shape and privileges.
 -- ---------------------------------------------------------------------------
 /**
  * No `school_id`, and that is a design assertion rather than an observation.
@@ -54,13 +59,12 @@ SELECT ok(
       JOIN pg_class c ON c.oid = t.tgrelid
      WHERE c.relname = 'parent_push_tokens' AND t.tgname LIKE 'enforce_school_writable_%'
   ),
-  '...so 0149''s write guard does not reach it, which is correct: one lapsed school must not silence '
-  'a parent''s alerts about a child at another'
+  '...so 0149''s write guard does not reach it: one lapsed school must not silence a parent''s alerts about a child at another'
 );
 
 SELECT ok(
   NOT has_table_privilege('authenticated', 'public.parent_push_tokens', 'DELETE'),
-  'and nobody may delete a token — a device going quiet stays answerable'
+  'nobody may delete a token — a device going quiet stays answerable'
 );
 
 SELECT ok(
@@ -72,7 +76,7 @@ SELECT ok(
   has_function_privilege('service_role', 'public.worker_parent_push_tokens(text[])', 'EXECUTE')
   AND NOT has_function_privilege('authenticated',
         'public.worker_parent_push_tokens(text[])', 'EXECUTE'),
-  'the worker reads tokens through a worker_ function only — prohibition 1'
+  'the worker reads tokens through a worker_ function, and only the worker may — prohibition 1'
 );
 
 -- ---------------------------------------------------------------------------
@@ -92,7 +96,7 @@ SELECT is(
  *
  * `UNIQUE (parent_user_id, platform)` would have replaced the row above, leaving one of two parents
  * sharing the account receiving nothing — and nothing would appear to have failed, which is the
- * hardest kind of fault to report.
+ * hardest kind of fault for a parent to report.
  */
 SELECT lives_ok(
   $$ SELECT public.register_push_token('ExponentPushToken[father-phone]', 'android') $$,
@@ -105,25 +109,16 @@ SELECT is(
   'so both parents sharing one account are reachable'
 );
 
-SELECT is(
-  (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_grace'])),
-  2,
-  '...and the worker is told about both'
-);
-
--- Re-registering the same token is a refresh, not a duplicate.
-SELECT is(
-  (SELECT COUNT(*)::INT FROM (
-     SELECT public.register_push_token('ExponentPushToken[mother-phone]', 'android')
-   ) again),
-  1,
-  'registering a token already held refreshes it'
+-- Re-registering a token already held is a refresh, not a duplicate.
+SELECT lives_ok(
+  $$ SELECT public.register_push_token('ExponentPushToken[mother-phone]', 'android') $$,
+  'registering a token already held is accepted'
 );
 
 SELECT is(
   (SELECT COUNT(*)::INT FROM public.parent_push_tokens),
   2,
-  '...and does not create a second row'
+  '...and refreshes the row rather than creating a second'
 );
 
 -- ---------------------------------------------------------------------------
@@ -135,16 +130,10 @@ SELECT ok(
 );
 
 SELECT is(
-  (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_grace'])),
-  1,
-  '...and the worker stops being told about it'
-);
-
-SELECT is(
   (SELECT retired_reason FROM public.parent_push_tokens
     WHERE push_token = 'ExponentPushToken[father-phone]'),
   'signed_out',
-  'but the row remains, with why — "it stopped working in March" is a diagnosis, a missing row is not'
+  'and the row remains, with why — "it stopped working in March" is a diagnosis, a missing row is not'
 );
 
 -- ---------------------------------------------------------------------------
@@ -159,30 +148,65 @@ SET LOCAL request.jwt.claims TO '{"sub": "user_parent_john", "role": "authentica
  */
 SELECT lives_ok(
   $$ SELECT public.register_push_token('ExponentPushToken[mother-phone]', 'android') $$,
-  'a handset signed into by somebody else re-registers'
-);
-
-SELECT is(
-  (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_grace'])),
-  0,
-  '...and the previous owner stops receiving alerts on it'
-);
-
-SELECT is(
-  (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_john'])),
-  1,
-  '...while the new owner starts'
+  'a handset signed into by somebody else re-registers to them'
 );
 
 /**
  * And one parent cannot see another's devices. Asserted from a session that has just written to the
- * table, which is the case where a missing policy would go unnoticed — the caller sees a row and
- * assumes the filter works.
+ * table, which is where a missing policy would go unnoticed — the caller sees a row and assumes the
+ * filter works.
  */
 SELECT is(
   (SELECT COUNT(*)::INT FROM public.parent_push_tokens),
   1,
   'a parent sees only their own devices, never another family''s'
+);
+
+-- ---------------------------------------------------------------------------
+-- The worker's seat. A different role, so a separate section.
+-- ---------------------------------------------------------------------------
+RESET ROLE;
+SET LOCAL ROLE service_role;
+
+SELECT is(
+  (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_john'])),
+  1,
+  'the worker is told about the handset''s new owner'
+);
+
+/**
+ * Grace has none left, and for two different reasons — one device retired at sign-out, the other
+ * reassigned when it changed hands. Both paths have to remove her from delivery, or she keeps
+ * receiving alerts on a phone she no longer holds.
+ */
+SELECT is(
+  (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_grace'])),
+  0,
+  '...and nothing about the previous owner, whose devices were retired and reassigned'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM public.worker_parent_push_tokens(ARRAY['user_parent_john'])
+     WHERE out_push_token = 'ExponentPushToken[father-phone]'
+  ),
+  'a retired token is never handed to the worker, whoever asks'
+);
+
+/**
+ * Expo answers with a ticket meaning "accepted", not "delivered", and reports `DeviceNotRegistered`
+ * for an app that has been uninstalled. Without acting on that the table accumulates dead tokens
+ * forever and every delivery statistic becomes meaningless.
+ */
+SELECT ok(
+  (SELECT public.worker_retire_push_token('ExponentPushToken[mother-phone]')),
+  'the worker retires a token Expo has rejected'
+);
+
+SELECT is(
+  (SELECT COUNT(*)::INT FROM public.worker_parent_push_tokens(ARRAY['user_parent_john'])),
+  0,
+  '...and stops being given it on the next batch'
 );
 
 SELECT * FROM finish();

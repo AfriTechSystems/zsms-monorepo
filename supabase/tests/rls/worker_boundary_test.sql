@@ -277,15 +277,26 @@ SELECT is(
   'ATTACK no worker_* function is executable by authenticated, anon, or PUBLIC'
 );
 
--- Positive counterpart: the lockdown must not have locked out the worker too.
+/**
+ * Positive counterpart: the lockdown must not have locked out the worker too.
+ *
+ * Compared against the TOTAL rather than a literal. This assertion read `9` and broke the moment
+ * `0157` added two more worker functions — failing for a reason that had nothing to do with the
+ * boundary it guards, which is the worst kind of test to inherit: it demands attention and then turns
+ * out to want a number bumped.
+ *
+ * The property that matters is not how many there are. It is that **every** one of them is reachable
+ * by the worker, which stays true however many get added.
+ */
 SELECT is(
-  (SELECT count(DISTINCT routine_name)::INT
-   FROM information_schema.routine_privileges
-   WHERE routine_schema = 'public'
-     AND routine_name LIKE 'worker\_%'
-     AND grantee = 'service_role'),
-  9,
-  'WORKER all nine worker_* functions are executable by service_role'
+  (SELECT count(DISTINCT p.proname)::INT
+     FROM pg_proc p
+     JOIN pg_namespace ns ON ns.oid = p.pronamespace
+    WHERE ns.nspname = 'public'
+      AND starts_with(p.proname, 'worker_')
+      AND NOT has_function_privilege('service_role', p.oid, 'EXECUTE')),
+  0,
+  'WORKER every worker_* function is executable by service_role, however many there are'
 );
 
 -- 0091 removed the last three direct table statements from apps/workers. The

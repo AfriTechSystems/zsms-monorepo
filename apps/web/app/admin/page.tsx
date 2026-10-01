@@ -89,6 +89,8 @@ export default function AdminOverviewPage(): JSX.Element {
             <div className="grid grid-cols-2 gap-cards lg:grid-cols-3">
               <StatCard
                 label="Schools"
+                href="/admin/schools"
+                hrefLabel="All schools"
                 value={String(data.metrics?.schools_total ?? 0)}
                 hint={`${data.metrics?.schools_active ?? 0} active · ${data.metrics?.schools_trial ?? 0} on trial`}
                 tone="neutral"
@@ -96,6 +98,8 @@ export default function AdminOverviewPage(): JSX.Element {
               />
               <StatCard
                 label="Needs attention"
+                href="/admin/health"
+                hrefLabel="School health"
                 value={String(data.atRisk)}
                 hint="at risk or critical"
                 // The one figure allowed to be alarming, and only when it is
@@ -105,6 +109,8 @@ export default function AdminOverviewPage(): JSX.Element {
               />
               <StatCard
                 label="Students enrolled"
+                href="/admin/schools"
+                hrefLabel="By school"
                 value={(data.metrics?.students_total ?? 0).toLocaleString('en-ZM')}
                 hint={`${data.metrics?.staff_total ?? 0} staff`}
                 tone="info"
@@ -112,6 +118,8 @@ export default function AdminOverviewPage(): JSX.Element {
               />
               <StatCard
                 label="Collected this month"
+                href="/admin/billing"
+                hrefLabel="Billing"
                 value={formatKwacha(data.metrics?.collected_this_month)}
                 hint="verified payments only"
                 tone="success"
@@ -119,6 +127,8 @@ export default function AdminOverviewPage(): JSX.Element {
               />
               <StatCard
                 label="In arrears"
+                href="/admin/health"
+                hrefLabel="Who is behind"
                 value={formatKwacha(data.metrics?.arrears_total)}
                 hint={`of ${formatKwacha(data.metrics?.outstanding_total)} outstanding`}
                 tone="warning"
@@ -126,6 +136,8 @@ export default function AdminOverviewPage(): JSX.Element {
               />
               <StatCard
                 label="Awaiting verification"
+                href="/admin/schools"
+                hrefLabel="By school"
                 value={String(data.metrics?.payments_pending ?? 0)}
                 hint="payments recorded, not yet confirmed"
                 tone={((data.metrics?.payments_pending ?? 0) > 0 ? 'primary' : 'neutral') as StatTone}

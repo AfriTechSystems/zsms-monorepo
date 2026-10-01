@@ -35,6 +35,7 @@ import { Field, Select } from '../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { formatLevel } from '../school-shared'
+import { ClassReadiness } from './class-readiness'
 
 interface Assignment {
   id: string
@@ -168,6 +169,15 @@ export default function TeachingPage({
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
       {loading && !data && !error && <TableSkeleton rows={5} columns={4} />}
+
+      {/*
+        The top of the drill-down, above the assignment table.
+
+        The table below answers "who teaches what", which is a decision already taken. This
+        answers "what is behind", which is the thing somebody opens the portal to find out —
+        and it had no screen at all until now.
+      */}
+      <ClassReadiness base={base} />
 
       {!error && data && (
         <div className="space-y-cards">

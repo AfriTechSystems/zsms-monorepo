@@ -5569,6 +5569,19 @@ export type Database = {
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }
+      school_class_readiness: {
+        Args: { p_academic_year?: string; p_term_number?: number }
+        Returns: {
+          out_class_id: string
+          out_grade_id: string
+          out_marks_missing: number
+          out_pupils: number
+          out_register_days: number
+          out_register_days_missing: number
+          out_subjects_assigned: number
+          out_subjects_with_marks: number
+        }[]
+      }
       school_credit_period: {
         Args: { p_from?: string; p_period_kind: string; p_school_id: string }
         Returns: {

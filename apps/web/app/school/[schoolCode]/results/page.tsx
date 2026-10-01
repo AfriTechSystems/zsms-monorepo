@@ -45,6 +45,7 @@ import { Card, CardContent } from '../../../../components/ui/card'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../components/ui/field'
+import { formatLevel } from '../school-shared'
 import { FormGrid, FormSection } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { useToast } from '../../../../components/ui/toast'
@@ -92,13 +93,32 @@ function MarkSheet(): JSX.Element {
 
   const structure = useApi<Structure>('/api/school/structure')
 
-  const classes = useMemo(
-    () =>
-      Object.values(structure.data?.classesByGrade ?? {})
-        .flat()
-        .sort(),
+  const gradeId = params.get('gradeId') ?? ''
+
+  /**
+   * Grade first, then the classes inside it.
+   *
+   * The class list was every class in the school flattened into one dropdown —
+   * `Object.values(classesByGrade).flat()`. A secondary school running twelve grades with
+   * three streams each put thirty-six options in front of a teacher with no indication which
+   * grade any of them belonged to, and `7A` beside `Form 1A` beside `9C` sorts into an order
+   * that means nothing to the person reading it.
+   *
+   * `RESULTS.md` scopes marks entry by grade and class in that order, which is also how a
+   * teacher thinks: they teach Grade 8 mathematics, and then one of its streams.
+   */
+  const grades = useMemo(
+    () => Object.keys(structure.data?.classesByGrade ?? {}).sort(),
     [structure.data],
   )
+
+  const classes = useMemo(() => {
+    const byGrade = structure.data?.classesByGrade ?? {}
+    // No grade chosen yet: show nothing rather than everything. An empty second
+    // dropdown is a clearer instruction than a list of thirty-six.
+    if (!gradeId) return []
+    return [...(byGrade[gradeId] ?? [])].sort()
+  }, [structure.data, gradeId])
 
   const ready = Boolean(classId && subjectCode)
   const sheetUrl = ready
@@ -221,17 +241,40 @@ function MarkSheet(): JSX.Element {
       <div className="space-y-cards">
         <FormSection>
           <FormGrid columns={4}>
+            <Field id="r-grade" label="Grade" required>
+              {(props) => (
+                <Select
+                  {...props}
+                  value={gradeId}
+                  // Changing grade clears the class: a class from the previous grade is not
+                  // in the new one, and leaving it set would load a mark sheet for a class
+                  // the teacher is no longer looking at.
+                  onChange={(e) => setParam({ gradeId: e.target.value, classId: '' })}
+                >
+                  <option value="">Choose a grade</option>
+                  {grades.map((g) => (
+                    <option key={g} value={g}>
+                      {formatLevel(g)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+
             <Field id="r-class" label="Class" required>
               {(props) => (
                 <Select
                   {...props}
                   value={classId}
+                  disabled={!gradeId}
                   onChange={(e) => setParam({ classId: e.target.value })}
                 >
-                  <option value="">Choose a class</option>
+                  <option value="">
+                    {gradeId ? 'Choose a class' : 'Choose a grade first'}
+                  </option>
                   {classes.map((c) => (
                     <option key={c} value={c}>
-                      {c}
+                      {formatLevel(c)}
                     </option>
                   ))}
                 </Select>

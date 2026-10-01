@@ -51,6 +51,8 @@
 import type { JSX } from 'react'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+
+import { createUserClient } from '../../lib/supabase'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, Building2, Sparkles } from 'lucide-react'
@@ -88,8 +90,41 @@ export default async function WelcomePage(): Promise<JSX.Element> {
   }
 
   /**
-   * No organisation. Both destinations below are real and reachable, and sign-out is present — which
-   * is the whole point of rendering rather than redirecting.
+   * No organisation — and this is where a PARENT lands, which is the second half of the
+   * lockout this page was built to end.
+   *
+   * A parent is not a member of any Clerk organisation and does not need to be:
+   * `is_linked_parent_of()` reads `parent_user_id = get_user_id()` and nothing else, so a
+   * parent's access is scoped by the link row rather than by an org. `AUTH.md` says
+   * otherwise — it lists parents as `org:parent | Clerk org member` — and the schema has
+   * never agreed with it.
+   *
+   * So before offering the generic choice below, try to link them. `claim_parent_links()`
+   * matches the VERIFIED email on their token against the addresses schools recorded at
+   * enrolment, links every match across every school, and returns how many. One match or
+   * twenty, they go to the parent portal.
+   *
+   * Failures are swallowed on purpose. If the linking call throws — most likely because
+   * Clerk is not sending the `email` claim — this page must still render the choice and the
+   * sign-out button. A dispatcher that 500s is the lockout again, in a new costume.
+   */
+  let linkedAsParent = false
+  try {
+    const client = await createUserClient()
+    if (client) {
+      const { data } = await client.rpc('claim_parent_links').maybeSingle()
+      const row = (data ?? {}) as { out_linked?: number; out_already_linked?: number }
+      linkedAsParent = (row.out_linked ?? 0) + (row.out_already_linked ?? 0) > 0
+    }
+  } catch {
+    // See above.
+  }
+
+  if (linkedAsParent) redirect('/parent')
+
+  /**
+   * Still nothing. Both destinations below are real and reachable, and sign-out is present —
+   * which is the whole point of rendering rather than redirecting.
    */
   return (
     <main

@@ -1358,6 +1358,77 @@ export type Database = {
           },
         ]
       }
+      parent_link_claims: {
+        Row: {
+          claimant_email: string | null
+          claimant_user_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          matched_on: string
+          parent_id: string
+          requested_at: string
+          school_id: string
+          status: string
+        }
+        Insert: {
+          claimant_email?: string | null
+          claimant_user_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          matched_on: string
+          parent_id: string
+          requested_at?: string
+          school_id: string
+          status?: string
+        }
+        Update: {
+          claimant_email?: string | null
+          claimant_user_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          matched_on?: string
+          parent_id?: string
+          requested_at?: string
+          school_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parent_link_claims_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_link_claims_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "parent_link_claims_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "parent_link_claims_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parent_push_tokens: {
         Row: {
           created_at: string
@@ -4878,6 +4949,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_parent_links: {
+        Args: never
+        Returns: {
+          out_already_linked: number
+          out_email: string
+          out_linked: number
+        }[]
+      }
       clear_student_custom_values: {
         Args: { p_field_ids: string[]; p_student_id: string }
         Returns: number
@@ -5021,6 +5100,7 @@ export type Database = {
         Returns: number
       }
       get_school_id: { Args: never; Returns: string }
+      get_user_email: { Args: never; Returns: string }
       get_user_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
       grade_from_scale_version: {
@@ -5350,6 +5430,13 @@ export type Database = {
           out_trial_ends_at: string
         }[]
       }
+      request_parent_link_by_phone: {
+        Args: { p_phone: string }
+        Returns: {
+          out_message: string
+          out_submitted: boolean
+        }[]
+      }
       request_school_link: {
         Args: {
           p_email: string
@@ -5505,6 +5592,13 @@ export type Database = {
           out_requester_email: string
           out_requester_name: string
           out_school_id: string
+        }[]
+      }
+      school_decide_parent_claim: {
+        Args: { p_approve: boolean; p_claim_id: string }
+        Returns: {
+          out_decided: boolean
+          out_linked: boolean
         }[]
       }
       school_fee_summary: {

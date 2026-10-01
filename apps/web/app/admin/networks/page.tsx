@@ -25,7 +25,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Building2, KeyRound, Loader2, Plus, Unlink, UserPlus } from 'lucide-react'
+import { Building2, KeyRound, Lightbulb, Loader2, Plus, Unlink, UserPlus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
@@ -87,7 +87,17 @@ interface SchoolOption {
   name: string
 }
 
+interface Suggestion {
+  out_basis: 'same_account' | 'same_email'
+  out_identifier: string
+  out_owner_name: string | null
+  out_school_count: number
+  out_school_names: string[] | null
+  out_already_networked: number
+}
+
 interface Payload {
+  suggestions?: Suggestion[]
   networks: Network[]
   links: LinkRow[]
   members: Member[]
@@ -234,6 +244,63 @@ export default function AdminNetworksPage(): JSX.Element {
             </FormActions>
           </form>
         </FormSection>
+
+        {/*
+          Groups that look like they want a network.
+
+          Placed ABOVE the list, because it is the one thing on this screen that is
+          new information rather than a record of decisions already taken. It renders
+          nothing when there is nothing to suggest.
+        */}
+        {(data?.suggestions?.length ?? 0) > 0 && (
+          <Card>
+            <CardContent className="flex flex-col gap-stack pt-card">
+              <div>
+                <h2 className="flex items-center gap-2 font-semibold">
+                  <Lightbulb aria-hidden="true" className="size-4 text-warning" />
+                  These schools may belong together
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Same owner, not all in a network. Create one above, then attach them —
+                  nothing is grouped automatically.
+                </p>
+              </div>
+
+              <ul className="flex flex-col gap-2">
+                {data?.suggestions?.map((sug) => (
+                  <li
+                    key={`${sug.out_basis}:${sug.out_identifier}`}
+                    className="rounded-md border border-border bg-surface p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{sug.out_owner_name ?? 'Unnamed owner'}</span>
+                      {/*
+                        The basis matters to whoever decides. "Same account" is exact;
+                        "same email" is a guess that people do use several addresses,
+                        and is the only signal available for a school AfriTech created.
+                      */}
+                      <Badge variant={sug.out_basis === 'same_account' ? 'success' : 'neutral'}>
+                        {sug.out_basis === 'same_account' ? 'Same account' : 'Same email'}
+                      </Badge>
+                      <span className="ml-auto text-sm text-muted-foreground">
+                        <span data-numeric>{sug.out_school_count}</span> schools
+                        {sug.out_already_networked > 0 && (
+                          <>
+                            {' · '}
+                            <span data-numeric>{sug.out_already_networked}</span> already in one
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {(sug.out_school_names ?? []).join(' · ')}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
 
         {(data?.networks.length ?? 0) === 0 ? (
           <Card>

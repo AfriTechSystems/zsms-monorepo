@@ -112,7 +112,7 @@ export async function GET(): Promise<Response> {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
 
-    const [networks, links, members, roles, schools] = await Promise.all([
+    const [networks, links, members, roles, schools, suggestions] = await Promise.all([
       client
         .from('school_networks')
         .select('id, name, slug, data_scope, billing_mode, status, notes, created_at')
@@ -139,6 +139,18 @@ export async function GET(): Promise<Response> {
         .from('schools')
         .select('id, school_id, name, subscription_tier, status')
         .order('name', { ascending: true }),
+      /*
+        Networks that should probably exist (0175).
+
+        `ONBOARDING.md` has AfriTech building the group; nothing told them a group
+        was there to build. An owner registering a second school is the clearest
+        signal in the system and it was going unread.
+
+        A SUGGESTION, never an automatic merge: registering a second school is not
+        the same as declaring a group, and silently joining two schools' dashboards
+        is hard to undo and alarming to see.
+      */
+      client.rpc('admin_network_suggestions'),
     ])
 
     if (networks.error) return fromPostgrestError(networks.error)
@@ -147,6 +159,9 @@ export async function GET(): Promise<Response> {
     const attachedIds = new Set(linkRows.map((l) => l['school_id'] as string))
 
     return ok({
+      // Empty rather than fatal: a failed suggestion query must not stop an
+      // administrator managing the networks that already exist.
+      suggestions: suggestions.data ?? [],
       networks: networks.data ?? [],
       links: linkRows,
       members: members.data ?? [],

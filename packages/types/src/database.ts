@@ -4729,6 +4729,18 @@ export type Database = {
         Args: { p_band_id: string }
         Returns: boolean
       }
+      admin_network_suggestions: {
+        Args: never
+        Returns: {
+          out_already_networked: number
+          out_basis: string
+          out_identifier: string
+          out_owner_name: string
+          out_school_count: number
+          out_school_ids: string[]
+          out_school_names: string[]
+        }[]
+      }
       admin_publish_prompt_template: {
         Args: {
           p_change_note?: string
@@ -5195,6 +5207,18 @@ export type Database = {
         }[]
       }
       my_network_id: { Args: never; Returns: string }
+      my_networks: {
+        Args: never
+        Returns: {
+          out_is_default: boolean
+          out_name: string
+          out_network_id: string
+          out_role: string
+          out_role_label: string
+          out_schools: number
+          out_slug: string
+        }[]
+      }
       my_school_invoices: {
         Args: never
         Returns: {

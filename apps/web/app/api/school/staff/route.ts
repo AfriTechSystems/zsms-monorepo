@@ -256,6 +256,25 @@ export async function POST(request: NextRequest): Promise<Response> {
         return fail('CONFLICT', `${email} has already been invited, or is already a member.`)
       }
 
+      /*
+        The membership quota, which on Clerk's free plan is FIVE PER ORGANISATION.
+
+        Verified against the live instance on 2026-10-01: every organisation reports
+        `max_allowed_memberships: 5`, and `createOrganisation()` asking for 0 (unlimited)
+        does not override it on that plan. So a school with six staff hits this, and it
+        will be during onboarding, in front of whoever is setting them up.
+
+        Named rather than rendered as "try again shortly", because retrying is exactly
+        what will not help and the operator needs to know the cause is commercial.
+      */
+      if (/quota|limit|maximum|max_allowed|plan/i.test(message)) {
+        return fail(
+          'CONFLICT',
+          'This school has reached the maximum number of staff accounts its plan allows. '
+            + 'Contact AfriTech to raise the limit before inviting anyone else.',
+        )
+      }
+
       console.error('[api] clerk invitation failed', message)
       return fail('SERVER_ERROR', 'The invitation could not be sent. Try again shortly.')
     }

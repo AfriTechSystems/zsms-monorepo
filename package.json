@@ -28,6 +28,7 @@
     "db:diff": "supabase db diff --linked",
     "db:types": "supabase gen types typescript --linked > packages/types/src/database.ts",
     "db:seed": "node scripts/seed-dev.mjs",
+    "clerk:check": "node --env-file-if-exists=.env.local scripts/check-clerk-claims.mjs",
     "dev:link-parent": "node scripts/link-dev-parent.mjs",
     "db:test": "node scripts/check-test-plans.mjs && supabase test db",
     "db:test:plans": "node scripts/check-test-plans.mjs",

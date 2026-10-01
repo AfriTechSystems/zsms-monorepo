@@ -293,6 +293,75 @@ Teacher profile → Activate Teacher Hub
 → Teacher Hub appears in their navigation
 ```
 
+### Scenario 4 — Teacher Asks to Be Linked (built 2026-10-01, migrations `0160`–`0161`)
+
+Every scenario above begins with the school. Until `0160` there was no way for the teacher
+to begin one, and this document said so — the Hub dashboard told a teacher to go and ask
+somebody at their school to press a button. That is where most of them stopped.
+
+```
+Teacher Hub dashboard → "Is your school on ZSMS?"
+→ Teacher enters their school's EXACT code (ZM-LSK-0001) and an optional note
+→ request_school_link() resolves the code and records a pending request
+→ Request appears on the school's Staff screen
+→ Someone with staff:write approves, choosing the role
+→ school_decide_join_request() marks the row and returns the invitation detail
+→ Route calls inviteToOrganisation() — the SAME Clerk Backend API call the
+  Staff screen uses
+→ Teacher accepts the invitation; State B from there as normal
+```
+
+**The teacher keeps using the Hub throughout.** A pending request changes nothing about
+what they can do; the Hub is a standalone product and waiting for a school is not a
+precondition for any of it.
+
+#### Why the lookup is by exact code and never by name
+
+`request_school_link()` matches `schools.school_id` with `=`. It never accepts a partial
+name and never returns a list.
+
+A name search would confirm, to anybody who signed up for a free Hub account, which schools
+are ZSMS customers — including every school that deliberately kept itself out of the public
+directory. That is a customer list, it is valuable to a competitor, and `PUBLIC_DIRECTORY.md`
+is built entirely around schools opting in to being discoverable. A lookup that quietly
+reversed that for anyone with an email address would be the largest hole in it.
+
+**A code matching no school returns the same result as one that matches.** The teacher is
+told the request has been sent either way, and a request against an unknown code is simply
+never created and never seen. This is a deliberate cost: a teacher who mistypes their code
+waits for an answer that will never come. The Hub screen states the format, shows the
+request as pending, and makes withdrawing obvious, which is the honest handling of a
+trade-off that cannot be designed away.
+
+#### What approval does and does not do
+
+| | |
+|---|---|
+| **Grants membership via** | `inviteToOrganisation()` — the existing server-side Clerk call. There is deliberately no second path by which somebody becomes a member of a school |
+| **Role** | Chosen by the **school** at approval, from `org:teacher`, `org:admin`, `org:staff`. `org:owner` is refused in SQL: a request from somebody who typed in a code must never end in ownership |
+| **Does NOT touch** | `teaching_resources`. Work made on a personal account, on personally-funded credits, stays the teacher's — joining a school is not consent to hand it over. Business rule 2 is unchanged and the Hub suite's owner-scoping assertions still hold afterwards |
+
+#### Limits
+
+- **Three pending requests** per teacher, across all schools, enforced in SQL. Without a cap
+  this is a broadcast channel into every school's admin screen.
+- **One pending request per school**, as a partial unique index over `status = 'pending'` —
+  so a teacher who was declined, withdrew, or left and is returning can ask again.
+- **Suspended, trial-expired and terminated schools** cannot be asked, and behave exactly
+  like an unknown code rather than reporting their status. A school's commercial standing is
+  not something a stranger may probe.
+
+#### Order of operations, and the failure it chooses
+
+The request row is marked **before** the invitation is sent. The reverse leaves an
+invitation sent against a request still reading `pending` if the second step fails, and the
+next press invites the same person twice.
+
+This ordering has its own failure — approved with no invitation behind it — and it is the
+better one: it is visible (the teacher never appears in staff), recoverable from the Staff
+screen, and the route reports `invited: false` with an explanation rather than a bare 500,
+so somebody is told rather than the teacher waiting on an email that was never sent.
+
 ---
 
 ## Dual-Context Navigation (State B — Linked Teacher)
@@ -440,4 +509,6 @@ The CPD Portfolio is exportable as a PDF for job applications. It becomes a cred
 | 2026-09-29 | **PDF and Word export built** | One content model, two renderers — `renderTeachingResourcePdf()` and `renderTeachingResourceDocx()` in `packages/documents`, both reading what `teaching_resources.content` already holds. PowerPoint later is a third function over the same shape rather than another model call, prompt or credit price. **Export is free**: rendering consumes no model tokens, and charging a teacher twice for the same words would discourage the suite it is meant to encourage. Rendered synchronously in the route rather than queued — report cards are batched four hundred at a time, this is one document somebody is waiting for, and queuing would make a download depend on Redis. Diagrams export as Mermaid source with a note, not as pictures; see the tracked row in CLAUDE.md. |
 | 2026-09-27 | **Metering moved to the platform AI credit ledger (`0132`–`0133`)** | The Hub's private `trial_resources_used` counter is retired and backfilled. Five free resources is now a five-credit **lifetime** allowance, so business rule 6 is unchanged. `trial_resources_used` is deprecated and no longer written. |
 | 2026-09-27 | **Paid plans gained a 60-credit monthly allowance; "unlimited" is withdrawn** | Unlimited generation for K300/month was safe only while the generator was a template costing nothing to run. With a model behind it, unlimited is an uncapped liability and exactly the flat-price-over-metered-cost trap `AI_CAPTURE.md` warns against. The number is configuration in `afritech.teacher_hub_plans`, so it is a business decision rather than a code change. Top-up credits extend it. |
-| 2026-09-27 | Community Library, PDF/Word export and an invitation-code box deliberately not built | Community Library is Phase 3 and needs a SECURITY DEFINER function rather than a widened policy, so a shared plan never exposes `created_by`. Export is browser print. There is no invitation code to type: ZSMS invites staff server-side, so the dashboard says to ask the school to invite you. |
+| 2026-09-27 | Community Library, PDF/Word export and an invitation-code box deliberately not built | Community Library is Phase 3 and needs a SECURITY DEFINER function rather than a widened policy, so a shared plan never exposes `created_by`. Export is browser print. There is no invitation code to type: ZSMS invites staff server-side, so the dashboard says to ask the school to invite you. **Superseded 2026-10-01 — see the row below. The reasoning held only while nothing existed on the school's side to receive a request; `0160` built that, and the box works now.** |
+| 2026-10-01 | **Scenario 4: a teacher can ask to be linked (`0160`, `0161`)** | Every documented linking scenario began with the school, so a teacher who already worked at a ZSMS school had to find the right person off-platform and ask them to press a button. `school_join_requests` plus `request_school_link()`, `withdraw_school_link_request()` and `school_decide_join_request()` add the other direction. Approval issues the **existing** server-side Clerk invitation rather than granting membership itself, so there remains exactly one way to become a member of a school. Lookup is by **exact school code**, never by name, so the endpoint cannot be used to enumerate which schools are ZSMS customers — and an unknown code is indistinguishable from a real one, which is a deliberate cost to the teacher who mistypes. `org:owner` cannot be granted this way. 21 pgTAP assertions in `school_join_requests_test.sql`. |
+| 2026-10-01 | **`0160` shipped with two invented column names; `0161` corrected them** | `schools.school_code` and `schools.deleted_at` do not exist — the identifier column is `schools.school_id`, and schools are not soft-deleted at all (`status` carries that). What misled me is `search_schools()`, which selects `s.school_id AS out_school_code`: the directory's public vocabulary says "school code" while the column underneath says `school_id`, and reading the API made the guess look confirmed. **`CREATE FUNCTION` accepted it, because a PL/pgSQL body is parsed lazily** — the function was broken from the moment it was applied and would have raised `42703` the first time a teacher pressed the button. Caught by running every branch of all three functions against the real database inside a transaction that rolls back, which is now the habit for any migration whose logic lives in a function body. |

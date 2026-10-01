@@ -30,6 +30,7 @@ import { DraftNotice } from '../../components/ui/draft-notice'
 import { draftAge, useFormDraft } from '../../lib/use-form-draft'
 import { SignedIn, SignedOut, useAuth } from '@zsms/auth-provider/react'
 import { useToast } from '../../components/ui/toast'
+import { SchoolLinkCard } from './school-link-card'
 import { HubSignIn } from './hub-sign-in'
 import {
   CURRICULUM_LABELS,
@@ -245,21 +246,20 @@ function TeacherHubDashboard(): JSX.Element {
         </Card>
 
         {/*
-          The linking prompt from the documented dashboard. It is informational only: ZSMS
-          invites staff server-side through the Backend API, so there is no code for a
-          teacher to type in — asking their school to invite them is the actual path, and
-          saying so is more useful than a box that cannot work.
+          This card used to be informational only, and said so: there was no code for a
+          teacher to type in, because ZSMS invites staff server-side and nothing existed on
+          the other side to receive a request. `0160` built that, so the box works now —
+          approval issues the same Backend API invitation the staff screen uses, rather than
+          a second way of becoming a member.
+
+          Name and email come from the Hub account rather than being asked again. Clerk owns
+          the email and the profile step already has the name; a third copy is a third thing
+          to keep in step.
         */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Is your school on ZSMS?</CardTitle>
-            <CardDescription>
-              If your school invites you, you will get attendance, marks and timetable
-              alongside these tools — and everything in your library stays yours, including
-              if you move school.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <SchoolLinkCard
+          defaultName={account?.full_name ?? ''}
+          defaultEmail={account?.email ?? ''}
+        />
       </div>
     </>
   )

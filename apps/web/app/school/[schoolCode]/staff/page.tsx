@@ -36,6 +36,7 @@ import { Button } from '../../../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { DataTable } from '../../../../components/ui/data-table'
 import { EmptyState } from '../../../../components/ui/empty-state'
+import { JoinRequests } from './join-requests'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
@@ -258,6 +259,11 @@ export default function StaffPage({
         description="Everyone who works here and the access they hold."
         note="A person needs a ROLE to sign in and a STAFF RECORD to appear on registers and mark sheets. Inviting someone creates the first; the second is filled in separately. Removing access never deletes their record or the work attached to it."
       />
+
+      {/* Renders nothing when there are none — see the component. Placed above the
+          staff list because an unanswered request is the thing on this screen that
+          somebody is waiting on. */}
+      <JoinRequests />
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
       {loading && !data && !error && <TableSkeleton rows={6} columns={4} />}

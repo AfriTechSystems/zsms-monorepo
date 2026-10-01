@@ -2243,6 +2243,76 @@ export type Database = {
           },
         ]
       }
+      school_join_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          granted_role: string | null
+          id: string
+          note: string | null
+          requested_at: string
+          requester_email: string
+          requester_name: string
+          requester_user_id: string
+          school_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          granted_role?: string | null
+          id?: string
+          note?: string | null
+          requested_at?: string
+          requester_email: string
+          requester_name: string
+          requester_user_id: string
+          school_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          granted_role?: string | null
+          id?: string
+          note?: string | null
+          requested_at?: string
+          requester_email?: string
+          requester_name?: string
+          requester_user_id?: string
+          school_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_join_requests_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_join_requests_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_join_requests_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_message_quotas: {
         Row: {
           alert_80_sent_at: string | null
@@ -5012,6 +5082,19 @@ export type Database = {
           out_trial_ends_at: string
         }[]
       }
+      request_school_link: {
+        Args: {
+          p_email: string
+          p_full_name: string
+          p_note?: string
+          p_school_code: string
+        }
+        Returns: {
+          out_message: string
+          out_request_id: string
+          out_submitted: boolean
+        }[]
+      }
       resolve_notification_template: {
         Args: {
           p_channel: string
@@ -5088,6 +5171,27 @@ export type Database = {
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }
+      school_decide_join_request: {
+        Args: { p_approve: boolean; p_request_id: string; p_role?: string }
+        Returns: {
+          out_clerk_org_id: string
+          out_decided: boolean
+          out_granted_role: string
+          out_requester_email: string
+          out_requester_name: string
+          out_school_id: string
+        }[]
+      }
+      school_fee_summary: {
+        Args: { p_filter?: string; p_search?: string }
+        Returns: {
+          out_arrears: number
+          out_outstanding: number
+          out_pupils_overdue: number
+          out_pupils_owing: number
+          out_total_pupils: number
+        }[]
+      }
       school_has_feature: {
         Args: { p_feature_key: string; p_school_id: string }
         Returns: boolean
@@ -5375,6 +5479,10 @@ export type Database = {
       wcag_contrast_ratio: {
         Args: { p_a: string; p_b: string }
         Returns: number
+      }
+      withdraw_school_link_request: {
+        Args: { p_request_id: string }
+        Returns: boolean
       }
       worker_announcement_recipients: {
         Args: { p_announcement_id: string; p_limit?: number }

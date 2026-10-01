@@ -4580,6 +4580,24 @@ export type Database = {
           status: string
         }[]
       }
+      admin_ai_usage_breakdown: {
+        Args: { p_dimension?: string; p_school_id?: string }
+        Returns: {
+          out_actions: number
+          out_cost_usd: number
+          out_credits_spent: number
+          out_label: string
+          out_schools: number
+        }[]
+      }
+      admin_ai_usage_distribution: {
+        Args: { p_school_id?: string }
+        Returns: {
+          out_band: string
+          out_credits: number
+          out_teachers: number
+        }[]
+      }
       admin_attach_clerk_org: {
         Args: { p_clerk_org_id: string; p_school_id: string }
         Returns: boolean
@@ -4659,6 +4677,20 @@ export type Database = {
       admin_revoke_override: {
         Args: { p_actor: string; p_id: string }
         Returns: boolean
+      }
+      admin_school_ai_summary: {
+        Args: { p_school_id: string }
+        Returns: {
+          out_actions: number
+          out_cost_usd: number
+          out_credits_purchased: number
+          out_credits_remaining: number
+          out_credits_spent: number
+          out_from_reserve: number
+          out_last_used_at: string
+          out_teachers_active: number
+          out_teachers_assigned: number
+        }[]
       }
       admin_set_onboarding_task: {
         Args: {

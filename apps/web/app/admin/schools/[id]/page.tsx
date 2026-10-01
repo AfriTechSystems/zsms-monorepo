@@ -46,6 +46,7 @@ import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
 import { StatusBadge, TIER_LABEL, formatKwacha } from '../../health-shared'
+import { AiUsagePanel } from './ai-usage-panel'
 import {
   OnboardingPanel,
   type ChecklistItem,
@@ -557,6 +558,10 @@ export default function AdminSchoolDetailPage({
             />
 
             <SubscriptionPanel school={data.school} onSaved={reload} />
+
+            {/* Renders nothing for a school that has never used AI — see the component.
+                Aggregates only: no teacher is named, by decision. */}
+            <AiUsagePanel schoolId={data.school.id} />
 
             <Card>
               <CardHeader>

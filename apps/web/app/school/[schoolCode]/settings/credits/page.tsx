@@ -48,6 +48,7 @@ import {
 import { Badge } from '../../../../../components/ui/badge'
 import { ErrorState, PageHeader, StatSkeleton } from '../../../../../components/ui/data-states'
 import { useApi } from '../../../../../lib/use-api'
+import { UsagePanel } from './usage-panel'
 import { useToast } from '../../../../../components/ui/toast'
 
 interface Plan {
@@ -437,6 +438,9 @@ function CreditsScreen(): JSX.Element {
           </CardContent>
         </Card>
       )}
+
+      {/* ---- How it has been used ---- */}
+      <UsagePanel />
 
       {/* ---- Who holds credits now ---- */}
       {assignments.length > 0 && (

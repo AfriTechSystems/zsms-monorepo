@@ -623,7 +623,11 @@ export type Database = {
           subject_name: string
           sync_source: string
           term_number: number
+          unlock_reason: string | null
+          unlocked_at: string | null
+          unlocked_by: string | null
           updated_at: string
+          was_published: boolean
         }
         Insert: {
           academic_year: string
@@ -647,7 +651,11 @@ export type Database = {
           subject_name: string
           sync_source?: string
           term_number: number
+          unlock_reason?: string | null
+          unlocked_at?: string | null
+          unlocked_by?: string | null
           updated_at?: string
+          was_published?: boolean
         }
         Update: {
           academic_year?: string
@@ -671,7 +679,11 @@ export type Database = {
           subject_name?: string
           sync_source?: string
           term_number?: number
+          unlock_reason?: string | null
+          unlocked_at?: string | null
+          unlocked_by?: string | null
           updated_at?: string
+          was_published?: boolean
         }
         Relationships: [
           {
@@ -5902,6 +5914,13 @@ export type Database = {
       teaching_resource_feature_key: {
         Args: { p_resource_kind: string }
         Returns: string
+      }
+      unlock_result_for_correction: {
+        Args: { p_reason: string; p_result_id: string }
+        Returns: {
+          out_message: string
+          out_unlocked: boolean
+        }[]
       }
       verify_payment: {
         Args: { p_decision: string; p_payment_id: string; p_reason?: string }

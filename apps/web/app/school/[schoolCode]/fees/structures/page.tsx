@@ -38,6 +38,7 @@ import { Field, Input, Select } from '../../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
 import { useToast } from '../../../../../components/ui/toast'
 import { formatKwacha, formatLevel } from '../../school-shared'
+import { FeeLineBuilder } from './fee-line-builder'
 
 interface Structure {
   id: string
@@ -48,6 +49,8 @@ interface Structure {
   fee_label: string
   amount: string | number
   is_mandatory: boolean
+  is_active: boolean
+  currency_code: string
 }
 
 export default function StructuresPage({
@@ -128,6 +131,14 @@ export default function StructuresPage({
 
       {!error && data && (
         <div className="space-y-cards">
+          {/*
+            The builder comes BEFORE issuing, because that is the order the work happens in —
+            and because the page used to open with "issue fees to pupils" above a price list
+            nothing could add to. Business rule 1: with no structure for a grade and term,
+            issuing creates nothing for those pupils and says nothing about why.
+          */}
+          <FeeLineBuilder structures={data as never} onChanged={reload} />
+
           <FormSection
             title="Issue fees to pupils"
             description="Turns the price list below into a bill for every pupil in each grade."

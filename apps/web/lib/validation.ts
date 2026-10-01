@@ -142,6 +142,12 @@ export const createFeeStructureSchema = z.object({
   amount: money,
   currencyCode: z.string().trim().length(3).optional(),
   isMandatory: z.boolean().optional(),
+  /**
+   * The term checkboxes from `FEE_STRUCTURES.md`. One fee line can apply to several terms —
+   * tuition to all three, an exam fee to Term 3 alone — and the table stores a row per term.
+   * Optional so the original single-`termNumber` callers keep working.
+   */
+  termNumbers: z.array(z.number().int().min(1).max(4)).min(1).max(4).optional(),
 })
 
 export const generateFeeRecordsSchema = z.object({
@@ -255,6 +261,12 @@ export const listResultsQuerySchema = z.object({
   academicYear: academicYear.optional(),
   termNumber: termNumber.optional(),
   subjectCode: z.string().trim().max(20).optional(),
+})
+
+/** Retiring a fee line, or bringing it back. `is_active`, never a delete. */
+export const updateFeeStructureSchema = z.object({
+  id: z.string().uuid(),
+  isActive: z.boolean(),
 })
 
 export type CreateFeeStructureInput = z.infer<typeof createFeeStructureSchema>

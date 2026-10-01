@@ -84,7 +84,10 @@ export async function GET(request: Request): Promise<Response> {
 
     const p = new URL(request.url).searchParams
     const page = Math.max(1, Number(p.get('page') ?? '1') || 1)
-    const perPage = 20
+    // Six, not twenty. Three rows of two on a laptop and six cards on a phone is about as much as
+    // anyone compares at once when choosing a school — and a shorter page makes the filters, which
+    // are the actual tool for narrowing, the obvious next move rather than scrolling.
+    const perPage = 6
 
     const { data, error } = await client.rpc('search_schools', {
       p_country_code: p.get('country') ?? 'ZM',

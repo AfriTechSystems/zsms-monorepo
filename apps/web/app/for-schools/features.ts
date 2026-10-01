@@ -41,7 +41,58 @@ export interface Feature {
   status: FeatureStatus
   /** Who it is for, when that is not obvious. Shown as a small label. */
   audience?: 'Parents' | 'Teachers' | 'Office'
+  /** Which part of the product this belongs to. Drives the grouping on `/features`. */
+  suite: SuiteKey
 }
+
+export type SuiteKey = 'records' | 'money' | 'classroom' | 'families' | 'insight' | 'reach'
+
+/**
+ * The suites, in the order a school meets them.
+ *
+ * Ordered by the sequence a school actually encounters the product rather than by how much is built:
+ * you enrol pupils before you bill them, bill them before you teach them, and reach families
+ * throughout. Sorting by readiness would put the roadmap first on a page whose job is to say what
+ * ZSMS does.
+ */
+export const SUITES: readonly { key: SuiteKey; title: string; blurb: string; icon: string }[] = [
+  {
+    key: 'records',
+    title: 'Records and roll',
+    blurb: 'One register of pupils and staff that every other part of ZSMS reads from.',
+    icon: 'Users',
+  },
+  {
+    key: 'money',
+    title: 'Fees and finance',
+    blurb: 'What each family owes, what has been paid, and what is still outstanding.',
+    icon: 'Wallet',
+  },
+  {
+    key: 'classroom',
+    title: 'The classroom',
+    blurb: 'Attendance, marks, reports and the tools a teacher uses day to day.',
+    icon: 'GraduationCap',
+  },
+  {
+    key: 'families',
+    title: 'Reaching families',
+    blurb: 'Getting the right information to the right parent, on the phone in their hand.',
+    icon: 'MessageCircle',
+  },
+  {
+    key: 'insight',
+    title: 'Insight',
+    blurb: 'Turning the records the school already keeps into decisions it can act on.',
+    icon: 'TrendingUp',
+  },
+  {
+    key: 'reach',
+    title: 'Reach and growth',
+    blurb: 'Being found by the families looking for a school, and what comes after.',
+    icon: 'Compass',
+  },
+]
 
 export const STATUS_COPY: Record<
   FeatureStatus,
@@ -76,6 +127,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Users',
     title: 'Pupils and staff records',
+    suite: 'records',
     status: 'live',
     audience: 'Office',
     body:
@@ -86,6 +138,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Wallet',
     title: 'Fees that reconcile',
+    suite: 'money',
     status: 'live',
     audience: 'Office',
     body:
@@ -95,6 +148,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'CalendarCheck',
     title: 'Attendance register',
+    suite: 'classroom',
     status: 'live',
     audience: 'Teachers',
     body:
@@ -104,6 +158,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'ClipboardList',
     title: 'Marks and results',
+    suite: 'classroom',
     status: 'live',
     audience: 'Teachers',
     body:
@@ -114,6 +169,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'FileText',
     title: 'Report cards and receipts',
+    suite: 'classroom',
     status: 'live',
     audience: 'Office',
     body: 'Generated as PDFs with your school’s branding, in batches, a whole class at a time.',
@@ -121,6 +177,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Smartphone',
     title: 'Parent portal',
+    suite: 'families',
     status: 'live',
     audience: 'Parents',
     body:
@@ -130,6 +187,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Megaphone',
     title: 'Announcements',
+    suite: 'families',
     status: 'live',
     audience: 'Office',
     body:
@@ -139,6 +197,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Sparkles',
     title: 'Teacher Hub',
+    suite: 'classroom',
     status: 'live',
     audience: 'Teachers',
     body:
@@ -148,6 +207,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Building2',
     title: 'Several schools, one account',
+    suite: 'records',
     status: 'live',
     audience: 'Office',
     body:
@@ -157,6 +217,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Globe',
     title: 'A page parents can find',
+    suite: 'reach',
     status: 'live',
     body:
       'Every school on ZSMS gets a public page with its grades, facilities and sign-in code, findable ' +
@@ -171,6 +232,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'MessageCircle',
     title: 'WhatsApp, SMS and email to parents',
+    suite: 'families',
     status: 'building',
     audience: 'Parents',
     body:
@@ -181,6 +243,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Smartphone',
     title: 'Teacher app that works without signal',
+    suite: 'classroom',
     status: 'building',
     audience: 'Teachers',
     body:
@@ -191,6 +254,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Smartphone',
     title: 'Parent app',
+    suite: 'families',
     status: 'building',
     audience: 'Parents',
     body:
@@ -201,6 +265,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'CalendarRange',
     title: 'Timetabling',
+    suite: 'classroom',
     status: 'building',
     audience: 'Office',
     body:
@@ -210,6 +275,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'CreditCard',
     title: 'Pay fees online',
+    suite: 'money',
     status: 'building',
     audience: 'Parents',
     body:
@@ -223,6 +289,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Landmark',
     title: 'School financing',
+    suite: 'money',
     status: 'planned',
     audience: 'Office',
     body:
@@ -233,6 +300,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'HandCoins',
     title: 'Payment plans for parents',
+    suite: 'money',
     status: 'planned',
     audience: 'Parents',
     body:
@@ -242,6 +310,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Bot',
     title: 'Ask your own data a question',
+    suite: 'insight',
     status: 'planned',
     audience: 'Office',
     body:
@@ -251,6 +320,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'TrendingUp',
     title: 'Early warning on pupils at risk',
+    suite: 'insight',
     status: 'planned',
     audience: 'Teachers',
     body:
@@ -261,6 +331,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'Plug',
     title: 'Accounting integrations',
+    suite: 'money',
     status: 'planned',
     audience: 'Office',
     body: 'Push verified fee income to QuickBooks or Xero instead of re-entering it.',
@@ -268,6 +339,7 @@ export const FEATURES: readonly Feature[] = [
   {
     icon: 'GraduationCap',
     title: 'The whole school journey',
+    suite: 'reach',
     status: 'planned',
     body:
       'A pupil’s record following them from Grade 1 to Form 6 and into a university or scholarship ' +

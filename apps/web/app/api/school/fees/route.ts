@@ -47,6 +47,9 @@ export async function GET(request: NextRequest): Promise<Response> {
     const filter = request.nextUrl.searchParams.get('filter') ?? 'outstanding'
     const search = request.nextUrl.searchParams.get('q')?.trim()
 
+    const page = Math.max(1, Number(request.nextUrl.searchParams.get('page') ?? '1') || 1)
+    const perPage = 25
+
     // No school filter: `financial_staff_read_fee_records` and its siblings
     // already scope the view to the caller's own school.
     let query = client
@@ -70,8 +73,27 @@ export async function GET(request: NextRequest): Promise<Response> {
       }
     }
 
-    const [balances, pending] = await Promise.all([
-      query.limit(500),
+    const [balances, summary, pending] = await Promise.all([
+      /*
+        A page, not a truncation. `.limit(500)` silently dropped every pupil past
+        the five hundredth — ordered by arrears, so the pupils omitted were the
+        ones least in debt, which made the omission least likely to be noticed.
+      */
+      query.range((page - 1) * perPage, page * perPage - 1),
+
+      /*
+        The totals come from the database over the WHOLE filtered set (0159), not
+        from the rows above. Summing a page would have made "Outstanding" mean
+        "outstanding among these twenty-five", which is not a number anybody
+        wants and reads exactly like one they do.
+
+        Same filter and search, passed to a function that applies them in SQL, so
+        the summary and the list cannot describe different sets of pupils.
+      */
+      client.rpc('school_fee_summary', {
+        p_filter: filter,
+        p_search: search && search.length > 0 ? search : null,
+      }),
       // The verification queue's size, so the screen can badge it without a
       // second request. A payment recorded but not verified is a claim, not
       // money — the two must never be added together.
@@ -82,6 +104,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     ])
 
     if (balances.error) return fromPostgrestError(balances.error)
+    if (summary.error) return fromPostgrestError(summary.error)
 
     // `.or()` widens PostgREST's inferred row type to a union including its
     // error shape; the runtime error is handled above, so the rows are narrowed
@@ -92,18 +115,22 @@ export async function GET(request: NextRequest): Promise<Response> {
       return Number.isFinite(n) ? n : 0
     }
 
-    return ok({
-      balances: rows,
-      summary: {
-        // Summed from the view's own per-pupil figures rather than recomputed
-        // from records — one arithmetic, one place.
-        outstanding: rows.reduce((t, r) => t + num(r['outstanding']), 0),
-        arrears: rows.reduce((t, r) => t + num(r['arrears_amount']), 0),
-        pupilsOwing: rows.filter((r) => num(r['outstanding']) > 0).length,
-        pupilsOverdue: rows.filter((r) => r['is_overdue'] === true).length,
+    // `school_fee_summary` returns exactly one row; PostgREST still delivers a set.
+    const totals = ((summary.data ?? []) as unknown as Array<Record<string, unknown>>)[0]
+
+    return ok(
+      {
+        balances: rows,
+        summary: {
+          outstanding: num(totals?.['out_outstanding']),
+          arrears: num(totals?.['out_arrears']),
+          pupilsOwing: num(totals?.['out_pupils_owing']),
+          pupilsOverdue: num(totals?.['out_pupils_overdue']),
+        },
+        pendingVerification: pending.count ?? 0,
+        canRecord: can(caller.role, 'fees:write'),
       },
-      pendingVerification: pending.count ?? 0,
-      canRecord: can(caller.role, 'fees:write'),
-    })
+      { total: num(totals?.['out_total_pupils']), page, perPage },
+    )
   })
 }

@@ -31,30 +31,7 @@
 import type { JSX } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import type { LucideIcon } from 'lucide-react'
-import {
-  ArrowRight,
-  BadgeCheck,
-  Bot,
-  Building2,
-  CalendarCheck,
-  CalendarRange,
-  ClipboardList,
-  CreditCard,
-  FileText,
-  Globe,
-  GraduationCap,
-  HandCoins,
-  Landmark,
-  Megaphone,
-  MessageCircle,
-  Plug,
-  Smartphone,
-  Sparkles,
-  TrendingUp,
-  Users,
-  Wallet,
-} from 'lucide-react'
+import { ArrowRight, BadgeCheck } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 
@@ -62,33 +39,12 @@ import { PublicShell } from '../../components/public/public-shell'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { FEATURES, STATUS_COPY, type FeatureStatus } from './features'
+import { featureIcon } from './feature-icons'
 
 /**
  * Icons resolved here so `features.ts` stays free of JSX and can be imported anywhere — including,
  * later, by the mobile app, which has no lucide-react.
  */
-const ICONS: Record<string, LucideIcon> = {
-  Bot,
-  Building2,
-  CalendarCheck,
-  CalendarRange,
-  ClipboardList,
-  CreditCard,
-  FileText,
-  Globe,
-  GraduationCap,
-  HandCoins,
-  Landmark,
-  Megaphone,
-  MessageCircle,
-  Plug,
-  Smartphone,
-  Sparkles,
-  TrendingUp,
-  Users,
-  Wallet,
-}
-
 const ORDER: readonly FeatureStatus[] = ['live', 'building', 'planned'] as const
 
 export const metadata: Metadata = {
@@ -141,7 +97,7 @@ export default function ForSchoolsPage(): JSX.Element {
 
             <ul className="mt-stack grid grid-cols-1 gap-cards sm:grid-cols-2">
               {items.map((f) => {
-                const Icon = ICONS[f.icon] ?? Sparkles
+                const Icon = featureIcon(f.icon)
                 return (
                   <li
                     key={f.title}

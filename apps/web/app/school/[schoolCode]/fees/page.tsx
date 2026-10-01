@@ -28,6 +28,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ClipboardCheck, Receipt, Search, Wallet } from 'lucide-react'
 
+import { Pagination } from '../../../../components/ui/pagination'
 import { useApi } from '../../../../lib/use-api'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
@@ -74,13 +75,19 @@ function FeesList({ base }: { base: string }): JSX.Element {
   const filter = params.get('filter') ?? 'outstanding'
   const q = params.get('q') ?? ''
 
+  const page = Math.max(1, Number(params.get('page') ?? '1') || 1)
+
   const url = useMemo(() => {
     const s = new URLSearchParams({ filter })
     if (q.trim()) s.set('q', q.trim())
+    if (page > 1) s.set('page', String(page))
     return `/api/school/fees?${s.toString()}`
-  }, [filter, q])
+  }, [filter, q, page])
 
-  const { data, loading, error, code, reload } = useApi<FeesPayload>(url)
+  const { data, meta, loading, error, code, reload } = useApi<FeesPayload>(url)
+
+  const total = meta?.total ?? 0
+  const perPage = meta?.perPage ?? 25
 
   const setParam = useCallback(
     (next: Record<string, string>) => {
@@ -89,6 +96,10 @@ function FeesList({ base }: { base: string }): JSX.Element {
         if (v) s.set(k, v)
         else s.delete(k)
       }
+      // Changing the filter or the search returns to page 1. Holding page 4 while
+      // the result set shrinks to one page shows an empty table that reads as
+      // "no pupils owe anything" — the opposite of what it means.
+      if (!('page' in next)) s.delete('page')
       router.replace(`${pathname}?${s.toString()}`, { scroll: false })
     },
     [params, pathname, router],
@@ -272,6 +283,14 @@ function FeesList({ base }: { base: string }): JSX.Element {
               />
             </CardContent>
           </Card>
+
+          <Pagination
+            page={page}
+            total={total}
+            perPage={perPage}
+            noun="pupils"
+            onPageChange={(next) => setParam({ page: String(next) })}
+          />
         </div>
       )}
     </>

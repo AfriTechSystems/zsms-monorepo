@@ -15,8 +15,9 @@ import type { JSX } from 'react'
 import { Suspense, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Building2, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
+import { Building2, Plus, Search } from 'lucide-react'
 
+import { Pagination } from '../../../components/ui/pagination'
 import { useApi } from '../../../lib/use-api'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
@@ -84,6 +85,8 @@ function SchoolsTable(): JSX.Element {
 
   const total = meta?.total ?? 0
   const perPage = meta?.perPage ?? 25
+  // Still needed for the table's caption, which tells a screen-reader user where they are
+  // before they start reading rows. `Pagination` computes its own internally.
   const lastPage = Math.max(1, Math.ceil(total / perPage))
 
   return (
@@ -270,36 +273,13 @@ function SchoolsTable(): JSX.Element {
             </CardContent>
           </Card>
 
-          <nav
-            aria-label="Pagination"
-            className="mt-cards flex flex-wrap items-center justify-between gap-3"
-          >
-            <p className="text-sm text-muted-foreground">
-              Showing <span data-numeric>{(page - 1) * perPage + 1}</span>–
-              <span data-numeric>{Math.min(page * perPage, total)}</span> of{' '}
-              <span data-numeric>{total}</span>
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setParam('page', String(page - 1))}
-              >
-                <ChevronLeft aria-hidden="true" />
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= lastPage}
-                onClick={() => setParam('page', String(page + 1))}
-              >
-                Next
-                <ChevronRight aria-hidden="true" />
-              </Button>
-            </div>
-          </nav>
+          <Pagination
+            page={page}
+            total={total}
+            perPage={perPage}
+            noun="schools"
+            onPageChange={(next) => setParam('page', String(next))}
+          />
         </>
       )}
     </>

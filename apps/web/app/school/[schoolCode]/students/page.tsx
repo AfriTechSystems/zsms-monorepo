@@ -30,8 +30,9 @@ import type { FormEvent, JSX } from 'react'
 import { Suspense, use, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Search, UserPlus, Users, Upload } from 'lucide-react'
+import { Search, UserPlus, Users, Upload } from 'lucide-react'
 
+import { Pagination } from '../../../../components/ui/pagination'
 import { useApi } from '../../../../lib/use-api'
 import { can } from '../../../../lib/roles'
 import type { Role } from '@zsms/auth-provider'
@@ -102,7 +103,6 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
 
   const total = meta?.total ?? 0
   const perPage = meta?.perPage ?? 25
-  const lastPage = Math.max(1, Math.ceil(total / perPage))
 
   const setParam = useCallback(
     (next: Record<string, string>) => {
@@ -300,38 +300,13 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
             </CardContent>
           </Card>
 
-          {total > perPage && (
-            <nav
-              aria-label="Pagination"
-              className="mt-cards flex flex-wrap items-center justify-between gap-3"
-            >
-              <p className="text-sm text-muted-foreground">
-                Showing <span data-numeric>{(page - 1) * perPage + 1}</span>–
-                <span data-numeric>{Math.min(page * perPage, total)}</span> of{' '}
-                <span data-numeric>{formatCount(total)}</span>
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setParam({ page: String(page - 1) })}
-                >
-                  <ChevronLeft aria-hidden="true" />
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= lastPage}
-                  onClick={() => setParam({ page: String(page + 1) })}
-                >
-                  Next
-                  <ChevronRight aria-hidden="true" />
-                </Button>
-              </div>
-            </nav>
-          )}
+          <Pagination
+            page={page}
+            total={total}
+            perPage={perPage}
+            noun="pupils"
+            onPageChange={(next) => setParam({ page: String(next) })}
+          />
         </>
       )}
     </>

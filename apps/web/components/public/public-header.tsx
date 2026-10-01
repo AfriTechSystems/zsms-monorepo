@@ -33,13 +33,14 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { GraduationCap, Menu, Search, Sparkles, X } from 'lucide-react'
+import { GraduationCap, LayoutGrid, Menu, Search, Sparkles, X } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
 
 const LINKS = [
   { href: '/schools', label: 'Find a school', icon: Search },
+  { href: '/features', label: 'Features', icon: LayoutGrid },
   { href: '/for-schools', label: 'For schools', icon: GraduationCap },
   { href: '/teacher', label: 'For teachers', icon: Sparkles },
 ] as const
@@ -57,6 +58,13 @@ export function PublicHeader(): JSX.Element {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/95">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-gutter sm:h-16">
+        {/*
+          `flex-1 basis-0` on the outer two columns is what actually centres the tabs. With `ml-auto`
+          the nav sat wherever the logo's width left it, which is off-centre by however wide the
+          wordmark happens to be — and it moves when the logo does. Equal-basis side columns make the
+          centre column's midpoint the header's midpoint regardless.
+        */}
+        <div className="flex flex-1 basis-0 justify-start">
         <Link href="/" className="shrink-0" aria-label="ZSMS home">
           {/*
             `zsms-logo.png`, not `zsms-lockup.png`. The lockup is 640x524 — a stacked mark with the
@@ -76,8 +84,9 @@ export function PublicHeader(): JSX.Element {
             className="h-7 w-auto sm:h-8"
           />
         </Link>
+        </div>
 
-        <nav aria-label="Main" className="ml-auto hidden items-center gap-1 sm:flex">
+        <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
           {LINKS.map((link) => {
             // `startsWith` so a school's profile page keeps "Find a school" marked as current — the
             // person is still inside the directory, and a nav that forgets that is disorienting.
@@ -101,7 +110,7 @@ export function PublicHeader(): JSX.Element {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 sm:ml-0">
+        <div className="flex flex-1 basis-0 items-center justify-end gap-2">
           <Button asChild variant="outline" size="sm">
             <Link href="/sign-in">Sign in</Link>
           </Button>

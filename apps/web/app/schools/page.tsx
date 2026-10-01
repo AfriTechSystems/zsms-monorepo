@@ -33,7 +33,16 @@ import type { JSX } from 'react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, BadgeCheck, Bus, School, Search, SlidersHorizontal, Users } from 'lucide-react'
+import {
+  ArrowRight,
+  BadgeCheck,
+  Bus,
+  ChevronRight,
+  School,
+  Search,
+  SlidersHorizontal,
+  Users,
+} from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 
@@ -147,6 +156,22 @@ function Directory(): JSX.Element {
         .sort((a, b) => a[1].localeCompare(b[1])),
     [country, province],
   )
+
+  /**
+   * Schools that published nothing are separated out and collapsed.
+   *
+   * They are not less relevant — a parent may well be looking for exactly one of them — but a card
+   * with no class size, no fees and no description has nothing to compare, and interleaving them
+   * broke the scan: every row stretched to its tallest card, so one detailed listing left its
+   * neighbour as a name over a band of empty space.
+   *
+   * Collapsed rather than dropped, because a directory that silently hides schools is lying about
+   * what is on ZSMS. The count is in the summary, so the parent knows they exist and can open them.
+   */
+  const detailed = (data ?? []).filter(
+    (s) => s.about || s.pupilsPerTeacher !== null || s.avgClassSize !== null || s.feeBandMin !== null,
+  )
+  const undetailed = (data ?? []).filter((s) => !detailed.includes(s))
 
   const total = meta?.total ?? 0
   const perPage = meta?.perPage ?? 20
@@ -300,7 +325,7 @@ function Directory(): JSX.Element {
           </p>
 
           <ul className="grid grid-cols-1 gap-cards sm:grid-cols-2">
-            {data.map((s) => {
+            {detailed.map((s) => {
               const ratio = formatPupilTeacherRatio(s.pupilsPerTeacher)
               const classSize = formatClassSize(s.avgClassSize)
               const fees = formatFeeBand(s.feeBandMin, s.feeBandMax)
@@ -411,6 +436,59 @@ function Directory(): JSX.Element {
               )
             })}
           </ul>
+
+          {undetailed.length > 0 && (
+            /*
+              A native <details>. A disclosure built from useState would need the open state, a
+              button, aria-expanded and a region association — four things to get wrong for a
+              behaviour the element already has, keyboard support included.
+            */
+            <details className="mt-cards rounded-lg border border-border bg-card/60">
+              <summary className="flex min-h-tap cursor-pointer list-none items-center gap-2 px-card py-3 text-sm font-medium transition-colors hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
+                <ChevronRight
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-90 [details[open]_&]:rotate-90"
+                />
+                <span>
+                  <span data-numeric>{undetailed.length}</span>
+                  {undetailed.length === 1 ? ' school has' : ' schools have'} not published details
+                </span>
+              </summary>
+              <ul className="flex flex-col border-t border-border">
+                {undetailed.map((s) => (
+                  <li key={s.schoolCode}>
+                    <Link
+                      href={`/schools/${s.schoolCode}`}
+                      className="flex min-h-tap items-center gap-3 px-card py-3 transition-colors hover:bg-muted/50"
+                    >
+                      {s.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={s.logoUrl}
+                          alt=""
+                          width={32}
+                          height={32}
+                          className="size-8 shrink-0 rounded object-contain"
+                        />
+                      ) : (
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded bg-muted">
+                          <School aria-hidden="true" className="size-4 text-muted-foreground" />
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{s.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {country.cities[s.cityCode] ?? s.cityCode} ·{' '}
+                          {LEVEL_LABEL[s.level] ?? s.level}
+                        </span>
+                      </span>
+                      <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
 
           {lastPage > 1 && (
             <nav aria-label="Pagination" className="mt-cards flex items-center justify-between gap-3">

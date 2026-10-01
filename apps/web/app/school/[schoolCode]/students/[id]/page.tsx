@@ -30,7 +30,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useEffect, useState } from 'react'
-import { Loader2, Save, UserMinus } from 'lucide-react'
+import { Loader2, Mail, Phone, Save, UserMinus, Users } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -50,6 +50,20 @@ import {
   formatLevel,
 } from '../../school-shared'
 
+interface Guardian {
+  relationship: string
+  is_primary: boolean
+  parents: {
+    id: string
+    full_name: string
+    phone_e164: string | null
+    email: string | null
+    preferred_contact: string
+    /** Null until the parent signs up and their verified email matches (0170). */
+    clerk_user_id: string | null
+  } | null
+}
+
 interface Student {
   id: string
   student_id: string
@@ -65,6 +79,8 @@ interface Student {
   gender: string | null
   created_at: string
   updated_at: string
+  guardians?: Guardian[]
+  guardiansLoaded?: boolean
 }
 
 interface Structure {
@@ -202,6 +218,104 @@ export default function StudentDetailPage({
                     <dd className="text-sm">{onRoll(data.status) ? 'Yes' : 'No'}</dd>
                   </div>
                 </dl>
+              </CardContent>
+            </Card>
+
+            {/*
+              Who to ring.
+
+              The pupil record showed no way to reach anybody responsible for them, so a
+              bursar chasing fees or an office ringing about an absence had to leave ZSMS to
+              find a number. The data has always existed; nothing asked for it.
+
+              `clerk_user_id` drives the "has an account" badge, which answers the question
+              staff actually ask when a parent says they cannot see anything: whether this
+              guardian has ever linked. A parent links by signing up with the email recorded
+              HERE (0170), so an address that is blank or wrong is the usual cause — and that
+              is visible on this card rather than needing a support call.
+            */}
+            <Card>
+              <CardContent className="pt-card">
+                <div className="mb-stack flex items-center justify-between gap-2">
+                  <h2 className="flex items-center gap-2 font-semibold">
+                    <Users aria-hidden="true" className="size-4 text-muted-foreground" />
+                    Parents and guardians
+                  </h2>
+                  {(data.guardians?.length ?? 0) > 0 && (
+                    <span data-numeric className="text-sm text-muted-foreground">
+                      {data.guardians?.length}
+                    </span>
+                  )}
+                </div>
+
+                {data.guardiansLoaded === false ? (
+                  <p className="text-sm text-danger">
+                    Contact details could not be loaded. The rest of this record is correct.
+                  </p>
+                ) : (data.guardians?.length ?? 0) === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No parent or guardian is recorded for this pupil. Without an email here, a
+                    parent cannot link their ZSMS account to see attendance, results or fees.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-stack">
+                    {data.guardians?.map((g, i) => (
+                      <li
+                        key={g.parents?.id ?? i}
+                        className="flex flex-wrap items-start gap-x-cards gap-y-1 rounded-md border border-border bg-surface p-3"
+                      >
+                        <div className="min-w-[10rem] flex-1">
+                          <p className="flex flex-wrap items-center gap-2 font-medium">
+                            {g.parents?.full_name ?? 'Unnamed guardian'}
+                            {g.is_primary && <Badge variant="info">Primary</Badge>}
+                            {g.parents?.clerk_user_id ? (
+                              <Badge variant="success">Has an account</Badge>
+                            ) : (
+                              <Badge variant="neutral">No account yet</Badge>
+                            )}
+                          </p>
+                          <p className="text-sm capitalize text-muted-foreground">
+                            {g.relationship}
+                          </p>
+                        </div>
+
+                        <dl className="flex flex-1 flex-col gap-0.5 text-sm">
+                          <div className="flex items-center gap-2">
+                            <dt className="sr-only">Phone</dt>
+                            <Phone aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                            <dd>
+                              {g.parents?.phone_e164 ? (
+                                // `tel:` so a phone dials it and a desktop hands it to the
+                                // softphone, rather than making somebody copy digits by eye.
+                                <a href={`tel:${g.parents.phone_e164}`} className="hover:underline">
+                                  {g.parents.phone_e164}
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground">No phone recorded</span>
+                              )}
+                            </dd>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <dt className="sr-only">Email</dt>
+                            <Mail aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                            <dd className="min-w-0">
+                              {g.parents?.email ? (
+                                <a
+                                  href={`mailto:${g.parents.email}`}
+                                  className="block truncate hover:underline"
+                                >
+                                  {g.parents.email}
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground">No email recorded</span>
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
 

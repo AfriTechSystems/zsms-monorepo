@@ -49,7 +49,44 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
     if (error) return fromPostgrestError(error)
     if (!data) return fail('NOT_FOUND', 'Student not found.')
 
-    return ok(data)
+    /*
+      The guardians, which this route never returned.
+
+      A pupil's record showed no way to reach anybody responsible for them — no name, no
+      phone, no email — so a bursar chasing fees or an office ringing about an absence had to
+      leave ZSMS to find a number. The data has always been there; nothing asked for it.
+
+      `school_management_links` and `school_management_read_parents` (0016) already admit
+      school staff, so this needs no new policy and no new grant. The link row carries the
+      relationship and which guardian is primary; `parents` carries how to reach them.
+
+      Read as a second query rather than an embed because `parents` has no `school_id` — a
+      parent may have children at several schools — so the join crosses a tenant boundary
+      that only the policies understand. Fetching it separately keeps PostgREST resolving
+      each table under its own policy, which is also what makes a parent at another school
+      invisible here.
+
+      A failure is NOT fatal: the pupil's own record still renders, with guardians absent and
+      the screen saying so. Losing a whole page because a contact list would not load is a
+      worse outcome than a page missing one card.
+    */
+    const guardians = await client
+      .from('student_parent_links')
+      .select(
+        'relationship, is_primary, is_active, '
+          + 'parents(id, full_name, phone_e164, email, preferred_contact, clerk_user_id)',
+      )
+      .eq('student_id', id)
+      .eq('is_active', true)
+      .order('is_primary', { ascending: false })
+
+    return ok({
+      ...data,
+      guardians: guardians.data ?? [],
+      // Told rather than inferred, so the screen never has to guess whether an empty list
+      // means "no guardians recorded" or "the query failed".
+      guardiansLoaded: guardians.error === null,
+    })
   })
 }
 

@@ -28,11 +28,10 @@ import { Field, Input, Select } from '../../components/ui/field'
 import { PageHeader, ErrorState, StatSkeleton } from '../../components/ui/data-states'
 import { DraftNotice } from '../../components/ui/draft-notice'
 import { draftAge, useFormDraft } from '../../lib/use-form-draft'
-import { SignedIn, SignedOut, useAuth } from '@zsms/auth-provider/react'
+import { SignedIn, useAuth } from '@zsms/auth-provider/react'
 import { useToast } from '../../components/ui/toast'
 import { SchoolLinkCard } from './school-link-card'
 import { CreditBalances } from './credit-balances'
-import { HubSignIn } from './hub-sign-in'
 import {
   CURRICULUM_LABELS,
   EntitlementNotice,
@@ -86,9 +85,9 @@ export default function TeacherHubPage(): JSX.Element {
    */
   return (
     <>
-      <SignedOut>
-        <HubSignIn />
-      </SignedOut>
+      {/* The signed-out branch moved to `layout.tsx`, so every Hub page is covered rather
+          than this one alone. Nothing is rendered here for a signed-out visitor — the layout
+          has already replaced the whole shell. */}
       <SignedIn>
         <TeacherHubDashboard />
       </SignedIn>

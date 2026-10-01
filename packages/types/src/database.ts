@@ -96,6 +96,7 @@ export type Database = {
         Row: {
           account_id: string
           actor_user_id: string
+          assignment_id: string | null
           cost_usd: number | null
           created_at: string
           credits: number
@@ -115,6 +116,7 @@ export type Database = {
         Insert: {
           account_id: string
           actor_user_id: string
+          assignment_id?: string | null
           cost_usd?: number | null
           created_at?: string
           credits: number
@@ -134,6 +136,7 @@ export type Database = {
         Update: {
           account_id?: string
           actor_user_id?: string
+          assignment_id?: string | null
           cost_usd?: number | null
           created_at?: string
           credits?: number
@@ -156,6 +159,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "ai_credit_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_credit_ledger_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "school_credit_assignments"
             referencedColumns: ["id"]
           },
           {
@@ -1964,6 +1974,229 @@ export type Database = {
           },
           {
             foreignKeyName: "school_branding_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_credit_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          clerk_user_id: string
+          credits_allocated: number
+          id: string
+          period_end: string
+          period_start: string
+          purchase_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          school_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          clerk_user_id: string
+          credits_allocated: number
+          id?: string
+          period_end: string
+          period_start: string
+          purchase_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          school_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          clerk_user_id?: string
+          credits_allocated?: number
+          id?: string
+          period_end?: string
+          period_start?: string
+          purchase_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_credit_assignments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "school_credit_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_credit_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_credit_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_credit_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_credit_purchases: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string
+          credits_per_seat: number
+          currency_code: string
+          id: string
+          invoice_id: string | null
+          lot_id: string | null
+          period_end: string
+          period_kind: string
+          period_start: string
+          plan_code: string
+          price_per_seat: number
+          school_id: string
+          seats: number
+          total_amount: number
+          total_credits: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by: string
+          credits_per_seat: number
+          currency_code?: string
+          id?: string
+          invoice_id?: string | null
+          lot_id?: string | null
+          period_end: string
+          period_kind: string
+          period_start: string
+          plan_code: string
+          price_per_seat: number
+          school_id: string
+          seats: number
+          total_amount: number
+          total_credits: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string
+          credits_per_seat?: number
+          currency_code?: string
+          id?: string
+          invoice_id?: string | null
+          lot_id?: string | null
+          period_end?: string
+          period_kind?: string
+          period_start?: string
+          plan_code?: string
+          price_per_seat?: number
+          school_id?: string
+          seats?: number
+          total_amount?: number
+          total_credits?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_credit_purchases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ai_credit_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_credit_purchases_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_credit_purchases_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "ai_credit_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_credit_purchases_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_credit_purchases_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_credit_purchases_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_credit_settings: {
+        Row: {
+          reserve_enabled: boolean
+          reserve_per_teacher_cap: number | null
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          reserve_enabled?: boolean
+          reserve_per_teacher_cap?: number | null
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          reserve_enabled?: boolean
+          reserve_per_teacher_cap?: number | null
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_credit_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_credit_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_credit_settings_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: true
             referencedRelation: "schools"
@@ -5168,9 +5401,54 @@ export type Database = {
           saved_count: number
         }[]
       }
+      school_assign_credits: {
+        Args: { p_purchase_id: string; p_user_ids: string[] }
+        Returns: {
+          out_assigned: number
+          out_unassigned_remaining: number
+        }[]
+      }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }
+      school_credit_period: {
+        Args: { p_from?: string; p_period_kind: string; p_school_id: string }
+        Returns: {
+          out_period_end: string
+          out_period_start: string
+        }[]
+      }
+      school_credit_plan_catalogue: {
+        Args: never
+        Returns: {
+          out_credits_per_seat: number
+          out_currency_code: string
+          out_display_name: string
+          out_period_kind: string
+          out_plan_code: string
+          out_price_per_seat: number
+        }[]
+      }
+      school_credit_quote: {
+        Args: { p_plan_code: string; p_seats: number }
+        Returns: {
+          out_credits_per_seat: number
+          out_currency_code: string
+          out_display_name: string
+          out_period_end: string
+          out_period_kind: string
+          out_period_start: string
+          out_plan_code: string
+          out_price_per_seat: number
+          out_seats: number
+          out_total_amount: number
+          out_total_credits: number
+        }[]
+      }
+      school_credit_unassigned: {
+        Args: { p_purchase_id: string }
+        Returns: number
+      }
       school_decide_join_request: {
         Args: { p_approve: boolean; p_request_id: string; p_role?: string }
         Returns: {
@@ -5252,6 +5530,31 @@ export type Database = {
           out_status: string
           out_type: string
           out_website_url: string
+        }[]
+      }
+      school_purchase_credits: {
+        Args: { p_plan_code: string; p_seats: number }
+        Returns: {
+          out_invoice_id: string
+          out_period_end: string
+          out_period_start: string
+          out_purchase_id: string
+          out_total_amount: number
+          out_total_credits: number
+        }[]
+      }
+      school_revoke_credit_assignment: {
+        Args: { p_assignment_id: string }
+        Returns: {
+          out_credits_returned: number
+          out_revoked: boolean
+        }[]
+      }
+      school_set_credit_reserve: {
+        Args: { p_enabled: boolean; p_per_teacher_cap?: number }
+        Returns: {
+          out_reserve_enabled: boolean
+          out_reserve_per_teacher_cap: number
         }[]
       }
       school_student_capacity: {
@@ -5397,6 +5700,19 @@ export type Database = {
           outstanding: number
           suggested: number
           term_number: number
+        }[]
+      }
+      teacher_credit_balances: {
+        Args: never
+        Returns: {
+          out_personal_available: number
+          out_reserve_available: number
+          out_school_allocated: number
+          out_school_available: number
+          out_school_expires_on: string
+          out_school_id: string
+          out_school_name: string
+          out_school_spent: number
         }[]
       }
       teacher_hub_activate_subscription: {

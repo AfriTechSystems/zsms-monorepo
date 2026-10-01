@@ -36,6 +36,7 @@ import {
   UserCog,
   Users,
   Wallet,
+  Coins,
 } from 'lucide-react'
 
 import type { Role } from '@zsms/auth-provider'
@@ -142,6 +143,10 @@ export function SchoolShell({
         // teacher looks for it, not because it is the same kind of thing.
         { path: '/settings/public-profile', label: 'Public listing', icon: Globe },
         { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
+        // `fees:read` to see, `fees:write` to buy — gated in the route, not here. Buying
+        // credits spends the school's money, so it sits with the bursar's permissions
+        // rather than with the ones for editing a timetable.
+        { path: '/settings/credits', label: 'AI credits', icon: Coins, needs: 'fees:read' },
       ],
     },
   ]

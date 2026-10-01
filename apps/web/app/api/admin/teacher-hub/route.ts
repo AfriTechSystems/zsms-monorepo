@@ -22,6 +22,25 @@
 
 import { z } from 'zod'
 
+/**
+ * What a Hub plan's price form may change.
+ *
+ * `planCode` identifies the row and is not among the editable fields: it is referenced by
+ * `standalone_teacher_accounts.plan_code`, so renaming one in place orphans every account.
+ * `billingPeriod` and `aiCreditsPeriod` are absent for a different reason — `ai_credit_balance()`
+ * reads them to decide the window an allowance is summed over, so changing one on a live plan
+ * silently re-prices every teacher holding it.
+ */
+const planPatchSchema = z.object({
+  planCode: z.string().min(1).max(40),
+  displayName: z.string().trim().min(1).max(80).optional(),
+  price: z.number().min(0).max(1_000_000).optional(),
+  includedResources: z.number().int().min(0).max(100_000).optional(),
+  aiCreditsIncluded: z.number().int().min(0).max(100_000).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(999).optional(),
+})
+
 import { createUserClient } from '../../../../lib/supabase'
 import { resolveAdminContext } from '../../../../lib/admin-context'
 import {
@@ -70,7 +89,7 @@ export async function GET(): Promise<Response> {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
 
-    const [accounts, plans] = await Promise.all([
+    const [accounts, plans, planCatalogue] = await Promise.all([
       // `afritech_manage_teacher_accounts` and the SELECT policy both admit AfriTech, so
       // this returns every account rather than one.
       client
@@ -82,6 +101,15 @@ export async function GET(): Promise<Response> {
         )
         .order('created_at', { ascending: false }),
       client.rpc('my_teacher_hub').maybeSingle(),
+      /*
+        The plan catalogue, through a `public` wrapper (0178).
+
+        `afritech.teacher_hub_plans` has granted UPDATE to AfriTech since 0130, but
+        `config.toml` sets `schemas = ["public"]` — so PostgREST never saw it and the
+        grant was real and unusable. Changing the Hub's price meant editing the
+        database by hand.
+      */
+      client.rpc('admin_teacher_hub_plans'),
     ])
 
     if (accounts.error) return fromPostgrestError(accounts.error)
@@ -92,6 +120,8 @@ export async function GET(): Promise<Response> {
 
     return ok(
       {
+        // The editable catalogue (0178), distinct from `my_teacher_hub()`'s own list.
+        planCatalogue: planCatalogue.data ?? [],
         accounts: rows.map((a) => ({
           ...a,
           /**
@@ -150,5 +180,47 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     return ok({ subscriptionEndsAt: data as unknown as string })
+  })
+}
+
+/**
+ * Change a Hub plan's price, allowance or availability.
+ *
+ * `plan_code` identifies the row and is never changed: `standalone_teacher_accounts.plan_code`
+ * references it, so renaming one in place would orphan every account on it.
+ *
+ * `billing_period` and `ai_credits_period` are deliberately not editable either — both are
+ * read by `ai_credit_balance()` to decide the window an allowance is summed over, and
+ * changing one on a live plan silently re-prices every teacher holding it.
+ */
+export async function PATCH(request: Request): Promise<Response> {
+  return guard(async () => {
+    const parsed = planPatchSchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) return validationFailed(parsed.error)
+
+    const client = await createUserClient()
+    if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    // No role check here: `admin_update_teacher_hub_plan()` refuses anybody who is not
+    // AfriTech, and a second rule in a route is one that can drift from the first — and the
+    // route is the half a direct PostgREST call bypasses.
+    const { data, error } = await client
+      .rpc('admin_update_teacher_hub_plan', {
+        p_plan_code: parsed.data.planCode,
+        p_display_name: parsed.data.displayName ?? null,
+        p_price: parsed.data.price ?? null,
+        p_included_resources: parsed.data.includedResources ?? null,
+        p_ai_credits_included: parsed.data.aiCreditsIncluded ?? null,
+        p_is_active: parsed.data.isActive ?? null,
+        p_sort_order: parsed.data.sortOrder ?? null,
+      })
+      .maybeSingle()
+
+    if (error) return fromPostgrestError(error)
+
+    const row = (data ?? {}) as { out_updated?: boolean; out_subscribers?: number }
+    if (!row.out_updated) return fail('NOT_FOUND', 'No such plan.')
+
+    return ok({ updated: true, subscribers: row.out_subscribers ?? 0 })
   })
 }

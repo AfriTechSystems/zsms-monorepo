@@ -36,6 +36,7 @@ import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { StatCard } from '../../../components/ui/stat-card'
 import { useToast } from '../../../components/ui/toast'
+import { PlanEditor, type HubPlan } from './plan-editor'
 
 interface HubAccount {
   clerk_user_id: string
@@ -60,6 +61,8 @@ interface Plan {
 
 interface Payload {
   accounts: HubAccount[]
+  /** The editable catalogue (0178), distinct from `plans` which drives the activation form. */
+  planCatalogue?: HubPlan[]
   plans: Plan[]
   summary: { total: number; trial: number; active: number; cancelled: number; suspended: number }
 }
@@ -155,6 +158,13 @@ export default function AdminTeacherHubPage(): JSX.Element {
       />
 
       <div className="space-y-cards">
+        {/*
+          Prices first. `afritech.teacher_hub_plans` has granted UPDATE to AfriTech since 0130,
+          but the table lives in a schema PostgREST cannot see — so the grant was real and
+          unusable, and changing the Hub's price meant editing the database by hand (0178).
+        */}
+        <PlanEditor plans={payload?.planCatalogue ?? []} onChanged={load} />
+
         {payload?.summary && (
           <div className="grid gap-4 sm:grid-cols-4">
             <StatCard label="Accounts" value={String(payload.summary.total)} />

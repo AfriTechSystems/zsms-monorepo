@@ -27,7 +27,7 @@ import type { JSX } from 'react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, Phone, PhoneOff } from 'lucide-react'
+import { AlertTriangle, Phone, PhoneOff, Plus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Badge } from '../../../components/ui/badge'
@@ -166,6 +166,18 @@ function Queue(): JSX.Element {
           ) : null
         }
       />
+
+      {/* The onboarding queue is where somebody realises a school needs setting up, and it
+          had no route to the screen that does it — reaching provisioning meant going to the
+          schools list first and knowing the button was there. */}
+      <div className="mb-cards">
+        <Button asChild>
+          <Link href="/admin/schools/new">
+            <Plus aria-hidden="true" />
+            Set up a new school
+          </Link>
+        </Button>
+      </div>
 
       <div className="mb-cards flex flex-wrap gap-2">
         {(

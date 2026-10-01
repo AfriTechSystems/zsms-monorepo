@@ -4815,6 +4815,22 @@ export type Database = {
           tier_name: string
         }[]
       }
+      admin_teacher_hub_plans: {
+        Args: never
+        Returns: {
+          out_ai_credits_included: number
+          out_ai_credits_period: string
+          out_billing_period: string
+          out_currency_code: string
+          out_display_name: string
+          out_included_resources: number
+          out_is_active: boolean
+          out_plan_code: string
+          out_price: number
+          out_sort_order: number
+          out_subscribers: number
+        }[]
+      }
       admin_update_school_commercial: {
         Args: {
           p_finance_module_enabled?: boolean
@@ -4836,6 +4852,22 @@ export type Database = {
           trial_ends_at: string
           updated_at: string
           whatsapp_enabled: boolean
+        }[]
+      }
+      admin_update_teacher_hub_plan: {
+        Args: {
+          p_ai_credits_included?: number
+          p_display_name?: string
+          p_included_resources?: number
+          p_is_active?: boolean
+          p_plan_code: string
+          p_price?: number
+          p_sort_order?: number
+        }
+        Returns: {
+          out_plan_code: string
+          out_subscribers: number
+          out_updated: boolean
         }[]
       }
       admin_update_tier: {

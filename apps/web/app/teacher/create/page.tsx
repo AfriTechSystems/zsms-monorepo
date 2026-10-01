@@ -69,6 +69,16 @@ const GRADES = [
   ...Array.from({ length: 6 }, (_, i) => `Form ${i + 1}`),
 ]
 
+interface CreditBalances {
+  school: {
+    schoolName: string | null
+    available: number
+    expiresOn: string | null
+    reserveAvailable: number
+  } | null
+  personal: { available: number }
+}
+
 export default function CreatePage(): JSX.Element {
   // `useSearchParams` needs a Suspense boundary or the whole route opts out of static
   // rendering with a build-time warning.
@@ -91,6 +101,40 @@ function CreateForm(): JSX.Element {
   const [hub, setHub] = useState<HubPayload | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  /**
+   * Which wallet pays for this resource.
+   *
+   * `auto` is school-first and is the default. The picker only appears when the teacher
+   * genuinely has both — offering a choice to somebody with one wallet is a decision they
+   * cannot make and a question they should not be asked.
+   */
+  const [creditSource, setCreditSource] = useState<'auto' | 'school' | 'personal'>('auto')
+  const [balances, setBalances] = useState<CreditBalances | null>(null)
+
+  /*
+    Balances are fetched separately from the hub payload, and a failure is swallowed.
+    Not knowing which wallet has credits must never stop a teacher generating: `auto`
+    still works, the database still decides correctly, and the only thing lost is the
+    picker. A generator that refuses to load because a balance call failed would be a
+    worse outcome than one that quietly bills school-first.
+  */
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await fetch('/api/teacher/credits')
+        if (!response.ok) return
+        const payload = await response.json()
+        if (!cancelled) setBalances(payload?.data ?? null)
+      } catch {
+        /* see above */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const [subject, setSubject] = useState('')
   const [grade, setGrade] = useState('')
@@ -170,6 +214,7 @@ function CreateForm(): JSX.Element {
           ...(kind === 'lesson_plan' ? { lessonType } : {}),
           ...(kind === 'quiz' ? { questionCount, questionStyle, difficulty } : {}),
           ...(context.trim() ? { context: context.trim() } : {}),
+          creditSource,
         }),
       },
     )
@@ -214,6 +259,13 @@ function CreateForm(): JSX.Element {
   }
 
   const blocked = hub?.entitlement ? !hub.entitlement.may_generate : false
+
+  const schoolAvailable =
+    (balances?.school?.available ?? 0) + (balances?.school?.reserveAvailable ?? 0)
+  const personalAvailable = balances?.personal?.available ?? 0
+  // Both, or there is nothing to choose between.
+  const showSourcePicker = schoolAvailable > 0 && personalAvailable > 0
+
   const ready = subject.trim() && grade.trim() && topic.trim().length >= 2
 
   return (
@@ -432,6 +484,62 @@ function CreateForm(): JSX.Element {
                 )}
               </Field>
             </div>
+
+            {showSourcePicker && (
+              <div className="flex flex-col gap-2 border-t border-border pt-5">
+                <p className="text-sm font-medium">Pay with</p>
+                <div className="flex flex-wrap gap-2">
+                  {/*
+                    Two options, not three. `auto` is the default and is what "School" means
+                    here — exposing a literal "Automatic" alongside "School" would be two
+                    labels for one behaviour.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => setCreditSource('auto')}
+                    aria-pressed={creditSource !== 'personal'}
+                    className={
+                      'flex min-h-tap flex-1 flex-col items-start justify-center rounded-md border px-3 py-2 text-left transition-colors '
+                      + (creditSource !== 'personal'
+                        ? 'border-primary bg-primary-tint/30'
+                        : 'border-border hover:bg-muted')
+                    }
+                  >
+                    <span className="text-sm font-medium">
+                      {balances?.school?.schoolName ?? 'My school'}
+                    </span>
+                    <span className="text-xs text-muted-text">
+                      <span data-numeric>{schoolAvailable}</span> credits
+                      {balances?.school?.expiresOn
+                        ? ` · expire ${new Date(balances.school.expiresOn).toLocaleDateString('en-ZM')}`
+                        : ''}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCreditSource('personal')}
+                    aria-pressed={creditSource === 'personal'}
+                    className={
+                      'flex min-h-tap flex-1 flex-col items-start justify-center rounded-md border px-3 py-2 text-left transition-colors '
+                      + (creditSource === 'personal'
+                        ? 'border-primary bg-primary-tint/30'
+                        : 'border-border hover:bg-muted')
+                    }
+                  >
+                    <span className="text-sm font-medium">My own credits</span>
+                    <span className="text-xs text-muted-text">
+                      <span data-numeric>{personalAvailable}</span> credits · no expiry
+                    </span>
+                  </button>
+                </div>
+                <p className="text-xs text-muted-text">
+                  {/* Said once, here, where the choice is made. */}
+                  Your school&rsquo;s credits are used first because they expire. Anything you
+                  make stays yours either way.
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 border-t border-border pt-5">
               <Button onClick={() => void submit()} disabled={submitting || blocked || !ready}>

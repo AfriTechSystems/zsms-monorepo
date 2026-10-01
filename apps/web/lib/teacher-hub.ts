@@ -63,6 +63,16 @@ export const generateSchema = z.object({
    * this cannot be used to stamp a resource with somewhere the teacher never taught.
    */
   schoolId: z.string().uuid().optional(),
+  /**
+   * Which wallet pays. `auto` is school-first, which is both the default and the right
+   * default: school credits expire at the end of the period the school paid for and
+   * personal ones do not, so spending the perishable balance first is also what is best
+   * for the teacher.
+   *
+   * The database refuses `school` for a teacher with no assignment, so this cannot be
+   * used to charge a school that never gave them credits.
+   */
+  creditSource: z.enum(['auto', 'school', 'personal']).default('auto'),
 })
 
 /** What a teacher may change about a saved resource. Matches the column-level grant. */

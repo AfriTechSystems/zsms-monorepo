@@ -4765,11 +4765,13 @@ export type Database = {
           p_metadata?: Json
           p_model_name?: string
           p_output_tokens?: number
+          p_source?: string
           p_units?: number
         }
         Returns: {
           credits_charged: number
           funded_allowance: number
+          funded_by: string
           funded_purchased: number
         }[]
       }
@@ -4877,6 +4879,7 @@ export type Database = {
         Args: {
           p_content: Json
           p_cost_usd?: number
+          p_credit_source?: string
           p_curriculum_type: string
           p_duration_minutes?: number
           p_generation_params?: Json
@@ -5449,6 +5452,18 @@ export type Database = {
         Args: { p_purchase_id: string }
         Returns: number
       }
+      school_credit_usage: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          out_actions: number
+          out_allocated: number
+          out_clerk_user_id: string
+          out_credits_spent: number
+          out_from_reserve: number
+          out_last_used_at: string
+          out_teacher_name: string
+        }[]
+      }
       school_decide_join_request: {
         Args: { p_approve: boolean; p_request_id: string; p_role?: string }
         Returns: {
@@ -5738,6 +5753,14 @@ export type Database = {
         }[]
       }
       teacher_reaches_class: { Args: { p_class_id: string }; Returns: boolean }
+      teacher_school_entitlement: {
+        Args: never
+        Returns: {
+          out_assignment_id: string
+          out_available: number
+          out_from_reserve: boolean
+        }[]
+      }
       teacher_teaches_subject: {
         Args: { p_class_id: string; p_subject_code: string }
         Returns: boolean

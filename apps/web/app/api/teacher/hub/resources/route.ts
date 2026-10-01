@@ -297,6 +297,8 @@ export async function POST(request: Request): Promise<Response> {
       p_idempotency_key: null,
       // Which prompt produced this. NULL for the scaffold, which has no prompt — ADR-041.
       p_prompt_version: liveConfig?.prompt.version ?? null,
+      // Decided BEFORE the charge, never split across two wallets (0167).
+      p_credit_source: body.creditSource,
     })
 
     if (error) {

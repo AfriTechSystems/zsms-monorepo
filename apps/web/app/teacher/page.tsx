@@ -31,6 +31,7 @@ import { draftAge, useFormDraft } from '../../lib/use-form-draft'
 import { SignedIn, SignedOut, useAuth } from '@zsms/auth-provider/react'
 import { useToast } from '../../components/ui/toast'
 import { SchoolLinkCard } from './school-link-card'
+import { CreditBalances } from './credit-balances'
 import { HubSignIn } from './hub-sign-in'
 import {
   CURRICULUM_LABELS,
@@ -174,6 +175,11 @@ function TeacherHubDashboard(): JSX.Element {
             </p>
           }
         />
+
+        {/* Renders nothing unless a school has actually given this teacher credits —
+            see the component. Placed above the tools because which wallet is paying
+            is a thing to know before generating, not after. */}
+        <CreditBalances />
 
         <GeneratorNotice modelBacked={hub?.modelBacked ?? false} />
 

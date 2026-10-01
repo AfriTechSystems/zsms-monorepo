@@ -25,17 +25,26 @@
 
 import type { JSX } from 'react'
 
+import { LogOut } from 'lucide-react'
+
 import { SignOutButton } from '@zsms/auth-provider/react'
 
 export function SignOutLink(): JSX.Element {
   return (
     <SignOutButton redirectUrl="/">
-      {/* A button rather than a link: it performs an action. Styled as a link because it sits inline
-          in a sentence, and sized to the tap target so it is reachable with a thumb. */}
+      {/*
+        Button-shaped, not an underlined word in a sentence.
+
+        It used to be styled as inline text because it sat mid-sentence. But this is the control
+        somebody on this page most often wants — arriving here usually means signing in as the
+        wrong account — and a control people have to hunt for should look like one. The danger
+        tint on hover is the honest signal: it ends the session.
+      */}
       <button
         type="button"
-        className="inline-flex min-h-tap items-center font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex min-h-tap items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:border-danger/40 hover:bg-danger/5 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
+        <LogOut aria-hidden="true" className="size-4" />
         Sign out
       </button>
     </SignOutButton>

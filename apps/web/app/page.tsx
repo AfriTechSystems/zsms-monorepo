@@ -23,12 +23,12 @@
 
 import type { JSX } from 'react'
 import type { Metadata } from 'next'
-import Link from 'next/link'
-import { ArrowRight, GraduationCap, Search, Sparkles, Users } from 'lucide-react'
+import { BadgeCheck, GraduationCap, Search, Sparkles, Users } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 
 import { PublicShell } from '../components/public/public-shell'
+import { PortalCards, type PortalCard } from '../components/public/portal-cards'
 
 export const metadata: Metadata = {
   title: 'ZSMS — school management for Zambian schools',
@@ -44,16 +44,16 @@ export const metadata: Metadata = {
  * sign-in page do something immediately, and only the two "learn about it" doors lead to copy. That
  * ratio is on purpose — three of the four audiences already know what they want.
  */
-const DOORS = [
+const DOORS: readonly PortalCard[] = [
   {
     href: '/schools',
     icon: Search,
     eyebrow: 'Parents',
-    title: 'Find a school for my child',
+    title: 'Find a school',
     body:
-      'Search schools by town, level and fees. See pupils per teacher and average class sizes, ' +
-      'calculated from each school’s own records.',
-    cta: 'Browse schools',
+      'Search by town, level and fees. Pupils per teacher and class sizes, calculated from each ' +
+      'school’s own records.',
+    cta: 'Browse',
     emphasis: true,
   },
   {
@@ -61,11 +61,8 @@ const DOORS = [
     icon: Users,
     eyebrow: 'Parents',
     title: 'My child’s school uses ZSMS',
-    body:
-      'See attendance, results and fee statements, and pay fees. You will need your school’s code — ' +
-      'it is on the school’s page in our directory.',
+    body: 'Attendance, results and fee statements. Sign in with the email your school has on file.',
     cta: 'Sign in',
-    emphasis: false,
   },
   {
     href: '/for-schools',
@@ -73,9 +70,9 @@ const DOORS = [
     eyebrow: 'School owners',
     title: 'I run a school',
     body:
-      'Pupils, staff, fees, attendance, results and report cards in one place, with WhatsApp to ' +
-      'parents. Thirty days free, no card.',
-    cta: 'See ZSMS for schools',
+      'Pupils, staff, fees, attendance, results and report cards in one place. Thirty days free, ' +
+      'no card.',
+    cta: 'See ZSMS',
     emphasis: true,
   },
   {
@@ -84,10 +81,9 @@ const DOORS = [
     eyebrow: 'Teachers',
     title: 'I’m a teacher',
     body:
-      'Build lesson plans, quizzes and homework for the Zambian curriculum, and export them to PDF ' +
-      'or Word. Works whether or not your school uses ZSMS.',
-    cta: 'Open the Teacher Hub',
-    emphasis: false,
+      'Lesson plans, quizzes and homework for the Zambian curriculum. Works whether or not your ' +
+      'school uses ZSMS.',
+    cta: 'Open the Hub',
   },
 ] as const
 
@@ -96,62 +92,46 @@ export default function HomePage(): JSX.Element {
 
   return (
     <PublicShell>
-      <header className="flex flex-col items-center gap-4 text-center">
-        <h1 className="max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
+      {/*
+        Tighter than it was. The old header ran a 3xl heading over a two-line paragraph with
+        `gap-4`, which on a 768px laptop pushed the fourth door below the fold — and the doors
+        are the entire purpose of this page.
+      */}
+      <header className="flex flex-col items-center gap-2 text-center">
+        <h1 className="max-w-2xl text-xl font-semibold tracking-tight sm:text-3xl">
           School management built for {country.name}
         </h1>
-        <p className="max-w-xl text-muted-foreground">
+        <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
           One place for pupils, fees, attendance and results — and one place for parents to follow
-          their child. Built by AfriTech Systems in Lusaka.
+          their child.
         </p>
       </header>
 
-      <nav aria-label="Where would you like to go?" className="mt-cards">
-        <h2 className="sr-only">Choose what you came for</h2>
-        <ul className="grid grid-cols-1 gap-cards sm:grid-cols-2">
-          {DOORS.map((door) => (
-            <li key={door.href}>
-              {/* The whole card is the link. A card with a small link inside it makes the obvious
-                  gesture — tapping the card — do nothing, which on a phone reads as a broken page. */}
-              <Link
-                href={door.href}
-                className={
-                  'group flex h-full flex-col gap-2 rounded-lg border p-card transition-colors ' +
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ' +
-                  (door.emphasis
-                    ? 'border-primary/40 bg-primary/5 hover:border-primary'
-                    : 'border-border bg-card hover:border-foreground/30')
-                }
-              >
-                <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <door.icon aria-hidden="true" className="size-4" />
-                  {door.eyebrow}
-                </span>
-                <span className="text-lg font-semibold leading-snug">{door.title}</span>
-                <span className="text-sm text-muted-foreground">{door.body}</span>
-                <span className="mt-auto flex items-center gap-1.5 pt-2 text-sm font-medium">
-                  {door.cta}
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="size-4 transition-transform group-hover:translate-x-0.5"
-                  />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <PortalCards
+        cards={DOORS}
+        label="Where would you like to go?"
+        className="mt-5 sm:mt-cards"
+      />
 
-      <section className="mt-cards rounded-lg border border-border bg-muted/30 p-card">
-        <h2 className="font-semibold">Why the numbers here can be trusted</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Where a school publishes its pupils-per-teacher or average class size, ZSMS calculates it from
-          that school&rsquo;s live pupil and staff records rather than taking their word for it. Schools
-          decide what to publish, and <strong className="font-medium text-foreground">we do not rank or
-          score schools</strong> — a league table built from how thoroughly a school uses our software
-          would tell you nothing about whether your child would be happy there.
+      {/*
+        Folded away by default. It is a good answer to a question nobody has yet asked on
+        arrival, and it was costing the fourth door its place on screen. A `<details>` keeps it
+        one tap away, keyboard-accessible, with no state to manage.
+      */}
+      <details className="mt-5 rounded-xl border border-border bg-card/60 sm:mt-cards">
+        <summary className="flex min-h-tap cursor-pointer list-none items-center gap-2 px-card text-sm font-medium transition-colors hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
+          <BadgeCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
+          Why the numbers here can be trusted
+        </summary>
+        <p className="border-t border-border px-card py-3 text-sm text-muted-foreground">
+          Where a school publishes its pupils-per-teacher or average class size, ZSMS calculates it
+          from that school&rsquo;s live pupil and staff records rather than taking their word for it.
+          Schools decide what to publish, and{' '}
+          <strong className="font-medium text-foreground">we do not rank or score schools</strong> —
+          a league table built from how thoroughly a school uses our software would tell you nothing
+          about whether your child would be happy there.
         </p>
-      </section>
+      </details>
 
     </PublicShell>
   )

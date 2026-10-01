@@ -40,8 +40,10 @@
 import type { JSX, ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { ArrowLeft } from 'lucide-react'
 
 import { createAnonClient } from '../../lib/supabase'
+import { SchoolTexture } from '../public/school-texture'
 
 export interface AuthBranding {
   schoolName: string
@@ -96,8 +98,12 @@ export function AuthShell({
        * counts its collapsing toolbar into `vh`, which is the specific reason a form can look centred
        * in a screenshot and sit under the address bar in someone's hand.
        */
-      className="flex min-h-dvh flex-col items-center justify-center gap-stack bg-background px-gutter py-6 sm:gap-cards sm:py-10"
+      className="relative flex min-h-dvh flex-col items-center justify-center gap-stack bg-background px-gutter py-6 sm:gap-cards sm:py-10"
     >
+      {/* The auth pages are the first screens most visitors meet, and they were the plainest
+          in the product — the texture belongs here more than anywhere. */}
+      <SchoolTexture />
+
       <div className="flex w-full max-w-md flex-col items-center gap-2 text-center sm:gap-3">
         <Link href="/" aria-label="ZSMS home">
           <Image
@@ -135,6 +141,19 @@ export function AuthShell({
       {footnote && (
         <p className="max-w-md text-balance text-center text-xs text-subtle">{footnote}</p>
       )}
+
+      {/*
+        The escape. Clerk's card offers sign-in and sign-up and nothing else, so somebody who
+        opened this page by mistake — or who wants the directory rather than an account — had
+        no route back to the public site at all.
+      */}
+      <Link
+        href="/"
+        className="inline-flex min-h-tap items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        Back to ZSMS
+      </Link>
     </main>
   )
 }

@@ -18,6 +18,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 
 import { PublicHeader } from './public-header'
+import { SchoolTexture } from './school-texture'
 import { RouteProgress } from './route-progress'
 
 export function PublicShell({
@@ -30,25 +31,7 @@ export function PublicShell({
 }): JSX.Element {
   return (
     <div className="relative flex min-h-dvh flex-col bg-background">
-      {/*
-        School objects — cap, test tube, flask, ruler, pencil, pen, book, globe, calculator,
-        microscope — as a faint repeating texture.
-
-        `fixed` rather than scrolling with the page, so it reads as a backdrop the content moves over
-        instead of wallpaper glued to the article. `-z-10` puts it behind everything, and `aria-hidden`
-        keeps it out of the accessibility tree — it is decoration and announcing ten object names to a
-        screen reader would be noise.
-
-        The opacity is the whole design. Cards are opaque, so the texture is only ever visible in the
-        gutters and behind headings, and at these values the eye resolves it as paper grain rather than
-        pictures. It is lighter in dark mode: the same stroke against a dark ground reads far stronger
-        than it does against white, so a single value would be invisible on one theme and distracting
-        on the other.
-      */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-[url('/brand/school-pattern.svg')] bg-[length:440px_440px] bg-repeat opacity-[0.10] dark:opacity-[0.055]"
-      />
+      <SchoolTexture />
 
       <a href="#main" className="skip-link">
         Skip to content

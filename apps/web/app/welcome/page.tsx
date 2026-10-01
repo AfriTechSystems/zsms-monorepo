@@ -54,9 +54,11 @@ import { redirect } from 'next/navigation'
 
 import { createUserClient } from '../../lib/supabase'
 import { OrganisationPicker } from './organisation-picker'
+import { PortalCards } from '../../components/public/portal-cards'
+import { SchoolTexture } from '../../components/public/school-texture'
 import Link from 'next/link'
 import Image from 'next/image'
-import { AlertTriangle, ArrowRight, Building2, Sparkles, Users } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Building2, Sparkles, Users } from 'lucide-react'
 
 import { getAuthProvider } from '@zsms/auth-provider'
 
@@ -145,11 +147,16 @@ export default async function WelcomePage(): Promise<JSX.Element> {
    * which is the whole point of rendering rather than redirecting.
    */
   return (
-    <main
+    <>
+      {/* Outside the flex container on purpose: it is `fixed`, so it paints the same either
+          way, but as a flex ITEM it was adding a gap for an element with no layout box. */}
+      <SchoolTexture />
+      <main
       id="main"
-      className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-cards px-gutter py-10"
+      className="relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center gap-2.5 px-gutter py-3 sm:gap-4 sm:py-5"
     >
-      <header className="flex flex-col items-center gap-3 text-center">
+
+      <header className="flex flex-col items-center gap-2 text-center">
         <Link href="/">
           <Image
             src="/brand/zsms-lockup.png"
@@ -157,10 +164,10 @@ export default async function WelcomePage(): Promise<JSX.Element> {
             width={640}
             height={524}
             priority
-            className="h-auto w-[150px]"
+            className="h-auto w-[76px] sm:w-[104px]"
           />
         </Link>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+        <h1 className="text-lg font-semibold tracking-tight sm:text-2xl">
           You&rsquo;re signed in. What next?
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -202,103 +209,102 @@ export default async function WelcomePage(): Promise<JSX.Element> {
         resolves exactly as the phone call does.
       */}
       {emailClaimMissing ? (
-        <section className="rounded-lg border border-danger/40 bg-danger/5 p-card">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <AlertTriangle aria-hidden="true" className="size-5 shrink-0 text-danger" />
+        <section className="rounded-xl border border-danger/40 bg-danger/5 p-3 sm:p-card">
+          <h2 className="flex items-center gap-2 text-sm font-semibold sm:text-base">
+            <AlertTriangle aria-hidden="true" className="size-4 shrink-0 text-danger sm:size-5" />
             We can&rsquo;t read your email address
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            This is a configuration problem on our side, not something you can fix. Please
-            contact AfriTech and quote <span className="font-mono">email claim missing</span>.
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            A configuration problem on our side, not something you can fix. Contact AfriTech and
+            quote <span className="font-mono">email claim missing</span>.
           </p>
         </section>
       ) : (
-        <section className="rounded-lg border border-border bg-card p-card">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <Users aria-hidden="true" className="size-5 shrink-0 text-primary" />
+        <section className="rounded-xl border border-border bg-card p-3 sm:p-card">
+          <h2 className="flex items-center gap-2 text-sm font-semibold sm:text-base">
+            <Users aria-hidden="true" className="size-4 shrink-0 text-primary sm:size-5" />
             Are you a parent?
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            We looked, and no school has recorded this address against a pupil:
+          {/* One sentence, the address, one sentence. It was a heading and three paragraphs,
+              which made it the tallest thing on a page whose whole job is to fit at once. */}
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            No school has recorded this address against a pupil:
           </p>
-          <p className="mt-2 break-all rounded-md bg-muted px-3 py-2 font-mono text-sm">
+          <p className="mt-1.5 break-all rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs sm:text-sm">
             {verifiedEmail ?? 'your sign-in address'}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Ask your school office to add exactly this address to your child&rsquo;s record.
-            Your children will appear here the next time you sign in — nothing else to do.
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Ask the school office to add it to your child&rsquo;s record — your children appear
+            here next time you sign in.
           </p>
         </section>
       )}
 
-      <nav aria-label="Choose where to go">
-        <p className="mb-stack text-sm text-muted-foreground">Otherwise:</p>
-        <ul className="flex flex-col gap-stack">
-          <li>
-            <Link
-              href="/register"
-              className="group flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-card transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="flex items-center gap-2 font-semibold">
-                <Building2 aria-hidden="true" className="size-5 shrink-0" />
-                Register my school
-              </span>
-              <span className="text-sm text-muted-foreground">
-                Set up your school on ZSMS and start a 30-day trial. You become its owner.
-              </span>
-              <span className="flex items-center gap-1.5 pt-1 text-sm font-medium">
-                Continue
-                <ArrowRight
-                  aria-hidden="true"
-                  className="size-4 transition-transform group-hover:translate-x-0.5"
-                />
-              </span>
-            </Link>
-          </li>
-
-          <li>
-            <Link
-              href="/teacher"
-              className="group flex flex-col gap-2 rounded-lg border border-border bg-card p-card transition-colors hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="flex items-center gap-2 font-semibold">
-                <Sparkles aria-hidden="true" className="size-5 shrink-0" />
-                Open the Teacher Hub
-              </span>
-              <span className="text-sm text-muted-foreground">
-                Lesson plans, quizzes and homework for the Zambian curriculum. Works whether or not your
-                school uses ZSMS.
-              </span>
-              <span className="flex items-center gap-1.5 pt-1 text-sm font-medium">
-                Continue
-                <ArrowRight
-                  aria-hidden="true"
-                  className="size-4 transition-transform group-hover:translate-x-0.5"
-                />
-              </span>
-            </Link>
-          </li>
-        </ul>
-      </nav>
-
-      <div className="flex flex-col gap-2 border-t border-border pt-cards text-sm">
-        <p className="text-muted-foreground">
-          Waiting for an invitation from your school? They&rsquo;ll email you a link — once you accept
-          it, signing in brings you straight to their dashboard.
-        </p>
-        {/*
-          The sign-out that was missing. Its absence outside the portal shells is what turned a wrong
-          redirect into a lockout, so it belongs on the one page every session passes through.
-        */}
-        <p className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground">Wrong account?</span>
-          <SignOutLink />
-        </p>
+      {/*
+        Side by side from `sm` rather than stacked. Two tall cards one above the other pushed
+        the sign-out below the fold on a laptop — and sign-out is the control somebody on this
+        page most often needs, because arriving here usually means they signed in as the wrong
+        account.
+      */}
+      <div>
+        <p className="mb-2 text-sm text-muted-foreground">Otherwise:</p>
+        <PortalCards
+          cards={[
+            {
+              href: '/register',
+              icon: Building2,
+              eyebrow: 'School owners',
+              title: 'Register my school',
+              body: 'Set up your school on ZSMS and start a 30-day trial. You become its owner.',
+              cta: 'Continue',
+              emphasis: true,
+            },
+            {
+              href: '/teacher',
+              icon: Sparkles,
+              eyebrow: 'Teachers',
+              title: 'Open the Teacher Hub',
+              body:
+                'Lesson plans, quizzes and homework for the Zambian curriculum. Works whether or '
+                + 'not your school uses ZSMS.',
+              cta: 'Continue',
+            },
+          ]}
+          label="Choose where to go"
+          columns="two"
+          compact
+        />
       </div>
 
-      <p className="text-center text-xs text-subtle">
+      {/*
+        Both escapes, as actual controls.
+
+        `Back to ZSMS` because this page had no route out except forwards: somebody who signed
+        in by accident could not reach the public site again. And sign-out as a BUTTON rather
+        than the sentence it used to be — its absence outside the portal shells is what turned
+        a wrong redirect into a lockout, and a control people need to find should look like one.
+      */}
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <p className="text-xs text-muted-foreground sm:text-sm">
+          Waiting for an invitation? Once you accept the emailed link, signing in brings you
+          straight to your dashboard.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/"
+            className="inline-flex min-h-tap items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:border-foreground/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Back to ZSMS
+          </Link>
+          <SignOutLink />
+        </div>
+      </div>
+
+      <p className="text-center text-[0.6875rem] leading-tight text-subtle">
         ZSMS is a product of AfriTech Systems Limited.
       </p>
     </main>
+    </>
   )
 }

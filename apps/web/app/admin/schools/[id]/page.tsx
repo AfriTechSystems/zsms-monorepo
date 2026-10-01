@@ -47,6 +47,7 @@ import { Field, Input, Select } from '../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
 import { StatusBadge, TIER_LABEL, formatKwacha } from '../../health-shared'
 import { AiUsagePanel } from './ai-usage-panel'
+import { SettingsHistory } from '../../../../components/ui/settings-history'
 import {
   OnboardingPanel,
   type ChecklistItem,
@@ -562,6 +563,10 @@ export default function AdminSchoolDetailPage({
             {/* Renders nothing for a school that has never used AI — see the component.
                 Aggregates only: no teacher is named, by decision. */}
             <AiUsagePanel schoolId={data.school.id} />
+
+            {/* What this school has changed about itself, by whom. Named explicitly
+                because AfriTech has no organisation of its own to resolve from. */}
+            <SettingsHistory schoolId={data.school.id} />
 
             <Card>
               <CardHeader>

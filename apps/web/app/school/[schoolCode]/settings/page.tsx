@@ -35,6 +35,7 @@ import { Button } from '../../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
+import { SettingsHistory } from '../../../../components/ui/settings-history'
 import { useToast } from '../../../../components/ui/toast'
 
 interface Profile {
@@ -612,6 +613,11 @@ export default function SchoolSettingsPage(): JSX.Element {
           </CardContent>
         </Card>
       </div>
+
+      {/* Renders nothing until something has actually been changed — see the component.
+          The school sees its own history here; AfriTech sees the same rows on the school's
+          admin page, because it is the same question asked by two people. */}
+      <SettingsHistory className="mt-cards" />
     </>
   )
 }

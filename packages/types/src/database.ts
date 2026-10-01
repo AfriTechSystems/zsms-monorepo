@@ -5710,6 +5710,19 @@ export type Database = {
           out_reserve_per_teacher_cap: number
         }[]
       }
+      school_settings_history: {
+        Args: { p_limit?: number; p_school_id?: string }
+        Returns: {
+          out_action: string
+          out_actor: string
+          out_actor_name: string
+          out_changed: Json
+          out_created_at: string
+          out_id: string
+          out_impersonated: string
+          out_table_name: string
+        }[]
+      }
       school_student_capacity: {
         Args: { p_school_id: string }
         Returns: {

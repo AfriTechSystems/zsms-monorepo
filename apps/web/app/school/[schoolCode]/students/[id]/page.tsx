@@ -30,7 +30,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useEffect, useState } from 'react'
-import { Loader2, Mail, Phone, Save, UserMinus, Users } from 'lucide-react'
+import { Loader2, Mail, Phone, Plus, Save, UserMinus, Users } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -39,6 +39,7 @@ import { Button } from '../../../../../components/ui/button'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
 import { CustomFieldsPanel } from './custom-fields-panel'
+import { useToast } from '../../../../../components/ui/toast'
 import { Field, Input, Select } from '../../../../../components/ui/field'
 import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
 import {
@@ -51,6 +52,7 @@ import {
 } from '../../school-shared'
 
 interface Guardian {
+  id: string
   relationship: string
   is_primary: boolean
   parents: {
@@ -98,10 +100,86 @@ export default function StudentDetailPage({
   const { schoolCode, id } = use(params)
   const base = `/school/${schoolCode}`
 
+  const { toast } = useToast()
   const { data, loading, error, code, reload } = useApi<Student>(`/api/students/${id}`)
   const { data: structure } = useApi<Structure>('/api/school/structure')
 
   const [form, setForm] = useState<Partial<Student>>({})
+  /**
+   * Adding a guardian — `PARENT_LINKING.md` Method 2.
+   *
+   * The phone is required and is how a guardian is identified: matched on the last nine
+   * digits, so one parent with four children at this school is one account rather than four,
+   * and `0977 123 456` is the same person as `+260977123456`.
+   */
+  const [gName, setGName] = useState('')
+  const [gPhone, setGPhone] = useState('')
+  const [gEmail, setGEmail] = useState('')
+  const [gRelationship, setGRelationship] = useState('mother')
+  const [gPrimary, setGPrimary] = useState(false)
+  const [gBusy, setGBusy] = useState(false)
+  const [gOpen, setGOpen] = useState(false)
+
+  const addGuardian = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault()
+      setGBusy(true)
+      try {
+        const response = await fetch(`/api/students/${id}/guardians`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: gName,
+            phone: gPhone,
+            email: gEmail || undefined,
+            relationship: gRelationship,
+            isPrimary: gPrimary,
+          }),
+        })
+        const body = await response.json()
+        if (!response.ok) {
+          toast(body?.error ?? 'That guardian could not be linked.', 'danger')
+          return
+        }
+        toast(body?.data?.message ?? 'Guardian linked.', 'success')
+        setGName('')
+        setGPhone('')
+        setGEmail('')
+        setGPrimary(false)
+        setGOpen(false)
+        reload()
+      } finally {
+        setGBusy(false)
+      }
+    },
+    [id, gName, gPhone, gEmail, gRelationship, gPrimary, toast, reload],
+  )
+
+  const removeGuardian = useCallback(
+    async (linkId: string) => {
+      setGBusy(true)
+      try {
+        const response = await fetch(`/api/students/${id}/guardians`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ linkId }),
+        })
+        const body = await response.json()
+        if (!response.ok) {
+          toast(body?.error ?? 'That could not be removed.', 'danger')
+          return
+        }
+        // Said plainly: removal is not instant, and a school expecting it to be would
+        // otherwise think it had failed.
+        toast('Removed. They keep access to past receipts and results for 30 days.', 'success')
+        reload()
+      } finally {
+        setGBusy(false)
+      }
+    },
+    [id, toast, reload],
+  )
+
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -254,8 +332,9 @@ export default function StudentDetailPage({
                   </p>
                 ) : (data.guardians?.length ?? 0) === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No parent or guardian is recorded for this pupil. Without an email here, a
-                    parent cannot link their ZSMS account to see attendance, results or fees.
+                    No parent or guardian is recorded for this pupil. Without one, nobody can be
+                    contacted about them — and no parent can link an account to see attendance,
+                    results or fees.
                   </p>
                 ) : (
                   <ul className="flex flex-col gap-stack">
@@ -312,9 +391,136 @@ export default function StudentDetailPage({
                             </dd>
                           </div>
                         </dl>
+
+                        {/*
+                          Removal is not instant, and the button says so rather than letting a
+                          school think it failed: `PARENT_LINKING.md` grants 30 days of access
+                          after unlinking so a parent can still download a receipt for fees
+                          they already paid.
+                        */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={gBusy}
+                          onClick={() => void removeGuardian(g.id)}
+                        >
+                          Remove
+                        </Button>
                       </li>
                     ))}
                   </ul>
+                )}
+
+                {/* ---- add a guardian ---- */}
+                {!gOpen ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-stack"
+                    onClick={() => setGOpen(true)}
+                  >
+                    <Plus aria-hidden="true" />
+                    Add a parent or guardian
+                  </Button>
+                ) : (
+                  <form
+                    onSubmit={addGuardian}
+                    className="mt-stack flex flex-col gap-3 rounded-md border border-border bg-surface p-3"
+                  >
+                    <div className="flex flex-wrap gap-3">
+                      <div className="flex min-w-[10rem] flex-1 flex-col gap-1.5">
+                        <label htmlFor="g-name" className="text-sm font-medium">
+                          Full name
+                        </label>
+                        <input
+                          id="g-name"
+                          value={gName}
+                          onChange={(e) => setGName(e.target.value)}
+                          required
+                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                        />
+                      </div>
+
+                      <div className="flex min-w-[10rem] flex-1 flex-col gap-1.5">
+                        <label htmlFor="g-phone" className="text-sm font-medium">
+                          Phone
+                        </label>
+                        <input
+                          id="g-phone"
+                          value={gPhone}
+                          onChange={(e) => setGPhone(e.target.value)}
+                          placeholder="+260977123456"
+                          required
+                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          If this number is already on another pupil, the same guardian is
+                          linked rather than a second one created.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <div className="flex min-w-[10rem] flex-1 flex-col gap-1.5">
+                        <label htmlFor="g-email" className="text-sm font-medium">
+                          Email <span className="text-subtle">(optional)</span>
+                        </label>
+                        <input
+                          id="g-email"
+                          type="email"
+                          value={gEmail}
+                          onChange={(e) => setGEmail(e.target.value)}
+                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {/* The single most useful thing on this form, and the least obvious. */}
+                          This is what they sign up with to see their child.
+                        </p>
+                      </div>
+
+                      <div className="flex w-40 flex-col gap-1.5">
+                        <label htmlFor="g-rel" className="text-sm font-medium">
+                          Relationship
+                        </label>
+                        <select
+                          id="g-rel"
+                          value={gRelationship}
+                          onChange={(e) => setGRelationship(e.target.value)}
+                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                        >
+                          {['mother', 'father', 'guardian', 'grandparent', 'sibling', 'uncle', 'aunt', 'other'].map(
+                            (r) => (
+                              <option key={r} value={r} className="capitalize">
+                                {r.charAt(0).toUpperCase() + r.slice(1)}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
+                    </div>
+
+                    <label className="flex min-h-tap cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={gPrimary}
+                        onChange={(e) => setGPrimary(e.target.checked)}
+                        className="size-4"
+                      />
+                      {/* One per pupil, enforced by `idx_spl_primary`. Ticking it moves the
+                          flag rather than failing. */}
+                      Main contact — receives fee reminders, absence alerts and results
+                    </label>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="submit" disabled={gBusy}>
+                        {gBusy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                        Link guardian
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={() => setGOpen(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
                 )}
               </CardContent>
             </Card>

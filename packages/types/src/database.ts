@@ -5196,6 +5196,22 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: boolean
       }
+      link_parent_to_student: {
+        Args: {
+          p_email?: string
+          p_full_name: string
+          p_is_primary?: boolean
+          p_phone: string
+          p_relationship?: string
+          p_student_id: string
+        }
+        Returns: {
+          out_created: boolean
+          out_link_id: string
+          out_message: string
+          out_parent_id: string
+        }[]
+      }
       log_audit_event: {
         Args: {
           p_action: string
@@ -5996,6 +6012,13 @@ export type Database = {
       teaching_resource_feature_key: {
         Args: { p_resource_kind: string }
         Returns: string
+      }
+      unlink_parent_from_student: {
+        Args: { p_link_id: string }
+        Returns: {
+          out_access_until: string
+          out_unlinked: boolean
+        }[]
       }
       unlock_result_for_correction: {
         Args: { p_reason: string; p_result_id: string }

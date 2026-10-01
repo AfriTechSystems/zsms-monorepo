@@ -73,7 +73,10 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
     const guardians = await client
       .from('student_parent_links')
       .select(
-        'relationship, is_primary, is_active, '
+        // The LINK's own id, which unlinking needs — the parent id identifies a person,
+        // not their connection to this pupil, and a guardian with four children here has
+        // one parent id and four links.
+        'id, relationship, is_primary, is_active, '
           + 'parents(id, full_name, phone_e164, email, preferred_contact, clerk_user_id)',
       )
       .eq('student_id', id)

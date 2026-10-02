@@ -31,7 +31,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Loader2, Megaphone, Send, X } from 'lucide-react'
+import { Gauge, Loader2, Megaphone, Send, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -52,6 +52,8 @@ import { RecipientPicker } from './recipient-picker'
 import { formatCount, formatDate } from '../school-shared'
 
 interface Announcement {
+  /** How many recipients have opened it. Counted from `announcement_reads`. */
+  readCount?: number
   id: string
   title: string
   body: string
@@ -70,6 +72,14 @@ interface Payload {
   announcements: Announcement[]
   audience: { all_parents: number; all_students: number; all_staff: number }
   tier: string | null
+  /**
+   * The school's own messaging allowance.
+   *
+   * Null when no quota row exists yet — a school that has sent nothing. Distinguished
+   * from zero remaining, because "you have used none of your allowance" and "we do not
+   * know your allowance" are different things to put on a screen.
+   */
+  quota: { limit: number; used: number; remaining: number; overageCredits: number } | null
   canWrite: boolean
   deliveryConfigured: boolean
 }
@@ -278,6 +288,51 @@ export default function AnnouncementsPage(): JSX.Element {
 
       {!error && data && (
         <div className="space-y-cards">
+          {/*
+            What the school has left to send with.
+
+            `school_message_quotas` has always held the limit, the usage and the 80% alert
+            timestamp, and NOTHING read it — so a school could see that a notice would
+            reach 250 parents without being able to see it had 40 messages left. WhatsApp
+            is metered and billed, so that is the difference between a decision and a
+            billing surprise.
+          */}
+          {data.quota && (
+            <div
+              className={
+                'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border p-3 text-sm '
+                + (data.quota.remaining === 0
+                  ? 'border-danger/40 bg-danger/5'
+                  : data.quota.remaining <= data.quota.limit * 0.2
+                    ? 'border-warning/40 bg-warning/5'
+                    : 'border-border bg-surface')
+              }
+            >
+              <Gauge aria-hidden="true" className="size-4 text-muted-foreground" />
+              <span>
+                <span data-numeric className="font-semibold">
+                  {data.quota.remaining.toLocaleString('en-ZM')}
+                </span>{' '}
+                of <span data-numeric>{data.quota.limit.toLocaleString('en-ZM')}</span> messages
+                left this month
+              </span>
+
+              {data.quota.overageCredits > 0 && (
+                // Overage is bought, not free — naming it stops a school reading the
+                // remaining figure as the whole story.
+                <span className="text-muted-foreground">
+                  plus <span data-numeric>{data.quota.overageCredits}</span> bought
+                </span>
+              )}
+
+              {data.quota.remaining === 0 && (
+                <span className="font-medium text-danger">
+                  Further messages will not be delivered until the allowance resets.
+                </span>
+              )}
+            </div>
+          )}
+
           {/* The single most important thing on this screen when it applies. */}
           {!data.deliveryConfigured && (
             <Alert variant="warning" title="Message delivery is not set up here">
@@ -597,6 +652,20 @@ export default function AnnouncementsPage(): JSX.Element {
                         {a.status === 'scheduled' ? 'Queued' : a.status}
                       </Badge>
                     ),
+                  },
+                  {
+                    key: 'read',
+                    header: 'Read',
+                    cell: (a) =>
+                      // Only for notices that actually went out. A draft with "0 read"
+                      // reads as a failure rather than as something not yet sent.
+                      a.status === 'sent' ? (
+                        <span data-numeric className="text-sm">
+                          {a.readCount ?? 0}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      ),
                   },
                   {
                     key: 'when',

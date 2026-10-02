@@ -27,6 +27,20 @@
  * billing surprise. Counted through `worker_announcement_recipients`? No — that
  * is a worker-boundary function and this is a user request. The count is derived
  * from the same tables the policies already scope.
+ *
+ * **This paragraph described the recipient count and nothing else until 2026-10-02.**
+ * `school_message_quotas` has always held `quota_limit`, `messages_used` and the
+ * 80%-alert timestamp, and no route read it — so a school could see that an announcement
+ * would reach 250 parents without being able to see that it had 40 messages left. The
+ * audit found the table had no reader at all. It is returned now, and the composer shows
+ * what remains before the send rather than after it.
+ *
+ * ## Read receipts
+ *
+ * `announcement_reads` has had a route for marking one read and nothing that counted
+ * them, so a head teacher could send a fee notice and never learn whether a single parent
+ * opened it. Counted per announcement in one grouped query rather than per row, because a
+ * term's worth of announcements would otherwise be one request each.
  */
 
 import type { NextRequest } from 'next/server'
@@ -119,7 +133,7 @@ export async function GET(): Promise<Response> {
     const school = await resolveSchoolContext(client)
     if (!school) return fail('FORBIDDEN', 'This session is not associated with a school.')
 
-    const [list, parents, pupils, staff, tier] = await Promise.all([
+    const [list, parents, pupils, staff, tier, quota, reads] = await Promise.all([
       client
         .from('announcements')
         .select(
@@ -141,6 +155,20 @@ export async function GET(): Promise<Response> {
         .in('status', ['active', 'on_leave']),
       client.from('staff_members').select('id', { count: 'exact', head: true }),
       client.from('schools').select('subscription_tier').eq('id', school.uuid).maybeSingle(),
+      /*
+        The real quota, which nothing read until now. `billing_period` is the current
+        month's row; ordering by it descending and taking one avoids hardcoding a date
+        format the table owns.
+      */
+      client
+        .from('school_message_quotas')
+        .select('billing_period, quota_limit, messages_used, overage_credits')
+        .order('billing_period', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      // Every read receipt for this school's announcements, counted in the application
+      // rather than per announcement — a term of notices would otherwise be one query each.
+      client.from('announcement_reads').select('announcement_id'),
     ])
 
     if (list.error) return fromPostgrestError(list.error)
@@ -151,8 +179,36 @@ export async function GET(): Promise<Response> {
         .filter((p): p is string => Boolean(p)),
     )
 
+    // announcement_id -> how many recipients have opened it.
+    const readCounts = new Map<string, number>()
+    for (const r of (reads.data ?? []) as Array<{ announcement_id: string }>) {
+      readCounts.set(r.announcement_id, (readCounts.get(r.announcement_id) ?? 0) + 1)
+    }
+
+    const q = quota.data as {
+      quota_limit?: number
+      messages_used?: number
+      overage_credits?: number
+    } | null
+
     return ok({
-      announcements: list.data ?? [],
+      announcements: ((list.data ?? []) as unknown as Array<{ id: string }>).map((a) => ({
+        ...a,
+        readCount: readCounts.get(a.id) ?? 0,
+      })),
+      /*
+        Null when the school has no quota row yet — a new school that has sent nothing.
+        Distinguished from zero remaining, because "you have used none of your allowance"
+        and "we do not know your allowance" are different things to show.
+      */
+      quota: q
+        ? {
+            limit: q.quota_limit ?? 0,
+            used: q.messages_used ?? 0,
+            remaining: Math.max(0, (q.quota_limit ?? 0) - (q.messages_used ?? 0)),
+            overageCredits: q.overage_credits ?? 0,
+          }
+        : null,
       audience: {
         all_parents: parentUsers.size,
         all_students: pupils.count ?? 0,

@@ -54,6 +54,7 @@ import { useApi } from '../../../../../lib/use-api'
 import { can } from '../../../../../lib/roles'
 import type { Role } from '@zsms/auth-provider'
 import { useToast } from '../../../../../components/ui/toast'
+import { ReviseIssued } from './revise-issued'
 
 interface Structure {
   id: string
@@ -540,6 +541,14 @@ export function FeeLineBuilder({
               ))}
           </ul>
         )}
+
+        {/* Correcting bills already issued. Business rule 3 means the editor above
+            deliberately does not touch them, which left a school that billed a whole
+            term wrongly with no way to fix it. */}
+        <ReviseIssued
+          year={year}
+          labels={[...new Set(forYear.filter((l) => l.is_active).map((l) => l.fee_label))].sort()}
+        />
 
         {/* ---- copy a year forward ---- */}
         {canWrite && years.filter((y) => y !== year).length > 0 && (

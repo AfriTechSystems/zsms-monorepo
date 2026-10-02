@@ -126,6 +126,42 @@ export async function POST(request: NextRequest): Promise<Response> {
       return fromPostgrestError(error)
     }
 
+    /*
+      The receipt.
+
+      Found by the gap audit on 2026-10-02: `generate-receipt` was enqueued from
+      `/api/payments/[id]/verify`, which **no screen has ever called** — the accountant's
+      queue uses this route. So verification worked, the money was recorded, and a receipt
+      was never produced for anybody. The dead route was the only place that asked for one.
+
+      Enqueued, not awaited, for the same reason it was there: rendering a PDF and calling
+      a messaging provider must not sit inside the request an accountant is waiting on, and
+      a provider outage must not fail a verification already recorded.
+
+      Only on `verified`. A rejected payment has no receipt to issue.
+    */
+    if (decision === 'verified') {
+      try {
+        const { getQueue } = await import('@zsms/queue')
+        await getQueue().enqueue(
+          'generate-receipt',
+          { paymentId },
+          {
+            priority: 1, // HIGH — a parent is waiting on confirmation.
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 2000 },
+            // The same payment verified twice must not produce two receipts.
+            deduplicationId: `receipt:${paymentId}`,
+          },
+        )
+      } catch (err) {
+        // The verification stands regardless. Losing the receipt job is recoverable — a
+        // sweep can re-enqueue it — whereas failing the response would leave the
+        // accountant unsure whether the money was recorded at all.
+        console.error('[api] failed to enqueue receipt for payment', paymentId, err)
+      }
+    }
+
     return ok({ paymentId, decision })
   })
 }

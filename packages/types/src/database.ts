@@ -4738,6 +4738,18 @@ export type Database = {
         Args: { p_band_id: string }
         Returns: boolean
       }
+      admin_generate_school_invoice: {
+        Args: {
+          p_currency?: string
+          p_due_days?: number
+          p_period_end: string
+          p_period_start: string
+          p_school_id: string
+          p_tax_rate?: number
+        }
+        Returns: Json
+      }
+      admin_issue_invoice: { Args: { p_invoice_id: string }; Returns: Json }
       admin_network_suggestions: {
         Args: never
         Returns: {
@@ -4760,6 +4772,17 @@ export type Database = {
         }
         Returns: number
       }
+      admin_record_invoice_payment: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_method: string
+          p_notes?: string
+          p_received?: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
       admin_record_onboarding_contact: {
         Args: {
           p_channel?: string
@@ -4781,6 +4804,20 @@ export type Database = {
       admin_revoke_override: {
         Args: { p_actor: string; p_id: string }
         Returns: boolean
+      }
+      admin_run_billing: {
+        Args: {
+          p_currency?: string
+          p_period_end: string
+          p_period_start: string
+          p_tax_rate?: number
+        }
+        Returns: {
+          out_created: number
+          out_failed: number
+          out_problems: Json
+          out_skipped: number
+        }[]
       }
       admin_school_ai_summary: {
         Args: { p_school_id: string }
@@ -4902,6 +4939,10 @@ export type Database = {
           p_tier_name: string
         }
         Returns: string
+      }
+      admin_void_invoice: {
+        Args: { p_invoice_id: string; p_reason: string }
+        Returns: Json
       }
       ai_allowance_for_account: {
         Args: { p_account_id: string }

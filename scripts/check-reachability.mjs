@@ -104,6 +104,21 @@ const ACCEPTED = new Map([
 ])
 
 const ACCEPTED_ROUTES = new Map([
+  // A SECOND implementation of marking a notice read. The parent portal uses
+  // `POST /api/parent/notices`, which inserts the same `announcement_reads` row —
+  // verified on 2026-10-02 after this script's own listing led to the wrong
+  // conclusion that receipts were never recorded. Kept rather than deleted because
+  // `ENDPOINTS.md` names it and the mobile parent client may use it; the duplication
+  // is the thing to watch, not the absence.
+  ['announcements/[id]/read', 'duplicate of POST /api/parent/notices, which the portal uses'],
+  ['documents/[id]', 'blocked on R2 credentials, not on a screen'],
+  // Half superseded, half a tracked gap. `/welcome` calls `claim_parent_links()`
+  // directly server-side, so the email retry is redundant there — but this route also
+  // raises a PHONE-ONLY claim for a parent whose school recorded no email, and that
+  // has no UI anywhere. Tracked in CLAUDE.md rather than deleted.
+  ['parent/link', 'email retry superseded by /welcome; the phone-claim half has no UI yet'],
+  ['school/parent-claims', 'phone-only parent claim approval — UI not built yet'],
+  ['payments/[id]/verify', 'superseded by /api/school/fees/verify; the receipt enqueue moved there'],
   ['health', 'uptime probe, called by infrastructure'],
   ['session/whoami', 'diagnostic'],
   ['announcements', 'ENDPOINTS.md contract — the mobile surface'],

@@ -17,6 +17,18 @@
  * Every figure comes from a database function. The route validates, dispatches and
  * renders. Re-deriving a total in TypeScript would create a second arithmetic that
  * could disagree with the invoice actually stored.
+ *
+ * ## The `admin_` prefix is load-bearing
+ *
+ * These five functions live in `afritech`, which `supabase/config.toml` does not expose —
+ * so PostgREST resolved every unqualified `rpc('run_billing')` against `public`, found
+ * nothing, and returned 404. **No invoice had ever been issued and no billing run had ever
+ * started** through the product; the failure was invisible because nothing fails at build
+ * time. Found by the gap audit on 2026-10-02 and fixed by `0186`'s `public` wrappers.
+ *
+ * The wrappers are SECURITY INVOKER, so the inner `is_afritech_admin()` check still runs
+ * against the real caller — verified: a non-AfriTech token gets 403 "Only AfriTech can run
+ * billing" rather than a 404.
  */
 
 import type { NextRequest } from 'next/server'
@@ -151,7 +163,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     switch (body.action) {
       case 'run_billing': {
-        const { data, error } = await client.rpc('run_billing', {
+        const { data, error } = await client.rpc('admin_run_billing', {
           p_period_start: body.periodStart,
           p_period_end: body.periodEnd,
           p_currency: body.currency ?? 'ZMW',
@@ -173,7 +185,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
 
       case 'generate_one': {
-        const { data, error } = await client.rpc('generate_school_invoice', {
+        const { data, error } = await client.rpc('admin_generate_school_invoice', {
           p_school_id: body.schoolId,
           p_period_start: body.periodStart,
           p_period_end: body.periodEnd,
@@ -194,7 +206,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
 
       case 'issue': {
-        const { data, error } = await client.rpc('issue_invoice', { p_invoice_id: body.invoiceId })
+        const { data, error } = await client.rpc('admin_issue_invoice', { p_invoice_id: body.invoiceId })
         if (error) {
           if (error.code === '42501') return fail('FORBIDDEN', error.message)
           if (error.code === 'P0002') return fail('CONFLICT', error.message)
@@ -204,7 +216,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
 
       case 'record_payment': {
-        const { data, error } = await client.rpc('record_invoice_payment', {
+        const { data, error } = await client.rpc('admin_record_invoice_payment', {
           p_invoice_id: body.invoiceId,
           p_amount: body.amount,
           p_method: body.method,
@@ -222,7 +234,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
 
       case 'void': {
-        const { data, error } = await client.rpc('void_invoice', {
+        const { data, error } = await client.rpc('admin_void_invoice', {
           p_invoice_id: body.invoiceId,
           p_reason: body.reason,
         })

@@ -42,6 +42,8 @@ import { Field, Input, PrefixedInput, Select } from '../../../components/ui/fiel
 import { FormActions, FormGrid, FormSection } from '../../../components/ui/form'
 import { useToast } from '../../../components/ui/toast'
 
+import { FeeBreakdown, type FeeRecordRow } from './fee-breakdown'
+
 interface StatementRow {
   entry_date: string
   entry_type: string
@@ -66,6 +68,13 @@ interface Payload {
   selected: { id: string; firstName: string; lastName: string } | null
   balance: { outstanding: string | number; arrears_amount: string | number; is_overdue: boolean } | null
   statement: StatementRow[]
+  /**
+   * One row per charge, from `fee_record_status`.
+   *
+   * The API has always returned these and the page rendered none of them — so a parent saw
+   * a total and a ledger, but never what the total was FOR.
+   */
+  records: FeeRecordRow[]
   payments: Payment[]
 }
 
@@ -275,6 +284,16 @@ function ParentFees(): JSX.Element {
           </FormActions>
         </form>
       </FormSection>
+
+      {/*
+        Above the statement, deliberately.
+
+        The statement is a LEDGER — every entry in date order, which answers "what has
+        happened on this account". The breakdown answers "what am I being charged for",
+        which is the question a parent actually arrives with, and the one a school office
+        spends its mornings answering on the phone.
+      */}
+      <FeeBreakdown records={data.records ?? []} />
 
       <Card>
         <CardHeader>

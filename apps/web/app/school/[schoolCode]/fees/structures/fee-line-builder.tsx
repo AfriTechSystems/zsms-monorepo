@@ -123,6 +123,55 @@ export function FeeLineBuilder({
     [structures, year],
   )
 
+  /**
+   * What a pupil in each grade actually pays, per term.
+   *
+   * The flat list below is how a bursar finds and retires ONE line; it is not how anybody
+   * checks the result is right. A school setting tuition, boarding and an activity fee
+   * separately has no way to see that a Grade 8 day pupil therefore owes K2,900 — which is
+   * the only number a parent will ever ask about.
+   *
+   * Day and boarding are separated because `student_type` means a line applies to one or
+   * the other: summing them would quote every pupil a boarder's fees.
+   */
+  const totals = useMemo(() => {
+    const groups = new Map<
+      string,
+      { gradeId: string; term: number; total: number; boardingExtra: number; parts: string[] }
+    >()
+
+    for (const line of forYear) {
+      if (!line.is_active) continue
+      const key = `${line.grade_id}-${line.term_number}`
+      const g = groups.get(key) ?? {
+        gradeId: line.grade_id,
+        term: line.term_number,
+        total: 0,
+        boardingExtra: 0,
+        parts: [] as string[],
+      }
+
+      const amount = Number(line.amount) || 0
+
+      if (line.student_type === 'boarding') {
+        // An extra, not part of the base: a day pupil never pays it.
+        g.boardingExtra += amount
+      } else if (line.student_type === 'day') {
+        g.total += amount
+        g.parts.push(`${line.fee_label} ${kwacha(amount)}`)
+      } else {
+        g.total += amount
+        g.parts.push(`${line.fee_label} ${kwacha(amount)}`)
+      }
+
+      groups.set(key, g)
+    }
+
+    return [...groups.values()].sort(
+      (a, b) => a.gradeId.localeCompare(b.gradeId) || a.term - b.term,
+    )
+  }, [forYear])
+
   /** Years already defined, so last year can be copied forward. */
   const years = useMemo(
     () => [...new Set(structures.map((s) => s.academic_year))].sort().reverse(),
@@ -391,6 +440,52 @@ export function FeeLineBuilder({
               )}
             </div>
           </form>
+        )}
+
+        {/* ---- what each grade actually pays ---- */}
+        {totals.length > 0 && (
+          <div className="rounded-lg border border-border bg-surface p-card">
+            <h3 className="text-sm font-semibold">What a pupil pays in {year}</h3>
+            <p className="mb-stack text-sm text-muted-foreground">
+              The lines below added up, the way they will appear on a parent&rsquo;s
+              statement. Check this before issuing — it is the number a family will ask
+              about.
+            </p>
+
+            <ul className="flex flex-col gap-1">
+              {totals.map((t) => (
+                <li
+                  key={`${t.gradeId}-${t.term}`}
+                  className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-border py-1.5 text-sm last:border-0"
+                >
+                  <span className="min-w-[7rem] font-medium">
+                    {t.gradeId === 'ALL' ? 'Every grade' : t.gradeId}
+                  </span>
+                  <span className="text-muted-foreground">Term {t.term}</span>
+
+                  {/* The components, named. A total with no breakdown is the thing a
+                      parent rings the office about, and the office cannot explain a
+                      number it cannot see either. */}
+                  <span className="min-w-[12rem] flex-1 text-muted-foreground">
+                    {t.parts.join(' + ')}
+                  </span>
+
+                  <span data-numeric className="font-semibold">
+                    {kwacha(t.total)}
+                  </span>
+
+                  {t.boardingExtra > 0 && (
+                    // Boarders pay more, and the difference is the question a school is
+                    // asked next. Shown as the extra rather than a second total, because
+                    // that is how a school quotes it.
+                    <span data-numeric className="text-sm text-muted-foreground">
+                      +{kwacha(t.boardingExtra)} boarding
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {/* ---- the price list ---- */}

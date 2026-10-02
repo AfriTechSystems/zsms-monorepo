@@ -51,6 +51,7 @@ import { createUserClient } from '../../../../lib/supabase'
 import { AFRITECH_ORG_SLUG } from '../../../../lib/admin-context'
 import { can } from '../../../../lib/roles'
 import { created, fail, fromPostgrestError, guard, ok, validationFailed } from '../../../../lib/api-response'
+import { resolveSchoolContext } from '../../../../lib/school-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -161,6 +162,89 @@ export async function GET(): Promise<Response> {
     // Members with an account but no employment record yet. They can already
     // use the product, so leaving them out would make the list wrong in the
     // direction that matters.
+    /*
+      Materialise the Clerk members who have no `staff_members` row.
+
+      Reported from the running application on 2026-10-02: a teacher accepts an
+      invitation and never appears in Teaching assignments, so no grade or class can be
+      assigned to them — and without an assignment they see nothing in their own
+      dashboard. A deadlock that only the school can break, and could not.
+
+      `0184` fixed half of it: a teacher who opens the portal or the app gets their row
+      created. **That is the wrong way round for this case.** The teacher needs an
+      assignment before there is anything worth opening, so waiting for them to sign in
+      first is backwards. The school must be able to assign somebody who has accepted and
+      not yet looked.
+
+      This route already knows exactly who those people are — it computes `unrecorded`
+      below to grey them out on the Staff screen. Creating the rows is the same
+      information put to use.
+
+      Written through the USER client, so `management_write_staff` decides whether this
+      caller may insert into their own school. No service role, no DEFINER function: the
+      policy is already the right rule and a second one would drift from it.
+
+      Only when the caller can manage staff. A read-only finance viewer opening the Staff
+      screen must not trigger writes, and the next owner to visit will do it anyway.
+    */
+    const missing = (members ?? []).filter((m) => m.userId && !seen.has(m.userId))
+
+    // Resolved only when there is something to write: the common case is that nothing
+    // is missing, and a staff list should not pay for a query it does not need.
+    const school = missing.length > 0 ? await resolveSchoolContext(client) : null
+
+    if (missing.length > 0 && school && can(ctx.role, 'staff:write')) {
+      const { error: backfillError } = await client.from('staff_members').insert(
+        missing.map((m) => ({
+          school_id: school.uuid,
+          clerk_user_id: m.userId,
+          // `first_name` and `last_name` are NOT NULL and Clerk does not require either.
+          // A correctable placeholder beats refusing the insert, which would leave the
+          // person unassignable — the exact problem this fixes.
+          first_name: m.firstName?.trim() || 'Unnamed',
+          last_name: m.lastName?.trim() || 'Staff member',
+          email: m.email,
+          // The membership date is the real joined date, and the only one anybody can
+          // establish after the fact.
+          join_date: m.createdAt ? new Date(m.createdAt).toISOString().slice(0, 10) : null,
+        })),
+      )
+
+      if (backfillError) {
+        // Not fatal. The list below still renders them as unrecorded, which is what the
+        // screen did before — a staff list that fails because a backfill failed would be
+        // a worse outcome than one that is merely incomplete.
+        console.error('[api] staff backfill failed', backfillError)
+      } else {
+        // Re-read so this response already contains them, rather than appearing correct
+        // only on the next load.
+        const refreshed = await client
+          .from('staff_members')
+          .select(
+            'id, clerk_user_id, staff_number, first_name, last_name, email, phone_e164, department, employment_type, join_date, location, qualifications, photo_url, is_active',
+          )
+          .order('last_name', { ascending: true })
+
+        if (!refreshed.error && refreshed.data) {
+          return ok({
+            staff: refreshed.data.map((r) => {
+              const clerk = byUserId.get(r.clerk_user_id as string)
+              return {
+                ...r,
+                role: clerk?.role ?? null,
+                hasAccount: Boolean(clerk),
+                imageUrl: clerk?.imageUrl ?? null,
+              }
+            }),
+            invitations: invitations ?? [],
+            accountsLoaded: members !== null,
+            assignableRoles: ASSIGNABLE,
+            canManage: can(ctx.role, 'staff:write'),
+          })
+        }
+      }
+    }
+
     const unrecorded = (members ?? [])
       .filter((m) => !seen.has(m.userId))
       .map((m) => ({

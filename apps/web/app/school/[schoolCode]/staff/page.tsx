@@ -29,6 +29,7 @@ import { use, useCallback, useState } from 'react'
 import { Loader2, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
+import { EditStaff } from './edit-staff'
 import { ROLE_LABEL } from '../../../../lib/roles'
 import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
@@ -46,6 +47,9 @@ interface StaffRow {
   id: string | null
   clerk_user_id: string
   staff_number: string | null
+  phone_e164: string | null
+  location: string | null
+  qualifications: string | null
   first_name: string | null
   last_name: string | null
   email: string | null
@@ -186,6 +190,7 @@ export default function StaffPage({
 
   const { data, loading, error, code, reload } = useApi<StaffPayload>('/api/school/staff')
   const [busy, setBusy] = useState<string | null>(null)
+  const [editing, setEditing] = useState<StaffRow | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const canManage = data?.canManage === true
@@ -268,6 +273,32 @@ export default function StaffPage({
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
       {loading && !data && !error && <TableSkeleton rows={6} columns={4} />}
 
+
+      {/* Opened from a row's staff record. Above the table rather than inline, so a
+
+          form with nine fields does not push the row being edited off screen. */}
+
+      {editing && (
+
+        <EditStaff
+
+          staff={editing as never}
+
+          onCancel={() => setEditing(null)}
+
+          onSaved={() => {
+
+            setEditing(null)
+
+            reload()
+
+          }}
+
+        />
+
+      )}
+
+
       {!error && data && (
         <div className="space-y-cards">
           {/* Said out loud rather than left as an empty column. An unreachable
@@ -328,13 +359,33 @@ export default function StaffPage({
                     key: 'record',
                     header: 'Staff record',
                     cell: (r) =>
-                      r.id ? (
+                      !r.id ? (
+                        /*
+                          A Clerk member with no `staff_members` row.
+
+                          Before `0184` this was permanent: accepting an invitation created
+                          the membership and nothing else, so the person was invisible here
+                          forever. It now resolves itself the first time they open the
+                          portal or the app, which is what this says rather than leaving a
+                          warning that looks like something the school must fix.
+                        */
+                        <span className="text-muted-foreground">
+                          Appears when they first sign in
+                        </span>
+                      ) : canManage ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditing(r)}
+                          className="min-h-tap rounded px-1 text-left text-primary-text hover:underline"
+                        >
+                          {r.staff_number ?? 'Add details'}
+                          {r.department ? ` · ${r.department}` : ''}
+                        </button>
+                      ) : (
                         <span className="text-muted-foreground">
                           {r.staff_number ?? '—'}
                           {r.department ? ` · ${r.department}` : ''}
                         </span>
-                      ) : (
-                        <span className="text-warning-text">Not created yet</span>
                       ),
                   },
                   {

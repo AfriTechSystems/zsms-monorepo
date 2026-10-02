@@ -125,7 +125,7 @@ export async function GET(): Promise<Response> {
     const { data: records, error } = await client
       .from('staff_members')
       .select(
-        'id, clerk_user_id, staff_number, first_name, last_name, email, phone_e164, department, employment_type, join_date, is_active',
+        'id, clerk_user_id, staff_number, first_name, last_name, email, phone_e164, department, employment_type, join_date, location, qualifications, photo_url, is_active',
       )
       .order('last_name', { ascending: true })
 

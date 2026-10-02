@@ -3433,8 +3433,10 @@ export type Database = {
           is_active: boolean
           join_date: string | null
           last_name: string
+          location: string | null
           phone_e164: string | null
           photo_url: string | null
+          qualifications: string | null
           school_id: string
           staff_number: string | null
           updated_at: string
@@ -3450,8 +3452,10 @@ export type Database = {
           is_active?: boolean
           join_date?: string | null
           last_name: string
+          location?: string | null
           phone_e164?: string | null
           photo_url?: string | null
+          qualifications?: string | null
           school_id: string
           staff_number?: string | null
           updated_at?: string
@@ -3467,8 +3471,10 @@ export type Database = {
           is_active?: boolean
           join_date?: string | null
           last_name?: string
+          location?: string | null
           phone_e164?: string | null
           photo_url?: string | null
+          qualifications?: string | null
           school_id?: string
           staff_number?: string | null
           updated_at?: string

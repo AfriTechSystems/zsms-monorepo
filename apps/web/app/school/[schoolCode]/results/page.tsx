@@ -46,12 +46,15 @@ import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { formatLevel } from '../school-shared'
+import { ReportCards } from './report-cards'
 import { FormGrid, FormSection } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { useToast } from '../../../../components/ui/toast'
 
 interface Row {
   studentId: string
+  /** The RESULT row, not the pupil. The unlock in `0172` is granular to one result. */
+  resultId: string | null
   studentCode: string
   firstName: string
   lastName: string
@@ -130,6 +133,18 @@ function MarkSheet(): JSX.Element {
   const [entries, setEntries] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  /**
+   * Correcting a published mark — `PUBLISHING.md` → *Post-Publication Corrections*.
+   *
+   * Held per result id rather than as a single open dialog, because a principal correcting
+   * two transposed marks in one class should not have to re-open the panel between them.
+   */
+  const [correcting, setCorrecting] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
+
+  /** At least one mark can still be written — either never published, or unlocked. */
+  const hasEditableRow = (data?.rows ?? []).some((r) => !r.published)
   const [formError, setFormError] = useState<string | null>(null)
 
   // Seeded from what is saved. A blank string is an unmarked pupil and stays
@@ -211,6 +226,32 @@ function MarkSheet(): JSX.Element {
       reload()
     },
     [data, entries, classId, subjectCode, academicYear, termNumber, total, structure.data, toast, reload],
+  )
+
+  const unlock = useCallback(
+    async (resultId: string) => {
+      setUnlocking(true)
+      try {
+        const result = await apiSend<{ unlocked: boolean; message: string }>(
+          '/api/school/results/unlock',
+          'POST',
+          { resultId, reason },
+        )
+        if (result.error) {
+          toast(result.error, 'danger')
+          return
+        }
+        // The mark is editable until it is saved, at which point the trigger re-locks it —
+        // so the message says what to do next rather than only what happened.
+        toast('Unlocked. Correct the mark and save — it re-locks itself.', 'success')
+        setCorrecting(null)
+        setReason('')
+        reload()
+      } finally {
+        setUnlocking(false)
+      }
+    },
+    [reason, toast, reload],
   )
 
   const publish = useCallback(async () => {
@@ -342,10 +383,17 @@ function MarkSheet(): JSX.Element {
 
         {ready && !error && data && (
           <>
-            {data.published && (
+            {data.published && !hasEditableRow && (
               <Alert variant="info" title="These results are published">
-                Parents can see them, and marks can no longer be edited here. A correction after
-                publication has to be made deliberately.
+                Parents can see them, and marks can no longer be edited here. To fix one, press
+                Correct beside the pupil and say why — that unlocks only their mark.
+              </Alert>
+            )}
+
+            {data.published && hasEditableRow && (
+              <Alert variant="warning" title="A mark is unlocked for correction">
+                Only the unlocked mark can be edited. Saving re-locks it automatically and
+                records the old and new value — there is nothing else to press.
               </Alert>
             )}
 
@@ -426,7 +474,15 @@ function MarkSheet(): JSX.Element {
                             // with no decimal point makes 7.5 untypeable.
                             inputMode="decimal"
                             placeholder="—"
-                            disabled={data.published || !data.canWrite}
+                            /*
+                              Per ROW, not per sheet. `data.published` is
+                              `rows.some(r => r.published)`, so once a class is published
+                              every input stayed disabled — including a mark the principal
+                              had just unlocked for correction, which made the correction
+                              impossible to type. The lock belongs to the result, which is
+                              also the granularity `0172` unlocks at.
+                            */
+                            disabled={r.published || !data.canWrite}
                             value={entries[r.studentId] ?? ''}
                             onChange={(e) =>
                               setEntries((s) => ({ ...s, [r.studentId]: e.target.value }))
@@ -444,6 +500,77 @@ function MarkSheet(): JSX.Element {
                             <span className="text-sm text-muted-foreground">—</span>
                           )}
                         </div>
+
+                        {/*
+                          Correcting one published mark.
+
+                          Offered per pupil, never per class, because `0172`'s unlock is
+                          granular on purpose: unlocking a whole class mid-correction would
+                          silently withdraw every other mark from the parents already
+                          reading them. Only the owner or principal may do it — the function
+                          refuses anybody else — so `canPublish` gates the control, which is
+                          the same pair of roles.
+                        */}
+                        {data.published && data.canPublish && r.resultId && (
+                          <div className="w-28 text-right">
+                            {correcting === r.resultId ? null : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setCorrecting(r.resultId)
+                                  setReason('')
+                                }}
+                              >
+                                Correct
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* The reason, which 0172 requires and records in `audit_logs`.
+                            Inline under the row rather than a modal: the principal needs to
+                            see which pupil and which mark while typing why. */}
+                        {correcting === r.resultId && (
+                          <div className="flex w-full flex-wrap items-end gap-2 rounded-md border border-warning/40 bg-warning/5 p-2">
+                            <div className="flex min-w-[14rem] flex-1 flex-col gap-1">
+                              <label
+                                htmlFor={`reason-${r.studentId}`}
+                                className="text-xs font-medium"
+                              >
+                                Why is this mark being corrected?
+                              </label>
+                              <input
+                                id={`reason-${r.studentId}`}
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                placeholder="Data entry error — correct mark is 82 not 28"
+                                className="min-h-tap rounded-md border border-border bg-background px-2 text-sm"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Recorded permanently against this result. Parents can already
+                                see the current mark.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={unlocking || reason.trim().length < 4}
+                              onClick={() => void unlock(r.resultId as string)}
+                            >
+                              Unlock to correct
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setCorrecting(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -458,7 +585,10 @@ function MarkSheet(): JSX.Element {
                 </CardContent>
               </Card>
 
-              {data.canWrite && !data.published && data.rows.length > 0 && (
+              {/* `hasEditableRow`, not `!data.published`: after unlocking one mark for
+                  correction the sheet is still "published" overall, and gating on that
+                  hid the only button that could save the correction. */}
+              {data.canWrite && hasEditableRow && data.rows.length > 0 && (
                 // Sticky, for the same reason as the attendance register: the
                 // save button must never be a scroll away from the last mark
                 // typed.
@@ -505,6 +635,15 @@ function MarkSheet(): JSX.Element {
             )}
           </>
         )}
+
+        {/* After the mark sheet, because generating is what happens once marks are in.
+            Visible whether or not a class is chosen: the usual action is the whole term. */}
+        <ReportCards
+          academicYear={academicYear}
+          termNumber={termNumber}
+          classId={classId}
+          canGenerate={data?.canPublish ?? false}
+        />
       </div>
     </>
   )

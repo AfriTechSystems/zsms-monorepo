@@ -124,6 +124,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     // error shape; the runtime error is handled above, so the rows are narrowed
     // once here rather than every field access being guarded.
     type MarkRow = {
+      id: string
       student_id: string
       marks_obtained: number | null
       marks_total: number | null
@@ -140,6 +141,10 @@ export async function GET(request: NextRequest): Promise<Response> {
       const existing = byStudent.get(p.id)
       return {
         studentId: p.id,
+        // The RESULT row's id, which correcting a published mark needs: the unlock in
+        // `0172` is granular to one result, never a pupil or a class, so the pupil id
+        // cannot identify what to unlock.
+        resultId: existing?.id ?? null,
         studentCode: p.student_id,
         firstName: p.first_name,
         lastName: p.last_name,

@@ -37,7 +37,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { DataTable } from '../../../components/ui/data-table'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, TableSkeleton } from '../../../components/ui/data-states'
-import { ChildPicker, ParentPageHeader, shortDate, type ChildOption } from '../parent-shared'
+import { ParentPageHeader, shortDate, type ChildOption } from '../parent-shared'
 
 interface Result {
   id: string
@@ -101,7 +101,6 @@ function ParentResults(): JSX.Element {
         childName={`${data.selected.firstName} ${data.selected.lastName}`}
         note="Only results the school has published appear here. A subject that is missing has not been published yet — it does not mean your child was not marked."
       >
-        <ChildPicker children={data.children} selectedId={data.selected.id} />
       </ParentPageHeader>
 
       {byTerm.length === 0 && (

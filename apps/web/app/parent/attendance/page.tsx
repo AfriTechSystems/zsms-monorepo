@@ -36,7 +36,7 @@ import { DataTable } from '../../../components/ui/data-table'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, StatSkeleton } from '../../../components/ui/data-states'
 import { StatCard } from '../../../components/ui/stat-card'
-import { ChildPicker, ParentPageHeader, shortDate, type ChildOption } from '../parent-shared'
+import { ParentPageHeader, shortDate, type ChildOption } from '../parent-shared'
 
 interface Payload {
   children: ChildOption[]
@@ -102,7 +102,6 @@ function ParentAttendance(): JSX.Element {
         childName={`${data.selected.firstName} ${data.selected.lastName}`}
         note="Only days a teacher marked the register appear here. A day that is missing was not marked — it does not mean your child was away. Arriving late counts as being at school."
       >
-        <ChildPicker children={data.children} selectedId={data.selected.id} />
       </ParentPageHeader>
 
       <div className="grid grid-cols-2 gap-cards sm:grid-cols-4">

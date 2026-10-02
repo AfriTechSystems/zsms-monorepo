@@ -22,6 +22,7 @@
  */
 
 import type { JSX, ReactNode } from 'react'
+import { ChildSwitcher } from './child-switcher'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -182,6 +183,18 @@ export function ParentShell({
             <Link href="/parent" className="font-semibold text-text lg:hidden">
               ZSMS
             </Link>
+
+            {/*
+              In the SHELL, not on each page.
+
+              The child picker was on three screens out of five — fees and notices had
+              none — and `/parent/schools` was unreachable because nothing linked to it. A
+              parent reading one child's fees had to return to the dashboard to change
+              child, and could not get back to the school list at all. Here it is on every
+              parent screen, including any added later.
+            */}
+            <ChildSwitcher />
+
             <div className="ml-auto flex items-center gap-2">{headerActions}</div>
           </div>
         </header>

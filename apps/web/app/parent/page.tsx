@@ -43,7 +43,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { EmptyState } from '../../components/ui/empty-state'
 import { ErrorState, StatSkeleton } from '../../components/ui/data-states'
 import { StatCard } from '../../components/ui/stat-card'
-import { ChildPicker } from './parent-shared'
 
 interface Child {
   id: string
@@ -161,10 +160,6 @@ function ParentHome(): JSX.Element {
             <span className="font-mono">{child.studentId}</span>
           </p>
         </div>
-
-        {/* The shared picker: groups by school when the family spans more than
-            one, and renders nothing when there is no choice to make. */}
-        <ChildPicker children={data.children} selectedId={child.id} />
       </div>
 
       <div className="grid grid-cols-1 gap-cards sm:grid-cols-3">

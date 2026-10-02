@@ -6,8 +6,24 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": { "supportsTablet": true, "bundleIdentifier": "zm.co.zsms.app" },
-    "android": { "package": "zm.co.zsms.app" },
-    "plugins": ["expo-status-bar"]
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "zm.co.zsms.app"
+    },
+    "android": {
+      "package": "zm.co.zsms.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1D4ED8"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "scheme": "zsms",
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

@@ -47,26 +47,36 @@ export type ParentCallerResult =
 /**
  * Resolves a parent caller.
  *
- * A school staff member reaching a parent route is refused rather than served:
- * the parent screens answer "your children", and for a member of staff that set
- * is empty, which would render as a broken portal rather than a clear refusal.
- * Staff read a pupil through the school portal, where the scoping is theirs.
+ * ## It does not look at the Clerk role, and that is the fix
+ *
+ * This refused anybody whose active role was not `org:parent`. Two things were wrong with
+ * that, and the second is the reason the first happened:
+ *
+ *   * **a teacher can be a parent at the same school.** Reported from the running
+ *     application: a staff member with two children enrolled signed in, reached the parent
+ *     portal, and was told "staff accounts use the school portal instead" — about their own
+ *     children. Being employed somewhere does not stop you being a parent there, and in a
+ *     small Zambian private school it is common.
+ *   * **parent access was never a Clerk role to begin with.** `is_linked_parent_of()` (0016)
+ *     reads `parent_user_id = get_user_id()` and nothing else — no `current_school_uuid()`,
+ *     no role claim. A parent needs no organisation at all, which is why `/welcome` links
+ *     them by verified email rather than inviting them to one. The role gate was asserting
+ *     a model the schema has never had.
+ *
+ * So there is no role check. Anybody signed in may reach these routes, and **the policies
+ * decide what they see** — which for somebody with no linked children is nothing. That is
+ * the honest answer rather than a refusal: the screens then say "we could not find your
+ * children" and show the address to give the school, which is actionable, where "you do not
+ * have access" is not.
+ *
+ * This is the same correction `/welcome` already received. Both had assumed a parent is a
+ * kind of organisation member.
  */
 export async function resolveParentCaller(): Promise<ParentCallerResult> {
   const session = await getAuthProvider().getSessionUser()
 
   if (!session) {
     return { ok: false, response: fail('UNAUTHORIZED', 'Authentication required.') }
-  }
-
-  if (session.role !== 'org:parent') {
-    return {
-      ok: false,
-      response: fail(
-        'FORBIDDEN',
-        'This is the parent portal. Staff accounts use the school portal instead.',
-      ),
-    }
   }
 
   return {

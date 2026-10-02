@@ -104,6 +104,26 @@ export function AuthShell({
           in the product — the texture belongs here more than anywhere. */}
       <SchoolTexture />
 
+      {/*
+        Top left, where a back control belongs.
+
+        It was at the BOTTOM, under the sign-in card and the legal footnote — which is the
+        last place somebody looks when they want to leave, and on a short phone it was below
+        the fold entirely. A route out that has to be scrolled to is not much better than
+        none, which was the complaint this originally answered.
+
+        `absolute` so it does not push the centred card down: the card stays vertically
+        centred on a laptop and the control sits in the corner rather than in the flow.
+      */}
+      <Link
+        href="/"
+        className="absolute left-gutter top-4 inline-flex min-h-tap items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 text-sm font-medium text-muted-foreground backdrop-blur transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:top-6"
+      >
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        Back to ZSMS
+      </Link>
+
+
       <div className="flex w-full max-w-md flex-col items-center gap-2 text-center sm:gap-3">
         <Link href="/" aria-label="ZSMS home">
           <Image
@@ -142,18 +162,6 @@ export function AuthShell({
         <p className="max-w-md text-balance text-center text-xs text-subtle">{footnote}</p>
       )}
 
-      {/*
-        The escape. Clerk's card offers sign-in and sign-up and nothing else, so somebody who
-        opened this page by mistake — or who wants the directory rather than an account — had
-        no route back to the public site at all.
-      */}
-      <Link
-        href="/"
-        className="inline-flex min-h-tap items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Back to ZSMS
-      </Link>
     </main>
   )
 }

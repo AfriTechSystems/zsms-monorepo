@@ -119,11 +119,21 @@ export function ChildPicker({
 export function ParentPageHeader({
   title,
   childName,
+  schoolName,
   note,
   children: picker,
 }: {
   title: string
   childName?: string
+  /**
+   * The school this child attends.
+   *
+   * Reported from the running application: a parent reached the portal and saw no
+   * indication which school they were looking at. For a parent with children at two
+   * schools that is the first thing they need; for one with children at a single school it
+   * is still the confirmation that ZSMS is anything to do with their child.
+   */
+  schoolName?: string | null
   note?: string
   children?: JSX.Element | null
 }): JSX.Element {
@@ -132,7 +142,13 @@ export function ParentPageHeader({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
-          {childName && <p className="text-sm text-muted-foreground">{childName}</p>}
+          {(childName || schoolName) && (
+            <p className="text-sm text-muted-foreground">
+              {childName}
+              {childName && schoolName && ' · '}
+              {schoolName && <span className="font-medium text-foreground">{schoolName}</span>}
+            </p>
+          )}
         </div>
         {picker}
       </div>

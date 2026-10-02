@@ -81,6 +81,8 @@ interface Student {
   gender: string | null
   created_at: string
   updated_at: string
+  nrc_or_birth_cert: string | null
+  examination_number: string | null
   guardians?: Guardian[]
   guardiansLoaded?: boolean
 }
@@ -234,6 +236,11 @@ export default function StudentDetailPage({
       if (form.gender !== data.gender) patch['gender'] = form.gender || undefined
       if (form.date_of_birth !== data.date_of_birth) patch['dateOfBirth'] = form.date_of_birth || undefined
       if (form.enrolment_date !== data.enrolment_date) patch['enrolmentDate'] = form.enrolment_date
+      // Sent as '' rather than undefined when cleared: undefined means "unchanged" to the
+      // route, so a school correcting a mistyped candidate number could never remove one.
+      if (form.examination_number !== data.examination_number) {
+        patch['examinationNumber'] = form.examination_number ?? ''
+      }
 
       const result = await apiSend(`/api/students/${id}`, 'PATCH', patch)
 
@@ -294,6 +301,26 @@ export default function StudentDetailPage({
                   <div>
                     <dt className="text-sm text-muted-foreground">Counts against the limit</dt>
                     <dd className="text-sm">{onRoll(data.status) ? 'Yes' : 'No'}</dd>
+                  </div>
+                  {/*
+                    Both were collected at enrolment and then invisible forever. The NRC or
+                    birth certificate is how a school office identifies a pupil against a
+                    paper file; the candidate number is what an ECZ mark sheet is printed
+                    with, so a teacher cross-referencing one had nothing to match against.
+                  */}
+                  <div>
+                    <dt className="text-sm text-muted-foreground">NRC / birth certificate</dt>
+                    <dd className="font-mono text-sm">
+                      {data.nrc_or_birth_cert || <span className="text-subtle">Not recorded</span>}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm text-muted-foreground">Candidate number</dt>
+                    <dd className="font-mono text-sm">
+                      {data.examination_number || (
+                        <span className="text-subtle">Not an examination class</span>
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </CardContent>
@@ -661,6 +688,24 @@ export default function StudentDetailPage({
                         type="date"
                         value={form.enrolment_date ?? ''}
                         onChange={(e) => set('enrolment_date', e.target.value)}
+                      />
+                    )}
+                  </Field>
+
+                  {/* Optional by design — Grades 1–5 and 7–11 never sit a national exam, so
+                      most pupils will never have one and the hint says so rather than
+                      leaving a blank field looking unfinished. */}
+                  <Field
+                    id="exam-number"
+                    label="Candidate number"
+                    hint="ECZ or Cambridge. Only Grade 6, Form 4 and Form 6 are issued one."
+                  >
+                    {(props) => (
+                      <Input
+                        {...props}
+                        value={form.examination_number ?? ''}
+                        onChange={(e) => set('examination_number', e.target.value)}
+                        placeholder="Not an examination class"
                       />
                     )}
                   </Field>

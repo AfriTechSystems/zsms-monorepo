@@ -151,6 +151,26 @@ export default async function WelcomePage(): Promise<JSX.Element> {
       {/* Outside the flex container on purpose: it is `fixed`, so it paints the same either
           way, but as a flex ITEM it was adding a gap for an element with no layout box. */}
       <SchoolTexture />
+
+      {/*
+        Top left, where a back control belongs.
+
+        It was at the BOTTOM, under the sign-in card and the legal footnote — which is the
+        last place somebody looks when they want to leave, and on a short phone it was below
+        the fold entirely. A route out that has to be scrolled to is not much better than
+        none, which was the complaint this originally answered.
+
+        `absolute` so it does not push the centred card down: the card stays vertically
+        centred on a laptop and the control sits in the corner rather than in the flow.
+      */}
+      <Link
+        href="/"
+        className="absolute left-gutter top-4 inline-flex min-h-tap items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 text-sm font-medium text-muted-foreground backdrop-blur transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:top-6"
+      >
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        Back to ZSMS
+      </Link>
+
       <main
       id="main"
       className="relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center gap-2.5 px-gutter py-3 sm:gap-4 sm:py-5"
@@ -289,14 +309,10 @@ export default async function WelcomePage(): Promise<JSX.Element> {
           Waiting for an invitation? Once you accept the emailed link, signing in brings you
           straight to your dashboard.
         </p>
+        {/* Sign-out stays here; the way BACK is in the top-left corner. They are different
+            things — one ends the session, the other leaves the page — and putting them side
+            by side invited the wrong one. */}
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/"
-            className="inline-flex min-h-tap items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:border-foreground/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ArrowLeft aria-hidden="true" className="size-4" />
-            Back to ZSMS
-          </Link>
           <SignOutLink />
         </div>
       </div>

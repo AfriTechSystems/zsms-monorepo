@@ -42,6 +42,13 @@ export const updateStudentSchema = createStudentSchema
   .partial()
   .extend({
     status: z.enum(['active', 'on_leave', 'transferred', 'graduated', 'withdrawn']).optional(),
+    /**
+     * The ECZ or Cambridge candidate number (0181).
+     *
+     * Empty string is accepted and becomes NULL in the route: clearing a field a school
+     * entered by mistake has to be possible, and a CHECK refuses a blank string outright.
+     */
+    examinationNumber: z.string().trim().max(40).optional().or(z.literal('')),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update.' })
 

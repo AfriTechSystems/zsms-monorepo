@@ -40,7 +40,12 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
     const { data, error } = await client
       .from('students')
       .select(
-        'id, student_id, school_id, first_name, last_name, grade_id, class_id, is_boarding, status, enrolment_date, date_of_birth, gender, photo_url, created_at, updated_at',
+        // One literal, deliberately: PostgREST infers the row type from this string, and a
+        // concatenated one is opaque to it — the type degrades and `...data` stops being
+        // spreadable. `nrc_or_birth_cert` existed and was never selected; `examination_number`
+        // did not exist until 0181. STUDENTS.md names both as profile fields, so the office
+        // could enter them at enrolment and never see either again.
+        'id, student_id, school_id, first_name, last_name, grade_id, class_id, is_boarding, status, enrolment_date, date_of_birth, gender, nrc_or_birth_cert, examination_number, photo_url, created_at, updated_at',
       )
       .eq('id', id)
       .eq('is_deleted', false)
@@ -123,6 +128,11 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
     if (input.enrolmentDate !== undefined) patch['enrolment_date'] = input.enrolmentDate
     if (input.photoUrl !== undefined) patch['photo_url'] = input.photoUrl
     if (input.status !== undefined) patch['status'] = input.status
+    // Blank clears it. The CHECK on the column refuses '' outright, so an empty field from
+    // the form has to become NULL here or correcting a mistyped number would be impossible.
+    if (input.examinationNumber !== undefined) {
+      patch['examination_number'] = input.examinationNumber === '' ? null : input.examinationNumber
+    }
 
     const { data, error } = await client
       .from('students')

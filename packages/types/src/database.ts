@@ -3853,6 +3853,7 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           enrolment_date: string
+          examination_number: string | null
           first_name: string
           gender: string | null
           grade_id: string
@@ -3875,6 +3876,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           enrolment_date?: string
+          examination_number?: string | null
           first_name: string
           gender?: string | null
           grade_id: string
@@ -3897,6 +3899,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           enrolment_date?: string
+          examination_number?: string | null
           first_name?: string
           gender?: string | null
           grade_id?: string

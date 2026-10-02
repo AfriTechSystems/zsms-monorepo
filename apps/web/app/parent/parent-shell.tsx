@@ -30,9 +30,17 @@ import { CalendarCheck, ClipboardList, LayoutDashboard, Megaphone, Wallet } from
 import { cn } from '../../lib/utils'
 
 const LINKS = [
-  { path: '', label: 'Home', icon: LayoutDashboard, exact: true },
+  /*
+    Home is THIRD of five, not first.
+
+    Asked for on 2026-10-02. At the left edge it is the hardest tab to reach with the thumb
+    of the hand holding the phone, and it is the one a parent returns to between every other
+    screen. The centre of a five-tab bar is the easiest point to hit, so the most-used
+    destination goes there and is drawn slightly larger.
+  */
   { path: '/attendance', label: 'Attendance', icon: CalendarCheck, exact: false },
   { path: '/results', label: 'Results', icon: ClipboardList, exact: false },
+  { path: '', label: 'Home', icon: LayoutDashboard, exact: true },
   { path: '/fees', label: 'Fees', icon: Wallet, exact: false },
   { path: '/notices', label: 'Notices', icon: Megaphone, exact: false },
 ] as const
@@ -109,21 +117,45 @@ function BottomTabs(): JSX.Element {
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <ul className="flex">
-        {links.map(({ href, label, icon: Icon, active }) => (
-          <li key={label} className="flex-1">
-            <Link
-              href={href}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors',
-                active ? 'text-primary-text' : 'text-muted-text',
-              )}
-            >
-              <Icon className={cn('size-5', active && 'text-primary')} aria-hidden />
-              <span>{label}</span>
-            </Link>
-          </li>
-        ))}
+        {links.map(({ href, label, icon: Icon, active }) => {
+          // The centre tab, drawn larger. Identified by its label rather than its index so
+          // reordering the array cannot silently enlarge the wrong one.
+          const isHome = label === 'Home'
+
+          return (
+            <li key={label} className="flex-1">
+              <Link
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'flex min-h-tap flex-col items-center justify-center gap-1 text-xs font-medium transition-colors',
+                  isHome ? 'py-1.5' : 'py-2',
+                  active ? 'text-primary-text' : 'text-muted-text',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex items-center justify-center transition-colors',
+                    // A filled circle only on Home, so the thumb has a target rather than a
+                    // glyph. It stays tinted when inactive: the point is that it is always
+                    // findable, not that it is always selected.
+                    isHome && 'size-9 rounded-full',
+                    isHome && (active ? 'bg-primary text-primary-foreground' : 'bg-muted'),
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      isHome ? 'size-5' : 'size-5',
+                      active && !isHome && 'text-primary',
+                    )}
+                    aria-hidden
+                  />
+                </span>
+                <span className={cn(isHome && 'font-semibold')}>{label}</span>
+              </Link>
+            </li>
+          )
+        })}
       </ul>
     </nav>
   )

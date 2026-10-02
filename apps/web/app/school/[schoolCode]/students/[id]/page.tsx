@@ -122,6 +122,49 @@ export default function StudentDetailPage({
   const [gBusy, setGBusy] = useState(false)
   const [gOpen, setGOpen] = useState(false)
 
+  /**
+   * Recording that a pupil has left — `TRANSFER.md`.
+   *
+   * Separate from the status dropdown on the form below, deliberately. Setting `status`
+   * there changes a field; this starts the family's 30-day grace period and records why,
+   * which is what leaving actually involves. A dropdown cannot ask for a reason.
+   */
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  const [leaveKind, setLeaveKind] = useState<'transferred' | 'withdrawn'>('transferred')
+  const [leaveReason, setLeaveReason] = useState('')
+  const [leaveTo, setLeaveTo] = useState('')
+  const [leaving, setLeaving] = useState(false)
+
+  const recordLeaving = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault()
+      setLeaving(true)
+      try {
+        const result = await apiSend<{ message: string }>(
+          '/api/school/students/year-end',
+          'POST',
+          {
+            action: 'transfer',
+            studentId: id,
+            reason: leaveReason,
+            destination: leaveTo || undefined,
+            kind: leaveKind,
+          },
+        )
+        if (result.error) {
+          toast(result.error, 'danger')
+          return
+        }
+        toast(result.data?.message ?? 'Recorded.', 'success')
+        setLeaveOpen(false)
+        reload()
+      } finally {
+        setLeaving(false)
+      }
+    },
+    [id, leaveReason, leaveTo, leaveKind, toast, reload],
+  )
+
   const addGuardian = useCallback(
     async (event: FormEvent) => {
       event.preventDefault()
@@ -740,6 +783,92 @@ export default function StudentDetailPage({
                 </FormActions>
               </FormSection>
             </form>
+
+            {/*
+              Leaving is not a status change.
+
+              The dropdown above sets a field; this starts the family's 30-day grace
+              period (TRANSFER.md business rule 2) and records why and where to. A pupil's
+              record is never deleted — their results and payments reference it.
+            */}
+            {onRoll(data.status) && (
+              <Card>
+                <CardContent className="pt-card">
+                  {!leaveOpen ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button variant="outline" size="sm" onClick={() => setLeaveOpen(true)}>
+                        Record that this pupil has left
+                      </Button>
+                      <p className="text-sm text-muted-foreground">
+                        Their record stays. The family keeps access to past results and
+                        receipts for 30 days.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={recordLeaving} className="flex flex-col gap-3">
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex w-44 flex-col gap-1.5">
+                          <label htmlFor="leave-kind" className="text-sm font-medium">
+                            What happened
+                          </label>
+                          <select
+                            id="leave-kind"
+                            value={leaveKind}
+                            onChange={(e) =>
+                              setLeaveKind(e.target.value as 'transferred' | 'withdrawn')
+                            }
+                            className="min-h-tap rounded-md border border-border bg-background px-3"
+                          >
+                            <option value="transferred">Transferred to another school</option>
+                            <option value="withdrawn">Left school altogether</option>
+                          </select>
+                        </div>
+
+                        {leaveKind === 'transferred' && (
+                          <div className="flex min-w-[12rem] flex-1 flex-col gap-1.5">
+                            <label htmlFor="leave-to" className="text-sm font-medium">
+                              Going to <span className="text-subtle">(optional)</span>
+                            </label>
+                            <input
+                              id="leave-to"
+                              value={leaveTo}
+                              onChange={(e) => setLeaveTo(e.target.value)}
+                              placeholder="Kabulonga Primary"
+                              className="min-h-tap rounded-md border border-border bg-background px-3"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="leave-reason" className="text-sm font-medium">
+                          Reason
+                        </label>
+                        <input
+                          id="leave-reason"
+                          value={leaveReason}
+                          onChange={(e) => setLeaveReason(e.target.value)}
+                          placeholder="Family relocated to Ndola"
+                          required
+                          minLength={4}
+                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="submit" disabled={leaving || leaveReason.trim().length < 4}>
+                          {leaving && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                          Record it
+                        </Button>
+                        <Button type="button" variant="ghost" onClick={() => setLeaveOpen(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Renders nothing when the school has defined no extra fields — an
                 empty "Additional details" heading reads as a broken section. */}

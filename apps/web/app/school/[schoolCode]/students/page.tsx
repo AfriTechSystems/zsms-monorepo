@@ -35,6 +35,7 @@ import { Search, UserPlus, Users, Upload } from 'lucide-react'
 import { Pagination } from '../../../../components/ui/pagination'
 import { useApi } from '../../../../lib/use-api'
 import { can } from '../../../../lib/roles'
+import { YearEnd } from './year-end'
 import type { Role } from '@zsms/auth-provider'
 import { Alert } from '../../../../components/ui/alert'
 import { Button } from '../../../../components/ui/button'
@@ -99,6 +100,13 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
   // direction. A button that appears and then vanishes is worse than one that
   // appears a moment late.
   const mayEnrol = can(structure?.role as Role | undefined, 'students:write')
+
+  /*
+    Promotion is the owner's and principal's act — `promote_students()` refuses anybody
+    else inside the function. `results:publish` is exactly that pair, so it is reused
+    rather than adding a `students:promote` nobody else would ever check.
+  */
+  const canPromote = can(structure?.role as Role | undefined, 'results:publish')
   const ceiling = capacity?.is_unlimited ? null : (capacity?.student_limit ?? null)
 
   const total = meta?.total ?? 0
@@ -309,6 +317,11 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
           />
         </>
       )}
+
+      {/* Once a year, and reserved to the people who run the school — the function
+          refuses anybody but the owner or principal, so the panel follows the same
+          pair rather than inventing a third rule. */}
+      {canPromote && <YearEnd onDone={reload} />}
     </>
   )
 }

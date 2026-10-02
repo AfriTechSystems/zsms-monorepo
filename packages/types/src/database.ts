@@ -5390,6 +5390,16 @@ export type Database = {
           students_total: number
         }[]
       }
+      promote_students: {
+        Args: { p_dry_run?: boolean }
+        Returns: {
+          out_applied: boolean
+          out_from_grade: string
+          out_is_final: boolean
+          out_pupils: number
+          out_to_grade: string
+        }[]
+      }
       province_for_city: { Args: { p_city_code: string }; Returns: string }
       publish_results: {
         Args: {
@@ -6015,6 +6025,19 @@ export type Database = {
       teaching_resource_feature_key: {
         Args: { p_resource_kind: string }
         Returns: string
+      }
+      transfer_student: {
+        Args: {
+          p_destination?: string
+          p_kind?: string
+          p_reason: string
+          p_student_id: string
+        }
+        Returns: {
+          out_access_until: string
+          out_done: boolean
+          out_message: string
+        }[]
       }
       unlink_parent_from_student: {
         Args: { p_link_id: string }

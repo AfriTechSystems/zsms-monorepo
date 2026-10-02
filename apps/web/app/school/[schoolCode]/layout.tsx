@@ -21,6 +21,7 @@
  */
 
 import type { JSX, ReactNode } from 'react'
+import { StaffRecordSync } from '../../../components/ui/staff-record-sync'
 import { ShieldAlert } from 'lucide-react'
 
 import { ThemeStyle } from '../../../lib/theme'
@@ -54,6 +55,12 @@ export default async function SchoolLayout({
 
   return (
     <>
+      {/* Accepting a Clerk invitation creates an organisation membership and nothing
+          else — until 0184 nothing wrote the `staff_members` row, so an accepted teacher
+          was invisible on the Staff screen and unassignable to a class. Renders nothing;
+          see the component. */}
+      <StaffRecordSync />
+
       <ThemeStyle theme={theme} />
       <a href="#main" className="skip-link">
         Skip to content

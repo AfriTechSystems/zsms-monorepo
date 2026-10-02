@@ -79,7 +79,48 @@ export default function TeachingPage({
   const { schoolCode } = use(params)
   const base = `/school/${schoolCode}`
 
+  // Declared before the memos below read it.
+  const [gradeId, setGradeId] = useState('')
+
   const { data, loading, error, code, reload } = useApi<Payload>('/api/school/teaching')
+
+  /*
+    `/api/school/structure` for the grade ORDER.
+
+    The assignment payload carries each class and its grade, but sorted by class id —
+    which puts `grade_10a` before `grade_1a`, because that is alphabetical and nothing
+    else. `school_grade_levels.level_order` is the school's own ladder and the only
+    correct sequence; Zambia runs two systems at once, so Form 1 follows Grade 6 at one
+    school and Grade 7 at another.
+  */
+  const { data: structure } = useApi<{
+    gradeLevels: Array<{ level_id: string; display_name: string | null }>
+  }>('/api/school/structure')
+
+  /** Grades that actually have a class, in the school's order. */
+  const grades = useMemo(() => {
+    const present = new Set((data?.classes ?? []).map((c) => c.gradeId))
+    const ordered = (structure?.gradeLevels ?? [])
+      .filter((g) => present.has(g.level_id))
+      .map((g) => ({ id: g.level_id, label: g.display_name ?? formatLevel(g.level_id) }))
+
+    // A class whose grade is missing from the structure would otherwise be
+    // unreachable — it still needs assigning, so it goes at the end rather than
+    // disappearing.
+    for (const id of present) {
+      if (!ordered.some((g) => g.id === id)) ordered.push({ id, label: formatLevel(id) })
+    }
+    return ordered
+  }, [data, structure])
+
+  /** Classes inside the chosen grade. Nothing until one is chosen. */
+  const classesInGrade = useMemo(
+    () =>
+      (data?.classes ?? [])
+        .filter((c) => c.gradeId === gradeId)
+        .sort((a, b) => a.classId.localeCompare(b.classId)),
+    [data, gradeId],
+  )
 
   const [teacherUserId, setTeacher] = useState('')
   const [scope, setScope] = useState<'class' | 'subject'>('class')
@@ -304,16 +345,51 @@ export default function TeachingPage({
                     )}
                   </Field>
 
+                  {/*
+                    Grade first, then the classes inside it.
+
+                    This was every class in the school in one dropdown, sorted
+                    alphabetically — so a secondary school with twelve grades put dozens of
+                    options in front of an administrator with `grade_10a` above `grade_1a`
+                    and no indication which grade any of them belonged to.
+                  */}
+                  <Field id="ta-grade" label="Grade" required>
+                    {(props) => (
+                      <Select
+                        {...props}
+                        value={gradeId}
+                        required
+                        // Changing grade clears the class: a class from the previous grade
+                        // is not in the new one, and leaving it set would assign a teacher
+                        // to something the administrator is no longer looking at.
+                        onChange={(e) => {
+                          setGradeId(e.target.value)
+                          setClassId('')
+                        }}
+                      >
+                        <option value="">Choose a grade</option>
+                        {grades.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.label}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </Field>
+
                   <Field id="ta-class" label="Class" required>
                     {(props) => (
                       <Select
                         {...props}
                         value={classId}
                         required
+                        disabled={!gradeId}
                         onChange={(e) => setClassId(e.target.value)}
                       >
-                        <option value="">Choose a class</option>
-                        {data.classes.map((c) => (
+                        <option value="">
+                          {gradeId ? 'Choose a class' : 'Choose a grade first'}
+                        </option>
+                        {classesInGrade.map((c) => (
                           <option key={c.classId} value={c.classId}>
                             {formatLevel(c.classId)}
                           </option>

@@ -5126,6 +5126,19 @@ export type Database = {
         Args: { p_school_id: string }
         Returns: boolean
       }
+      ensure_my_staff_record: {
+        Args: {
+          p_email?: string
+          p_first_name?: string
+          p_last_name?: string
+          p_phone?: string
+        }
+        Returns: {
+          out_created: boolean
+          out_message: string
+          out_staff_id: string
+        }[]
+      }
       ensure_onboarding_checklist: {
         Args: { p_school_id: string }
         Returns: number

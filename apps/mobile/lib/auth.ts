@@ -10,12 +10,14 @@
  */
 
 import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-expo'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
-import type { TokenGetter } from './api'
+import { api, type TokenGetter } from './api'
 
 export interface Session {
   isLoaded: boolean
+  firstName: string | null
+  lastName: string | null
   isSignedIn: boolean
   userId: string | null
   email: string | null
@@ -42,8 +44,35 @@ export function useSession(): Session {
     }
   }, [getToken])
 
+  /*
+    Put the teacher on their school's roll.
+
+    Accepting a Clerk invitation creates an organisation membership and nothing else —
+    until `0184` nothing wrote the `staff_members` row, so an accepted teacher held a role,
+    passed RLS, and was invisible on the Staff screen and unassignable to a class.
+
+    Fired once per launch, after Clerk has resolved. Idempotent on the server, so being
+    wrong here costs one indexed lookup; failing is silent, because a teacher opening the
+    app has something to do and the next launch retries.
+  */
+  const synced = useRef(false)
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || synced.current) return
+    synced.current = true
+    void api
+      .post('/api/session/staff-record', token, {
+        firstName: user?.firstName ?? undefined,
+        lastName: user?.lastName ?? undefined,
+      })
+      .catch(() => {
+        // Silent on purpose — see above.
+      })
+  }, [isLoaded, isSignedIn, token, user])
+
   return {
     isLoaded,
+    firstName: user?.firstName ?? null,
+    lastName: user?.lastName ?? null,
     isSignedIn: Boolean(isSignedIn),
     userId: userId ?? null,
     email: user?.primaryEmailAddress?.emailAddress ?? null,

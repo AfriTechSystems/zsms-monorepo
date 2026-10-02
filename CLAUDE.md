@@ -48,6 +48,29 @@ The tree is:
 
 **`npm run lint` did nothing until 2026-09-27**: the script was `next lint` with no config, which prompts interactively and surfaced under turbo as an opaque non-zero exit. It is now `eslint` with a flat config in `apps/web/eslint.config.mjs`, and the nine dead imports it immediately found are gone.
 
+**Three commands exist because the same mistakes kept recurring. Use them.**
+
+- **`npm run db:cols -- <table>`** prints a table's real columns, nullability, defaults and
+  CHECK constraints. **Run it before writing any SQL against a table, including one you
+  believe you know.** Four bugs in one session came from assuming a column's shape —
+  `schools.school_code`, `student_parent_links.school_id`, `student_parent_links.updated_at`
+  and `students.class_id` being NOT NULL. Three were inventions that failed loudly; the
+  worst *succeeded*, ignoring `unlinked_at`/`unlinked_by` which do exist, and recorded less
+  than the schema was built to hold.
+- **`npm run gaps`** lists `public` functions no source calls and API routes no screen
+  references — the chain `docs → schema → function → route → screen → a link to it`. The
+  most expensive failure here is not a bug but work that is correct and unreachable: a whole
+  migration for results corrections with no screen, a report-card worker nothing could
+  invoke, and `generate-receipt` enqueued from a route no screen has ever called, so no
+  receipt had ever been produced. Part of `ci:checks`. Curated exceptions carry a reason.
+- **`npm run clerk:check`** mints a real token and decodes it, which is the artefact SQL
+  actually sees.
+
+Three skills in `.claude/skills/` carry the judgement the scripts cannot: **`zsms-migration`**
+(numbering, introspection, DEFINER and grant patterns, exercising against the real
+database), **`zsms-feature`** (the reachability chain, the permission matrix, the API
+envelope), and **`zsms-review`** (auditing for gaps and tenant-isolation mistakes).
+
 **Running locally.** `npm run dev` frees port 3000, starts `apps/web` on it, and prints the LAN address a phone can reach. `npm run dev:clean` also clears `apps/web/.next`; `npm run port:free` just releases the port. Use these rather than `turbo dev` directly (`dev:turbo` if you need it): a killed turbo wrapper leaves `next dev` orphaned, holding port 3000 with a broken compiler worker pool, and the symptom is a 500 reading "Jest worker encountered 2 child process exceptions" — which looks like an application error and is not one. Next's fallback to port 3001 is silent, so every URL written down becomes wrong. Workers are excluded on purpose — they need Redis and provider credentials a UI session has no reason to hold, and a worker crash used to take the web app down with it. Use `npm run dev:workers` to run one deliberately, or `npm run dev:all` for the whole set. Note also that `next build` overwrites the `.next` that `next dev` serves from, so a build run while the dev server is up wedges it — `npm run dev:clean` is the recovery. And `node --experimental-strip-types` is **not** a drop-in TypeScript runner: it requires explicit `.ts` on every relative import, and it has silently broken two scripts in this repo. Use `tsx`.
 
 **Read `JOURNAL.md` first.** It records what each session actually did, the defects found, and what was deliberately deferred — including several cases where a documented claim turned out not to match the schema.

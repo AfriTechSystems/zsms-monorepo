@@ -52,6 +52,7 @@ import { Loader2, LogOut } from 'lucide-react'
 import { SignOutButton, useAuth, useOrganizationList } from '@zsms/auth-provider/react'
 
 import { cn } from '../../lib/utils'
+import { PortalSwitch } from './portal-switch'
 import { clearAllDrafts } from '../../lib/use-form-draft'
 
 export function AccountMenu({ className }: { className?: string }): JSX.Element | null {
@@ -114,6 +115,16 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
       )}
 
       {switching && <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" />}
+
+      {/*
+        A way back to the portal chooser.
+
+        Distinct from the organisation switcher above: that moves between SCHOOLS, which
+        is one audience in several places. This moves between AUDIENCES — the same person
+        as a parent, a teacher and an owner, which is ordinary in a small school. Renders
+        nothing when the account reaches only one portal.
+      */}
+      <PortalSwitch />
 
       <SignOutButton redirectUrl="/sign-in">
         <button

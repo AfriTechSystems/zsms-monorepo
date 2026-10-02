@@ -317,3 +317,37 @@ export async function removeFromOrganisation(params: {
     userId: params.userId,
   })
 }
+
+/**
+ * Every organisation an account belongs to.
+ *
+ * ## Why the session alone is not enough
+ *
+ * A Clerk session acts in ONE organisation at a time, so `session.organisationId` names
+ * the active one and says nothing about the others. That is fine for authorisation — the
+ * token's `o.*` claims are what RLS reads — and wrong for the question "where can this
+ * person go".
+ *
+ * Found on 2026-10-02 while building the portal chooser: an account that is both an
+ * AfriTech administrator and a school owner reported only ONE portal, because the
+ * inventory detected AfriTech by comparing the ACTIVE organisation's slug. Whichever
+ * organisation happened to be active was the only one anybody could see, and the other
+ * was unreachable without knowing to switch first.
+ *
+ * Schools are also derivable from the database through `my_schools()`, which is the
+ * authority for them. This exists for the organisations that are NOT schools — AfriTech
+ * being the only one today — and to tell the chooser which Clerk organisation each
+ * portal needs made active.
+ */
+export async function listUserOrganisations(userId: string): Promise<
+  Array<{ organisationId: string; slug: string | null; name: string; role: string }>
+> {
+  const page = await client().users.getOrganizationMembershipList({ userId, limit: 100 })
+
+  return page.data.map((m) => ({
+    organisationId: m.organization.id,
+    slug: m.organization.slug,
+    name: m.organization.name,
+    role: qualify(m.role),
+  }))
+}

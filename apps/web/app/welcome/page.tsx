@@ -54,6 +54,8 @@ import { redirect } from 'next/navigation'
 
 import { createUserClient } from '../../lib/supabase'
 import { OrganisationPicker } from './organisation-picker'
+import { listPortals } from '../../lib/portals'
+import { PortalChooser } from './portal-chooser'
 import { PortalCards } from '../../components/public/portal-cards'
 import { SchoolTexture } from '../../components/public/school-texture'
 import Link from 'next/link'
@@ -62,8 +64,6 @@ import { AlertTriangle, ArrowLeft, Building2, Sparkles, Users } from 'lucide-rea
 
 import { getAuthProvider } from '@zsms/auth-provider'
 
-import { AFRITECH_ORG_SLUG } from '../../lib/admin-context'
-import { isPortalRole } from '../../lib/roles'
 import { SignOutLink } from './sign-out-link'
 
 export const dynamic = 'force-dynamic'
@@ -80,16 +80,33 @@ export default async function WelcomePage(): Promise<JSX.Element> {
   // No session at all is the one case that legitimately belongs at sign-in.
   if (!session) redirect('/sign-in?redirect_url=/welcome')
 
-  if (session.organisationSlug === AFRITECH_ORG_SLUG) redirect('/admin')
+  /*
+    An inventory, not a cascade.
 
-  if (session.organisationSlug) {
-    // The slug IS the school code, lowercased — one identifier shared with Clerk and with
-    // `school_branding_by_slug()`.
-    if (isPortalRole(session.role)) {
-      redirect(`/school/${session.organisationSlug.toLowerCase()}`)
-    }
-    // A parent or pupil signed into a school organisation. Their portal is a separate surface.
-    redirect('/parent')
+    This page used to redirect on the FIRST match: AfriTech, then a school organisation,
+    then parent. Reported from the running application on 2026-10-02 — one address is a
+    parent, a teacher AND possibly a school owner, all true at once, which in a small
+    Zambian private school is ordinary rather than unusual. A head teacher's own children
+    attend the school they run.
+
+    So an owner who was also a parent landed in the school portal and never learned the
+    parent portal existed. The routing was a cascade where it needed to be a list.
+
+    One portal still redirects — asking somebody to choose between one thing is a worse
+    experience than the old bug. Several asks.
+  */
+  const portalClient = await createUserClient()
+  const inventory = portalClient ? await listPortals(portalClient, session) : []
+
+  if (inventory.length === 1) redirect(inventory[0]!.href)
+
+  if (inventory.length > 1) {
+    return (
+      <>
+        <SchoolTexture />
+        <PortalChooser portals={inventory} email={session.email} />
+      </>
+    )
   }
 
   /**

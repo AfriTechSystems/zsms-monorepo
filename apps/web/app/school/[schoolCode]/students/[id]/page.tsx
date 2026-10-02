@@ -502,12 +502,12 @@ export default function StudentDetailPage({
                         <label htmlFor="g-name" className="text-sm font-medium">
                           Full name
                         </label>
-                        <input
+                        <Input
                           id="g-name"
                           value={gName}
                           onChange={(e) => setGName(e.target.value)}
                           required
-                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                          
                         />
                       </div>
 
@@ -515,13 +515,13 @@ export default function StudentDetailPage({
                         <label htmlFor="g-phone" className="text-sm font-medium">
                           Phone
                         </label>
-                        <input
+                        <Input
                           id="g-phone"
                           value={gPhone}
                           onChange={(e) => setGPhone(e.target.value)}
                           placeholder="+260977123456"
                           required
-                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                          
                         />
                         <p className="text-xs text-muted-foreground">
                           If this number is already on another pupil, the same guardian is
@@ -535,12 +535,12 @@ export default function StudentDetailPage({
                         <label htmlFor="g-email" className="text-sm font-medium">
                           Email <span className="text-subtle">(optional)</span>
                         </label>
-                        <input
+                        <Input
                           id="g-email"
                           type="email"
                           value={gEmail}
                           onChange={(e) => setGEmail(e.target.value)}
-                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                          
                         />
                         <p className="text-xs text-muted-foreground">
                           {/* The single most useful thing on this form, and the least obvious. */}
@@ -552,11 +552,11 @@ export default function StudentDetailPage({
                         <label htmlFor="g-rel" className="text-sm font-medium">
                           Relationship
                         </label>
-                        <select
+                        <Select
                           id="g-rel"
                           value={gRelationship}
                           onChange={(e) => setGRelationship(e.target.value)}
-                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                          
                         >
                           {['mother', 'father', 'guardian', 'grandparent', 'sibling', 'uncle', 'aunt', 'other'].map(
                             (r) => (
@@ -565,12 +565,12 @@ export default function StudentDetailPage({
                               </option>
                             ),
                           )}
-                        </select>
+                        </Select>
                       </div>
                     </div>
 
                     <label className="flex min-h-tap cursor-pointer items-center gap-2 text-sm">
-                      <input
+                      <Input
                         type="checkbox"
                         checked={gPrimary}
                         onChange={(e) => setGPrimary(e.target.checked)}
@@ -811,17 +811,17 @@ export default function StudentDetailPage({
                           <label htmlFor="leave-kind" className="text-sm font-medium">
                             What happened
                           </label>
-                          <select
+                          <Select
                             id="leave-kind"
                             value={leaveKind}
                             onChange={(e) =>
                               setLeaveKind(e.target.value as 'transferred' | 'withdrawn')
                             }
-                            className="min-h-tap rounded-md border border-border bg-background px-3"
+                            
                           >
                             <option value="transferred">Transferred to another school</option>
                             <option value="withdrawn">Left school altogether</option>
-                          </select>
+                          </Select>
                         </div>
 
                         {leaveKind === 'transferred' && (
@@ -829,12 +829,12 @@ export default function StudentDetailPage({
                             <label htmlFor="leave-to" className="text-sm font-medium">
                               Going to <span className="text-subtle">(optional)</span>
                             </label>
-                            <input
+                            <Input
                               id="leave-to"
                               value={leaveTo}
                               onChange={(e) => setLeaveTo(e.target.value)}
                               placeholder="Kabulonga Primary"
-                              className="min-h-tap rounded-md border border-border bg-background px-3"
+                              
                             />
                           </div>
                         )}
@@ -844,14 +844,14 @@ export default function StudentDetailPage({
                         <label htmlFor="leave-reason" className="text-sm font-medium">
                           Reason
                         </label>
-                        <input
+                        <Input
                           id="leave-reason"
                           value={leaveReason}
                           onChange={(e) => setLeaveReason(e.target.value)}
                           placeholder="Family relocated to Ndola"
                           required
                           minLength={4}
-                          className="min-h-tap rounded-md border border-border bg-background px-3"
+                          
                         />
                       </div>
 

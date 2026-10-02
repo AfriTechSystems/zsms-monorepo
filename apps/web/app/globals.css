@@ -153,3 +153,32 @@
     opacity: 1;
   }
 }
+
+/**
+ * Illustration motion.
+ *
+ * One animation, used by the flag on `SchoolBuilding` and anything else that wants a
+ * sign of life. Four pixels over four seconds: the drawing should look alive rather
+ * than animated, and on an empty screen anything faster becomes the busiest thing
+ * on the page — which is the opposite of what an empty state is for.
+ *
+ * Stopped outright under `prefers-reduced-motion`. Unlike the splash bar there is no
+ * honest still equivalent to substitute: a flag that does not move is simply a flag,
+ * and nothing is being communicated by the movement that the drawing does not already
+ * say.
+ */
+@keyframes zsms-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+.zsms-float {
+  animation: zsms-float 4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zsms-float {
+    animation: none;
+  }
+}

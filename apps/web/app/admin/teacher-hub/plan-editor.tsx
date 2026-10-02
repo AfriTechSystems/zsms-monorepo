@@ -36,6 +36,7 @@ import { useState } from 'react'
 import { Loader2, Tag } from 'lucide-react'
 
 import { Badge } from '../../../components/ui/badge'
+import { Input } from '../../../components/ui/field'
 import { Button } from '../../../components/ui/button'
 import {
   Card,
@@ -177,7 +178,7 @@ export function PlanEditor({
                   >
                     Price ({plan.out_currency_code})
                   </label>
-                  <input
+                  <Input
                     id={`price-${plan.out_plan_code}`}
                     type="number"
                     min={0}
@@ -189,7 +190,7 @@ export function PlanEditor({
                         [plan.out_plan_code]: { ...c[plan.out_plan_code], price: e.target.value },
                       }))
                     }
-                    className="min-h-tap rounded-md border border-border bg-background px-2"
+                    
                   />
                 </div>
 
@@ -200,7 +201,7 @@ export function PlanEditor({
                   >
                     Credits / {plan.out_ai_credits_period}
                   </label>
-                  <input
+                  <Input
                     id={`credits-${plan.out_plan_code}`}
                     type="number"
                     min={0}
@@ -212,7 +213,7 @@ export function PlanEditor({
                         [plan.out_plan_code]: { ...c[plan.out_plan_code], credits: e.target.value },
                       }))
                     }
-                    className="min-h-tap rounded-md border border-border bg-background px-2"
+                    
                   />
                 </div>
 

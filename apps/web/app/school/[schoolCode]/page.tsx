@@ -31,15 +31,7 @@
 import type { JSX } from 'react'
 import { use } from 'react'
 import Link from 'next/link'
-import {
-  ArrowRight,
-  CalendarCheck,
-  Megaphone,
-  TriangleAlert,
-  UserPlus,
-  Users,
-  Wallet,
-} from 'lucide-react'
+import { ArrowRight, CalendarCheck, TriangleAlert, UserPlus, Users, Wallet } from 'lucide-react'
 
 import { useApi } from '../../../lib/use-api'
 import { can } from '../../../lib/roles'
@@ -278,7 +270,7 @@ export default function SchoolDashboardPage({
                 <dl className="space-y-2">
                   {Object.entries(data.roll.byStatus).length === 0 ? (
                     <EmptyState
-                      icon={Users}
+                      illustration="pupils"
                       title="No pupils yet"
                       description="Enrol the first pupil to start the roll."
                       action={
@@ -330,7 +322,7 @@ export default function SchoolDashboardPage({
               <CardContent>
                 {data.announcements.length === 0 ? (
                   <EmptyState
-                    icon={Megaphone}
+                    illustration="notices"
                     title="Nothing sent yet"
                     description="Announcements sent to this school will appear here."
                   />

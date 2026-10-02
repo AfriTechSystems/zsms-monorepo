@@ -31,7 +31,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Gauge, Loader2, Megaphone, Send, X } from 'lucide-react'
+import { Gauge, Loader2, Send, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -691,7 +691,7 @@ export default function AnnouncementsPage(): JSX.Element {
                 ]}
                 empty={
                   <EmptyState
-                    icon={Megaphone}
+                    illustration="notices"
                     title="No announcements yet"
                     description="Notices you send to parents, pupils or staff appear here with what happened to each one."
                   />

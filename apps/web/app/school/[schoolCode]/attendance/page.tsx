@@ -254,7 +254,7 @@ function Register(): JSX.Element {
         <form onSubmit={save}>
           {data.register.length === 0 ? (
             <EmptyState
-              icon={CalendarCheck}
+              illustration="attendance"
               title="No pupils to mark"
               description="Either this class has nobody on the roll, or it is not one you are assigned to teach."
             />

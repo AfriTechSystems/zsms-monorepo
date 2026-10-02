@@ -42,6 +42,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { Loader2, Plus, Receipt, RotateCcw } from 'lucide-react'
 
 import { Badge } from '../../../../../components/ui/badge'
+import { Input, Select } from '../../../../../components/ui/field'
 import { Button } from '../../../../../components/ui/button'
 import {
   Card,
@@ -306,11 +307,11 @@ export function FeeLineBuilder({
             <label htmlFor="fee-year" className="text-sm font-medium">
               Academic year
             </label>
-            <input
+            <Input
               id="fee-year"
               value={year}
               onChange={(e) => setYear(e.target.value)}
-              className="min-h-tap w-32 rounded-md border border-border bg-background px-3"
+              className="w-32"
             />
           </div>
           {/* Next year is a normal thing to prepare in October, so it is one tap rather than
@@ -330,13 +331,13 @@ export function FeeLineBuilder({
                 <label htmlFor="fee-label" className="text-sm font-medium">
                   Fee
                 </label>
-                <input
+                <Input
                   id="fee-label"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   placeholder="Tuition Fee"
                   required
-                  className="min-h-tap rounded-md border border-border bg-background px-3"
+                  
                 />
               </div>
 
@@ -344,7 +345,7 @@ export function FeeLineBuilder({
                 <label htmlFor="fee-amount" className="text-sm font-medium">
                   Amount (K)
                 </label>
-                <input
+                <Input
                   id="fee-amount"
                   type="number"
                   min={0}
@@ -352,7 +353,7 @@ export function FeeLineBuilder({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   required
-                  className="min-h-tap rounded-md border border-border bg-background px-3"
+                  
                 />
               </div>
 
@@ -360,11 +361,11 @@ export function FeeLineBuilder({
                 <label htmlFor="fee-grade" className="text-sm font-medium">
                   Grade
                 </label>
-                <select
+                <Select
                   id="fee-grade"
                   value={gradeId}
                   onChange={(e) => setGradeId(e.target.value)}
-                  className="min-h-tap rounded-md border border-border bg-background px-3"
+                  
                 >
                   {/* `ALL` is the documented special value — one amount for every grade. */}
                   <option value="ALL">Every grade</option>
@@ -373,25 +374,25 @@ export function FeeLineBuilder({
                       {g.display_name ?? g.level_id}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="flex min-w-[10rem] flex-col gap-1.5">
                 <label htmlFor="fee-type" className="text-sm font-medium">
                   Applies to
                 </label>
-                <select
+                <Select
                   id="fee-type"
                   value={studentType}
                   onChange={(e) => setStudentType(e.target.value)}
-                  className="min-h-tap rounded-md border border-border bg-background px-3"
+                  
                 >
                   {STUDENT_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
                       {t.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -400,7 +401,7 @@ export function FeeLineBuilder({
               <span className="text-sm font-medium">Terms</span>
               {[1, 2, 3].map((t) => (
                 <label key={t} className="flex min-h-tap cursor-pointer items-center gap-2 text-sm">
-                  <input
+                  <Input
                     type="checkbox"
                     checked={terms.includes(t)}
                     onChange={(e) =>
@@ -417,7 +418,7 @@ export function FeeLineBuilder({
               ))}
 
               <label className="ml-auto flex min-h-tap cursor-pointer items-center gap-2 text-sm">
-                <input
+                <Input
                   type="checkbox"
                   checked={mandatory}
                   onChange={(e) => setMandatory(e.target.checked)}

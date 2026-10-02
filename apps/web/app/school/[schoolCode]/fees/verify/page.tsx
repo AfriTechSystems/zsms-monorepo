@@ -33,7 +33,7 @@
 import type { ChangeEvent, JSX } from 'react'
 import { use, useCallback, useState } from 'react'
 import Link from 'next/link'
-import { Check, ClipboardCheck, Loader2, X } from 'lucide-react'
+import { Check, Loader2, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -158,7 +158,7 @@ export default function VerifyPage({
             <Card>
               <CardContent className="p-0">
                 <EmptyState
-                  icon={ClipboardCheck}
+                  illustration="fees"
                   title="Nothing waiting"
                   description="Every recorded payment has been confirmed or rejected."
                 />

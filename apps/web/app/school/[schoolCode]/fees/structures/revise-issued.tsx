@@ -31,6 +31,7 @@ import { useCallback, useState } from 'react'
 import { Loader2, PencilLine } from 'lucide-react'
 
 import { Alert } from '../../../../../components/ui/alert'
+import { Input, Select } from '../../../../../components/ui/field'
 import { Button } from '../../../../../components/ui/button'
 import { apiSend } from '../../../../../lib/use-api'
 import { useToast } from '../../../../../components/ui/toast'
@@ -126,12 +127,12 @@ export function ReviseIssued({
               <label htmlFor="rev-label" className="text-sm font-medium">
                 Which fee
               </label>
-              <select
+              <Select
                 id="rev-label"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 required
-                className="min-h-tap rounded-md border border-border bg-background px-3"
+                
               >
                 <option value="">Choose a fee</option>
                 {labels.map((l) => (
@@ -139,32 +140,32 @@ export function ReviseIssued({
                     {l}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="flex w-28 flex-col gap-1.5">
               <label htmlFor="rev-term" className="text-sm font-medium">
                 Term
               </label>
-              <select
+              <Select
                 id="rev-term"
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
-                className="min-h-tap rounded-md border border-border bg-background px-3"
+                
               >
                 {[1, 2, 3].map((t) => (
                   <option key={t} value={String(t)}>
                     Term {t}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="flex w-36 flex-col gap-1.5">
               <label htmlFor="rev-amount" className="text-sm font-medium">
                 Correct amount (K)
               </label>
-              <input
+              <Input
                 id="rev-amount"
                 type="number"
                 min={0}
@@ -172,7 +173,7 @@ export function ReviseIssued({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
-                className="min-h-tap rounded-md border border-border bg-background px-3"
+                
               />
             </div>
           </div>
@@ -181,14 +182,14 @@ export function ReviseIssued({
             <label htmlFor="rev-reason" className="text-sm font-medium">
               Why is it changing?
             </label>
-            <input
+            <Input
               id="rev-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Tuition was issued at K2,500 — the board approved K2,650"
               required
               minLength={4}
-              className="min-h-tap rounded-md border border-border bg-background px-3"
+              
             />
             <p className="text-xs text-muted-foreground">
               Recorded against every bill this changes. Families have already been told the

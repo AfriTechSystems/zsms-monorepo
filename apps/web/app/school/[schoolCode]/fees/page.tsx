@@ -271,7 +271,7 @@ function FeesList({ base }: { base: string }): JSX.Element {
                 ]}
                 empty={
                   <EmptyState
-                    icon={Wallet}
+                    illustration={filter === 'all' ? 'pupils' : 'fees'}
                     title={filter === 'all' ? 'No pupils' : 'Nothing outstanding'}
                     description={
                       filter === 'all'

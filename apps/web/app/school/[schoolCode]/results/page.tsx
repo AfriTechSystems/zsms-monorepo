@@ -541,12 +541,12 @@ function MarkSheet(): JSX.Element {
                               >
                                 Why is this mark being corrected?
                               </label>
-                              <input
+                              <Input
                                 id={`reason-${r.studentId}`}
                                 value={reason}
                                 onChange={(e) => setReason(e.target.value)}
                                 placeholder="Data entry error — correct mark is 82 not 28"
-                                className="min-h-tap rounded-md border border-border bg-background px-2 text-sm"
+                                className="text-sm"
                               />
                               <p className="text-xs text-muted-foreground">
                                 Recorded permanently against this result. Parents can already
@@ -577,7 +577,7 @@ function MarkSheet(): JSX.Element {
 
                   {data.rows.length === 0 && (
                     <EmptyState
-                      icon={ClipboardList}
+                      illustration="results"
                       title="No pupils in this class"
                       description="Enrol pupils into the class before entering marks."
                     />

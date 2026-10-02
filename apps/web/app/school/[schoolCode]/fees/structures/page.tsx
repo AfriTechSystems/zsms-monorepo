@@ -24,7 +24,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
-import { Loader2, Receipt, Send } from 'lucide-react'
+import { Loader2, Send } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -252,7 +252,7 @@ export default function StructuresPage({
                 ]}
                 empty={
                   <EmptyState
-                    icon={Receipt}
+                    illustration="fees"
                     title="No fee structures yet"
                     description="A structure sets what one grade pays for one term. Nothing can be billed or paid until at least one exists."
                   />

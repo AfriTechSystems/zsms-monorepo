@@ -52,6 +52,7 @@ import { AFRITECH_ORG_SLUG } from '../../../../lib/admin-context'
 import { can } from '../../../../lib/roles'
 import { created, fail, fromPostgrestError, guard, ok, validationFailed } from '../../../../lib/api-response'
 import { resolveSchoolContext } from '../../../../lib/school-context'
+import { publicOrigin } from '../../../../lib/public-origin'
 
 export const dynamic = 'force-dynamic'
 
@@ -324,10 +325,20 @@ export async function POST(request: NextRequest): Promise<Response> {
         // with no route into ZSMS. Their account existed; there was nowhere to
         // send them.
         //
-        // Derived from the request rather than an env var so it is correct on
-        // localhost, on a phone hitting the LAN address, and in production
-        // without three different values to keep in step.
-        redirectUrl: new URL('/sign-up', request.nextUrl.origin).toString(),
+        /*
+          `/accept-invitation`, not `/sign-up`.
+
+          Clerk decides whether a ticket needs a sign-in or a sign-up and says which in
+          `__clerk_status`. Sending every invitation to `/sign-up` showed a "create your
+          account" form to people who already had one, with no way out — reported from
+          the running application. The landing page branches on the status.
+
+          The origin comes from `publicOrigin()` rather than `request.nextUrl.origin`.
+          `nextUrl` reflects the address the server is BOUND to, and `npm run dev` binds
+          `0.0.0.0` on purpose so a phone can reach it — so every invitation email
+          contained `http://0.0.0.0:3000/...`, which no browser can resolve.
+        */
+        redirectUrl: new URL('/accept-invitation', publicOrigin(request)).toString(),
       })
       return created(invitation)
     } catch (err) {

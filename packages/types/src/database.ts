@@ -4690,6 +4690,14 @@ export type Database = {
           out_teachers: number
         }[]
       }
+      admin_anonymise_data_subject: {
+        Args: { p_id: string; p_kind: string; p_reason: string }
+        Returns: {
+          out_done: boolean
+          out_message: string
+          out_retained: string
+        }[]
+      }
       admin_attach_clerk_org: {
         Args: { p_clerk_org_id: string; p_school_id: string }
         Returns: boolean
@@ -4737,6 +4745,10 @@ export type Database = {
       admin_delete_tier_price_band: {
         Args: { p_band_id: string }
         Returns: boolean
+      }
+      admin_export_data_subject: {
+        Args: { p_id: string; p_kind: string }
+        Returns: Json
       }
       admin_generate_school_invoice: {
         Args: {
@@ -5190,6 +5202,7 @@ export type Database = {
         Args: { p_school_id: string }
         Returns: number
       }
+      export_my_data: { Args: never; Returns: Json }
       fee_statement: {
         Args: { p_from?: string; p_student_id: string; p_to?: string }
         Returns: {

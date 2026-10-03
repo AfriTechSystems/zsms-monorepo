@@ -53,6 +53,7 @@ import { SignOutButton, useAuth, useOrganizationList } from '@zsms/auth-provider
 
 import { cn } from '../../lib/utils'
 import { PortalSwitch } from './portal-switch'
+import { DownloadMyData } from './download-my-data'
 import { clearAllDrafts } from '../../lib/use-form-draft'
 
 export function AccountMenu({ className }: { className?: string }): JSX.Element | null {
@@ -125,6 +126,12 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
         nothing when the account reaches only one portal.
       */}
       <PortalSwitch />
+
+      {/* The right to portability (ZDPA), self-service. `export_my_data()` resolves the
+          caller from the token and takes no identifier, so it works for a parent, a
+          member of staff or a Hub teacher alike — which is why it belongs here rather
+          than in one portal. */}
+      <DownloadMyData />
 
       <SignOutButton redirectUrl="/sign-in">
         <button

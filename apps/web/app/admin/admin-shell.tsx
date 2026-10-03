@@ -20,19 +20,7 @@
 
 import type { JSX, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import {
-  BookMarked,
-  Building2,
-  Gauge,
-  HeartPulse,
-  Network,
-  Receipt,
-  PhoneCall,
-  Siren,
-  Sparkles,
-  ToggleRight,
-  Wallet,
-} from 'lucide-react'
+import { BookMarked, Building2, Gauge, HeartPulse, Network, PhoneCall, Receipt, ShieldAlert, Siren, Sparkles, ToggleRight, Wallet } from 'lucide-react'
 
 import { AppShell } from '../../components/layout/app-shell'
 import type { NavGroup } from '../../components/layout/nav-config'
@@ -119,6 +107,10 @@ export function AdminShell({
       items: [
         { path: '/health', label: 'School health', icon: HeartPulse },
         { path: '/incidents', label: 'Incidents', icon: Siren, badge: openIncidents },
+        // ZDPA requests are AfriTech's obligation, not a school's, and carry a
+        // 30-day clock — which is why they sit beside incidents rather than in
+        // settings somewhere.
+        { path: '/data-requests', label: 'Data requests', icon: ShieldAlert },
       ],
     },
     {

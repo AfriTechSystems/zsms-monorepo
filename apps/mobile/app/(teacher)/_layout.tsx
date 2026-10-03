@@ -1,37 +1,52 @@
 /**
- * The teacher's tabs.
+ * The teacher shell.
  *
- * Spec: `Official Documentation/10 Attendance/ATTENDANCE.md`
- *       ADR-004 — offline-first attendance is the reason this app exists
+ * Spec: `Official Documentation/06 School and Tenant Management/TEACHER_PORTAL.md`
  *
- * ## Three tabs, not five
+ * ## The bar is generic and does not change with link state
  *
- * The web sidebar has eleven destinations because a bursar and a principal share it. A
- * teacher standing in front of a class has three jobs: mark the register, enter marks, and
- * find a pupil. Anything else belongs on the web, and putting it here would bury the one
- * screen that has to be reachable in a second.
+ * Five tabs, the same five whether or not a teacher belongs to a school. Linking
+ * **ungates** features on the Home grid rather than rearranging navigation, so somebody
+ * who joins a school in March still recognises the app they used in February.
  *
- * ## Icons carry the labels
+ * An earlier version swapped the tabs by state. That is worse than it sounds: the thing a
+ * user builds muscle memory on is position, and moving it is the one change they cannot
+ * learn around.
  *
- * Mobile shows a fraction of the web's text, so the icon is the label rather than
- * decoration. They come from `lucide-react-native` — the same set the web draws from — so
- * a symbol means the same thing in both places.
+ * ## Home is centre, and larger
+ *
+ * At an edge it is the hardest tab to reach with the thumb of the hand holding the phone,
+ * and it is the one a teacher returns to between every other screen. The centre of five
+ * is the easiest point to hit.
+ *
+ * ## "More" is the sidebar
+ *
+ * A full-screen categorised menu rather than a drawer. On a phone it carries the same
+ * content with no nested navigator, no gesture handler, and no edge-swipe competing with
+ * the register's horizontal controls.
  */
 
 import type { JSX } from 'react'
 import { Redirect, Tabs } from 'expo-router'
-import { CalendarCheck, ClipboardList, Users } from 'lucide-react-native'
+import {
+  CalendarCheck,
+  FolderOpen,
+  LayoutGrid,
+  Menu,
+  WandSparkles,
+} from 'lucide-react-native'
+import { View } from 'react-native'
 
 import { useSession } from '../../lib/auth'
 import { Loading, Screen, usePalette } from '../../components/ui'
-import { TAP } from '../../theme'
+import { RADIUS, TAP } from '../../theme'
 
 export default function TeacherLayout(): JSX.Element {
   const { isLoaded, isSignedIn } = useSession()
   const c = usePalette()
 
-  // Nothing is rendered until Clerk has read the token cache: redirecting before then
-  // bounces a signed-in teacher to sign-in on every cold start.
+  // Nothing renders until Clerk has read the token cache; redirecting sooner bounces a
+  // signed-in teacher to sign-in on every cold start.
   if (!isLoaded) {
     return (
       <Screen>
@@ -54,8 +69,7 @@ export default function TeacherLayout(): JSX.Element {
         tabBarStyle: {
           backgroundColor: c.surface,
           borderTopColor: c.border,
-          // Taller than the default: this is tapped with a thumb while holding a
-          // register in the other hand.
+          // Taller than default: tapped with a thumb while holding a register.
           height: TAP + 34,
           paddingTop: 6,
           paddingBottom: 10,
@@ -64,38 +78,77 @@ export default function TeacherLayout(): JSX.Element {
       }}
     >
       <Tabs.Screen
+        name="attendance"
+        options={{
+          title: 'Attendance',
+          tabBarIcon: ({ color, focused }) => (
+            <CalendarCheck size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          title: 'Create',
+          tabBarIcon: ({ color, focused }) => (
+            <WandSparkles size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="index"
         options={{
-          title: 'Today',
-          tabBarLabel: 'Today',
+          title: 'Home',
+          tabBarLabel: 'Home',
+          // The centre tab, drawn as a filled target rather than a glyph — on a bar of
+          // five it is the one a thumb goes to without looking.
           tabBarIcon: ({ color, focused }) => (
-            <CalendarCheck size={23} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: RADIUS.full,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: focused ? c.primary : c.surfaceSunken,
+              }}
+            >
+              <LayoutGrid
+                size={20}
+                color={focused ? c.onPrimary : color}
+                strokeWidth={focused ? 2.4 : 2}
+              />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="library"
+        options={{
+          title: 'Library',
+          tabBarIcon: ({ color, focused }) => (
+            <FolderOpen size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />
       <Tabs.Screen
-        name="marks"
+        name="more"
         options={{
-          title: 'Marks',
-          tabBarLabel: 'Marks',
+          title: 'More',
           tabBarIcon: ({ color, focused }) => (
-            <ClipboardList size={23} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <Menu size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />
-      <Tabs.Screen
-        name="pupils"
-        options={{
-          title: 'Pupils',
-          tabBarLabel: 'Pupils',
-          tabBarIcon: ({ color, focused }) => (
-            <Users size={23} color={color} strokeWidth={focused ? 2.4 : 1.9} />
-          ),
-        }}
-      />
-      {/* The register is reached from Today, not from the bar: it always belongs to a
-          class, and a tab that needs a class chosen first is a tab that opens empty. */}
+
+      {/* Reached from a screen, never the bar: each needs something chosen first, and a
+          tab that opens empty is a tab nobody presses twice. */}
       <Tabs.Screen name="register/[classId]" options={{ href: null, title: 'Register' }} />
+      <Tabs.Screen name="pupils" options={{ href: null, title: 'Pupils' }} />
+      <Tabs.Screen name="marks" options={{ href: null, title: 'Marks' }} />
+      <Tabs.Screen name="account" options={{ href: null, title: 'Account' }} />
     </Tabs>
   )
 }

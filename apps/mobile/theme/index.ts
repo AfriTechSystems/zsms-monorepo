@@ -156,6 +156,17 @@ export const TYPE = {
   body: { fontSize: 15, fontWeight: '400' as const },
   label: { fontSize: 13, fontWeight: '500' as const },
   caption: { fontSize: 12, fontWeight: '400' as const },
-  /** Figures, so columns of numbers line up. */
-  numeric: { fontSize: 15, fontWeight: '600' as const, fontVariant: ['tabular-nums' as const] },
 } as const
+
+/**
+ * Figures, so columns of numbers line up.
+ *
+ * Outside the `as const` object on purpose: that would freeze `fontVariant` into a
+ * readonly tuple, and React Native's `TextStyle` requires a mutable `FontVariant[]` —
+ * a type error at every use site rather than here.
+ */
+export const NUMERIC = {
+  fontSize: 15,
+  fontWeight: '600',
+  fontVariant: ['tabular-nums'],
+} satisfies import('react-native').TextStyle

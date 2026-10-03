@@ -1,94 +1,66 @@
 /**
- * Today — the classes a teacher has to mark.
+ * Home — every feature, as a grid.
  *
- * Spec: `Official Documentation/10 Attendance/ATTENDANCE.md`
- *       `Official Documentation/08 Staff Management/ASSIGNMENTS.md`
+ * Spec: `Official Documentation/06 School and Tenant Management/TEACHER_PORTAL.md`
  *
- * ## The first screen answers one question
+ * ## Why a grid rather than a dashboard of numbers
  *
- * "What do I have to do now." Not a dashboard, not a summary — a list of the classes this
- * teacher is assigned to, each one tap from its register. A teacher opens this between
- * lessons with a class waiting, which is the whole design constraint.
+ * A teacher opens this to DO something, not to read a summary. The web dashboard leads
+ * with figures because a head teacher is monitoring; a phone is held by somebody between
+ * lessons with a class waiting.
  *
- * ## Assignments come from the server, never from a filter here
+ * ## The layout does not change when a school is linked
  *
- * `teacher_assignments` is what RLS uses to decide which pupils this teacher may see at
- * all. Re-deriving "my classes" on the phone would be a second rule that drifts from the
- * policy — and the phone's copy is the one that can be wrong without anybody noticing.
+ * Linking ungates the school half rather than rearranging anything, so a teacher who
+ * joins a school in March recognises the screen they used in February with more of it
+ * available. That is why the gating lives in `lib/features.ts` as data.
+ *
+ * ## Unbuilt features are shown, greyed, and say which kind of unavailable they are
+ *
+ * "Coming soon" and "needs your school" are different answers and a teacher can act on
+ * exactly one of them. Hiding the unbuilt ones would make every release reshuffle the
+ * grid, which is worse than an honest placeholder.
  */
 
 import type { JSX } from 'react'
 import { useMemo } from 'react'
-import { Link } from 'expo-router'
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { CalendarCheck, ChevronRight, GraduationCap, LogOut } from 'lucide-react-native'
+import { useRouter } from 'expo-router'
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { ChevronRight, School } from 'lucide-react-native'
 
+import { FEATURES, featureState, type Feature } from '../../lib/features'
 import { useApi } from '../../lib/use-api'
 import { useSession } from '../../lib/auth'
-import {
-  Badge,
-  Body,
-  Caption,
-  Card,
-  Empty,
-  ErrorNote,
-  Loading,
-  Row,
-  Screen,
-  Title,
-  usePalette,
-} from '../../components/ui'
+import { Badge, Body, Caption, Card, Row, Screen, Title, usePalette } from '../../components/ui'
 import { RADIUS, SPACE, TAP, TYPE } from '../../theme'
 
-interface Assignment {
-  id: string
-  scope: string
-  classId: string | null
-  subjectCode: string | null
-  subjectName: string | null
-  termNumber: number
-  academicYear: string
-}
-
 interface Overview {
-  school: { name?: string; school_id?: string } | null
-  role: string
-  today: string
-  assignments: Assignment[]
+  school: { name?: string } | null
+  assignments: Array<{ classId: string | null }>
 }
 
-export default function Today(): JSX.Element {
+export default function Home(): JSX.Element {
   const c = usePalette()
-  const { fullName, signOut } = useSession()
-  const { data, loading, error, reload } = useApi<Overview>('/api/teacher/overview')
+  const router = useRouter()
+  const { firstName } = useSession()
+  const { data, loading, reload } = useApi<Overview>('/api/teacher/overview')
 
-  /**
-   * One card per CLASS, not per assignment.
-   *
-   * A teacher taking three subjects in Grade 8A has three assignment rows and one
-   * register to mark. Listing the rows would offer the same register three times and
-   * make the day look three times longer than it is.
-   */
-  const classes = useMemo(() => {
-    const byClass = new Map<string, { classId: string; subjects: string[] }>()
-    for (const a of data?.assignments ?? []) {
-      if (!a.classId) continue
-      const entry = byClass.get(a.classId) ?? { classId: a.classId, subjects: [] }
-      if (a.subjectName && !entry.subjects.includes(a.subjectName)) {
-        entry.subjects.push(a.subjectName)
-      }
-      byClass.set(a.classId, entry)
-    }
-    return [...byClass.values()].sort((x, y) => x.classId.localeCompare(y.classId))
-  }, [data])
+  /*
+    Linked is "the session resolves a school", not "assignments exist".
+
+    A teacher invited this morning has a school and no classes yet, and telling them
+    attendance needs a school would be wrong — they need a class, which their school
+    gives them.
+  */
+  const linked = Boolean(data?.school)
+
+  const classCount = useMemo(
+    () => new Set((data?.assignments ?? []).map((a) => a.classId).filter(Boolean)).size,
+    [data],
+  )
 
   const today = useMemo(
-    () =>
-      new Date().toLocaleDateString('en-ZM', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      }),
+    () => new Date().toLocaleDateString('en-ZM', { weekday: 'long', day: 'numeric', month: 'long' }),
     [],
   )
 
@@ -97,91 +69,46 @@ export default function Today(): JSX.Element {
       <ScrollView
         contentContainerStyle={{ padding: SPACE.gutter, gap: SPACE.cards, paddingBottom: SPACE.xxl }}
         refreshControl={
-          // Pull to refresh, because the alternative on a phone is closing the app.
           <RefreshControl refreshing={loading} onRefresh={reload} tintColor={c.primary} />
         }
       >
-        <View style={{ gap: SPACE.xs }}>
+        <View style={{ gap: 2 }}>
           <Caption>{today}</Caption>
-          <Title>{firstNameOf(fullName) ? `Hello, ${firstNameOf(fullName)}` : 'Your classes'}</Title>
-          {data?.school?.name && <Body muted>{data.school.name}</Body>}
+          <Title>{firstName ? `Hello, ${firstName}` : 'Your teaching'}</Title>
         </View>
 
-        {error && <ErrorNote message={error} onRetry={reload} />}
-        {loading && !data && <Loading label="Finding your classes" />}
-
-        {!error && data && classes.length === 0 && (
-          <Empty
-            icon={GraduationCap}
-            title="No classes assigned"
-            body="Your school assigns classes and subjects on the web. Once they do, your registers appear here."
-          />
-        )}
-
-        {classes.map((entry) => (
-          <Link
-            key={entry.classId}
-            href={{ pathname: '/(teacher)/register/[classId]', params: { classId: entry.classId } }}
-            asChild
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Mark the register for ${formatClass(entry.classId)}`}
-              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+        {/* The school, or the absence of one, said plainly. A standalone teacher is not
+            in a broken state and the card does not imply they are. */}
+        <Card>
+          <Row gap={SPACE.md}>
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: RADIUS.md,
+                backgroundColor: linked ? c.primaryTint : c.surfaceSunken,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              <Card>
-                <Row gap={SPACE.md}>
-                  {/* The icon is in a tinted circle rather than bare: at a glance down a
-                      list, the shape is what the eye finds, not the glyph. */}
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: RADIUS.md,
-                      backgroundColor: c.primaryTint,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <CalendarCheck size={22} color={c.primaryMark} strokeWidth={2} />
-                  </View>
+              <School size={20} color={linked ? c.primaryMark : c.textSubtle} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[TYPE.heading, { color: c.text }]} numberOfLines={1}>
+                {data?.school?.name ?? 'No school linked'}
+              </Text>
+              <Caption>
+                {linked
+                  ? classCount > 0
+                    ? `${classCount} ${classCount === 1 ? 'class' : 'classes'} assigned to you`
+                    : 'No classes assigned yet — your school sets these'
+                  : 'Your plans and quizzes are yours either way'}
+              </Caption>
+            </View>
+          </Row>
+        </Card>
 
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[TYPE.heading, { color: c.text }]}>
-                      {formatClass(entry.classId)}
-                    </Text>
-                    <Text style={[TYPE.caption, { color: c.textMuted }]} numberOfLines={1}>
-                      {entry.subjects.length > 0 ? entry.subjects.join(' · ') : 'Class teacher'}
-                    </Text>
-                  </View>
-
-                  <ChevronRight size={20} color={c.textSubtle} />
-                </Row>
-              </Card>
-            </Pressable>
-          </Link>
-        ))}
-
-        {data && (
-          <Pressable
-            onPress={() => void signOut()}
-            accessibilityRole="button"
-            style={{
-              minHeight: TAP,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: SPACE.sm,
-              marginTop: SPACE.lg,
-              borderRadius: RADIUS.md,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: c.border,
-            }}
-          >
-            <LogOut size={16} color={c.textMuted} />
-            <Text style={[TYPE.label, { color: c.textMuted }]}>Sign out</Text>
-          </Pressable>
-        )}
+        <FeatureGrid linked={linked} onOpen={(href) => router.push(href as never)} />
       </ScrollView>
     </Screen>
   )
@@ -189,16 +116,111 @@ export default function Today(): JSX.Element {
 
 // ---------------------------------------------------------------------------
 
-/** `grade_8a` reads as "Grade 8A" to a teacher and as nothing at all as it stands. */
-function formatClass(id: string): string {
-  return id
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+function FeatureGrid({
+  linked,
+  onOpen,
+}: {
+  linked: boolean
+  onOpen: (href: string) => void
+}): JSX.Element {
+  const c = usePalette()
+
+  /*
+    School features first WHEN LINKED, personal tools first otherwise.
+
+    The order changes; the contents do not. A linked teacher's day starts with a
+    register, and a standalone teacher has no register to start with.
+  */
+  const ordered = useMemo(() => {
+    const weight = (f: Feature): number => {
+      const state = featureState(f, linked)
+      // Anything unavailable sinks, whatever its group — a grid whose first row is
+      // greyed out reads as a broken app.
+      if (state !== 'ready') return 10
+      if (linked) return f.schoolOnly ? 0 : 1
+      return f.schoolOnly ? 2 : 0
+    }
+    return [...FEATURES].sort((a, b) => weight(a) - weight(b))
+  }, [linked])
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm }}>
+      {ordered.map((feature) => {
+        const state = featureState(feature, linked)
+        const available = state === 'ready'
+        const Icon = feature.icon
+
+        return (
+          <Pressable
+            key={feature.key}
+            disabled={!available}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !available }}
+            accessibilityLabel={
+              available
+                ? feature.label
+                : `${feature.label}, ${state === 'coming' ? 'coming soon' : 'needs a school'}`
+            }
+            onPress={() => feature.href && onOpen(feature.href)}
+            style={({ pressed }) => ({
+              // Three across on a phone, with the gutter and two gaps removed.
+              width: '31.5%',
+              minHeight: TAP + 34,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              paddingVertical: SPACE.md,
+              borderRadius: RADIUS.lg,
+              backgroundColor: c.surface,
+              borderWidth: 1,
+              borderColor: c.border,
+              opacity: available ? (pressed ? 0.7 : 1) : 0.45,
+            })}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: RADIUS.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: available ? c.primaryTint : c.surfaceSunken,
+              }}
+            >
+              <Icon
+                size={19}
+                color={available ? c.primaryMark : c.textSubtle}
+                strokeWidth={2}
+              />
+            </View>
+
+            <Text
+              numberOfLines={2}
+              style={[
+                TYPE.caption,
+                {
+                  color: available ? c.text : c.textSubtle,
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  paddingHorizontal: 4,
+                },
+              ]}
+            >
+              {feature.label}
+            </Text>
+
+            {/* Which kind of unavailable. A teacher can act on "needs a school" and
+                cannot act on "soon", so they must not look the same. */}
+            {!available && (
+              <Text style={[TYPE.caption, { fontSize: 10, color: c.textSubtle }]}>
+                {state === 'coming' ? 'Soon' : 'Needs school'}
+              </Text>
+            )}
+          </Pressable>
+        )
+      })}
+    </View>
+  )
 }
 
-function firstNameOf(full: string | null): string | null {
-  return full?.trim().split(/\s+/)[0] ?? null
-}
-
-export { formatClass }
+export { FeatureGrid }

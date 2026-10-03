@@ -65,7 +65,7 @@ import {
   usePalette,
 } from '../../../components/ui'
 import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
-import { formatClass } from '../index'
+import { formatClass } from '../attendance'
 
 type Status = 'present' | 'absent' | 'late' | 'excused'
 

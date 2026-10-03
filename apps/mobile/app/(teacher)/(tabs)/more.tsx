@@ -27,11 +27,11 @@ import { useRouter } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { ChevronRight, LayoutGrid, LogOut } from 'lucide-react-native'
 
-import { FEATURES, featureState, type Feature } from '../../lib/features'
-import { useApi } from '../../lib/use-api'
-import { useSession } from '../../lib/auth'
-import { Badge, Caption, Row, Screen, usePalette } from '../../components/ui'
-import { RADIUS, SPACE, TAP, TYPE } from '../../theme'
+import { FEATURES, featureState, type Feature } from '../../../lib/features'
+import { useApi } from '../../../lib/use-api'
+import { useSession } from '../../../lib/auth'
+import { Badge, Caption, Row, Screen, usePalette } from '../../../components/ui'
+import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 
 const GROUPS: Array<Feature['group']> = ['Teaching', 'My tools', 'School', 'Account']
 

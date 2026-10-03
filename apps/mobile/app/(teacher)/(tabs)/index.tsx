@@ -28,11 +28,11 @@ import { useRouter } from 'expo-router'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { ChevronRight, School } from 'lucide-react-native'
 
-import { FEATURES, featureState, type Feature } from '../../lib/features'
-import { useApi } from '../../lib/use-api'
-import { useSession } from '../../lib/auth'
-import { Badge, Body, Caption, Card, Row, Screen, Title, usePalette } from '../../components/ui'
-import { RADIUS, SPACE, TAP, TYPE } from '../../theme'
+import { FEATURES, featureState, type Feature } from '../../../lib/features'
+import { useApi } from '../../../lib/use-api'
+import { useSession } from '../../../lib/auth'
+import { Badge, Body, Caption, Card, Row, Screen, Title, usePalette } from '../../../components/ui'
+import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 
 interface Overview {
   school: { name?: string } | null

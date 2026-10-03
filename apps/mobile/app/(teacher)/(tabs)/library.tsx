@@ -15,7 +15,7 @@ import { Link } from 'expo-router'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { ChevronRight, FolderOpen } from 'lucide-react-native'
 
-import { useApi } from '../../lib/use-api'
+import { useApi } from '../../../lib/use-api'
 import {
   Badge,
   Caption,
@@ -26,8 +26,8 @@ import {
   Row,
   Screen,
   usePalette,
-} from '../../components/ui'
-import { SPACE, TYPE } from '../../theme'
+} from '../../../components/ui'
+import { SPACE, TYPE } from '../../../theme'
 
 interface Resource {
   id: string

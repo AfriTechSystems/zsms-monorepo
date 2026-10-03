@@ -10,8 +10,8 @@ import type { JSX } from 'react'
 import { ScrollView } from 'react-native'
 import { Users } from 'lucide-react-native'
 
-import { Empty, Screen } from '../../components/ui'
-import { SPACE } from '../../theme'
+import { Empty, Screen } from '../../../components/ui'
+import { SPACE } from '../../../theme'
 
 export default function Pupils(): JSX.Element {
   return (

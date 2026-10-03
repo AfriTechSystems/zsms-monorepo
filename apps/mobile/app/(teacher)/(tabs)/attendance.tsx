@@ -18,7 +18,7 @@ import { Link } from 'expo-router'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { CalendarCheck, ChevronRight, GraduationCap } from 'lucide-react-native'
 
-import { useApi } from '../../lib/use-api'
+import { useApi } from '../../../lib/use-api'
 import {
   Caption,
   Card,
@@ -28,8 +28,8 @@ import {
   Row,
   Screen,
   usePalette,
-} from '../../components/ui'
-import { RADIUS, SPACE, TYPE } from '../../theme'
+} from '../../../components/ui'
+import { RADIUS, SPACE, TYPE } from '../../../theme'
 
 interface Assignment {
   id: string

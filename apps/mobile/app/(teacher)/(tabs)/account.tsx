@@ -13,8 +13,8 @@ import type { JSX } from 'react'
 import { RefreshControl, ScrollView, Text, View } from 'react-native'
 import { CreditCard } from 'lucide-react-native'
 
-import { useApi } from '../../lib/use-api'
-import { useSession } from '../../lib/auth'
+import { useApi } from '../../../lib/use-api'
+import { useSession } from '../../../lib/auth'
 import {
   Body,
   Caption,
@@ -25,8 +25,8 @@ import {
   Screen,
   Title,
   usePalette,
-} from '../../components/ui'
-import { NUMERIC, RADIUS, SPACE, TYPE } from '../../theme'
+} from '../../../components/ui'
+import { NUMERIC, RADIUS, SPACE, TYPE } from '../../../theme'
 
 interface Hub {
   account?: {

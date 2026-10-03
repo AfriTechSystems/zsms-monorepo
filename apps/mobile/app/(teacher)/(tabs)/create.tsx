@@ -38,9 +38,9 @@ import {
 } from 'react-native'
 import { Sparkles } from 'lucide-react-native'
 
-import { api } from '../../lib/api'
-import { useApi } from '../../lib/use-api'
-import { useSession } from '../../lib/auth'
+import { api } from '../../../lib/api'
+import { useApi } from '../../../lib/use-api'
+import { useSession } from '../../../lib/auth'
 import {
   Body,
   Button,
@@ -50,8 +50,8 @@ import {
   Screen,
   Title,
   usePalette,
-} from '../../components/ui'
-import { RADIUS, SPACE, TAP, TYPE } from '../../theme'
+} from '../../../components/ui'
+import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 
 type Kind = 'lesson_plan' | 'quiz' | 'homework'
 
@@ -92,7 +92,7 @@ export default function Create(): JSX.Element {
         return
       }
       setTopic('')
-      router.push('/(teacher)/library')
+      router.push('/(teacher)/(tabs)/library')
     } finally {
       setBusy(false)
     }

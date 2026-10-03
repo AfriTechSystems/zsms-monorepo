@@ -49,9 +49,9 @@ import {
   Users,
 } from 'lucide-react-native'
 
-import { api } from '../../../lib/api'
-import { useApi } from '../../../lib/use-api'
-import { useSession } from '../../../lib/auth'
+import { api } from '../../../../lib/api'
+import { useApi } from '../../../../lib/use-api'
+import { useSession } from '../../../../lib/auth'
 import {
   Badge,
   Body,
@@ -63,8 +63,8 @@ import {
   Row,
   Screen,
   usePalette,
-} from '../../../components/ui'
-import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
+} from '../../../../components/ui'
+import { RADIUS, SPACE, TAP, TYPE } from '../../../../theme'
 import { formatClass } from '../attendance'
 
 type Status = 'present' | 'absent' | 'late' | 'excused'

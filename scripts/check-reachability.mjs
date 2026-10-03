@@ -144,7 +144,24 @@ function walk(dir, out = []) {
   return out
 }
 
-const SOURCE_DIRS = ['apps/web/app', 'apps/web/lib', 'apps/web/components', 'apps/workers/src', 'packages']
+/*
+  `apps/mobile` joined this list on 2026-10-03, and the omission was already producing a
+  false positive: `/api/session/notices` is called only from the phone, so the script
+  reported a route nothing reaches while the chain was complete.
+
+  A checker that cries wolf is worse than no checker — the value here is the diff, and
+  noise is what trains everybody to stop reading it.
+*/
+const SOURCE_DIRS = [
+  'apps/web/app',
+  'apps/web/lib',
+  'apps/web/components',
+  'apps/mobile/app',
+  'apps/mobile/lib',
+  'apps/mobile/components',
+  'apps/workers/src',
+  'packages',
+]
 const sources = SOURCE_DIRS.flatMap((d) => {
   try {
     return walk(d)

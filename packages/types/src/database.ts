@@ -4239,6 +4239,222 @@ export type Database = {
           },
         ]
       }
+      timetable_periods: {
+        Row: {
+          applies_days: number[]
+          created_at: string
+          end_time: string
+          id: string
+          is_teaching_period: boolean
+          period_name: string
+          period_order: number
+          school_id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          applies_days?: number[]
+          created_at?: string
+          end_time: string
+          id?: string
+          is_teaching_period?: boolean
+          period_name: string
+          period_order: number
+          school_id: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          applies_days?: number[]
+          created_at?: string
+          end_time?: string
+          id?: string
+          is_teaching_period?: boolean
+          period_name?: string
+          period_order?: number
+          school_id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timetable_periods_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "timetable_periods_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "timetable_periods_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      timetable_slots: {
+        Row: {
+          class_id: string
+          created_at: string
+          day_of_week: number
+          id: string
+          notes: string | null
+          period_id: string
+          room: string | null
+          school_id: string
+          slot_type: string
+          staff_user_id: string | null
+          subject_id: string | null
+          timetable_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          day_of_week: number
+          id?: string
+          notes?: string | null
+          period_id: string
+          room?: string | null
+          school_id: string
+          slot_type?: string
+          staff_user_id?: string | null
+          subject_id?: string | null
+          timetable_id: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          notes?: string | null
+          period_id?: string
+          room?: string | null
+          school_id?: string
+          slot_type?: string
+          staff_user_id?: string | null
+          subject_id?: string | null
+          timetable_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timetable_slots_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "timetable_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timetable_slots_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "timetable_slots_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "timetable_slots_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timetable_slots_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "school_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timetable_slots_timetable_id_fkey"
+            columns: ["timetable_id"]
+            isOneToOne: false
+            referencedRelation: "timetables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      timetables: {
+        Row: {
+          academic_year: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          name: string
+          published: boolean
+          published_at: string | null
+          school_id: string
+          term_number: number
+          updated_at: string
+        }
+        Insert: {
+          academic_year: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          published?: boolean
+          published_at?: string | null
+          school_id: string
+          term_number: number
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          published?: boolean
+          published_at?: string | null
+          school_id?: string
+          term_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timetables_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "timetables_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "timetables_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       feature_catalogue: {

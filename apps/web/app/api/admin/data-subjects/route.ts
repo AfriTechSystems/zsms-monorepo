@@ -102,3 +102,50 @@ export async function POST(request: Request): Promise<Response> {
     })
   })
 }
+
+/**
+ * GET — erasure requests people have made themselves.
+ *
+ * `0192` gave data subjects a way to ask without telephoning AfriTech, which is what
+ * the Act actually requires. Those requests landed in `data_erasure_requests` and
+ * nothing displayed them — a right exercised into a table nobody reads is not a right
+ * exercised. This is the other half.
+ *
+ * Pending ones first and oldest first within that, because the obligation has a clock:
+ * thirty days from the request, not from the day somebody notices it.
+ */
+export async function GET(): Promise<Response> {
+  return guard(async () => {
+    const client = await createUserClient()
+    if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    const [requests, retention] = await Promise.all([
+      client
+        .from('data_erasure_requests')
+        // ONE literal. A concatenated select loses PostgREST's row-type inference and
+        // every column comes back as `GenericStringError` — the trap CONVENTIONS.md
+        // warns about, and it caught this on the first type-check.
+        .select(
+          'id, user_id, email, subject_kind, reason, status, requested_at, action_after, resolved_at, resolved_by, resolution_note',
+        )
+        .order('status', { ascending: true })
+        .order('requested_at', { ascending: true })
+        .limit(200),
+      // Read rather than restated. The screen used to say "seven years" while the
+      // setting said six, which is the sort of drift a hardcoded number guarantees.
+      client.rpc('platform_setting', { p_key: 'financial_retention_years' }),
+    ])
+
+    // RLS already restricts this to AfriTech; a 403 here would be a second rule to
+    // keep in step with the first.
+    if (requests.error) return fromPostgrestError(requests.error)
+
+    const rows = requests.data ?? []
+
+    return ok({
+      requests: rows,
+      pending: rows.filter((r) => r.status === 'pending').length,
+      retentionYears: Number(retention.data ?? 6),
+    })
+  })
+}

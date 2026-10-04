@@ -34,12 +34,14 @@ import { useCallback, useState } from 'react'
 import {
   AlertTriangle,
   Download,
+  Inbox,
   Loader2,
   Search,
   ShieldAlert,
 } from 'lucide-react'
 
 import { Alert } from '../../../components/ui/alert'
+import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import {
   Card,
@@ -51,12 +53,43 @@ import {
 import { PageHeader } from '../../../components/ui/data-states'
 import { Field, Input, Select, Textarea } from '../../../components/ui/field'
 import { FormGrid } from '../../../components/ui/form'
-import { apiSend } from '../../../lib/use-api'
+import { apiSend, useApi } from '../../../lib/use-api'
 import { useToast } from '../../../components/ui/toast'
 
 type Kind = 'student' | 'parent' | 'staff'
 
+interface ErasureRequest {
+  id: string
+  user_id: string
+  email: string | null
+  subject_kind: string
+  reason: string | null
+  status: string
+  requested_at: string
+  action_after: string
+  resolved_at: string | null
+}
+
+const KIND_LABEL: Record<string, string> = {
+  parent: 'Parent',
+  staff: 'School staff',
+  teacher_hub: 'Teacher Hub',
+  unknown: 'Not matched to a record',
+}
+
 export default function DataRequests(): JSX.Element {
+  /*
+    What people have asked for themselves.
+
+    `0192` gave data subjects a way to ask without telephoning AfriTech, which is what
+    the Act actually requires. Those requests landed in a table nothing displayed — a
+    right exercised into a table nobody reads is not a right exercised.
+  */
+  const inbox = useApi<{
+    requests: ErasureRequest[]
+    pending: number
+    retentionYears: number
+  }>('/api/admin/data-subjects')
   const { toast } = useToast()
 
   const [kind, setKind] = useState<Kind>('student')
@@ -135,10 +168,73 @@ export default function DataRequests(): JSX.Element {
       <PageHeader
         title="Data subject requests"
         description="Access, portability and erasure under the Zambia Data Protection Act."
-        note="AfriTech is the data controller, so these are AfriTech's obligations and not the school's — access and erasure within 30 days, portability within 14. Erasure anonymises rather than deletes: Zambian financial regulation requires seven years of payment records, so amounts and dates are retained while the identifying columns are replaced. Every action here is recorded in an audit log nobody can edit, including AfriTech."
+        note={`AfriTech is the data controller, so these are AfriTech's obligations and not the school's — access and erasure within 30 days, portability within 14. Erasure anonymises rather than deletes: payment records are kept for ${inbox.data?.retentionYears ?? 6} years, so amounts and dates are retained while the identifying columns are replaced. Every action here is recorded in an audit log nobody can edit, including AfriTech.`}
       />
 
       <div className="space-y-cards">
+        {/* People who have asked, before the manual tools. An operator opening this
+            screen should see the queue, not a blank lookup form — the clock started
+            when they asked, not when somebody noticed. */}
+        {(inbox.data?.requests.length ?? 0) > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Inbox aria-hidden="true" className="size-5 text-primary" />
+                Asked for by the person
+              </CardTitle>
+              <CardDescription>
+                {inbox.data?.pending
+                  ? `${inbox.data.pending} waiting. Each can be withdrawn by the person until the date shown.`
+                  : 'Nothing waiting.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="divide-y divide-border">
+                {inbox.data?.requests.map((r: ErasureRequest) => (
+                  <li key={r.id} className="flex flex-wrap items-start gap-2 py-stack">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">
+                        {r.email ?? r.user_id}{' '}
+                        <Badge variant="neutral">
+                          {KIND_LABEL[r.subject_kind] ?? r.subject_kind}
+                        </Badge>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Asked {new Date(r.requested_at).toLocaleDateString('en-GB')}
+                        {r.status === 'pending' && (
+                          <>
+                            {' · '}actionable from{' '}
+                            {new Date(r.action_after).toLocaleDateString('en-GB')}
+                          </>
+                        )}
+                      </p>
+                      {r.reason && (
+                        <p className="text-sm text-muted-foreground">
+                          &ldquo;{r.reason}&rdquo;
+                        </p>
+                      )}
+                      {/* The id the erasure tool below needs, so an operator does not
+                          have to go and find it. */}
+                      <p className="font-mono text-sm text-subtle">{r.user_id}</p>
+                    </div>
+                    <Badge
+                      variant={
+                        r.status === 'pending'
+                          ? 'warning'
+                          : r.status === 'completed'
+                            ? 'success'
+                            : 'neutral'
+                      }
+                    >
+                      {r.status}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

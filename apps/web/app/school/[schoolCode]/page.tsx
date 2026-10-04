@@ -29,6 +29,7 @@
  */
 
 import type { JSX } from 'react'
+import { SetupProgress } from './setup-progress'
 import { use } from 'react'
 import Link from 'next/link'
 import { ArrowRight, CalendarCheck, TriangleAlert, UserPlus, Users, Wallet } from 'lucide-react'
@@ -166,6 +167,11 @@ export default function SchoolDashboardPage({
 
       {!error && data && (
         <div className="space-y-cards">
+          {/* Above the figures while anything is outstanding: a dashboard of numbers is
+              useless to a school that cannot yet mark a register. Renders nothing once
+              everything derivable is done. */}
+          <SetupProgress base={base} />
+
           {/* A school that is not `active` has staff who need to know why their
               screens are about to behave oddly, stated once at the top rather
               than discovered one refusal at a time. */}

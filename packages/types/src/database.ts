@@ -4845,6 +4845,13 @@ export type Database = {
           out_teachers_assigned: number
         }[]
       }
+      admin_set_checklist_item: {
+        Args: { p_complete: boolean; p_item_key: string; p_school_id: string }
+        Returns: {
+          out_done: boolean
+          out_message: string
+        }[]
+      }
       admin_set_onboarding_task: {
         Args: {
           p_assigned_to?: string
@@ -5343,6 +5350,18 @@ export type Database = {
           out_slug: string
         }[]
       }
+      my_onboarding_progress: {
+        Args: never
+        Returns: {
+          out_blocks: string
+          out_category: string
+          out_complete: boolean
+          out_derived: boolean
+          out_item_key: string
+          out_label: string
+          out_sort_order: number
+        }[]
+      }
       my_school_invoices: {
         Args: never
         Returns: {
@@ -5557,6 +5576,13 @@ export type Database = {
           p_title: string
         }
         Returns: string
+      }
+      refresh_onboarding_checklist: {
+        Args: { p_school_id?: string }
+        Returns: {
+          out_complete: boolean
+          out_item: string
+        }[]
       }
       register_push_token: {
         Args: { p_platform: string; p_push_token: string }

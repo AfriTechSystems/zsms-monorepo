@@ -19,11 +19,12 @@
  */
 
 import type { JSX } from 'react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Check, CircleDashed, Mail, ShieldCheck, Trash2 } from 'lucide-react'
+import { AlertTriangle, Check, CircleDashed, Mail, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { apiSend } from '../../../../lib/use-api'
+import { useToast } from '../../../../components/ui/toast'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
 import { Field, Textarea } from '../../../../components/ui/field'
@@ -63,6 +64,20 @@ export interface Progress {
   items_total: number
 }
 
+/**
+ * The only items a human may tick.
+ *
+ * The other ten are worked out from the school's own data — grade levels, subjects, a
+ * first pupil — and `admin_set_checklist_item()` refuses them. These four depend on
+ * things the database cannot see: credentials, and features not built.
+ */
+const MANUAL = new Set([
+  'whatsapp_configured',
+  'payment_gateway',
+  'document_templates',
+  'custom_roles',
+])
+
 const CATEGORY_LABEL: Record<string, string> = {
   critical: 'Critical',
   important: 'Important',
@@ -89,6 +104,61 @@ export function OnboardingPanel({
   onChanged: () => void
 }): JSX.Element {
   const router = useRouter()
+  const { toast } = useToast()
+  const [busyItem, setBusyItem] = useState<string | null>(null)
+
+  /*
+    Ticking one of the four manual items.
+
+    The derived ten are refused by `admin_set_checklist_item()` and never reach here —
+    the panel shows text for those rather than a control.
+  */
+  const setItem = useCallback(
+    async (itemKey: string, complete: boolean) => {
+      setBusyItem(itemKey)
+      try {
+        const result = await apiSend(`/api/admin/schools/${schoolId}/checklist`, 'POST', {
+          action: 'set',
+          itemKey,
+          complete,
+        })
+        if (result.error) {
+          toast(result.error, 'danger')
+          return
+        }
+        onChanged()
+      } finally {
+        setBusyItem(null)
+      }
+    },
+    [schoolId, toast, onChanged],
+  )
+
+  /** Recompute the derived ten from live data. */
+  const refresh = useCallback(async () => {
+    setBusyItem('__refresh')
+    try {
+      const result = await apiSend<{ changed: number }>(
+        `/api/admin/schools/${schoolId}/checklist`,
+        'POST',
+        { action: 'refresh' },
+      )
+      if (result.error) {
+        toast(result.error, 'danger')
+        return
+      }
+      toast(
+        result.data?.changed
+          ? `${result.data.changed} item${result.data.changed === 1 ? '' : 's'} updated.`
+          : 'Already up to date.',
+        'success',
+      )
+      onChanged()
+    } finally {
+      setBusyItem(null)
+    }
+  }, [schoolId, toast, onChanged])
+
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -214,6 +284,24 @@ export function OnboardingPanel({
         )}
 
         <div className="space-y-stack">
+          {/* Recomputes the derived ten from live data. Normally unnecessary — a school
+              reading its own dashboard refreshes them — but an operator looking at a
+              school that has not signed in for a week needs a current answer now. */}
+          <div className="mb-stack flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busyItem !== null}
+              onClick={() => void refresh()}
+              className="inline-flex min-h-tap items-center gap-1.5 rounded-md border border-border px-2.5 text-sm text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground disabled:opacity-60"
+            >
+              <RefreshCw aria-hidden="true" className="size-4" />
+              Recheck from the school&rsquo;s data
+            </button>
+            <p className="text-sm text-muted-foreground">
+              Most items tick themselves; four need AfriTech.
+            </p>
+          </div>
+
           {(['critical', 'important', 'optional'] as const).map((category) => {
             const items = byCategory(category)
             if (items.length === 0) return null
@@ -243,6 +331,24 @@ export function OnboardingPanel({
                         <p className="text-sm text-muted-foreground">{item.description}</p>
                         {!item.isComplete && item.blocks && (
                           <p className="mt-1 text-sm text-warning">Blocks: {item.blocks}</p>
+                        )}
+
+                        {/* Tickable only when the system cannot know the answer. For the
+                            derived ten the panel says so instead, because a control that
+                            always refuses is worse than none. */}
+                        {MANUAL.has(item.item_key) ? (
+                          <button
+                            type="button"
+                            disabled={busyItem === item.item_key}
+                            onClick={() => void setItem(item.item_key, !item.isComplete)}
+                            className="mt-1 min-h-tap rounded px-1 text-sm font-medium text-primary-text hover:underline disabled:opacity-60"
+                          >
+                            {item.isComplete ? 'Mark not done' : 'Mark done'}
+                          </button>
+                        ) : (
+                          <p className="mt-1 text-sm text-subtle">
+                            Worked out from the school&rsquo;s own records.
+                          </p>
                         )}
                         {/* A school created before this item entered the catalogue has no row
                             for it. Worth distinguishing from "not done yet" — the fix is a

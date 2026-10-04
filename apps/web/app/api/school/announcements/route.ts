@@ -78,6 +78,15 @@ const createSchema = z
     title: z.string().trim().min(1).max(160),
     body: z.string().trim().min(1).max(4000),
     importance: z.enum(['regular', 'important']).default('regular'),
+    /*
+      Which channels the sender asked for.
+
+      In-app is added below whether or not it appears here: it is how a notice reaches
+      the portal and the phone app, and the database rejects an announcement without it.
+      The rest record an INTENT — WhatsApp and email have no credentials and push has no
+      tokens, so the composer says which are live rather than pretending.
+    */
+    channels: z.array(z.enum(['in_app', 'push', 'whatsapp', 'email', 'sms'])).optional(),
     targetAudience: z.enum(AUDIENCES),
     targetScope: z.enum(SCOPES),
     // Grade ids, class ids, or Clerk user ids depending on scope. 500 rather than
@@ -138,7 +147,8 @@ export async function GET(): Promise<Response> {
         .from('announcements')
         .select(
           'id, title, body, importance, target_audience, target_scope, ' +
-            'target_ids, status, scheduled_at, sent_at, whatsapp_jobs_queued, created_at',
+            'target_ids, status, scheduled_at, sent_at, whatsapp_jobs_queued, ' +
+            'channels, created_at',
         )
         .order('created_at', { ascending: false })
         .limit(100),
@@ -275,6 +285,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         target_audience: v.targetAudience,
         target_scope: v.targetScope,
         target_ids: v.targetIds ?? [],
+        // In-app always, deduplicated. The CHECK on the column enforces the same thing;
+        // doing it here means a caller who omits it gets a working announcement rather
+        // than a constraint violation.
+        channels: Array.from(new Set(['in_app', ...(v.channels ?? [])])),
         created_by: caller.userId,
         // 'sending' and 'sent' are the worker's to set. An API that wrote 'sent'
         // would be asserting a delivery it has not performed.

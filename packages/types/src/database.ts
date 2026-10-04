@@ -240,9 +240,77 @@ export type Database = {
           },
         ]
       }
+      announcement_starters: {
+        Row: {
+          audience: string | null
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          importance: string
+          is_active: boolean
+          label: string
+          school_id: string | null
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: string | null
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          importance?: string
+          is_active?: boolean
+          label: string
+          school_id?: string | null
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: string | null
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          importance?: string
+          is_active?: boolean
+          label?: string
+          school_id?: string | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_starters_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "announcement_starters_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "announcement_starters_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           body: string
+          channels: string[]
           created_at: string
           created_by: string
           id: string
@@ -261,6 +329,7 @@ export type Database = {
         }
         Insert: {
           body: string
+          channels?: string[]
           created_at?: string
           created_by: string
           id?: string
@@ -279,6 +348,7 @@ export type Database = {
         }
         Update: {
           body?: string
+          channels?: string[]
           created_at?: string
           created_by?: string
           id?: string

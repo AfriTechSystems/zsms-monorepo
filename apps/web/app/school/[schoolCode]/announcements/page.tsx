@@ -31,7 +31,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Gauge, Loader2, Send, X } from 'lucide-react'
+import { Check, FileText, Gauge, Loader2, Send, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -66,6 +66,31 @@ interface Announcement {
   sent_at: string | null
   whatsapp_jobs_queued: number | null
   created_at: string
+}
+
+/**
+ * The channels a sender can ask for beyond in-app.
+ *
+ * Every one is currently unconfigured — Meta, Resend and Twilio have no credentials and
+ * no push token has ever been registered. They are offered anyway, labelled, because
+ * the REQUEST is worth recording: it is what a school expected, and what to turn on
+ * first.
+ */
+const CHANNELS = [
+  { key: 'push', label: 'Push notification to phones' },
+  { key: 'whatsapp', label: 'WhatsApp' },
+  { key: 'sms', label: 'SMS' },
+  { key: 'email', label: 'Email' },
+] as const
+
+interface Starter {
+  id: string
+  label: string
+  title: string
+  body: string
+  importance: string
+  audience: string | null
+  isOwn: boolean
 }
 
 interface Payload {
@@ -129,10 +154,19 @@ export default function AnnouncementsPage(): JSX.Element {
 
   const { data, loading, error, code, reload } = useApi<Payload>('/api/school/announcements')
   const structure = useApi<Structure>('/api/school/structure')
+  const starters = useApi<{ starters: Starter[] }>('/api/school/announcements/starters')
 
   const [title, setTitle] = useState('')
   const [bodyText, setBodyText] = useState('')
   const [importance, setImportance] = useState('regular')
+  /*
+    Channels beyond in-app.
+
+    In-app is not in this set because it is not a choice — it is how a notice reaches
+    the portal and the phone app, and the database rejects an announcement without it.
+    These are the extras, and most are not switched on yet; the form says which.
+  */
+  const [extraChannels, setExtraChannels] = useState<string[]>([])
   const [targetAudience, setTargetAudience] = useState('parents')
   const [targetScope, setTargetScope] = useState('school')
   const [targetIds, setTargetIds] = useState<string[]>([])
@@ -207,6 +241,8 @@ export default function AnnouncementsPage(): JSX.Element {
         title,
         body: bodyText,
         importance,
+        // In-app is added server side; these are the extras the sender asked for.
+        channels: extraChannels,
         targetAudience,
         targetScope: isIndividual ? 'individual' : targetScope,
         targetIds: isIndividual || needsGradeOrClass ? targetIds : undefined,
@@ -247,6 +283,7 @@ export default function AnnouncementsPage(): JSX.Element {
       title,
       bodyText,
       importance,
+      extraChannels,
       targetAudience,
       targetScope,
       isIndividual,
@@ -369,6 +406,36 @@ export default function AnnouncementsPage(): JSX.Element {
           {data.canWrite ? (
             <FormSection title="Write an announcement">
               <form onSubmit={(e) => void submit('draft', e)} noValidate>
+                {/* A starting point, not a finished message. The bracketed parts are
+                    deliberately obvious so nobody sends one unedited. */}
+                {(starters.data?.starters.length ?? 0) > 0 && (
+                  <div className="mb-stack flex flex-col gap-1.5">
+                    <p className="text-sm font-medium">Start from a common message</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {starters.data?.starters.map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => {
+                            setTitle(st.title)
+                            setBodyText(st.body)
+                            setImportance(st.importance)
+                            if (st.audience) setTargetAudience(st.audience)
+                          }}
+                          className="inline-flex min-h-tap items-center gap-1.5 rounded-full border border-border px-3 text-sm transition-colors hover:border-primary hover:bg-muted"
+                        >
+                          <FileText aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                          {st.label}
+                          {st.isOwn && <Badge variant="neutral">yours</Badge>}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Fills the form so you can edit it. Replace anything in [brackets].
+                    </p>
+                  </div>
+                )}
+
                 <FormGrid columns={2}>
                   <Field id="a-title" label="Title" required hint="What it is about, in a line.">
                     {(props) => (
@@ -556,6 +623,52 @@ export default function AnnouncementsPage(): JSX.Element {
                     )}
                   </Field>
 
+                  <Field
+                    id="a-channels"
+                    label="How it is delivered"
+                    hint="Everyone sees it in the portal and the app. The rest are extra."
+                  >
+                    {() => (
+                      <div className="flex flex-col gap-1.5">
+                        {/* Shown as a fixed fact rather than a ticked box somebody
+                            could untick: an announcement delivered nowhere is not an
+                            announcement, and the database refuses it. */}
+                        <p className="flex items-center gap-1.5 text-sm">
+                          <Check aria-hidden="true" className="size-4 text-success" />
+                          In the portal and the phone app
+                          <Badge variant="success">working</Badge>
+                        </p>
+
+                        {CHANNELS.map((ch) => (
+                          <label
+                            key={ch.key}
+                            className="flex min-h-tap cursor-pointer items-center gap-2 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={extraChannels.includes(ch.key)}
+                              onChange={(e) =>
+                                setExtraChannels((prev) =>
+                                  e.target.checked
+                                    ? [...prev, ch.key]
+                                    : prev.filter((c) => c !== ch.key),
+                                )
+                              }
+                              className="size-4"
+                            />
+                            {ch.label}
+                            {/* Honest about what is switched on. A school that ticks
+                                WhatsApp and hears nothing more would assume parents
+                                were texted. */}
+                            <Badge variant="warning">not switched on yet</Badge>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </Field>
+                </FormGrid>
+
+                <FormGrid columns={2}>
                   <Field
                     id="a-when"
                     label="Send later"

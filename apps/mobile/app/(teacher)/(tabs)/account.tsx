@@ -16,7 +16,12 @@ import { Bell, BellOff, CreditCard } from 'lucide-react-native'
 
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
-import { enablePush, pushState, type PushState } from '../../../lib/push'
+import {
+  enablePush,
+  pushState,
+  pushUnavailableReason,
+  type PushState,
+} from '../../../lib/push'
 import {
   Body,
   Button,
@@ -49,10 +54,21 @@ export default function Account(): JSX.Element {
     the time a teacher opens their account they have seen what the app is for.
   */
   const [push, setPush] = useState<PushState | null>(null)
+  const [pushWhy, setPushWhy] = useState<string | null>(null)
   const [pushBusy, setPushBusy] = useState(false)
 
   useEffect(() => {
-    void pushState().then(setPush)
+    void pushState().then((state) => {
+      setPush(state)
+      /*
+        Fetch the reason only when there is one.
+
+        "Not available on this device" sends somebody looking for a fault in the app,
+        when the real answer is usually that Expo Go dropped push in SDK 53 — which is
+        actionable, and only by whoever is testing.
+      */
+      if (state === 'unavailable') void pushUnavailableReason().then(setPushWhy)
+    })
   }, [])
   const c = usePalette()
   const { fullName, email, getToken } = useSession()
@@ -127,7 +143,7 @@ export default function Account(): JSX.Element {
                   : push === 'declined'
                     ? 'Turned off. Switch notifications on for ZSMS in your phone settings.'
                     : push === 'unavailable'
-                      ? 'Not available on this device.'
+                      ? (pushWhy ?? 'Not available on this device.')
                       : 'Get told when your school sends a notice.'}
               </Caption>
             </View>

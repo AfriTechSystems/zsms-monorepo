@@ -122,6 +122,15 @@ export const api = {
     apiCall<T>(path, getToken, { method: 'POST', body: JSON.stringify(body) }),
   patch: <T>(path: string, getToken: TokenGetter, body: unknown) =>
     apiCall<T>(path, getToken, { method: 'PATCH', body: JSON.stringify(body) }),
+  /*
+    DELETE carries a body here, which is unusual but deliberate.
+
+    Retiring a push token names WHICH token to forget, and a token is a capability to
+    reach somebody's phone — in a query string it would land in every access log
+    between here and the server. The body keeps it out of them.
+  */
+  delete: <T>(path: string, getToken: TokenGetter, body: unknown) =>
+    apiCall<T>(path, getToken, { method: 'DELETE', body: JSON.stringify(body) }),
 }
 
 export { BASE_URL }

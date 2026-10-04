@@ -65,8 +65,6 @@ const CALLED_BY_POSTGRES = [
  * a place to hide things.
  * ------------------------------------------------------------------------- */
 const ACCEPTED = new Map([
-  ['register_push_token', 'mobile only — no client exists yet'],
-  ['retire_push_token', 'mobile only — no client exists yet'],
   ['worker_parent_push_tokens', 'worker boundary, called by apps/workers'],
   ['worker_retire_push_token', 'worker boundary, called by apps/workers'],
   ['ai_credit_consume', 'called by other SQL functions, not by a route'],

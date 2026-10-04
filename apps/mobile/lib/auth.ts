@@ -13,6 +13,7 @@ import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-expo'
 import { useCallback, useEffect, useRef } from 'react'
 
 import { api, type TokenGetter } from './api'
+import { retirePush } from './push'
 
 export interface Session {
   isLoaded: boolean
@@ -79,6 +80,18 @@ export function useSession(): Session {
     fullName: user?.fullName ?? null,
     getToken: token,
     signOut: async () => {
+      /*
+        Forget this device before the session goes.
+
+        A shared phone is ordinary in a Zambian school. Leaving a push token registered
+        means the next notice for this person lands on a handset somebody else is
+        holding, which is a disclosure rather than an untidiness.
+
+        Done here rather than at the two buttons that call this, so a third one added
+        later cannot forget. It never throws and never blocks: somebody signing out on a
+        borrowed phone must get out.
+      */
+      await retirePush(token)
       await signOut()
     },
   }

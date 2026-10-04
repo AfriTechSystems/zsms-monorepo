@@ -10,13 +10,16 @@
  */
 
 import type { JSX } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshControl, ScrollView, Text, View } from 'react-native'
-import { CreditCard } from 'lucide-react-native'
+import { Bell, BellOff, CreditCard } from 'lucide-react-native'
 
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
+import { enablePush, pushState, type PushState } from '../../../lib/push'
 import {
   Body,
+  Button,
   Caption,
   Card,
   ErrorNote,
@@ -38,8 +41,21 @@ interface Hub {
 }
 
 export default function Account(): JSX.Element {
+  /*
+    Notifications are asked for HERE, not at launch.
+
+    A phone that asks before showing anything gets "Don't allow", and on iOS that answer
+    is close to final — the app can never ask again, only send somebody to Settings. By
+    the time a teacher opens their account they have seen what the app is for.
+  */
+  const [push, setPush] = useState<PushState | null>(null)
+  const [pushBusy, setPushBusy] = useState(false)
+
+  useEffect(() => {
+    void pushState().then(setPush)
+  }, [])
   const c = usePalette()
-  const { fullName, email } = useSession()
+  const { fullName, email, getToken } = useSession()
   const { data, loading, error, reload } = useApi<Hub>('/api/teacher/hub')
 
   return (
@@ -94,6 +110,43 @@ export default function Account(): JSX.Element {
             <Caption>{data.account.subscription_status ?? ''}</Caption>
           </Card>
         )}
+
+        {/* ---- Notifications ---- */}
+        <Card>
+          <Row gap={SPACE.sm}>
+            {push === 'on' ? (
+              <Bell size={21} color={c.primaryMark} strokeWidth={2} />
+            ) : (
+              <BellOff size={21} color={c.textSubtle} strokeWidth={2} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Body>Notifications</Body>
+              <Caption>
+                {push === 'on'
+                  ? 'This phone will be told when your school sends a notice.'
+                  : push === 'declined'
+                    ? 'Turned off. Switch notifications on for ZSMS in your phone settings.'
+                    : push === 'unavailable'
+                      ? 'Not available on this device.'
+                      : 'Get told when your school sends a notice.'}
+              </Caption>
+            </View>
+          </Row>
+
+          {push === 'unasked' && (
+            <Button
+              label={pushBusy ? 'Asking…' : 'Turn on notifications'}
+              onPress={() => {
+                setPushBusy(true)
+                void enablePush(getToken)
+                  .then(setPush)
+                  .finally(() => setPushBusy(false))
+              }}
+              busy={pushBusy}
+              full
+            />
+          )}
+        </Card>
 
         {/* Stated rather than discovered at the point of refusal. */}
         <Caption>

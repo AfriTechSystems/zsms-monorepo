@@ -33,7 +33,7 @@ import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
-import { SectionNav } from '../../../../components/ui/section-nav'
+import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { SettingsHistory } from '../../../../components/ui/settings-history'
@@ -100,6 +100,7 @@ export default function SchoolSettingsPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [section, setSection] = useSectionTabs<'profile' | 'academic' | 'terms'>('profile')
 
   const [profile, setProfile] = useState<Partial<Profile>>({})
   const [academic, setAcademic] = useState<Partial<Academic>>({})
@@ -193,436 +194,444 @@ export default function SchoolSettingsPage(): JSX.Element {
         note="Your subscription tier and school identifier are shown but cannot be changed here — AfriTech sets the first, and the second appears inside every pupil number and receipt ever issued."
       />
 
-      {/* Three sections on one screen, the third below two long forms. Without this
-          nothing tells somebody that term dates are even here. */}
-      <SectionNav
-        sections={[
-          { id: 'school-profile', label: 'School profile' },
-          { id: 'academic-structure', label: 'Academic structure' },
-          { id: 'term-dates', label: 'Term dates' },
+      {/* Three sections on one screen. Switched rather than scrolled past: term dates
+          sat below two long forms, and nothing told anybody the screen had them. */}
+      <SectionTabs
+        tabs={[
+          { key: 'profile', label: 'School profile' },
+          { key: 'academic', label: 'Academic structure' },
+          { key: 'terms', label: 'Term dates' },
         ]}
+        active={section}
+        onChange={setSection}
       />
 
       <div className="space-y-cards">
         {/* ---------------- Profile ---------------- */}
-        <Card id="school-profile" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>School profile</CardTitle>
-            <CardDescription>
-              Appears on report cards, receipts and every message sent to a parent.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field id="name" label="School name" required>
-                {(props) => (
-                  <Input
-                    {...props}
-                    value={profile.name ?? ''}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                  />
-                )}
-              </Field>
+        {section === 'profile' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>School profile</CardTitle>
+              <CardDescription>
+                Appears on report cards, receipts and every message sent to a parent.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field id="name" label="School name" required>
+                  {(props) => (
+                    <Input
+                      {...props}
+                      value={profile.name ?? ''}
+                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                    />
+                  )}
+                </Field>
 
-              <Field
-                id="display-name"
-                label="Short name"
-                hint="For tight spaces like the portal header. Blank uses the full name."
-              >
-                {(props) => (
-                  <Input
-                    {...props}
-                    value={profile.display_name ?? ''}
-                    onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
-                  />
-                )}
-              </Field>
+                <Field
+                  id="display-name"
+                  label="Short name"
+                  hint="For tight spaces like the portal header. Blank uses the full name."
+                >
+                  {(props) => (
+                    <Input
+                      {...props}
+                      value={profile.display_name ?? ''}
+                      onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
+                    />
+                  )}
+                </Field>
 
-              <Field id="phone" label="Phone" hint="International format, e.g. +260971234567.">
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="tel"
-                    value={profile.phone ?? ''}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  />
-                )}
-              </Field>
+                <Field id="phone" label="Phone" hint="International format, e.g. +260971234567.">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      type="tel"
+                      value={profile.phone ?? ''}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    />
+                  )}
+                </Field>
 
-              <Field id="email" label="Email">
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="email"
-                    value={profile.email ?? ''}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                  />
-                )}
-              </Field>
+                <Field id="email" label="Email">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      type="email"
+                      value={profile.email ?? ''}
+                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    />
+                  )}
+                </Field>
 
-              <Field id="address" label="Address" className="sm:col-span-2">
-                {(props) => (
-                  <Input
-                    {...props}
-                    value={profile.address ?? ''}
-                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                  />
-                )}
-              </Field>
+                <Field id="address" label="Address" className="sm:col-span-2">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      value={profile.address ?? ''}
+                      onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                    />
+                  )}
+                </Field>
 
-              <Field id="type" label="School type">
-                {(props) => (
-                  <Select
-                    {...props}
-                    value={profile.type ?? 'day'}
-                    onChange={(e) => setProfile({ ...profile, type: e.target.value })}
-                  >
-                    <option value="day">Day</option>
-                    <option value="boarding">Boarding</option>
-                    <option value="hybrid">Day and boarding</option>
-                  </Select>
-                )}
-              </Field>
+                <Field id="type" label="School type">
+                  {(props) => (
+                    <Select
+                      {...props}
+                      value={profile.type ?? 'day'}
+                      onChange={(e) => setProfile({ ...profile, type: e.target.value })}
+                    >
+                      <option value="day">Day</option>
+                      <option value="boarding">Boarding</option>
+                      <option value="hybrid">Day and boarding</option>
+                    </Select>
+                  )}
+                </Field>
 
-              <Field id="level" label="Level">
-                {(props) => (
-                  <Select
-                    {...props}
-                    value={profile.level ?? 'combined'}
-                    onChange={(e) => setProfile({ ...profile, level: e.target.value })}
-                  >
-                    <option value="primary">Primary</option>
-                    <option value="secondary">Secondary</option>
-                    <option value="combined">Combined</option>
-                  </Select>
-                )}
-              </Field>
+                <Field id="level" label="Level">
+                  {(props) => (
+                    <Select
+                      {...props}
+                      value={profile.level ?? 'combined'}
+                      onChange={(e) => setProfile({ ...profile, level: e.target.value })}
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                      <option value="combined">Combined</option>
+                    </Select>
+                  )}
+                </Field>
 
-              <Field
-                id="ministry"
-                label="Ministry registration number"
-                hint="Optional. Printed on attendance certificates and formal documents."
-              >
-                {(props) => (
-                  <Input
-                    {...props}
-                    value={profile.ministry_reg_number ?? ''}
-                    onChange={(e) =>
-                      setProfile({ ...profile, ministry_reg_number: e.target.value })
-                    }
-                  />
-                )}
-              </Field>
+                <Field
+                  id="ministry"
+                  label="Ministry registration number"
+                  hint="Optional. Printed on attendance certificates and formal documents."
+                >
+                  {(props) => (
+                    <Input
+                      {...props}
+                      value={profile.ministry_reg_number ?? ''}
+                      onChange={(e) =>
+                        setProfile({ ...profile, ministry_reg_number: e.target.value })
+                      }
+                    />
+                  )}
+                </Field>
 
-              <Field id="logo" label="Logo URL" hint="Appears on PDFs and in the portal header.">
-                {(props) => (
-                  <Input
-                    {...props}
-                    value={profile.logo_url ?? ''}
-                    onChange={(e) => setProfile({ ...profile, logo_url: e.target.value })}
-                  />
-                )}
-              </Field>
-            </div>
-
-            {/*
-              Shown and disabled rather than omitted. A school owner seeing their tier greyed out
-              learns that ZSMS holds it and AfriTech sets it; hiding it would suggest the product
-              has no record of what they pay for.
-            */}
-            <div className="rounded-lg border border-border bg-sunken p-4">
-              <p className="mb-3 flex items-center gap-2 text-sm font-medium text-text">
-                <Lock className="size-4" aria-hidden />
-                Set by AfriTech
-              </p>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-muted-text">School identifier</p>
-                  <p className="font-mono text-sm text-text">{data.profile.school_id}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-text">Subscription</p>
-                  <p className="text-sm text-text">
-                    <Badge variant="info">{data.profile.subscription_tier}</Badge>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-text">Status</p>
-                  <p className="text-sm text-text">
-                    <Badge variant={data.profile.status === 'active' ? 'success' : 'warning'}>
-                      {data.profile.status}
-                    </Badge>
-                  </p>
-                </div>
+                <Field id="logo" label="Logo URL" hint="Appears on PDFs and in the portal header.">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      value={profile.logo_url ?? ''}
+                      onChange={(e) => setProfile({ ...profile, logo_url: e.target.value })}
+                    />
+                  )}
+                </Field>
               </div>
-              <p className="mt-3 text-xs text-muted-text">{data.readOnly.reason}</p>
-            </div>
 
-            <Button
-              onClick={() =>
-                void save(
-                  {
-                    profile: {
-                      name: profile.name,
-                      displayName: profile.display_name,
-                      address: profile.address,
-                      phone: profile.phone || null,
-                      email: profile.email || null,
-                      logoUrl: profile.logo_url || null,
-                      ministryRegNumber: profile.ministry_reg_number,
-                      type: profile.type,
-                      level: profile.level,
+              {/*
+                Shown and disabled rather than omitted. A school owner seeing their tier greyed out
+                learns that ZSMS holds it and AfriTech sets it; hiding it would suggest the product
+                has no record of what they pay for.
+              */}
+              <div className="rounded-lg border border-border bg-sunken p-4">
+                <p className="mb-3 flex items-center gap-2 text-sm font-medium text-text">
+                  <Lock className="size-4" aria-hidden />
+                  Set by AfriTech
+                </p>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-text">School identifier</p>
+                    <p className="font-mono text-sm text-text">{data.profile.school_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-text">Subscription</p>
+                    <p className="text-sm text-text">
+                      <Badge variant="info">{data.profile.subscription_tier}</Badge>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-text">Status</p>
+                    <p className="text-sm text-text">
+                      <Badge variant={data.profile.status === 'active' ? 'success' : 'warning'}>
+                        {data.profile.status}
+                      </Badge>
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-muted-text">{data.readOnly.reason}</p>
+              </div>
+
+              <Button
+                onClick={() =>
+                  void save(
+                    {
+                      profile: {
+                        name: profile.name,
+                        displayName: profile.display_name,
+                        address: profile.address,
+                        phone: profile.phone || null,
+                        email: profile.email || null,
+                        logoUrl: profile.logo_url || null,
+                        ministryRegNumber: profile.ministry_reg_number,
+                        type: profile.type,
+                        level: profile.level,
+                      },
                     },
-                  },
-                  'Profile saved.',
-                )
-              }
-              disabled={saving || !profile.name || profile.name.trim().length < 2}
-            >
-              {saving ? 'Saving…' : 'Save profile'}
-            </Button>
-          </CardContent>
-        </Card>
+                    'Profile saved.',
+                  )
+                }
+                disabled={saving || !profile.name || profile.name.trim().length < 2}
+              >
+                {saving ? 'Saving…' : 'Save profile'}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ---------------- Academic structure ---------------- */}
-        <Card id="academic-structure" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>Academic structure</CardTitle>
-            <CardDescription>
-              Zambia runs two systems at once — traditional ECZ grades and the 2023 reform. This is
-              which one your school follows.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field id="curriculum" label="Curriculum">
-                {(props) => (
-                  <Select
-                    {...props}
-                    value={academic.curriculum_type ?? 'ecz'}
-                    onChange={(e) => setAcademic({ ...academic, curriculum_type: e.target.value })}
-                  >
-                    <option value="ecz">ECZ</option>
-                    <option value="cambridge_igcse">Cambridge IGCSE</option>
-                    <option value="cambridge_alevel">Cambridge A-Level</option>
-                    <option value="mixed">Mixed</option>
-                  </Select>
-                )}
-              </Field>
+        {section === 'academic' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Academic structure</CardTitle>
+              <CardDescription>
+                Zambia runs two systems at once — traditional ECZ grades and the 2023 reform. This is
+                which one your school follows.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field id="curriculum" label="Curriculum">
+                  {(props) => (
+                    <Select
+                      {...props}
+                      value={academic.curriculum_type ?? 'ecz'}
+                      onChange={(e) => setAcademic({ ...academic, curriculum_type: e.target.value })}
+                    >
+                      <option value="ecz">ECZ</option>
+                      <option value="cambridge_igcse">Cambridge IGCSE</option>
+                      <option value="cambridge_alevel">Cambridge A-Level</option>
+                      <option value="mixed">Mixed</option>
+                    </Select>
+                  )}
+                </Field>
 
-              <Field id="grading" label="Grading system">
-                {(props) => (
-                  <Select
-                    {...props}
-                    value={academic.grading_system ?? 'ecz'}
-                    onChange={(e) => setAcademic({ ...academic, grading_system: e.target.value })}
-                  >
-                    <option value="ecz">ECZ traditional</option>
-                    <option value="cambridge_o">Cambridge O-Level</option>
-                    <option value="cambridge_a">Cambridge A-Level</option>
-                    <option value="custom">School-defined</option>
-                  </Select>
-                )}
-              </Field>
+                <Field id="grading" label="Grading system">
+                  {(props) => (
+                    <Select
+                      {...props}
+                      value={academic.grading_system ?? 'ecz'}
+                      onChange={(e) => setAcademic({ ...academic, grading_system: e.target.value })}
+                    >
+                      <option value="ecz">ECZ traditional</option>
+                      <option value="cambridge_o">Cambridge O-Level</option>
+                      <option value="cambridge_a">Cambridge A-Level</option>
+                      <option value="custom">School-defined</option>
+                    </Select>
+                  )}
+                </Field>
 
-              <Field
-                id="structure"
-                label="Grade structure"
-                hint="Grades 1–12, or the 2023 reform's Grades 1–6 then Forms 1–6."
-              >
-                {(props) => (
-                  <Select
-                    {...props}
-                    value={academic.structure_type ?? 'traditional'}
-                    onChange={(e) => setAcademic({ ...academic, structure_type: e.target.value })}
-                  >
-                    <option value="traditional">Grades 1–12 (traditional)</option>
-                    <option value="reform">Grades 1–6 then Forms 1–6 (2023 reform)</option>
-                    <option value="hybrid">Both, mid-transition</option>
-                  </Select>
-                )}
-              </Field>
+                <Field
+                  id="structure"
+                  label="Grade structure"
+                  hint="Grades 1–12, or the 2023 reform's Grades 1–6 then Forms 1–6."
+                >
+                  {(props) => (
+                    <Select
+                      {...props}
+                      value={academic.structure_type ?? 'traditional'}
+                      onChange={(e) => setAcademic({ ...academic, structure_type: e.target.value })}
+                    >
+                      <option value="traditional">Grades 1–12 (traditional)</option>
+                      <option value="reform">Grades 1–6 then Forms 1–6 (2023 reform)</option>
+                      <option value="hybrid">Both, mid-transition</option>
+                    </Select>
+                  )}
+                </Field>
 
-              <Field id="highest" label="Highest level offered">
-                {(props) => (
-                  <Input
-                    {...props}
-                    value={academic.highest_level_offered ?? ''}
-                    onChange={(e) =>
-                      setAcademic({ ...academic, highest_level_offered: e.target.value })
-                    }
-                  />
-                )}
-              </Field>
-            </div>
+                <Field id="highest" label="Highest level offered">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      value={academic.highest_level_offered ?? ''}
+                      onChange={(e) =>
+                        setAcademic({ ...academic, highest_level_offered: e.target.value })
+                      }
+                    />
+                  )}
+                </Field>
+              </div>
 
-            <Button
-              onClick={() =>
-                void save(
-                  {
-                    academic: {
-                      curriculumType: academic.curriculum_type ?? undefined,
-                      gradingSystem: academic.grading_system ?? undefined,
-                      structureType: academic.structure_type ?? undefined,
-                      highestLevelOffered: academic.highest_level_offered ?? undefined,
+              <Button
+                onClick={() =>
+                  void save(
+                    {
+                      academic: {
+                        curriculumType: academic.curriculum_type ?? undefined,
+                        gradingSystem: academic.grading_system ?? undefined,
+                        structureType: academic.structure_type ?? undefined,
+                        highestLevelOffered: academic.highest_level_offered ?? undefined,
+                      },
                     },
-                  },
-                  'Academic structure saved.',
-                )
-              }
-              disabled={saving}
-            >
-              {saving ? 'Saving…' : 'Save academic structure'}
-            </Button>
-          </CardContent>
-        </Card>
+                    'Academic structure saved.',
+                  )
+                }
+                disabled={saving}
+              >
+                {saving ? 'Saving…' : 'Save academic structure'}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ---------------- Term dates ---------------- */}
-        <Card id="term-dates" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>Term dates</CardTitle>
-            <CardDescription>
-              When each term runs. Fees, marks and attendance are all recorded against a term —
-              until these are set, nothing in ZSMS knows which term today falls in.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {data.currentTerm ? (
-              <Alert
-                variant={data.currentTerm.is_between ? 'warning' : 'info'}
-                title={
-                  data.currentTerm.is_between
-                    ? `On holiday — term ${data.currentTerm.term_number} starts ${shortDate(data.currentTerm.starts_on)}`
-                    : `Currently in ${data.currentTerm.academic_year} term ${data.currentTerm.term_number}`
-                }
-              >
-                {shortDate(data.currentTerm.starts_on)} to {shortDate(data.currentTerm.ends_on)}
-              </Alert>
-            ) : (
-              <Alert variant="warning" title="No term dates set">
-                Add your terms below. Without them nothing can work out which term a payment or a
-                mark belongs to without being told.
-              </Alert>
-            )}
+        {section === 'terms' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Term dates</CardTitle>
+              <CardDescription>
+                When each term runs. Fees, marks and attendance are all recorded against a term —
+                until these are set, nothing in ZSMS knows which term today falls in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {data.currentTerm ? (
+                <Alert
+                  variant={data.currentTerm.is_between ? 'warning' : 'info'}
+                  title={
+                    data.currentTerm.is_between
+                      ? `On holiday — term ${data.currentTerm.term_number} starts ${shortDate(data.currentTerm.starts_on)}`
+                      : `Currently in ${data.currentTerm.academic_year} term ${data.currentTerm.term_number}`
+                  }
+                >
+                  {shortDate(data.currentTerm.starts_on)} to {shortDate(data.currentTerm.ends_on)}
+                </Alert>
+              ) : (
+                <Alert variant="warning" title="No term dates set">
+                  Add your terms below. Without them nothing can work out which term a payment or a
+                  mark belongs to without being told.
+                </Alert>
+              )}
 
-            {data.terms.length > 0 && (
-              <ul className="divide-y divide-border">
-                {data.terms.map((t) => (
-                  <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                    <div>
-                      <p className="font-medium text-text">
-                        {t.academic_year} · Term {t.term_number}
-                      </p>
-                      <p className="text-xs text-muted-text">
-                        {shortDate(t.starts_on)} to {shortDate(t.ends_on)}
-                      </p>
-                    </div>
+              {data.terms.length > 0 && (
+                <ul className="divide-y divide-border">
+                  {data.terms.map((t) => (
+                    <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                      <div>
+                        <p className="font-medium text-text">
+                          {t.academic_year} · Term {t.term_number}
+                        </p>
+                        <p className="text-xs text-muted-text">
+                          {shortDate(t.starts_on)} to {shortDate(t.ends_on)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setTerm({
+                            id: t.id,
+                            academicYear: t.academic_year,
+                            termNumber: String(t.term_number),
+                            startsOn: t.starts_on,
+                            endsOn: t.ends_on,
+                          })
+                        }
+                      >
+                        Edit
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {term ? (
+                <div className="space-y-3 rounded-lg border border-border p-4">
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <Field id="ay" label="Academic year" required>
+                      {(props) => (
+                        <Input
+                          {...props}
+                          value={term.academicYear}
+                          onChange={(e) => setTerm({ ...term, academicYear: e.target.value })}
+                        />
+                      )}
+                    </Field>
+                    <Field id="tn" label="Term" required>
+                      {(props) => (
+                        <Input
+                          {...props}
+                          type="number"
+                          min={1}
+                          max={6}
+                          value={term.termNumber}
+                          onChange={(e) => setTerm({ ...term, termNumber: e.target.value })}
+                        />
+                      )}
+                    </Field>
+                    <Field id="so" label="Starts" required>
+                      {(props) => (
+                        <Input
+                          {...props}
+                          type="date"
+                          value={term.startsOn}
+                          onChange={(e) => setTerm({ ...term, startsOn: e.target.value })}
+                        />
+                      )}
+                    </Field>
+                    <Field id="eo" label="Ends" required>
+                      {(props) => (
+                        <Input
+                          {...props}
+                          type="date"
+                          value={term.endsOn}
+                          onChange={(e) => setTerm({ ...term, endsOn: e.target.value })}
+                        />
+                      )}
+                    </Field>
+                  </div>
+                  <div className="flex gap-2">
                     <Button
-                      variant="ghost"
                       size="sm"
-                      onClick={() =>
-                        setTerm({
-                          id: t.id,
-                          academicYear: t.academic_year,
-                          termNumber: String(t.term_number),
-                          startsOn: t.starts_on,
-                          endsOn: t.ends_on,
-                        })
-                      }
+                      onClick={() => void saveTerm()}
+                      disabled={saving || !term.academicYear || !term.startsOn || !term.endsOn}
                     >
-                      Edit
+                      {saving ? 'Saving…' : 'Save term'}
                     </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {term ? (
-              <div className="space-y-3 rounded-lg border border-border p-4">
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <Field id="ay" label="Academic year" required>
-                    {(props) => (
-                      <Input
-                        {...props}
-                        value={term.academicYear}
-                        onChange={(e) => setTerm({ ...term, academicYear: e.target.value })}
-                      />
-                    )}
-                  </Field>
-                  <Field id="tn" label="Term" required>
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="number"
-                        min={1}
-                        max={6}
-                        value={term.termNumber}
-                        onChange={(e) => setTerm({ ...term, termNumber: e.target.value })}
-                      />
-                    )}
-                  </Field>
-                  <Field id="so" label="Starts" required>
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="date"
-                        value={term.startsOn}
-                        onChange={(e) => setTerm({ ...term, startsOn: e.target.value })}
-                      />
-                    )}
-                  </Field>
-                  <Field id="eo" label="Ends" required>
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="date"
-                        value={term.endsOn}
-                        onChange={(e) => setTerm({ ...term, endsOn: e.target.value })}
-                      />
-                    )}
-                  </Field>
+                    <Button size="sm" variant="ghost" onClick={() => setTerm(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-text">
+                    Terms cannot overlap. If they do, ZSMS says which one clashes.
+                  </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => void saveTerm()}
-                    disabled={saving || !term.academicYear || !term.startsOn || !term.endsOn}
-                  >
-                    {saving ? 'Saving…' : 'Save term'}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setTerm(null)}>
-                    Cancel
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-text">
-                  Terms cannot overlap. If they do, ZSMS says which one clashes.
-                </p>
-              </div>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setTerm({
-                    academicYear: String(new Date().getFullYear()),
-                    termNumber: String(Math.min(data.terms.length + 1, 6)),
-                    startsOn: '',
-                    endsOn: '',
-                  })
-                }
-              >
-                <Plus className="size-4" aria-hidden />
-                Add a term
-              </Button>
-            )}
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setTerm({
+                      academicYear: String(new Date().getFullYear()),
+                      termNumber: String(Math.min(data.terms.length + 1, 6)),
+                      startsOn: '',
+                      endsOn: '',
+                    })
+                  }
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Add a term
+                </Button>
+              )}
 
-            <p className="flex items-center gap-2 text-xs text-muted-text">
-              <CalendarRange className="size-3" aria-hidden />
-              A term cannot be deleted here — fees, marks and attendance reference it by number.
-              Contact AfriTech if one was added by mistake.
-            </p>
-          </CardContent>
-        </Card>
+              <p className="flex items-center gap-2 text-xs text-muted-text">
+                <CalendarRange className="size-3" aria-hidden />
+                A term cannot be deleted here — fees, marks and attendance reference it by number.
+                Contact AfriTech if one was added by mistake.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Renders nothing until something has actually been changed — see the component.

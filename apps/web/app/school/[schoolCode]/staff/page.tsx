@@ -25,7 +25,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
-import { SectionNav } from '../../../../components/ui/section-nav'
+import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
 import { use, useCallback, useState } from 'react'
 import { Loader2, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
 
@@ -115,8 +115,7 @@ function InviteForm({ roles, onSent }: { roles: string[]; onSent: () => void }):
 
   return (
     <FormSection
-      id="invite-someone"
-      title="Invite someone"
+    title="Invite someone"
       description="They receive an email, choose a password, and land in this school with the role you pick."
     >
       <form onSubmit={submit} noValidate>
@@ -191,6 +190,7 @@ export default function StaffPage({
   use(params)
 
   const { data, loading, error, code, reload } = useApi<StaffPayload>('/api/school/staff')
+  const [section, setSection] = useSectionTabs<'members' | 'invited' | 'invite'>('members')
   const [busy, setBusy] = useState<string | null>(null)
   const [editing, setEditing] = useState<StaffRow | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -267,14 +267,15 @@ export default function StaffPage({
         note="A person needs a ROLE to sign in and a STAFF RECORD to appear on registers and mark sheets. Inviting someone creates the first; the second is filled in separately. Removing access never deletes their record or the work attached to it."
       />
 
-      {/* The invite form sits below both lists, so inviting somebody means scrolling
-          past every member of staff to reach it. */}
-      <SectionNav
-        sections={[
-          { id: 'on-the-staff', label: 'On the staff' },
-          { id: 'invited', label: 'Invited' },
-          { id: 'invite-someone', label: 'Invite someone' },
+      {/* A staff list grows without limit, and the invite form sat below all of it. */}
+      <SectionTabs
+        tabs={[
+          { key: 'members', label: 'On the staff' },
+          { key: 'invited', label: 'Invited' },
+          { key: 'invite', label: 'Invite someone' },
         ]}
+        active={section}
+        onChange={setSection}
       />
 
       {/* Renders nothing when there are none — see the component. Placed above the
@@ -328,144 +329,146 @@ export default function StaffPage({
             </Alert>
           )}
 
-          <Card id="on-the-staff" className="scroll-mt-20">
-            <CardHeader>
-              <CardTitle>On the staff</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                A person needs a role to sign in, and a staff record to appear on registers and
-                mark sheets. Both are shown.
-              </p>
-            </CardHeader>
-            <CardContent className="p-0">
-              <DataTable
-                caption="Staff at this school"
-                rows={data.staff}
-                rowKey={(r) => r.clerk_user_id || (r.id ?? fullName(r))}
-                columns={[
-                  {
-                    key: 'person',
-                    header: 'Person',
-                    primary: true,
-                    cell: (r) => (
-                      <>
-                        <span className="font-medium text-foreground">{fullName(r)}</span>
-                        {r.email && (
-                          <span className="block truncate text-xs text-subtle">{r.email}</span>
-                        )}
-                      </>
-                    ),
-                  },
-                  {
-                    key: 'role',
-                    header: 'Access',
-                    cell: (r) =>
-                      r.role ? (
-                        <Badge variant={r.role === 'org:owner' ? 'primary' : 'neutral'}>
-                          {ROLE_LABEL[r.role] ?? r.role}
-                        </Badge>
-                      ) : (
-                        <Badge variant="warning">No sign-in</Badge>
+          {section === 'members' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>On the staff</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  A person needs a role to sign in, and a staff record to appear on registers and
+                  mark sheets. Both are shown.
+                </p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <DataTable
+                  caption="Staff at this school"
+                  rows={data.staff}
+                  rowKey={(r) => r.clerk_user_id || (r.id ?? fullName(r))}
+                  columns={[
+                    {
+                      key: 'person',
+                      header: 'Person',
+                      primary: true,
+                      cell: (r) => (
+                        <>
+                          <span className="font-medium text-foreground">{fullName(r)}</span>
+                          {r.email && (
+                            <span className="block truncate text-xs text-subtle">{r.email}</span>
+                          )}
+                        </>
                       ),
-                  },
-                  {
-                    key: 'record',
-                    header: 'Staff record',
-                    cell: (r) =>
-                      !r.id ? (
-                        /*
-                          A Clerk member with no `staff_members` row.
+                    },
+                    {
+                      key: 'role',
+                      header: 'Access',
+                      cell: (r) =>
+                        r.role ? (
+                          <Badge variant={r.role === 'org:owner' ? 'primary' : 'neutral'}>
+                            {ROLE_LABEL[r.role] ?? r.role}
+                          </Badge>
+                        ) : (
+                          <Badge variant="warning">No sign-in</Badge>
+                        ),
+                    },
+                    {
+                      key: 'record',
+                      header: 'Staff record',
+                      cell: (r) =>
+                        !r.id ? (
+                          /*
+                            A Clerk member with no `staff_members` row.
 
-                          Before `0184` this was permanent: accepting an invitation created
-                          the membership and nothing else, so the person was invisible here
-                          forever. It now resolves itself the first time they open the
-                          portal or the app, which is what this says rather than leaving a
-                          warning that looks like something the school must fix.
-                        */
-                        <span className="text-muted-foreground">
-                          Appears when they first sign in
-                        </span>
-                      ) : canManage ? (
-                        <button
-                          type="button"
-                          onClick={() => setEditing(r)}
-                          className="min-h-tap rounded px-1 text-left text-primary-text hover:underline"
-                        >
-                          {r.staff_number ?? 'Add details'}
-                          {r.department ? ` · ${r.department}` : ''}
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          {r.staff_number ?? '—'}
-                          {r.department ? ` · ${r.department}` : ''}
-                        </span>
-                      ),
-                  },
-                  {
-                    key: 'joined',
-                    header: 'Joined',
-                    hideOnMobile: true,
-                    cell: (r) => formatDate(r.join_date),
-                  },
-                  ...(canManage
-                    ? [
-                        {
-                          key: 'manage',
-                          header: 'Change access',
-                          cell: (r: StaffRow) =>
-                            // The owner is not editable here, and there is no
-                            // point rendering a control that always refuses.
-                            r.role === 'org:owner' || !r.hasAccount ? (
-                              <span className="text-muted-foreground">—</span>
-                            ) : (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <label htmlFor={`role-${r.clerk_user_id}`} className="sr-only">
-                                  Role for {fullName(r)}
-                                </label>
-                                <Select
-                                  id={`role-${r.clerk_user_id}`}
-                                  value={r.role ?? ''}
-                                  disabled={busy === r.clerk_user_id}
-                                  className="h-9 min-h-0 w-auto py-1 text-sm"
-                                  onChange={(e) => void changeRole(r.clerk_user_id, e.target.value)}
-                                >
-                                  {data.assignableRoles.map((role) => (
-                                    <option key={role} value={role}>
-                                      {ROLE_LABEL[role] ?? role}
-                                    </option>
-                                  ))}
-                                </Select>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={busy === r.clerk_user_id}
-                                  onClick={() => void removeAccess(r)}
-                                >
-                                  <ShieldOff aria-hidden="true" />
-                                  <span className="sr-only">Remove access for {fullName(r)}</span>
-                                </Button>
-                              </div>
-                            ),
-                        },
-                      ]
-                    : []),
-                ]}
-                empty={
-                  <EmptyState
-                    icon={UserCog}
-                    title="Nobody on staff yet"
-                    description={
-                      canManage
-                        ? 'Invite the first colleague below.'
-                        : 'Staff appear here once the school owner invites them.'
-                    }
-                  />
-                }
-              />
-            </CardContent>
-          </Card>
+                            Before `0184` this was permanent: accepting an invitation created
+                            the membership and nothing else, so the person was invisible here
+                            forever. It now resolves itself the first time they open the
+                            portal or the app, which is what this says rather than leaving a
+                            warning that looks like something the school must fix.
+                          */
+                          <span className="text-muted-foreground">
+                            Appears when they first sign in
+                          </span>
+                        ) : canManage ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditing(r)}
+                            className="min-h-tap rounded px-1 text-left text-primary-text hover:underline"
+                          >
+                            {r.staff_number ?? 'Add details'}
+                            {r.department ? ` · ${r.department}` : ''}
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {r.staff_number ?? '—'}
+                            {r.department ? ` · ${r.department}` : ''}
+                          </span>
+                        ),
+                    },
+                    {
+                      key: 'joined',
+                      header: 'Joined',
+                      hideOnMobile: true,
+                      cell: (r) => formatDate(r.join_date),
+                    },
+                    ...(canManage
+                      ? [
+                          {
+                            key: 'manage',
+                            header: 'Change access',
+                            cell: (r: StaffRow) =>
+                              // The owner is not editable here, and there is no
+                              // point rendering a control that always refuses.
+                              r.role === 'org:owner' || !r.hasAccount ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <label htmlFor={`role-${r.clerk_user_id}`} className="sr-only">
+                                    Role for {fullName(r)}
+                                  </label>
+                                  <Select
+                                    id={`role-${r.clerk_user_id}`}
+                                    value={r.role ?? ''}
+                                    disabled={busy === r.clerk_user_id}
+                                    className="h-9 min-h-0 w-auto py-1 text-sm"
+                                    onChange={(e) => void changeRole(r.clerk_user_id, e.target.value)}
+                                  >
+                                    {data.assignableRoles.map((role) => (
+                                      <option key={role} value={role}>
+                                        {ROLE_LABEL[role] ?? role}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={busy === r.clerk_user_id}
+                                    onClick={() => void removeAccess(r)}
+                                  >
+                                    <ShieldOff aria-hidden="true" />
+                                    <span className="sr-only">Remove access for {fullName(r)}</span>
+                                  </Button>
+                                </div>
+                              ),
+                          },
+                        ]
+                      : []),
+                  ]}
+                  empty={
+                    <EmptyState
+                      icon={UserCog}
+                      title="Nobody on staff yet"
+                      description={
+                        canManage
+                          ? 'Invite the first colleague below.'
+                          : 'Staff appear here once the school owner invites them.'
+                      }
+                    />
+                  }
+                />
+              </CardContent>
+            </Card>
+          )}
 
-          {canManage && data.invitations.length > 0 && (
-            <Card id="invited" className="scroll-mt-20">
+          {section === 'invited' && canManage && data.invitations.length > 0 && (
+            <Card>
               <CardHeader>
                 <CardTitle>Invited, not yet joined</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -522,14 +525,17 @@ export default function StaffPage({
             </Card>
           )}
 
-          {canManage ? (
-            <InviteForm roles={data.assignableRoles} onSent={reload} />
-          ) : (
-            <Alert variant="info" title="Inviting staff is the owner's to do">
-              Only the school owner and the principal can invite colleagues or change what someone
-              can do. Ask one of them, and they can do it from this screen.
-            </Alert>
-          )}
+          {/* The refusal belongs on this tab too: somebody who cannot invite should
+              learn that where they went looking, not be shown nothing. */}
+          {section === 'invite' &&
+            (canManage ? (
+              <InviteForm roles={data.assignableRoles} onSent={reload} />
+            ) : (
+              <Alert variant="info" title="Inviting staff is the owner's to do">
+                Only the school owner and the principal can invite colleagues or change what
+                someone can do. Ask one of them, and they can do it from this screen.
+              </Alert>
+            ))}
         </div>
       )}
     </>

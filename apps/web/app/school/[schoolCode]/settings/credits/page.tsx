@@ -28,7 +28,7 @@
  */
 
 import type { JSX } from 'react'
-import { SectionNav } from '../../../../../components/ui/section-nav'
+import { SectionTabs, useSectionTabs } from '../../../../../components/ui/section-tabs'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
@@ -115,6 +115,7 @@ const money = (amount: number, currency: string): string =>
 function CreditsScreen(): JSX.Element {
   const { data, loading, error, code, reload } = useApi<CreditsPayload>('/api/school/credits')
   const staff = useApi<{ staff: StaffMember[] }>('/api/school/staff')
+  const [section, setSection] = useSectionTabs<'in-force' | 'buy' | 'assign' | 'holders'>('in-force')
   const { toast } = useToast()
 
   const [planCode, setPlanCode] = useState<string>('')
@@ -225,19 +226,21 @@ function CreditsScreen(): JSX.Element {
         description="Buy credits for your teachers and choose who gets them. Each teacher's credits are their own — one teacher cannot spend another's."
       />
 
-      {/* Four sections, and the one that says who holds credits is last. */}
-      <SectionNav
-        sections={[
-          { id: 'in-force', label: 'In force' },
-          { id: 'buy-credits', label: 'Buy' },
-          { id: 'assign-credits', label: 'Assign' },
-          { id: 'who-holds', label: 'Who holds them' },
+      {/* Who holds credits is the last of four, and the one a bursar checks most. */}
+      <SectionTabs
+        tabs={[
+          { key: 'in-force', label: 'In force' },
+          { key: 'buy', label: 'Buy' },
+          { key: 'assign', label: 'Assign' },
+          { key: 'holders', label: 'Who holds them' },
         ]}
+        active={section}
+        onChange={setSection}
       />
 
       {/* ---- What is in force right now ---- */}
-      {live ? (
-        <Card id="in-force" className="scroll-mt-20">
+      {section === 'in-force' && (live ? (
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Coins aria-hidden="true" className="size-5 text-primary" />
@@ -269,11 +272,11 @@ function CreditsScreen(): JSX.Element {
             </div>
           </CardContent>
         </Card>
-      )}
+      ))}
 
       {/* ---- Buy ---- */}
-      {data.canBuy && (
-        <Card id="buy-credits" className="scroll-mt-20">
+      {section === 'buy' && data.canBuy && (
+        <Card>
           <CardHeader>
             <CardTitle>Buy credits</CardTitle>
             <CardDescription>
@@ -357,8 +360,8 @@ function CreditsScreen(): JSX.Element {
       )}
 
       {/* ---- Assign ---- */}
-      {live && data.canBuy && (
-        <Card id="assign-credits" className="scroll-mt-20">
+      {section === 'assign' && live && data.canBuy && (
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users aria-hidden="true" className="size-5 text-primary" />
@@ -454,8 +457,8 @@ function CreditsScreen(): JSX.Element {
       <UsagePanel />
 
       {/* ---- Who holds credits now ---- */}
-      {assignments.length > 0 && (
-        <Card id="who-holds" className="scroll-mt-20">
+      {section === 'holders' && assignments.length > 0 && (
+        <Card>
           <CardHeader>
             <CardTitle>Teachers with credits</CardTitle>
           </CardHeader>

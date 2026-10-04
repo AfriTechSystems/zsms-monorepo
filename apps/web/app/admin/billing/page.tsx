@@ -29,7 +29,7 @@
  */
 
 import type { JSX } from 'react'
-import { SectionNav } from '../../../components/ui/section-nav'
+import { SectionTabs, useSectionTabs } from '../../../components/ui/section-tabs'
 import { useCallback, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, Play, Receipt, Send, Wallet, X } from 'lucide-react'
 
@@ -117,6 +117,7 @@ function lastMonth(): { start: string; end: string } {
 export default function AdminBillingPage(): JSX.Element {
   const { data, loading, error, code, reload } = useApi<Payload>('/api/admin/billing')
   const { toast } = useToast()
+  const [section, setSection] = useSectionTabs<'run' | 'payment' | 'invoices'>('run')
 
   const defaults = useMemo(lastMonth, [])
   const [periodStart, setPeriodStart] = useState(defaults.start)
@@ -186,13 +187,16 @@ export default function AdminBillingPage(): JSX.Element {
         note="This is AfriTech's revenue, not a school's fee income — separate money in separate tables. A run creates drafts; issuing is what sends a bill, and only an issued invoice can take a payment. Payments are money that has already arrived, recorded here with its bank or mobile-money reference."
       />
 
-      {/* Recording a payment means scrolling past the billing run every time. */}
-      <SectionNav
-        sections={[
-          { id: 'run-billing', label: 'Run billing' },
-          { id: 'record-payment', label: 'Record a payment' },
-          { id: 'invoices', label: 'Invoices' },
+      {/* Recording a payment meant scrolling past the billing run every time, and the
+          invoice table is the part that grows without limit. */}
+      <SectionTabs
+        tabs={[
+          { key: 'run', label: 'Run billing' },
+          { key: 'payment', label: 'Record a payment' },
+          { key: 'invoices', label: 'Invoices' },
         ]}
+        active={section}
+        onChange={setSection}
       />
 
       <div className="space-y-cards">
@@ -260,269 +264,275 @@ export default function AdminBillingPage(): JSX.Element {
           </Card>
         </div>
 
-        <FormSection
-          id="run-billing"
-          title="Run billing"
-          description="Creates one draft invoice per active school for the period. Safe to repeat — schools already invoiced are skipped."
-        >
-          <FormGrid columns={3}>
-            <Field id="b-start" label="Period from" required>
-              {(props) => (
-                <Input
-                  {...props}
-                  type="date"
-                  value={periodStart}
-                  onChange={(e) => setPeriodStart(e.target.value)}
-                />
-              )}
-            </Field>
-            <Field id="b-end" label="Period to" required>
-              {(props) => (
-                <Input
-                  {...props}
-                  type="date"
-                  value={periodEnd}
-                  onChange={(e) => setPeriodEnd(e.target.value)}
-                />
-              )}
-            </Field>
-            <Field id="b-tax" label="VAT %" hint="Stored on each invoice, so a later change never rewrites it.">
-              {(props) => (
-                <Input
-                  {...props}
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={taxRate}
-                  onChange={(e) => setTaxRate(e.target.value)}
-                />
-              )}
-            </Field>
-          </FormGrid>
-          <FormActions>
-            <Button disabled={busy !== null} onClick={() => void runBilling()}>
-              {busy === 'run' ? (
-                <Loader2 aria-hidden="true" className="animate-spin" />
-              ) : (
-                <Play aria-hidden="true" />
-              )}
-              Run billing for this period
-            </Button>
-          </FormActions>
-        </FormSection>
+        {section === 'run' && (
+          <FormSection
+         
+            title="Run billing"
+            description="Creates one draft invoice per active school for the period. Safe to repeat — schools already invoiced are skipped."
+          >
+            <FormGrid columns={3}>
+              <Field id="b-start" label="Period from" required>
+                {(props) => (
+                  <Input
+                    {...props}
+                    type="date"
+                    value={periodStart}
+                    onChange={(e) => setPeriodStart(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field id="b-end" label="Period to" required>
+                {(props) => (
+                  <Input
+                    {...props}
+                    type="date"
+                    value={periodEnd}
+                    onChange={(e) => setPeriodEnd(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field id="b-tax" label="VAT %" hint="Stored on each invoice, so a later change never rewrites it.">
+                {(props) => (
+                  <Input
+                    {...props}
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    inputMode="decimal"
+                    value={taxRate}
+                    onChange={(e) => setTaxRate(e.target.value)}
+                  />
+                )}
+              </Field>
+            </FormGrid>
+            <FormActions>
+              <Button disabled={busy !== null} onClick={() => void runBilling()}>
+                {busy === 'run' ? (
+                  <Loader2 aria-hidden="true" className="animate-spin" />
+                ) : (
+                  <Play aria-hidden="true" />
+                )}
+                Run billing for this period
+              </Button>
+            </FormActions>
+          </FormSection>
+        )}
 
-        <FormSection
-          id="record-payment"
-          title="Record a payment"
-          description="Money that has already arrived. This does not take a payment — there is no gateway here yet."
-        >
-          <FormGrid columns={4}>
-            <Field id="p-invoice" label="Invoice" required>
-              {(props) => (
-                <Select {...props} value={payInvoice} onChange={(e) => setPayInvoice(e.target.value)}>
-                  <option value="">Choose an unpaid invoice</option>
-                  {unpaid.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.invoice_number} — {i.school_name} — {money(num(i.total) - num(i.amount_paid))} due
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Field id="p-amount" label="Amount received" required>
-              {(props) => (
-                <PrefixedInput
-                  {...props}
-                  prefix="K"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                />
-              )}
-            </Field>
-            <Field id="p-method" label="How it arrived" required>
-              {(props) => (
-                <Select {...props} value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
-                  <option value="bank_transfer">Bank transfer</option>
-                  <option value="mobile_money">Mobile money</option>
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                </Select>
-              )}
-            </Field>
-            <Field
-              id="p-ref"
-              label="Reference"
-              hint="From the statement, so this can be reconciled."
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  value={payReference}
-                  maxLength={120}
-                  onChange={(e) => setPayReference(e.target.value)}
-                />
-              )}
-            </Field>
-          </FormGrid>
-          <FormActions>
-            <Button
-              variant="outline"
-              disabled={busy !== null || !payInvoice || num(payAmount) <= 0}
-              onClick={async () => {
-                const res = await act('pay', {
-                  action: 'record_payment',
-                  invoiceId: payInvoice,
-                  amount: num(payAmount),
-                  method: payMethod,
-                  reference: payReference || undefined,
-                })
-                if (res) {
-                  toast(`${money(payAmount)} recorded.`)
-                  setPayAmount('')
-                  setPayReference('')
-                  setPayInvoice('')
-                }
-              }}
-            >
-              {busy === 'pay' ? (
-                <Loader2 aria-hidden="true" className="animate-spin" />
-              ) : (
-                <Wallet aria-hidden="true" />
-              )}
-              Record payment
-            </Button>
-          </FormActions>
-        </FormSection>
+        {section === 'payment' && (
+          <FormSection
+         
+            title="Record a payment"
+            description="Money that has already arrived. This does not take a payment — there is no gateway here yet."
+          >
+            <FormGrid columns={4}>
+              <Field id="p-invoice" label="Invoice" required>
+                {(props) => (
+                  <Select {...props} value={payInvoice} onChange={(e) => setPayInvoice(e.target.value)}>
+                    <option value="">Choose an unpaid invoice</option>
+                    {unpaid.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.invoice_number} — {i.school_name} — {money(num(i.total) - num(i.amount_paid))} due
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+              <Field id="p-amount" label="Amount received" required>
+                {(props) => (
+                  <PrefixedInput
+                    {...props}
+                    prefix="K"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field id="p-method" label="How it arrived" required>
+                {(props) => (
+                  <Select {...props} value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                    <option value="bank_transfer">Bank transfer</option>
+                    <option value="mobile_money">Mobile money</option>
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                  </Select>
+                )}
+              </Field>
+              <Field
+                id="p-ref"
+                label="Reference"
+                hint="From the statement, so this can be reconciled."
+              >
+                {(props) => (
+                  <Input
+                    {...props}
+                    value={payReference}
+                    maxLength={120}
+                    onChange={(e) => setPayReference(e.target.value)}
+                  />
+                )}
+              </Field>
+            </FormGrid>
+            <FormActions>
+              <Button
+                variant="outline"
+                disabled={busy !== null || !payInvoice || num(payAmount) <= 0}
+                onClick={async () => {
+                  const res = await act('pay', {
+                    action: 'record_payment',
+                    invoiceId: payInvoice,
+                    amount: num(payAmount),
+                    method: payMethod,
+                    reference: payReference || undefined,
+                  })
+                  if (res) {
+                    toast(`${money(payAmount)} recorded.`)
+                    setPayAmount('')
+                    setPayReference('')
+                    setPayInvoice('')
+                  }
+                }}
+              >
+                {busy === 'pay' ? (
+                  <Loader2 aria-hidden="true" className="animate-spin" />
+                ) : (
+                  <Wallet aria-hidden="true" />
+                )}
+                Record payment
+              </Button>
+            </FormActions>
+          </FormSection>
+        )}
 
-        <Card id="invoices" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>Invoices</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <DataTable
-              caption="Subscription invoices"
-              rows={data?.invoices ?? []}
-              rowKey={(i) => i.id}
-              columns={[
-                {
-                  key: 'school',
-                  header: 'School',
-                  primary: true,
-                  cell: (i) => (
-                    <>
-                      <span className="font-medium text-foreground">{i.school_name}</span>
-                      <span className="block font-mono text-xs text-subtle">
-                        {i.invoice_number} · {shortDate(i.period_start)}
-                      </span>
-                    </>
-                  ),
-                },
-                {
-                  key: 'basis',
-                  header: 'Based on',
-                  cell: (i) =>
-                    i.pricing_model === 'per_student' && i.student_count !== null
-                      ? `${i.student_count} × ${money(i.unit_price)}`
-                      : `${i.tier_name}, flat`,
-                },
-                { key: 'total', header: 'Total', numeric: true, cell: (i) => money(i.total) },
-                {
-                  key: 'due',
-                  header: 'Outstanding',
-                  numeric: true,
-                  cell: (i) => {
-                    const owed = num(i.total) - num(i.amount_paid)
-                    return i.status === 'void' ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : owed > 0 ? (
-                      <span className="text-warning-text">{money(owed)}</span>
-                    ) : (
-                      <span className="text-success-text">—</span>
-                    )
+        {section === 'invoices' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Invoices</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <DataTable
+                caption="Subscription invoices"
+                rows={data?.invoices ?? []}
+                rowKey={(i) => i.id}
+                columns={[
+                  {
+                    key: 'school',
+                    header: 'School',
+                    primary: true,
+                    cell: (i) => (
+                      <>
+                        <span className="font-medium text-foreground">{i.school_name}</span>
+                        <span className="block font-mono text-xs text-subtle">
+                          {i.invoice_number} · {shortDate(i.period_start)}
+                        </span>
+                      </>
+                    ),
                   },
-                },
-                {
-                  key: 'status',
-                  header: 'State',
-                  cell: (i) => (
-                    <>
-                      <Badge variant={STATUS_TONE[i.status] ?? 'neutral'}>
-                        {STATUS_LABEL[i.status] ?? i.status}
-                      </Badge>
-                      {['issued', 'part_paid'].includes(i.status) &&
-                        i.due_at &&
-                        new Date(i.due_at) < new Date() && (
-                          <span className="ml-1 inline-flex items-center text-xs text-danger-text">
-                            <AlertTriangle aria-hidden="true" className="mr-0.5 size-3" />
-                            overdue
-                          </span>
+                  {
+                    key: 'basis',
+                    header: 'Based on',
+                    cell: (i) =>
+                      i.pricing_model === 'per_student' && i.student_count !== null
+                        ? `${i.student_count} × ${money(i.unit_price)}`
+                        : `${i.tier_name}, flat`,
+                  },
+                  { key: 'total', header: 'Total', numeric: true, cell: (i) => money(i.total) },
+                  {
+                    key: 'due',
+                    header: 'Outstanding',
+                    numeric: true,
+                    cell: (i) => {
+                      const owed = num(i.total) - num(i.amount_paid)
+                      return i.status === 'void' ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : owed > 0 ? (
+                        <span className="text-warning-text">{money(owed)}</span>
+                      ) : (
+                        <span className="text-success-text">—</span>
+                      )
+                    },
+                  },
+                  {
+                    key: 'status',
+                    header: 'State',
+                    cell: (i) => (
+                      <>
+                        <Badge variant={STATUS_TONE[i.status] ?? 'neutral'}>
+                          {STATUS_LABEL[i.status] ?? i.status}
+                        </Badge>
+                        {['issued', 'part_paid'].includes(i.status) &&
+                          i.due_at &&
+                          new Date(i.due_at) < new Date() && (
+                            <span className="ml-1 inline-flex items-center text-xs text-danger-text">
+                              <AlertTriangle aria-hidden="true" className="mr-0.5 size-3" />
+                              overdue
+                            </span>
+                          )}
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'act',
+                    header: '',
+                    cell: (i) => (
+                      <div className="flex flex-wrap gap-1">
+                        {i.status === 'draft' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy !== null}
+                            onClick={async () => {
+                              const res = await act('issue', { action: 'issue', invoiceId: i.id })
+                              if (res) toast(`${i.invoice_number} issued.`)
+                            }}
+                          >
+                            <Send aria-hidden="true" />
+                            Issue
+                          </Button>
                         )}
-                    </>
-                  ),
-                },
-                {
-                  key: 'act',
-                  header: '',
-                  cell: (i) => (
-                    <div className="flex flex-wrap gap-1">
-                      {i.status === 'draft' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy !== null}
-                          onClick={async () => {
-                            const res = await act('issue', { action: 'issue', invoiceId: i.id })
-                            if (res) toast(`${i.invoice_number} issued.`)
-                          }}
-                        >
-                          <Send aria-hidden="true" />
-                          Issue
-                        </Button>
-                      )}
-                      {i.status !== 'paid' && i.status !== 'void' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy !== null}
-                          onClick={async () => {
-                            // A reason is required by the function, and a school will
-                            // ask why a bill vanished.
-                            const reason = window.prompt(
-                              `Why is ${i.invoice_number} being voided? The school may ask.`,
-                            )
-                            if (!reason) return
-                            const res = await act('void', {
-                              action: 'void',
-                              invoiceId: i.id,
-                              reason,
-                            })
-                            if (res) toast(`${i.invoice_number} voided.`)
-                          }}
-                        >
-                          <X aria-hidden="true" />
-                          Void
-                        </Button>
-                      )}
-                    </div>
-                  ),
-                },
-              ]}
-              empty={
-                <EmptyState
-                  icon={Receipt}
-                  title="No invoices yet"
-                  description="Run billing for a period above to create drafts, then issue them."
-                />
-              }
-            />
-          </CardContent>
-        </Card>
+                        {i.status !== 'paid' && i.status !== 'void' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy !== null}
+                            onClick={async () => {
+                              // A reason is required by the function, and a school will
+                              // ask why a bill vanished.
+                              const reason = window.prompt(
+                                `Why is ${i.invoice_number} being voided? The school may ask.`,
+                              )
+                              if (!reason) return
+                              const res = await act('void', {
+                                action: 'void',
+                                invoiceId: i.id,
+                                reason,
+                              })
+                              if (res) toast(`${i.invoice_number} voided.`)
+                            }}
+                          >
+                            <X aria-hidden="true" />
+                            Void
+                          </Button>
+                        )}
+                      </div>
+                    ),
+                  },
+                ]}
+                empty={
+                  <EmptyState
+                    icon={Receipt}
+                    title="No invoices yet"
+                    description="Run billing for a period above to create drafts, then issue them."
+                  />
+                }
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </>
   )

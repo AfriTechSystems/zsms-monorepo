@@ -33,7 +33,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
-import { SectionNav } from '../../../../../components/ui/section-nav'
+import { SectionTabs, useSectionTabs } from '../../../../../components/ui/section-tabs'
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, Receipt } from 'lucide-react'
 
@@ -121,6 +121,7 @@ export default function StudentFeesPage({
   // other spans three.
   const url = `/api/school/fees/${studentId}${parsedAmount > 0 ? `?amount=${parsedAmount}` : ''}`
   const { data, loading, error, code, reload } = useApi<Payload>(url)
+  const [section, setSection] = useSectionTabs<'statement' | 'payment' | 'history'>('statement')
 
   // Seeded from the suggestion and then owned by the operator. Reset whenever a
   // fresh suggestion arrives, so changing the amount does not leave stale
@@ -209,81 +210,85 @@ export default function StudentFeesPage({
           />
 
           <div className="space-y-cards">
-            {/* Payment history is below the statement and the payment form. */}
-            <SectionNav
-              sections={[
-                { id: 'statement', label: 'Statement' },
-                { id: 'record-payment', label: 'Record a payment' },
-                { id: 'payment-history', label: 'History' },
+            {/* Payment history grows for the whole of a pupil's time at the school. */}
+            <SectionTabs
+              tabs={[
+                { key: 'statement', label: 'Statement' },
+                { key: 'payment', label: 'Record a payment' },
+                { key: 'history', label: 'History' },
               ]}
+              active={section}
+              onChange={setSection}
             />
 
-            <Card id="statement" className="scroll-mt-20">
-              <CardHeader>
-                <CardTitle>Statement</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Every charge and every verified payment, oldest first, with a running balance.
-                </p>
-              </CardHeader>
-              <CardContent className="p-0">
-                <DataTable
-                  caption={`Fee statement for ${pupilName}`}
-                  rows={data.statement}
-                  rowKey={(r, ) => `${r.entry_date}-${r.entry_type}-${r.reference ?? ''}`}
-                  collapsible={false}
-                  columns={[
-                    {
-                      key: 'entry',
-                      header: 'Entry',
-                      primary: true,
-                      cell: (r) => (
-                        <span
-                          className={
-                            // Brought-forward is weighted, not annotated. It is
-                            // an ordinary part of the ledger, not a caveat.
-                            r.entry_type === 'brought_forward'
-                              ? 'font-semibold text-foreground'
-                              : 'text-foreground'
-                          }
-                        >
-                          {r.description}
-                        </span>
-                      ),
-                    },
-                    { key: 'date', header: 'Date', cell: (r) => formatDate(r.entry_date) },
-                    {
-                      key: 'debit',
-                      header: 'Charged',
-                      numeric: true,
-                      cell: (r) => (num(r.debit) > 0 ? formatKwacha(r.debit) : '—'),
-                    },
-                    {
-                      key: 'credit',
-                      header: 'Paid',
-                      numeric: true,
-                      cell: (r) => (num(r.credit) > 0 ? formatKwacha(r.credit) : '—'),
-                    },
-                    {
-                      key: 'balance',
-                      header: 'Balance',
-                      numeric: true,
-                      cell: (r) => (
-                        <span className="font-medium">{formatKwacha(r.running_balance)}</span>
-                      ),
-                    },
-                  ]}
-                  empty={
-                    <div className="p-card text-sm text-muted-foreground">
-                      Nothing has been billed to this pupil yet.
-                    </div>
-                  }
-                />
-              </CardContent>
-            </Card>
+            {section === 'statement' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Statement</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Every charge and every verified payment, oldest first, with a running balance.
+                  </p>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <DataTable
+                    caption={`Fee statement for ${pupilName}`}
+                    rows={data.statement}
+                    rowKey={(r, ) => `${r.entry_date}-${r.entry_type}-${r.reference ?? ''}`}
+                    collapsible={false}
+                    columns={[
+                      {
+                        key: 'entry',
+                        header: 'Entry',
+                        primary: true,
+                        cell: (r) => (
+                          <span
+                            className={
+                              // Brought-forward is weighted, not annotated. It is
+                              // an ordinary part of the ledger, not a caveat.
+                              r.entry_type === 'brought_forward'
+                                ? 'font-semibold text-foreground'
+                                : 'text-foreground'
+                            }
+                          >
+                            {r.description}
+                          </span>
+                        ),
+                      },
+                      { key: 'date', header: 'Date', cell: (r) => formatDate(r.entry_date) },
+                      {
+                        key: 'debit',
+                        header: 'Charged',
+                        numeric: true,
+                        cell: (r) => (num(r.debit) > 0 ? formatKwacha(r.debit) : '—'),
+                      },
+                      {
+                        key: 'credit',
+                        header: 'Paid',
+                        numeric: true,
+                        cell: (r) => (num(r.credit) > 0 ? formatKwacha(r.credit) : '—'),
+                      },
+                      {
+                        key: 'balance',
+                        header: 'Balance',
+                        numeric: true,
+                        cell: (r) => (
+                          <span className="font-medium">{formatKwacha(r.running_balance)}</span>
+                        ),
+                      },
+                    ]}
+                    empty={
+                      <div className="p-card text-sm text-muted-foreground">
+                        Nothing has been billed to this pupil yet.
+                      </div>
+                    }
+                  />
+                </CardContent>
+              </Card>
+            )}
 
-            {data.canRecord ? (
+            {section === 'payment' && (data.canRecord ? (
               <FormSection
-                id="record-payment"
+             
                 title="Record a payment"
                 description="Recorded now, confirmed by whoever checks the bank. The balance moves on verification, not here."
               >
@@ -415,10 +420,10 @@ export default function StudentFeesPage({
                 You can see this statement. The school owner and the accountant record and verify
                 payments.
               </Alert>
-            )}
+            ))}
 
-            {data.payments.length > 0 && (
-              <Card id="payment-history" className="scroll-mt-20">
+            {section === 'history' && data.payments.length > 0 && (
+              <Card>
                 <CardHeader>
                   <CardTitle>Payment history</CardTitle>
                 </CardHeader>

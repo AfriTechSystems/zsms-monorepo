@@ -24,7 +24,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
-import { SectionNav } from '../../../../components/ui/section-nav'
+import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
 import { useCallback, useState } from 'react'
 import { use } from 'react'
 import {
@@ -448,6 +448,7 @@ export default function AdminSchoolDetailPage({
   const { id } = use(params)
 
   const { data, loading, error, code, reload } = useApi<Detail>(`/api/admin/schools/${id}`)
+  const [section, setSection] = useSectionTabs<'glance' | 'onboarding' | 'features' | 'overrides' | 'impersonation'>('glance')
   const [revoking, setRevoking] = useState<string | null>(null)
   const [revokeError, setRevokeError] = useState<string | null>(null)
   const capacity = toCapacity(data?.capacity)
@@ -498,80 +499,86 @@ export default function AdminSchoolDetailPage({
             }
           />
 
-          {/* The longest screen in the product: an operator looking for the override
-              table scrolls past onboarding and the whole feature matrix to reach it. */}
-          <SectionNav
-            sections={[
-              { id: 'at-a-glance', label: 'At a glance' },
-              { id: 'onboarding', label: 'Onboarding' },
-              { id: 'feature-access', label: 'Feature access' },
-              { id: 'overrides', label: 'Overrides' },
-              { id: 'impersonation', label: 'Impersonation' },
+          {/* The longest screen in the product: finding the override table meant scrolling
+              past onboarding and the whole feature matrix. */}
+          <SectionTabs
+            tabs={[
+              { key: 'glance', label: 'At a glance' },
+              { key: 'onboarding', label: 'Onboarding' },
+              { key: 'features', label: 'Feature access' },
+              { key: 'overrides', label: 'Overrides' },
+              { key: 'impersonation', label: 'Impersonation' },
             ]}
+            active={section}
+            onChange={setSection}
           />
 
           <div className="space-y-cards">
-            <Card id="at-a-glance" className="scroll-mt-20">
-              <CardContent className="pt-card">
-                <dl className="grid grid-cols-2 gap-stack lg:grid-cols-4">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">School code</dt>
-                    <dd className="font-mono text-sm">{data.school.school_id}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Pupils enrolled</dt>
-                    {/* The ceiling shown is the RESOLVED one — the same value
-                        the enrolment trigger reads — with where it came from
-                        named. `schools.max_students` was shown here before; it
-                        is a per-school copy nothing enforces, so it could and
-                        eventually would disagree with what a school actually
-                        hits. */}
-                    <dd data-numeric className="text-lg font-semibold">
-                      {capacity ? capacity.currentCount : data.studentCount}
+            {section === 'glance' && (
+              <Card>
+                <CardContent className="pt-card">
+                  <dl className="grid grid-cols-2 gap-stack lg:grid-cols-4">
+                    <div>
+                      <dt className="text-sm text-muted-foreground">School code</dt>
+                      <dd className="font-mono text-sm">{data.school.school_id}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Pupils enrolled</dt>
+                      {/* The ceiling shown is the RESOLVED one — the same value
+                          the enrolment trigger reads — with where it came from
+                          named. `schools.max_students` was shown here before; it
+                          is a per-school copy nothing enforces, so it could and
+                          eventually would disagree with what a school actually
+                          hits. */}
+                      <dd data-numeric className="text-lg font-semibold">
+                        {capacity ? capacity.currentCount : data.studentCount}
+                        {capacity && (
+                          <span className="text-sm font-normal text-muted-foreground">
+                            {' '}
+                            of {capacity.limitLabel}
+                          </span>
+                        )}
+                      </dd>
                       {capacity && (
-                        <span className="text-sm font-normal text-muted-foreground">
-                          {' '}
-                          of {capacity.limitLabel}
-                        </span>
+                        <p className="text-xs text-subtle">
+                          {capacity.source === 'school_override'
+                            ? 'Per-school override'
+                            : capacity.source === 'tier_override'
+                              ? 'Tier override'
+                              : capacity.source === 'tier'
+                                ? `${TIER_LABEL[data.school.subscription_tier] ?? data.school.subscription_tier} tier`
+                                : 'No ceiling configured'}
+                          {capacity.atCapacity ? ' · at capacity' : ''}
+                        </p>
                       )}
-                    </dd>
-                    {capacity && (
-                      <p className="text-xs text-subtle">
-                        {capacity.source === 'school_override'
-                          ? 'Per-school override'
-                          : capacity.source === 'tier_override'
-                            ? 'Tier override'
-                            : capacity.source === 'tier'
-                              ? `${TIER_LABEL[data.school.subscription_tier] ?? data.school.subscription_tier} tier`
-                              : 'No ceiling configured'}
-                        {capacity.atCapacity ? ' · at capacity' : ''}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Joined</dt>
-                    <dd className="text-sm">{formatDate(data.school.created_at)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Clerk organisation</dt>
-                    <dd className="truncate font-mono text-xs">{data.school.clerk_org_id ?? '—'}</dd>
-                  </div>
-                </dl>
-              </CardContent>
-            </Card>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Joined</dt>
+                      <dd className="text-sm">{formatDate(data.school.created_at)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Clerk organisation</dt>
+                      <dd className="truncate font-mono text-xs">{data.school.clerk_org_id ?? '—'}</dd>
+                    </div>
+                  </dl>
+                </CardContent>
+              </Card>
+            )}
 
-            <div id="onboarding" className="scroll-mt-20">
-                <OnboardingPanel
-                schoolId={data.school.id}
-                schoolCode={data.school.school_id}
-                status={data.school.status}
-                isProvisioned={data.isProvisioned}
-                onboarding={data.onboarding}
-                checklist={data.checklist}
-                progress={data.progress}
-                onChanged={reload}
-            />
-            </div>
+            {section === 'onboarding' && (
+              <div>
+                  <OnboardingPanel
+                  schoolId={data.school.id}
+                  schoolCode={data.school.school_id}
+                  status={data.school.status}
+                  isProvisioned={data.isProvisioned}
+                  onboarding={data.onboarding}
+                  checklist={data.checklist}
+                  progress={data.progress}
+                  onChanged={reload}
+              />
+              </div>
+            )}
 
             <SubscriptionPanel school={data.school} onSaved={reload} />
 
@@ -583,184 +590,190 @@ export default function AdminSchoolDetailPage({
                 because AfriTech has no organisation of its own to resolve from. */}
             <SettingsHistory schoolId={data.school.id} />
 
-            <Card id="feature-access" className="scroll-mt-20">
-              <CardHeader>
-                <CardTitle>Resolved feature access</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  What this school can actually use right now, resolved through overrides and tier —
-                  not simply what {TIER_LABEL[data.school.subscription_tier] ?? data.school.subscription_tier}{' '}
-                  includes.
-                </p>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <caption className="sr-only">Resolved feature access for {data.school.name}</caption>
-                    <thead className="border-y border-border bg-sunken text-left">
-                      <tr>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Feature</th>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Category</th>
-                        <th scope="col" className="px-4 py-2.5 text-right font-medium">Add-on price</th>
-                        <th scope="col" className="px-4 py-2.5 font-medium">Access</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.features.map((f) => (
-                        <tr key={f.feature_key} className="border-b border-border last:border-0">
-                          <th scope="row" className="px-4 py-3 text-left font-normal">
-                            <span className="font-medium text-foreground">{f.display_name}</span>
-                            <span className="block font-mono text-xs text-subtle">{f.feature_key}</span>
-                          </th>
-                          <td className="px-4 py-3 capitalize text-muted-foreground">
-                            {f.category.replace(/_/g, ' ')}
-                          </td>
-                          <td data-numeric className="px-4 py-3 text-right text-muted-foreground">
-                            {f.is_available_as_addon && f.monthly_addon_price_zmw
-                              ? `${formatKwacha(f.monthly_addon_price_zmw)}/mo`
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            {f.enabled ? (
-                              <Badge variant="success">
-                                <Check aria-hidden="true" />
-                                Available
-                              </Badge>
-                            ) : (
-                              <Badge variant="neutral">
-                                <Minus aria-hidden="true" />
-                                Not included
-                              </Badge>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card id="overrides" className="scroll-mt-20">
-              <CardHeader>
-                <CardTitle>Overrides</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Exceptions that apply to this school alone. A revoke override beats a grant, and
-                  both beat the tier.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-cards">
-                {revokeError && (
-                  <Alert variant="danger" title="Could not revoke">
-                    {revokeError}
-                  </Alert>
-                )}
-
-                {data.overrides.length === 0 ? (
-                  <EmptyState
-                    icon={Ticket}
-                    title="No overrides"
-                    description="This school gets exactly what its tier includes."
-                  />
-                ) : (
-                  <ul className="space-y-stack">
-                    {data.overrides.map((o) => (
-                      <li
-                        key={o.id}
-                        className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-3"
-                      >
-                        <div className="min-w-0 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {/* Only a revoke is danger and only a grant is
-                                success. The rest change a value rather than
-                                turn something on or off, and colouring a
-                                lowered ceiling green would read as a favour. */}
-                            <Badge
-                              variant={
-                                o.override_type === 'revoke_feature'
-                                  ? 'danger'
-                                  : o.override_type === 'grant_feature'
-                                    ? 'success'
-                                    : 'primary'
-                              }
-                            >
-                              {o.override_type.replace(/_/g, ' ')}
-                            </Badge>
-                            {o.feature_key && (
-                              <span className="font-mono text-xs text-subtle">{o.feature_key}</span>
-                            )}
-                            {o.override_value && (
-                              <span className="font-mono text-xs text-subtle">{o.override_value}</span>
-                            )}
-                            {!o.is_active && <Badge variant="neutral">Revoked {formatDate(o.revoked_at)}</Badge>}
-                          </div>
-                          <p className="text-sm">{o.reason}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {o.ticket_ref ? `${o.ticket_ref} · ` : ''}
-                            granted {formatDate(o.created_at)}
-                            {o.expires_at ? ` · expires ${formatDate(o.expires_at)}` : ' · no expiry'}
-                          </p>
-                        </div>
-
-                        {o.is_active && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={revoking === o.id}
-                            onClick={() => void revoke(o)}
-                          >
-                            {revoking === o.id ? (
-                              <Loader2 aria-hidden="true" className="animate-spin" />
-                            ) : (
-                              <Undo2 aria-hidden="true" />
-                            )}
-                            Revoke
-                          </Button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <div className="border-t border-border pt-cards">
-                  <h3 className="mb-stack font-semibold">Record a new override</h3>
-                  <OverrideForm
-                    schoolId={data.school.id}
-                    features={data.features}
-                    capacity={capacity}
-                    onSaved={reload}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card id="impersonation" className="scroll-mt-20">
-              <CardHeader>
-                <CardTitle>Impersonation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-stack">
-                <Alert variant="warning" title="Not available yet">
-                  <p>
-                    Impersonation needs Clerk actor tokens, which the auth provider cannot mint
-                    today. <code className="font-mono text-xs">/api/admin/impersonate</code> answers{' '}
-                    <code className="font-mono text-xs">501</code> and says so, rather than
-                    returning a session that looks real.
+            {section === 'features' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resolved feature access</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    What this school can actually use right now, resolved through overrides and tier —
+                    not simply what {TIER_LABEL[data.school.subscription_tier] ?? data.school.subscription_tier}{' '}
+                    includes.
                   </p>
-                </Alert>
-                <p className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                  <span>
-                    When it lands, every impersonated session carries an{' '}
-                    <code className="font-mono text-xs">act</code> claim, so the database can tell
-                    who really acted — <code className="font-mono text-xs">is_impersonation_session()</code>{' '}
-                    and <code className="font-mono text-xs">get_actor_id()</code> already exist for it.
-                  </span>
-                </p>
-                <Button variant="outline" disabled>
-                  <KeyRound aria-hidden="true" />
-                  Sign in as a user at this school
-                </Button>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <caption className="sr-only">Resolved feature access for {data.school.name}</caption>
+                      <thead className="border-y border-border bg-sunken text-left">
+                        <tr>
+                          <th scope="col" className="px-4 py-2.5 font-medium">Feature</th>
+                          <th scope="col" className="px-4 py-2.5 font-medium">Category</th>
+                          <th scope="col" className="px-4 py-2.5 text-right font-medium">Add-on price</th>
+                          <th scope="col" className="px-4 py-2.5 font-medium">Access</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.features.map((f) => (
+                          <tr key={f.feature_key} className="border-b border-border last:border-0">
+                            <th scope="row" className="px-4 py-3 text-left font-normal">
+                              <span className="font-medium text-foreground">{f.display_name}</span>
+                              <span className="block font-mono text-xs text-subtle">{f.feature_key}</span>
+                            </th>
+                            <td className="px-4 py-3 capitalize text-muted-foreground">
+                              {f.category.replace(/_/g, ' ')}
+                            </td>
+                            <td data-numeric className="px-4 py-3 text-right text-muted-foreground">
+                              {f.is_available_as_addon && f.monthly_addon_price_zmw
+                                ? `${formatKwacha(f.monthly_addon_price_zmw)}/mo`
+                                : '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              {f.enabled ? (
+                                <Badge variant="success">
+                                  <Check aria-hidden="true" />
+                                  Available
+                                </Badge>
+                              ) : (
+                                <Badge variant="neutral">
+                                  <Minus aria-hidden="true" />
+                                  Not included
+                                </Badge>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {section === 'overrides' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Overrides</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Exceptions that apply to this school alone. A revoke override beats a grant, and
+                    both beat the tier.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-cards">
+                  {revokeError && (
+                    <Alert variant="danger" title="Could not revoke">
+                      {revokeError}
+                    </Alert>
+                  )}
+
+                  {data.overrides.length === 0 ? (
+                    <EmptyState
+                      icon={Ticket}
+                      title="No overrides"
+                      description="This school gets exactly what its tier includes."
+                    />
+                  ) : (
+                    <ul className="space-y-stack">
+                      {data.overrides.map((o) => (
+                        <li
+                          key={o.id}
+                          className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-3"
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Only a revoke is danger and only a grant is
+                                  success. The rest change a value rather than
+                                  turn something on or off, and colouring a
+                                  lowered ceiling green would read as a favour. */}
+                              <Badge
+                                variant={
+                                  o.override_type === 'revoke_feature'
+                                    ? 'danger'
+                                    : o.override_type === 'grant_feature'
+                                      ? 'success'
+                                      : 'primary'
+                                }
+                              >
+                                {o.override_type.replace(/_/g, ' ')}
+                              </Badge>
+                              {o.feature_key && (
+                                <span className="font-mono text-xs text-subtle">{o.feature_key}</span>
+                              )}
+                              {o.override_value && (
+                                <span className="font-mono text-xs text-subtle">{o.override_value}</span>
+                              )}
+                              {!o.is_active && <Badge variant="neutral">Revoked {formatDate(o.revoked_at)}</Badge>}
+                            </div>
+                            <p className="text-sm">{o.reason}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {o.ticket_ref ? `${o.ticket_ref} · ` : ''}
+                              granted {formatDate(o.created_at)}
+                              {o.expires_at ? ` · expires ${formatDate(o.expires_at)}` : ' · no expiry'}
+                            </p>
+                          </div>
+
+                          {o.is_active && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={revoking === o.id}
+                              onClick={() => void revoke(o)}
+                            >
+                              {revoking === o.id ? (
+                                <Loader2 aria-hidden="true" className="animate-spin" />
+                              ) : (
+                                <Undo2 aria-hidden="true" />
+                              )}
+                              Revoke
+                            </Button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="border-t border-border pt-cards">
+                    <h3 className="mb-stack font-semibold">Record a new override</h3>
+                    <OverrideForm
+                      schoolId={data.school.id}
+                      features={data.features}
+                      capacity={capacity}
+                      onSaved={reload}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {section === 'impersonation' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Impersonation</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-stack">
+                  <Alert variant="warning" title="Not available yet">
+                    <p>
+                      Impersonation needs Clerk actor tokens, which the auth provider cannot mint
+                      today. <code className="font-mono text-xs">/api/admin/impersonate</code> answers{' '}
+                      <code className="font-mono text-xs">501</code> and says so, rather than
+                      returning a session that looks real.
+                    </p>
+                  </Alert>
+                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                      When it lands, every impersonated session carries an{' '}
+                      <code className="font-mono text-xs">act</code> claim, so the database can tell
+                      who really acted — <code className="font-mono text-xs">is_impersonation_session()</code>{' '}
+                      and <code className="font-mono text-xs">get_actor_id()</code> already exist for it.
+                    </span>
+                  </p>
+                  <Button variant="outline" disabled>
+                    <KeyRound aria-hidden="true" />
+                    Sign in as a user at this school
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </>
       )}

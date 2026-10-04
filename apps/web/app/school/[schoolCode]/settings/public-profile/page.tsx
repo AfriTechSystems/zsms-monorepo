@@ -28,7 +28,7 @@
  */
 
 import type { JSX } from 'react'
-import { SectionNav } from '../../../../../components/ui/section-nav'
+import { SectionTabs, useSectionTabs } from '../../../../../components/ui/section-tabs'
 import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { BadgeCheck, ExternalLink, Eye, EyeOff } from 'lucide-react'
@@ -97,6 +97,7 @@ export default function PublicProfileSettingsPage({
   const { schoolCode } = use(params)
   const { toast } = useToast()
   const { data, loading, error, code, reload } = useApi<Payload>('/api/school/public-profile')
+  const [section, setSection] = useSectionTabs<'status' | 'verified' | 'fees' | 'facilities'>('status')
 
   const [about, setAbout] = useState('')
   const [established, setEstablished] = useState('')
@@ -166,182 +167,192 @@ export default function PublicProfileSettingsPage({
 
       {!error && data && (
         <div className="space-y-cards">
-          {/* Four sections, and Facilities sits below three long forms. */}
-          <SectionNav
-            sections={[
-              { id: 'listing-status', label: 'Status' },
-              { id: 'verified', label: 'Verified by ZSMS' },
-              { id: 'fees', label: 'Fees' },
-              { id: 'facilities', label: 'Facilities' },
+          {/* Facilities sat below three long forms. */}
+          <SectionTabs
+            tabs={[
+              { key: 'status', label: 'Status' },
+              { key: 'verified', label: 'Verified by ZSMS' },
+              { key: 'fees', label: 'Fees' },
+              { key: 'facilities', label: 'Facilities' },
             ]}
+            active={section}
+            onChange={setSection}
           />
 
-          <FormSection
-            id="listing-status"
-            title={published ? 'Your extra details are live' : 'Your extra details are hidden'}
-            description={
-              published
-                ? 'Parents can see everything you have switched on below.'
-                : 'Only your name, town, level and school code appear. Turn this on when you are ready to show more.'
-            }
-            actions={
-              <Badge variant={published ? 'success' : 'neutral'}>
-                {published ? 'Published' : 'Hidden'}
-              </Badge>
-            }
-          >
-            <Button
-              disabled={saving !== null}
-              variant={published ? 'outline' : 'default'}
-              onClick={() => void save({ isPublished: !published }, 'publish')}
+          {section === 'status' && (
+            <FormSection
+           
+              title={published ? 'Your extra details are live' : 'Your extra details are hidden'}
+              description={
+                published
+                  ? 'Parents can see everything you have switched on below.'
+                  : 'Only your name, town, level and school code appear. Turn this on when you are ready to show more.'
+              }
+              actions={
+                <Badge variant={published ? 'success' : 'neutral'}>
+                  {published ? 'Published' : 'Hidden'}
+                </Badge>
+              }
             >
-              {published ? (
-                <>
-                  <EyeOff aria-hidden="true" />
-                  Hide extra details
-                </>
-              ) : (
-                <>
-                  <Eye aria-hidden="true" />
-                  Publish extra details
-                </>
-              )}
-            </Button>
-          </FormSection>
+              <Button
+                disabled={saving !== null}
+                variant={published ? 'outline' : 'default'}
+                onClick={() => void save({ isPublished: !published }, 'publish')}
+              >
+                {published ? (
+                  <>
+                    <EyeOff aria-hidden="true" />
+                    Hide extra details
+                  </>
+                ) : (
+                  <>
+                    <Eye aria-hidden="true" />
+                    Publish extra details
+                  </>
+                )}
+              </Button>
+            </FormSection>
+          )}
 
-          <FormSection
-            id="verified"
-            title="Verified by ZSMS"
-            description="We calculate these from your own pupil and staff records — you cannot edit them, and neither can we. Choose which to show."
-          >
-            <div className="space-y-stack">
-              <div className="rounded-md border border-border p-card">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="font-medium">Teacher to pupils</p>
-                  <p data-numeric className="text-xl font-semibold">
-                    {formatPupilTeacherRatio(data.metrics?.pupilsPerTeacher ?? null) ?? '—'}
+          {section === 'verified' && (
+            <FormSection
+           
+              title="Verified by ZSMS"
+              description="We calculate these from your own pupil and staff records — you cannot edit them, and neither can we. Choose which to show."
+            >
+              <div className="space-y-stack">
+                <div className="rounded-md border border-border p-card">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="font-medium">Teacher to pupils</p>
+                    <p data-numeric className="text-xl font-semibold">
+                      {formatPupilTeacherRatio(data.metrics?.pupilsPerTeacher ?? null) ?? '—'}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {data.metrics
+                      ? `${data.metrics.pupils} pupils on the roll, ${data.metrics.teachers} ` +
+                        `member${data.metrics.teachers === 1 ? '' : 's'} of staff with teaching assignments. ` +
+                        'Staff without a teaching assignment are not counted.'
+                      : 'Not enough information yet.'}
                   </p>
+                  {/* Only the ratio is published, never the counts. Said here so a head teacher knows
+                      exactly what a parent will see. */}
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Parents see only the ratio, never your pupil or staff numbers.
+                  </p>
+                  <div className="mt-stack">
+                    <CheckboxField
+                      id="publish-ratio"
+                      label="Show pupils per teacher"
+                      checked={p?.publish_ratio === true}
+                      disabled={saving !== null || !published}
+                      onChange={(v) => void save({ publishRatio: v }, 'ratio')}
+                      hint={!published ? 'Publish extra details first.' : undefined}
+                    />
+                  </div>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {data.metrics
-                    ? `${data.metrics.pupils} pupils on the roll, ${data.metrics.teachers} ` +
-                      `member${data.metrics.teachers === 1 ? '' : 's'} of staff with teaching assignments. ` +
-                      'Staff without a teaching assignment are not counted.'
-                    : 'Not enough information yet.'}
-                </p>
-                {/* Only the ratio is published, never the counts. Said here so a head teacher knows
-                    exactly what a parent will see. */}
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Parents see only the ratio, never your pupil or staff numbers.
-                </p>
-                <div className="mt-stack">
-                  <CheckboxField
-                    id="publish-ratio"
-                    label="Show pupils per teacher"
-                    checked={p?.publish_ratio === true}
-                    disabled={saving !== null || !published}
-                    onChange={(v) => void save({ publishRatio: v }, 'ratio')}
-                    hint={!published ? 'Publish extra details first.' : undefined}
-                  />
+
+                <div className="rounded-md border border-border p-card">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="font-medium">Average class size</p>
+                    <p data-numeric className="text-xl font-semibold">
+                      {formatClassSize(data.metrics?.avgClassSize ?? null) ?? '—'}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {data.metrics
+                      ? `Across ${data.metrics.classes} class${data.metrics.classes === 1 ? '' : 'es'} with pupils in them.`
+                      : 'Not enough information yet.'}
+                  </p>
+                  <div className="mt-stack">
+                    <CheckboxField
+                      id="publish-class-sizes"
+                      label="Show average class size"
+                      checked={p?.publish_class_sizes === true}
+                      disabled={saving !== null || !published}
+                      onChange={(v) => void save({ publishClassSizes: v }, 'classes')}
+                      hint={!published ? 'Publish extra details first.' : undefined}
+                    />
+                  </div>
                 </div>
               </div>
+            </FormSection>
+          )}
 
-              <div className="rounded-md border border-border p-card">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="font-medium">Average class size</p>
-                  <p data-numeric className="text-xl font-semibold">
-                    {formatClassSize(data.metrics?.avgClassSize ?? null) ?? '—'}
-                  </p>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {data.metrics
-                    ? `Across ${data.metrics.classes} class${data.metrics.classes === 1 ? '' : 'es'} with pupils in them.`
-                    : 'Not enough information yet.'}
-                </p>
-                <div className="mt-stack">
-                  <CheckboxField
-                    id="publish-class-sizes"
-                    label="Show average class size"
-                    checked={p?.publish_class_sizes === true}
-                    disabled={saving !== null || !published}
-                    onChange={(v) => void save({ publishClassSizes: v }, 'classes')}
-                    hint={!published ? 'Publish extra details first.' : undefined}
-                  />
-                </div>
-              </div>
-            </div>
-          </FormSection>
-
-          <FormSection
-            id="fees"
-            title="Fees"
-            description="A range parents should expect, in your own words. We do not read this from your fee structures, and we do not label it as verified."
-          >
-            <FormGrid>
-              <Field id="fee-min" label="Lowest term fee (K)">
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="number"
-                    min={0}
-                    value={feeMin}
-                    onChange={(e) => setFeeMin(e.target.value)}
-                    placeholder="1500"
-                  />
-                )}
-              </Field>
-              <Field id="fee-max" label="Highest term fee (K)">
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="number"
-                    min={0}
-                    value={feeMax}
-                    onChange={(e) => setFeeMax(e.target.value)}
-                    placeholder="3000"
-                  />
-                )}
-              </Field>
-            </FormGrid>
-            <div className="mt-stack">
-              <CheckboxField
-                id="publish-fees"
-                label="Show this range to parents"
-                hint="Parents filter on affordability more than anything else. Showing a range is usually worth it."
-                checked={p?.publish_fee_band === true}
-                disabled={saving !== null || !published}
-                onChange={(v) =>
-                  void save(
-                    {
-                      publishFeeBand: v,
-                      feeBandMin: feeMin === '' ? null : Number(feeMin),
-                      feeBandMax: feeMax === '' ? null : Number(feeMax),
-                    },
-                    'fees',
-                  )
-                }
-              />
-            </div>
-          </FormSection>
-
-          <FormSection
-            id="facilities"
-            title="Facilities"
-            description="Shown as a list on your page, and parents can filter on boarding and transport."
-          >
-            <FormGrid>
-              {FACILITIES.map(([key, column, label]) => (
+          {section === 'fees' && (
+            <FormSection
+           
+              title="Fees"
+              description="A range parents should expect, in your own words. We do not read this from your fee structures, and we do not label it as verified."
+            >
+              <FormGrid>
+                <Field id="fee-min" label="Lowest term fee (K)">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      type="number"
+                      min={0}
+                      value={feeMin}
+                      onChange={(e) => setFeeMin(e.target.value)}
+                      placeholder="1500"
+                    />
+                  )}
+                </Field>
+                <Field id="fee-max" label="Highest term fee (K)">
+                  {(props) => (
+                    <Input
+                      {...props}
+                      type="number"
+                      min={0}
+                      value={feeMax}
+                      onChange={(e) => setFeeMax(e.target.value)}
+                      placeholder="3000"
+                    />
+                  )}
+                </Field>
+              </FormGrid>
+              <div className="mt-stack">
                 <CheckboxField
-                  key={key}
-                  id={key}
-                  label={label}
-                  checked={p?.[column] === true}
-                  disabled={saving !== null}
-                  onChange={(v) => void save({ [key]: v }, key)}
+                  id="publish-fees"
+                  label="Show this range to parents"
+                  hint="Parents filter on affordability more than anything else. Showing a range is usually worth it."
+                  checked={p?.publish_fee_band === true}
+                  disabled={saving !== null || !published}
+                  onChange={(v) =>
+                    void save(
+                      {
+                        publishFeeBand: v,
+                        feeBandMin: feeMin === '' ? null : Number(feeMin),
+                        feeBandMax: feeMax === '' ? null : Number(feeMax),
+                      },
+                      'fees',
+                    )
+                  }
                 />
-              ))}
-            </FormGrid>
-          </FormSection>
+              </div>
+            </FormSection>
+          )}
+
+          {section === 'facilities' && (
+            <FormSection
+           
+              title="Facilities"
+              description="Shown as a list on your page, and parents can filter on boarding and transport."
+            >
+              <FormGrid>
+                {FACILITIES.map(([key, column, label]) => (
+                  <CheckboxField
+                    key={key}
+                    id={key}
+                    label={label}
+                    checked={p?.[column] === true}
+                    disabled={saving !== null}
+                    onChange={(v) => void save({ [key]: v }, key)}
+                  />
+                ))}
+              </FormGrid>
+            </FormSection>
+          )}
 
           <FormSection
             title="About your school"

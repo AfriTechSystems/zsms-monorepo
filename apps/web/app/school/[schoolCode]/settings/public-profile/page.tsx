@@ -97,7 +97,7 @@ export default function PublicProfileSettingsPage({
   const { schoolCode } = use(params)
   const { toast } = useToast()
   const { data, loading, error, code, reload } = useApi<Payload>('/api/school/public-profile')
-  const [section, setSection] = useSectionTabs<'status' | 'verified' | 'fees' | 'facilities'>('status')
+  const [section, setSection] = useSectionTabs<'status' | 'verified' | 'fees' | 'facilities'>('status', ['status', 'verified', 'fees', 'facilities'])
 
   const [about, setAbout] = useState('')
   const [established, setEstablished] = useState('')

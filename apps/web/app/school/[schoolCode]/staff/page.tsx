@@ -190,7 +190,7 @@ export default function StaffPage({
   use(params)
 
   const { data, loading, error, code, reload } = useApi<StaffPayload>('/api/school/staff')
-  const [section, setSection] = useSectionTabs<'members' | 'invited' | 'invite'>('members')
+  const [section, setSection] = useSectionTabs<'members' | 'invited' | 'invite'>('members', ['members', 'invited', 'invite'])
   const [busy, setBusy] = useState<string | null>(null)
   const [editing, setEditing] = useState<StaffRow | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)

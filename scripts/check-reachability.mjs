@@ -70,6 +70,7 @@ const ACCEPTED = new Map([
   ['worker_parent_push_tokens', 'worker boundary, called by apps/workers'],
   ['worker_retire_push_token', 'worker boundary, called by apps/workers'],
   ['ai_credit_consume', 'called by other SQL functions, not by a route'],
+  ['platform_setting', 'read by request_my_erasure and my_erasure_status, not by a route'],
   ['ai_credit_balance', 'called by other SQL functions, not by a route'],
   ['ai_allowance_for_account', 'called by ai_credit_balance'],
   ['ai_credit_account_for_caller', 'called by other SQL functions'],

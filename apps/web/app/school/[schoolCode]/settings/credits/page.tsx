@@ -115,7 +115,7 @@ const money = (amount: number, currency: string): string =>
 function CreditsScreen(): JSX.Element {
   const { data, loading, error, code, reload } = useApi<CreditsPayload>('/api/school/credits')
   const staff = useApi<{ staff: StaffMember[] }>('/api/school/staff')
-  const [section, setSection] = useSectionTabs<'in-force' | 'buy' | 'assign' | 'holders'>('in-force')
+  const [section, setSection] = useSectionTabs<'in-force' | 'buy' | 'assign' | 'holders'>('in-force', ['in-force', 'buy', 'assign', 'holders'])
   const { toast } = useToast()
 
   const [planCode, setPlanCode] = useState<string>('')

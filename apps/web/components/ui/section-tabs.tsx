@@ -28,6 +28,7 @@
 
 import type { JSX } from 'react'
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export interface SectionTab<K extends string = string> {
   key: K
@@ -41,9 +42,33 @@ export interface SectionTab<K extends string = string> {
  *
  * A hook rather than internal state, because the screen needs to read the choice to
  * decide what to render, and a tab bar that owns a secret cannot tell it.
+ *
+ * ## `?section=` opens a tab from elsewhere
+ *
+ * The setup checklist links to "Term dates", which is the third tab of School settings.
+ * Without this the link lands on the first tab and the person has to find it anyway,
+ * which defeats the point of the prompt.
+ *
+ * It is read ONCE, as the initial value, and never again. Keeping the tab in the URL
+ * would mean every click pushed a history entry, so Back would walk tabs instead of
+ * leaving the screen — which is the behaviour the user rejected when they asked for a
+ * switch rather than routes.
  */
-export function useSectionTabs<K extends string>(initial: K): [K, (k: K) => void] {
-  const [active, setActive] = useState<K>(initial)
+export function useSectionTabs<K extends string>(
+  initial: K,
+  /** Every valid key. The hint is checked against it; anything else is ignored. */
+  valid: readonly K[],
+): [K, (k: K) => void] {
+  const params = useSearchParams()
+  const hinted = params.get('section')
+
+  const [active, setActive] = useState<K>(
+    // Checked, not trusted. This arrives from a URL anybody can type, and an
+    // unrecognised value would leave the page rendering no section at all.
+    hinted !== null && (valid as readonly string[]).includes(hinted)
+      ? (hinted as K)
+      : initial,
+  )
   return [active, setActive]
 }
 

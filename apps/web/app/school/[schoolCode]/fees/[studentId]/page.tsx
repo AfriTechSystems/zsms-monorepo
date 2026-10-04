@@ -121,7 +121,7 @@ export default function StudentFeesPage({
   // other spans three.
   const url = `/api/school/fees/${studentId}${parsedAmount > 0 ? `?amount=${parsedAmount}` : ''}`
   const { data, loading, error, code, reload } = useApi<Payload>(url)
-  const [section, setSection] = useSectionTabs<'statement' | 'payment' | 'history'>('statement')
+  const [section, setSection] = useSectionTabs<'statement' | 'payment' | 'history'>('statement', ['statement', 'payment', 'history'])
 
   // Seeded from the suggestion and then owned by the operator. Reset whenever a
   // fresh suggestion arrives, so changing the amount does not leave stale

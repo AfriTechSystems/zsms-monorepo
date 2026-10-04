@@ -448,7 +448,7 @@ export default function AdminSchoolDetailPage({
   const { id } = use(params)
 
   const { data, loading, error, code, reload } = useApi<Detail>(`/api/admin/schools/${id}`)
-  const [section, setSection] = useSectionTabs<'glance' | 'onboarding' | 'features' | 'overrides' | 'impersonation'>('glance')
+  const [section, setSection] = useSectionTabs<'glance' | 'onboarding' | 'features' | 'overrides' | 'impersonation'>('glance', ['glance', 'onboarding', 'features', 'overrides', 'impersonation'])
   const [revoking, setRevoking] = useState<string | null>(null)
   const [revokeError, setRevokeError] = useState<string | null>(null)
   const capacity = toCapacity(data?.capacity)

@@ -4489,6 +4489,7 @@ export type Database = {
           category: string | null
           description: string | null
           is_active: boolean | null
+          is_mandatory: boolean | null
           item_key: string | null
           label: string | null
           sort_order: number | null
@@ -4499,6 +4500,7 @@ export type Database = {
           category?: string | null
           description?: string | null
           is_active?: boolean | null
+          is_mandatory?: boolean | null
           item_key?: string | null
           label?: string | null
           sort_order?: number | null
@@ -4509,6 +4511,7 @@ export type Database = {
           category?: string | null
           description?: string | null
           is_active?: boolean | null
+          is_mandatory?: boolean | null
           item_key?: string | null
           label?: string | null
           sort_order?: number | null
@@ -5494,6 +5497,7 @@ export type Database = {
           out_from_data: boolean
           out_item_key: string
           out_label: string
+          out_mandatory: boolean
           out_overridden: boolean
           out_reason: string
           out_sort_order: number

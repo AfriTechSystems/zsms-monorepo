@@ -1,55 +1,46 @@
 'use client'
 
 /**
- * How ready this school is to use ZSMS.
+ * How ready this school is, summarised on the dashboard.
  *
  * Spec: `Official Documentation/15 Super Admin and Platform/ONBOARDING.md`
- *       `Official Documentation/06 School and Tenant Management/SCHOOL_SETUP.md`
  *
- * ## Why the school sees this and not only AfriTech
+ * ## A summary, not the checklist
  *
- * `ONBOARDING.md` frames the checklist as AfriTech's queue. But nobody at AfriTech can
- * enter a school's subjects or set its term dates — the school does almost all of it. A
- * head teacher who can see "fee structure missing, which blocks fee tracking" acts on
- * it; one who cannot waits for a phone call that may not come.
+ * The full list lives at `/settings/readiness`, with what each gap blocks and a link to
+ * the screen that fixes it. This is the nudge: a bar, the count, what is still required,
+ * and a way through. It took the whole dashboard before, which is what was reported.
  *
- * ## It says what each gap COSTS
+ * ## Collapsed is remembered, and it disappears when done
  *
- * "Grade levels — not done" is a chore. "Grade levels — blocks student import,
- * attendance and results" is a reason. The catalogue carries that consequence and this
- * shows it, because the consequence is what makes somebody act today rather than later.
+ * Somebody who has read it once and is working through it does not need it open every
+ * morning — but it must still be there, because the work is not finished. Collapsing is
+ * per browser, like the sidebar.
  *
- * ## It disappears when the school is ready
- *
- * A permanent checklist reading 100% is furniture. Once everything derivable is done the
- * card stops rendering, and the dashboard goes back to being about pupils.
+ * Once everything derivable is done it stops rendering entirely. The checklist stays
+ * reachable from Settings, where the same details are edited later. A permanent banner
+ * reading 100% is furniture.
  */
 
 import type { JSX } from 'react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, CircleCheck, Circle, Rocket } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronRight, Lock, Rocket } from 'lucide-react'
 
 import { Badge } from '../../../components/ui/badge'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../../../components/ui/card'
+import { Card, CardContent } from '../../../components/ui/card'
 import { useApi } from '../../../lib/use-api'
+import { STEP_DESTINATIONS } from '../../../lib/onboarding-steps'
 
 interface Item {
   out_item_key: string
   out_label: string
-  out_category: string
   out_blocks: string | null
   out_complete: boolean
-  /** What the data alone says, before any human sign-off. */
   out_from_data: boolean
   out_overridden: boolean
   out_derived: boolean
+  out_mandatory: boolean
 }
 
 interface Progress {
@@ -59,56 +50,79 @@ interface Progress {
   percent: number
 }
 
-/**
- * Where each outstanding item is actually done.
- *
- * Without this the card tells somebody what is missing and leaves them to find the
- * screen, which is the difference between a prompt and a complaint. Keys with no
- * destination are the ones AfriTech configures.
- */
-const DESTINATION: Record<string, string> = {
-  school_profile: '/settings',
-  grade_structure: '/settings',
-  grading_system: '/settings',
-  subjects: '/settings',
-  term_dates: '/settings',
-  logo: '/settings/public-profile',
-  fee_structure: '/fees/structures',
-  first_student: '/students/new',
-  first_staff: '/staff',
-  parent_links: '/students',
-}
+const STORAGE_KEY = 'zsms.setup-progress.collapsed'
 
 export function SetupProgress({ base }: { base: string }): JSX.Element | null {
   const { data } = useApi<Progress>('/api/school/onboarding')
+  const [collapsed, setCollapsed] = useState(false)
+
+  /*
+    Read after mount, never during render.
+
+    `localStorage` does not exist on the server, so reading it in the initial state
+    would make the first client render disagree with the server's. It can also throw in
+    a private window, so the read is wrapped and a failure simply leaves it open.
+  */
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(STORAGE_KEY) === '1')
+    } catch {
+      /* Blocked storage: show it open, which is the safe default. */
+    }
+  }, [])
+
+  const toggle = (): void => {
+    setCollapsed((was) => {
+      const next = !was
+      try {
+        window.localStorage.setItem(STORAGE_KEY, next ? '1' : '0')
+      } catch {
+        /* Not worth interrupting anybody over a remembered preference. */
+      }
+      return next
+    })
+  }
 
   const outstanding = useMemo(
     () => (data?.items ?? []).filter((i) => !i.out_complete && i.out_derived),
     [data],
   )
+  const required = useMemo(() => outstanding.filter((i) => i.out_mandatory), [outstanding])
 
-  // Nothing the school can act on. A checklist at 100% is furniture, and the four
-  // manual items are AfriTech's to configure — listing them here would be a list of
-  // somebody else's jobs.
+  // Nothing left the school can act on. The checklist stays in Settings for later.
   if (!data || outstanding.length === 0) return null
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Rocket aria-hidden="true" className="size-5 text-primary" />
-          Finish setting up
-        </CardTitle>
-        <CardDescription>
-          <span data-numeric>{data.complete}</span> of <span data-numeric>{data.total}</span>{' '}
-          done. These are worked out from your own records, so they tick themselves as you
-          go.
-        </CardDescription>
-      </CardHeader>
+      <CardContent className="flex flex-col gap-stack pt-card">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          className="flex min-h-tap items-center gap-2 text-left"
+        >
+          {collapsed ? (
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+          )}
+          <Rocket aria-hidden="true" className="size-5 shrink-0 text-primary" />
+          <span className="font-semibold">Finish setting up</span>
+          <span className="text-sm text-muted-foreground">
+            <span data-numeric>{data.complete}</span> of{' '}
+            <span data-numeric>{data.total}</span>
+          </span>
+          {/* Visible even when collapsed: a school cannot enrol anybody until these are
+              done, and that should not be hidden behind a chevron. */}
+          {required.length > 0 && (
+            <Badge variant="danger" className="ml-auto">
+              <Lock aria-hidden="true" className="size-3" />
+              {required.length} required
+            </Badge>
+          )}
+        </button>
 
-      <CardContent className="flex flex-col gap-cards">
-        {/* A bar rather than only a number: the shape of "nearly there" is read at a
-            glance where a percentage has to be interpreted. */}
+        {/* The bar stays visible when collapsed — it is the whole summary in one line. */}
         <div
           className="h-2 w-full overflow-hidden rounded-full bg-sunken"
           role="progressbar"
@@ -123,67 +137,47 @@ export function SetupProgress({ base }: { base: string }): JSX.Element | null {
           />
         </div>
 
-        <Link
-          href={`${base}/settings/readiness`}
-          className="inline-flex min-h-tap items-center gap-1.5 self-start text-sm font-medium text-primary-text hover:underline"
-        >
-          See the full checklist
-          <ArrowRight aria-hidden="true" className="size-4" />
-        </Link>
+        {!collapsed && (
+          <>
+            <ul className="flex flex-col gap-1">
+              {outstanding.slice(0, 5).map((item) => {
+                const destination = STEP_DESTINATIONS[item.out_item_key]
+                const href = destination
+                  ? `${base}${destination.href}${destination.tab ? `?section=${destination.tab}` : ''}`
+                  : `${base}/settings/readiness`
 
-        <ul className="flex flex-col gap-1">
-          {(data.items ?? [])
-            .filter((i) => i.out_derived)
-            .map((item) => {
-              const href = DESTINATION[item.out_item_key]
-              const row = (
-                <>
-                  {item.out_complete ? (
-                    <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
-                  ) : (
-                    <Circle aria-hidden="true" className="size-4 shrink-0 text-subtle" />
-                  )}
-
-                  <span
-                    className={
-                      item.out_complete ? 'text-muted-foreground line-through' : 'font-medium'
-                    }
-                  >
-                    {item.out_label}
-                  </span>
-
-                  {/* The consequence, which is what makes somebody act. */}
-                  {!item.out_complete && item.out_blocks && (
-                    <Badge variant="warning">blocks {item.out_blocks.toLowerCase()}</Badge>
-                  )}
-
-                  {!item.out_complete && href && (
-                    <ArrowRight
-                      aria-hidden="true"
-                      className="ml-auto size-4 shrink-0 text-primary-text"
-                    />
-                  )}
-                </>
-              )
-
-              return (
-                <li key={item.out_item_key}>
-                  {item.out_complete || !href ? (
-                    <div className="flex min-h-tap flex-wrap items-center gap-2 px-1 text-sm">
-                      {row}
-                    </div>
-                  ) : (
+                return (
+                  <li key={item.out_item_key}>
                     <Link
-                      href={`${base}${href}`}
+                      href={href}
                       className="flex min-h-tap flex-wrap items-center gap-2 rounded-md px-1 text-sm transition-colors hover:bg-muted"
                     >
-                      {row}
+                      <span className="font-medium">{item.out_label}</span>
+                      {item.out_mandatory && <Badge variant="danger">Required</Badge>}
+                      {item.out_blocks && (
+                        <Badge variant="warning">blocks {item.out_blocks.toLowerCase()}</Badge>
+                      )}
+                      <ArrowRight
+                        aria-hidden="true"
+                        className="ml-auto size-4 shrink-0 text-primary-text"
+                      />
                     </Link>
-                  )}
-                </li>
-              )
-            })}
-        </ul>
+                  </li>
+                )
+              })}
+            </ul>
+
+            <Link
+              href={`${base}/settings/readiness`}
+              className="inline-flex min-h-tap items-center gap-1.5 self-start text-sm font-medium text-primary-text hover:underline"
+            >
+              {outstanding.length > 5
+                ? `See all ${outstanding.length} outstanding`
+                : 'See the full checklist'}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </>
+        )}
       </CardContent>
     </Card>
   )

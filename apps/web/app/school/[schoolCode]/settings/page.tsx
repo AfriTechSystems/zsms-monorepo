@@ -100,7 +100,7 @@ export default function SchoolSettingsPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [section, setSection] = useSectionTabs<'profile' | 'academic' | 'terms'>('profile')
+  const [section, setSection] = useSectionTabs<'profile' | 'academic' | 'terms'>('profile', ['profile', 'academic', 'terms'])
 
   const [profile, setProfile] = useState<Partial<Profile>>({})
   const [academic, setAcademic] = useState<Partial<Academic>>({})

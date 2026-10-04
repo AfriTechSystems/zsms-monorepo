@@ -29,8 +29,10 @@
  */
 
 import type { JSX } from 'react'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { useCallback, useState } from 'react'
-import { Circle, CircleCheck, Info, PenLine, Undo2 } from 'lucide-react'
+import { ArrowRight, Circle, CircleCheck, Info, Lock, PenLine, Undo2 } from 'lucide-react'
 
 import { Alert } from '../../../../../components/ui/alert'
 import { Badge } from '../../../../../components/ui/badge'
@@ -40,9 +42,11 @@ import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components
 import { Field, Input } from '../../../../../components/ui/field'
 import { useToast } from '../../../../../components/ui/toast'
 import { apiSend, useApi } from '../../../../../lib/use-api'
+import { STEP_DESTINATIONS, STEP_UNAVAILABLE } from '../../../../../lib/onboarding-steps'
 
 interface Item {
   out_item_key: string
+  out_mandatory: boolean
   out_label: string
   out_description: string | null
   out_category: string
@@ -73,6 +77,8 @@ const shortDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function ReadinessPage(): JSX.Element {
+  const params = useParams<{ schoolCode: string }>()
+  const base = `/school/${params.schoolCode}`
   const { data, loading, error, code, reload } = useApi<Payload>('/api/school/onboarding')
   const { toast } = useToast()
 
@@ -163,7 +169,10 @@ export default function ReadinessPage(): JSX.Element {
             </h2>
 
             <ul className="divide-y divide-border rounded-md border border-border">
-              {items.map((item) => (
+              {items.map((item) => {
+                const destination = STEP_DESTINATIONS[item.out_item_key]
+                const unavailable = STEP_UNAVAILABLE[item.out_item_key]
+                return (
                 <li key={item.out_item_key} className="flex flex-col gap-2 p-card">
                   <div className="flex items-start gap-3">
                     {item.out_complete ? (
@@ -188,10 +197,26 @@ export default function ReadinessPage(): JSX.Element {
 
                       {/* What it costs, which is what makes somebody act today rather
                           than nod at a chore. */}
-                      {!item.out_complete && item.out_blocks && (
-                        <Badge variant="warning" className="mt-1">
-                          Blocks {item.out_blocks.toLowerCase()}
-                        </Badge>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {/* Said before they look for a way round it. */}
+                        {item.out_mandatory && !item.out_complete && (
+                          <Badge variant="danger">
+                            <Lock aria-hidden="true" className="size-3" />
+                            Required
+                          </Badge>
+                        )}
+                        {!item.out_complete && item.out_blocks && (
+                          <Badge variant="warning">
+                            Blocks {item.out_blocks.toLowerCase()}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* No screen because the feature is not built. An explanation
+                          rather than a link to nowhere — a school reading "not done"
+                          with no way to act assumes the fault is theirs. */}
+                      {!item.out_complete && unavailable && (
+                        <p className="mt-1 text-sm text-subtle">{unavailable}</p>
                       )}
 
                       {/* Both answers, always. A sign-off adds a human judgement; it
@@ -223,33 +248,54 @@ export default function ReadinessPage(): JSX.Element {
                       )}
                     </div>
 
-                    {item.out_overridden ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => void submit(item.out_item_key, false)}
-                      >
-                        <Undo2 aria-hidden="true" />
-                        Undo
-                      </Button>
-                    ) : (
-                      /* Offered only where the data has not already answered. Signing
-                         off something the records show as done is noise. */
-                      !item.out_from_data && (
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {/* The whole point of the list: take them to where it is done.
+                          A checklist that names what is missing and leaves somebody to
+                          find the screen is a complaint, not a prompt. */}
+                      {!item.out_complete && destination && (
+                        <Button asChild size="sm">
+                          <Link
+                            href={`${base}${destination.href}${
+                              destination.tab ? `?section=${destination.tab}` : ''
+                            }`}
+                          >
+                            {destination.action}
+                            <ArrowRight aria-hidden="true" />
+                          </Link>
+                        </Button>
+                      )}
+
+                      {item.out_overridden ? (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           disabled={busy}
-                          onClick={() => {
-                            setSigningOff(item.out_item_key)
-                            setReason('')
-                          }}
+                          onClick={() => void submit(item.out_item_key, false)}
                         >
-                          Sign off
+                          <Undo2 aria-hidden="true" />
+                          Undo
                         </Button>
-                      )
-                    )}
+                      ) : (
+                        /* Offered only where the data has not already answered, and
+                           never for a mandatory step — "Skip for now" on grade levels
+                           would let a school reach ready and then be unable to enrol
+                           anybody. */
+                        !item.out_from_data &&
+                        !item.out_mandatory && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => {
+                              setSigningOff(item.out_item_key)
+                              setReason('')
+                            }}
+                          >
+                            Sign off
+                          </Button>
+                        )
+                      )}
+                    </div>
                   </div>
 
                   {signingOff === item.out_item_key && (
@@ -289,7 +335,7 @@ export default function ReadinessPage(): JSX.Element {
                     </div>
                   )}
                 </li>
-              ))}
+              )})}
             </ul>
           </section>
         )

@@ -117,7 +117,7 @@ function lastMonth(): { start: string; end: string } {
 export default function AdminBillingPage(): JSX.Element {
   const { data, loading, error, code, reload } = useApi<Payload>('/api/admin/billing')
   const { toast } = useToast()
-  const [section, setSection] = useSectionTabs<'run' | 'payment' | 'invoices'>('run')
+  const [section, setSection] = useSectionTabs<'run' | 'payment' | 'invoices'>('run', ['run', 'payment', 'invoices'])
 
   const defaults = useMemo(lastMonth, [])
   const [periodStart, setPeriodStart] = useState(defaults.start)

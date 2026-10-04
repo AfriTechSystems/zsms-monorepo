@@ -39,13 +39,13 @@
     "db:cols": "node scripts/describe-table.mjs",
     "gaps": "node scripts/check-reachability.mjs"
   },
-  "//react": "Declared at the root ONLY to control npm hoisting, not because the root builds anything. apps/web needs React 19 (Next 15 App Router); apps/mobile needs exactly 18.3.1 (React Native 0.76). Two majors must coexist, so which one wins the root slot matters: `styled-jsx` is a transitive dependency of `next` that npm hoists to the root while `next` itself stays nested in apps/web. It then resolves `react` from the root. If the root holds 18.3.1, prerendering _document/_error loads a second React instance and fails with `Cannot read properties of null (reading 'useContext')`. Pinning 19 here puts web and Clerk on one instance and nests Expo's 18.3.1 under apps/mobile. Revisit when React Native supports React 19 \u2014 then the whole repo can share one version and this can go.",
-  "//types-react": "apps/mobile pulls @types/react 18 and npm hoists it to the root, which is what @radix-ui/* resolved against while apps/web compiled against 19 \u2014 producing 'Type ReactNode is not assignable to type ReactNode', the same name from two copies. Pinning 19 in root devDependencies would fix the hoist but forces a full re-resolve that collides with react-native's react@^18 peer, so the override below is scoped to the packages that actually need it, exactly as the @clerk/nextjs -> next override is. Remove alongside the react pin once React Native supports React 19.",
+  "//react": "Declared at the root ONLY to control npm hoisting, not because the root builds anything. Every workspace is now on React 19 \u2014 apps/mobile moved with Expo SDK 57 (React Native 0.86.3 peer-requires ^19.2.3), so the old two-majors problem is gone. It stays pinned here because `styled-jsx`, a transitive dependency of `next`, hoists to the root and resolves React from it; without a root pin npm is free to put a second copy there and prerendering fails with `Cannot read properties of null (reading 'useContext')`. One version everywhere is the whole point.",
+  "//types-react": "Pinned through `overrides` so every hoisted package compiles against the same React types. A stale @types/react 18 survived at the root from the SDK-52 era and react-native's own types resolved against it, which made every class component 'not a valid JSX element type'.",
   "devDependencies": {
     "expo": "57.0.26",
     "expo-router": "~57.0.24",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "supabase": "^2.114.0",
     "tsx": "^4.23.12",
     "turbo": "^2.3.3",
@@ -71,6 +71,15 @@
     "@types/react": "~19.2.4",
     "babel-preset-expo": "~57.0.13",
     "expo": "57.0.26",
-    "react-native": "0.86.3"
-  }
+    "expo-secure-store": "57.0.4",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "2.32.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.2",
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.13.0"
+  },
+  "//native-singletons": "The react-native-* and expo-* entries in `overrides` exist because each holds singleton state on the native side and MUST appear exactly once. `@clerk/clerk-expo` and `expo-router` hoist a dozen Expo packages to the root, where loose peers like `react-native-gesture-handler: \"*\"` resolved to 3.3.0 while apps/mobile pinned 2.32.0 \u2014 incompatible majors, with expo-router/drawer using one and the app initialising the other. Every drawer and tab layout threw. Versions are whatever `expo install` picks for SDK 57, which is the set Expo tests together."
 }

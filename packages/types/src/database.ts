@@ -1316,6 +1316,11 @@ export type Database = {
           id: string
           is_complete: boolean
           item_key: string
+          overridden: boolean
+          overridden_at: string | null
+          overridden_by: string | null
+          overridden_by_role: string | null
+          override_reason: string | null
           school_id: string
           updated_at: string
         }
@@ -1326,6 +1331,11 @@ export type Database = {
           id?: string
           is_complete?: boolean
           item_key: string
+          overridden?: boolean
+          overridden_at?: string | null
+          overridden_by?: string | null
+          overridden_by_role?: string | null
+          override_reason?: string | null
           school_id: string
           updated_at?: string
         }
@@ -1336,6 +1346,11 @@ export type Database = {
           id?: string
           is_complete?: boolean
           item_key?: string
+          overridden?: boolean
+          overridden_at?: string | null
+          overridden_by?: string | null
+          overridden_by_role?: string | null
+          override_reason?: string | null
           school_id?: string
           updated_at?: string
         }
@@ -4845,13 +4860,6 @@ export type Database = {
           out_teachers_assigned: number
         }[]
       }
-      admin_set_checklist_item: {
-        Args: { p_complete: boolean; p_item_key: string; p_school_id: string }
-        Returns: {
-          out_done: boolean
-          out_message: string
-        }[]
-      }
       admin_set_onboarding_task: {
         Args: {
           p_assigned_to?: string
@@ -5353,12 +5361,18 @@ export type Database = {
       my_onboarding_progress: {
         Args: never
         Returns: {
+          out_at: string
           out_blocks: string
+          out_by_role: string
           out_category: string
           out_complete: boolean
           out_derived: boolean
+          out_description: string
+          out_from_data: boolean
           out_item_key: string
           out_label: string
+          out_overridden: boolean
+          out_reason: string
           out_sort_order: number
         }[]
       }
@@ -5997,6 +6011,18 @@ export type Database = {
       set_incident_status: {
         Args: { p_incident_id: string; p_note?: string; p_status: string }
         Returns: boolean
+      }
+      set_onboarding_override: {
+        Args: {
+          p_item_key: string
+          p_override: boolean
+          p_reason?: string
+          p_school_id: string
+        }
+        Returns: {
+          out_done: boolean
+          out_message: string
+        }[]
       }
       set_school_public_profile: {
         Args: {

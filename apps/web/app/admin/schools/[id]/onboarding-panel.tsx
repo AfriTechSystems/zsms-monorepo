@@ -65,13 +65,14 @@ export interface Progress {
 }
 
 /**
- * The only items a human may tick.
+ * The four the database cannot answer at all.
  *
- * The other ten are worked out from the school's own data — grade levels, subjects, a
- * first pupil — and `admin_set_checklist_item()` refuses them. These four depend on
- * things the database cannot see: credentials, and features not built.
+ * The other ten are worked out from the school's own data and tick themselves. Any of
+ * the fourteen can still be SIGNED OFF with a reason — AfriTech is sometimes paid to do
+ * a school's setup — but for these four a sign-off is the only route there will ever
+ * be, so the panel says so rather than implying the school is simply behind.
  */
-const MANUAL = new Set([
+const NEVER_DERIVED = new Set([
   'whatsapp_configured',
   'payment_gateway',
   'document_templates',
@@ -106,6 +107,8 @@ export function OnboardingPanel({
   const router = useRouter()
   const { toast } = useToast()
   const [busyItem, setBusyItem] = useState<string | null>(null)
+  const [signingOff, setSigningOff] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
 
   /*
     Ticking one of the four manual items.
@@ -114,13 +117,14 @@ export function OnboardingPanel({
     the panel shows text for those rather than a control.
   */
   const setItem = useCallback(
-    async (itemKey: string, complete: boolean) => {
+    async (itemKey: string, complete: boolean, reason?: string) => {
       setBusyItem(itemKey)
       try {
         const result = await apiSend(`/api/admin/schools/${schoolId}/checklist`, 'POST', {
           action: 'set',
           itemKey,
           complete,
+          reason,
         })
         if (result.error) {
           toast(result.error, 'danger')
@@ -336,19 +340,65 @@ export function OnboardingPanel({
                         {/* Tickable only when the system cannot know the answer. For the
                             derived ten the panel says so instead, because a control that
                             always refuses is worse than none. */}
-                        {MANUAL.has(item.item_key) ? (
-                          <button
-                            type="button"
-                            disabled={busyItem === item.item_key}
-                            onClick={() => void setItem(item.item_key, !item.isComplete)}
-                            className="mt-1 min-h-tap rounded px-1 text-sm font-medium text-primary-text hover:underline disabled:opacity-60"
-                          >
-                            {item.isComplete ? 'Mark not done' : 'Mark done'}
-                          </button>
-                        ) : (
+                        {!NEVER_DERIVED.has(item.item_key) && (
                           <p className="mt-1 text-sm text-subtle">
                             Worked out from the school&rsquo;s own records.
                           </p>
+                        )}
+
+                        {/* Any item can be signed off — AfriTech is sometimes paid to
+                            do the work, and a school may handle something outside ZSMS
+                            entirely. The reason is mandatory, which is what separates a
+                            sign-off from a box somebody clicked to clear a warning. */}
+                        {signingOff === item.item_key ? (
+                          <div className="mt-2 flex flex-col gap-2">
+                            <input
+                              type="text"
+                              value={reason}
+                              maxLength={500}
+                              placeholder="Why is this done? e.g. we built their templates"
+                              onChange={(e) => setReason(e.target.value)}
+                              className="min-h-tap w-full rounded-md border border-border bg-surface px-2 text-sm"
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={busyItem === item.item_key || reason.trim().length === 0}
+                                onClick={() => {
+                                  void setItem(item.item_key, true, reason.trim()).then(() => {
+                                    setSigningOff(null)
+                                    setReason('')
+                                  })
+                                }}
+                                className="min-h-tap rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                              >
+                                Sign off
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSigningOff(null)}
+                                className="min-h-tap rounded px-2 text-sm text-muted-foreground hover:underline"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busyItem === item.item_key}
+                            onClick={() => {
+                              if (item.isComplete) {
+                                void setItem(item.item_key, false)
+                              } else {
+                                setSigningOff(item.item_key)
+                                setReason('')
+                              }
+                            }}
+                            className="mt-1 min-h-tap rounded px-1 text-sm font-medium text-primary-text hover:underline disabled:opacity-60"
+                          >
+                            {item.isComplete ? 'Withdraw sign-off' : 'Sign off for them'}
+                          </button>
                         )}
                         {/* A school created before this item entered the catalogue has no row
                             for it. Worth distinguishing from "not done yet" — the fix is a

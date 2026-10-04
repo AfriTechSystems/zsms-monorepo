@@ -46,6 +46,9 @@ interface Item {
   out_category: string
   out_blocks: string | null
   out_complete: boolean
+  /** What the data alone says, before any human sign-off. */
+  out_from_data: boolean
+  out_overridden: boolean
   out_derived: boolean
 }
 
@@ -119,6 +122,14 @@ export function SetupProgress({ base }: { base: string }): JSX.Element | null {
             style={{ width: `${data.percent}%` }}
           />
         </div>
+
+        <Link
+          href={`${base}/settings/readiness`}
+          className="inline-flex min-h-tap items-center gap-1.5 self-start text-sm font-medium text-primary-text hover:underline"
+        >
+          See the full checklist
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </Link>
 
         <ul className="flex flex-col gap-1">
           {(data.items ?? [])

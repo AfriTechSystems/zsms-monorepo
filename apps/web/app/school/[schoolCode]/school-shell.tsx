@@ -25,18 +25,19 @@ import type { JSX, ReactNode } from 'react'
 import {
   CalendarCheck,
   ClipboardList,
+  Cog,
+  Coins,
   FileSpreadsheet,
   Globe,
   GraduationCap,
   LayoutDashboard,
+  ListChecks,
   Megaphone,
   Receipt,
-  Cog,
   SlidersHorizontal,
   UserCog,
   Users,
   Wallet,
-  Coins,
 } from 'lucide-react'
 
 import type { Role } from '@zsms/auth-provider'
@@ -136,6 +137,13 @@ export function SchoolShell({
          * them is informative rather than a dead end.
          */
         { path: '/settings', label: 'School settings', icon: Cog, exact: true },
+        /*
+          The setup checklist, beside the settings it sends people to.
+
+          `settings:write` because every outstanding item is management's to do — a
+          teacher reading a list of other people's jobs is clutter.
+        */
+        { path: '/settings/readiness', label: 'Setup checklist', icon: ListChecks, needs: 'settings:write' },
         // Defining what is recorded about a pupil is a pupil-write act.
         { path: '/settings/fields', label: 'Pupil fields', icon: SlidersHorizontal, needs: 'students:write' },
         // Outward-facing rather than internal configuration, and the only settings row a

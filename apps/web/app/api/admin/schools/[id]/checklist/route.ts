@@ -10,12 +10,16 @@
  * to true**. The checklist was created at 0% and stayed there, which is exactly what
  * "AfriTech cannot complete a school's onboarding" looks like from the outside.
  *
- * ## Ten of fourteen are not tickable, by design
+ * ## A sign-off, not a tick
  *
- * `admin_set_checklist_item()` refuses the derived keys. Letting an operator mark "Grade
- * levels" done by hand would make the dashboard disagree with the database the moment
- * the next refresh runs, and whoever read it in between would act on a number that was
- * never true. `refresh` recomputes those from live data instead.
+ * `0188` let the ten derived items refuse manual completion outright, on the grounds
+ * that a tick disagreeing with the database is a lie. True of a tick, and wrong for the
+ * business: AfriTech is sometimes paid to do a school's setup, and a school may handle
+ * something outside ZSMS entirely.
+ *
+ * `set_onboarding_override()` takes a mandatory reason and records who and when. The
+ * derivation keeps running beside it, and the screen shows both — so the checklist can
+ * reach done without anybody being misled. `refresh` recomputes the derived ten.
  */
 
 import { z } from 'zod'
@@ -31,6 +35,15 @@ const bodySchema = z.discriminatedUnion('action', [
     action: z.literal('set'),
     itemKey: z.string().trim().min(1).max(60),
     complete: z.boolean(),
+    /*
+      Required to sign something off, and that is the point.
+
+      `0189` replaced a plain tick with an override carrying a reason: AfriTech is
+      sometimes paid to do a school's setup, and recording THAT is different from
+      silently marking a box. The derivation keeps running underneath and both answers
+      stay visible.
+    */
+    reason: z.string().trim().max(500).optional(),
   }),
 ])
 
@@ -63,16 +76,17 @@ export async function POST(
     }
 
     const { data, error } = await client
-      .rpc('admin_set_checklist_item', {
+      .rpc('set_onboarding_override', {
         p_school_id: id,
         p_item_key: parsed.data.itemKey,
-        p_complete: parsed.data.complete,
+        p_override: parsed.data.complete,
+        p_reason: parsed.data.reason ?? null,
       })
       .maybeSingle()
 
     if (error) {
       if (error.code === '42501') return fail('FORBIDDEN', error.message)
-      // 22023 is the function refusing a DERIVED key, and its message names which.
+      // 22023 is the function refusing a sign-off with no reason.
       if (error.code === '22023') return fail('VALIDATION_ERROR', error.message)
       return fromPostgrestError(error)
     }

@@ -20,10 +20,18 @@
  * dashboard is exactly when the answer has to be current.
  */
 
+import { z } from 'zod'
+
 import { createUserClient } from '../../../../lib/supabase'
 import { getAuthProvider, type Role } from '@zsms/auth-provider'
 import { can } from '../../../../lib/roles'
-import { fail, fromPostgrestError, guard, ok } from '../../../../lib/api-response'
+import {
+  fail,
+  fromPostgrestError,
+  guard,
+  ok,
+  validationFailed,
+} from '../../../../lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,9 +63,17 @@ export async function GET(): Promise<Response> {
     type Item = {
       out_item_key: string
       out_label: string
+      out_description: string | null
       out_category: string
       out_blocks: string | null
+      /** Done by either route — derived from data, or signed off by a person. */
       out_complete: boolean
+      /** What the data alone says. Kept separate so a sign-off never hides it. */
+      out_from_data: boolean
+      out_overridden: boolean
+      out_reason: string | null
+      out_by_role: string | null
+      out_at: string | null
       out_derived: boolean
     }
 
@@ -76,5 +92,61 @@ export async function GET(): Promise<Response> {
         .filter((i) => !i.out_complete && i.out_blocks)
         .map((i) => ({ item: i.out_label, blocks: i.out_blocks })),
     })
+  })
+}
+
+/**
+ * POST — sign a checklist item off, or withdraw the sign-off.
+ *
+ * ## Why a school may do this at all
+ *
+ * Most of the list is derived from the school's own data and ticks itself. A sign-off
+ * is for the cases the data cannot see: AfriTech was paid to do the setup, the school
+ * runs fees in an accounting package so a ZSMS fee structure is never coming, or the
+ * work was training rather than a record.
+ *
+ * The derivation keeps running underneath and both answers are returned, so a sign-off
+ * adds a human judgement rather than hiding the facts.
+ */
+const signOffSchema = z.object({
+  itemKey: z.string().trim().min(1).max(60),
+  override: z.boolean(),
+  reason: z.string().trim().max(500).optional(),
+})
+
+export async function POST(request: Request): Promise<Response> {
+  return guard(async () => {
+    const parsed = signOffSchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) return validationFailed(parsed.error)
+
+    const client = await createUserClient()
+    if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    /*
+      `p_school_id` is null on purpose.
+
+      The function resolves a school caller from their own session and ignores the
+      argument — passing one from the browser would be inviting it to be changed.
+    */
+    const { data, error } = await client
+      .rpc('set_onboarding_override', {
+        p_school_id: null,
+        p_item_key: parsed.data.itemKey,
+        p_override: parsed.data.override,
+        p_reason: parsed.data.reason ?? null,
+      })
+      .maybeSingle()
+
+    if (error) {
+      if (error.code === '42501') return fail('FORBIDDEN', error.message)
+      // The function refusing a sign-off with no reason, which is a user error.
+      if (error.code === '22023') return fail('VALIDATION_ERROR', error.message)
+      return fromPostgrestError(error)
+    }
+
+    const row = (data ?? {}) as { out_done?: boolean; out_message?: string }
+    if (!row.out_done) return fail('NOT_FOUND', row.out_message ?? 'No such checklist item.')
+
+    return ok({ done: true, message: row.out_message })
   })
 }

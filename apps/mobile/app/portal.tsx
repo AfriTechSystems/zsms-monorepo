@@ -42,7 +42,21 @@ const ICON = {
 } as const
 
 /** Only the teacher portal has screens in this build. */
-const NATIVE = new Set(['teacher', 'school'])
+/**
+ * Where each portal goes inside the app.
+ *
+ * A kind that is absent opens the web portal instead, which is honest and useful — far
+ * better than a dead card.
+ *
+ * `school` lands in the teacher app on purpose: a school owner on a phone is almost
+ * always there to mark a register or read a notice, and the administrative half of the
+ * school portal is a desk job.
+ */
+const NATIVE: Record<string, string> = {
+  teacher: '/(teacher)/(tabs)',
+  school: '/(teacher)/(tabs)',
+  parent: '/(parent)/(tabs)',
+}
 
 export default function PortalPicker(): JSX.Element {
   const c = usePalette()
@@ -63,20 +77,22 @@ export default function PortalPicker(): JSX.Element {
 
         {portals.map((portal) => {
           const Icon = ICON[portal.kind]
-          const native = NATIVE.has(portal.kind)
+          const nativeHref = NATIVE[portal.kind]
 
           return (
             <Pressable
               key={portal.key}
               accessibilityRole="button"
               onPress={() => {
-                if (native) {
-                  router.replace('/(teacher)/(tabs)')
+                if (nativeHref) {
+                  // By KIND, not "is it native at all". Sending every native portal to
+                  // the teacher app was correct while that was the only one built; a
+                  // parent tapping their own card would now land in a register.
+                  router.replace(nativeHref as never)
                   return
                 }
-                // Not built natively yet. Opening the web portal is honest and useful —
-                // far better than a dead card, and the parent portal is phone-first on
-                // the web anyway.
+                // No screens for this one. Opening the web portal is honest and
+                // useful — far better than a dead card.
                 void Linking.openURL(`${BASE_URL}${portal.href}`)
               }}
               style={({ pressed }) => ({
@@ -110,7 +126,7 @@ export default function PortalPicker(): JSX.Element {
                   <Text style={[TYPE.heading, { color: c.text }]} numberOfLines={1}>
                     {portal.label}
                   </Text>
-                  {!native && <Badge label="Opens in browser" tone="neutral" />}
+                  {!nativeHref && <Badge label="Opens in browser" tone="neutral" />}
                 </Row>
                 <Caption>{portal.description}</Caption>
               </View>

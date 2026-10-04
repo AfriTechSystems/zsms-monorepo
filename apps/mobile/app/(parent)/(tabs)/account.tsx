@@ -1,0 +1,128 @@
+/**
+ * A parent's account: who they are, notifications, and their data.
+ *
+ * Spec: `Official Documentation/01 Foundation Layer/COMPLIANCE.md`
+ *       Zambia Data Protection Act 2021
+ *
+ * ## Notifications are asked for here
+ *
+ * Not at launch. A phone that asks before showing anything gets "Don't allow", and on
+ * iOS that answer is close to final. By the time a parent opens their account they have
+ * seen what the app is for.
+ *
+ * ## Data rights point at the web, deliberately
+ *
+ * Downloading a file and asking to be erased are both better done on a screen with
+ * room to explain what is kept and for how long. A six-year financial retention rule
+ * compressed onto a phone card is the kind of thing somebody agrees to without reading.
+ * The app says the rights exist and where to exercise them.
+ */
+
+import type { JSX } from 'react'
+import { useEffect, useState } from 'react'
+import { Linking, ScrollView, Text, View } from 'react-native'
+import { Bell, BellOff, ShieldCheck } from 'lucide-react-native'
+
+import {
+  Body,
+  Button,
+  Caption,
+  Card,
+  Row,
+  Screen,
+  Title,
+  usePalette,
+} from '../../../components/ui'
+import { useSession } from '../../../lib/auth'
+import { enablePush, pushState, type PushState } from '../../../lib/push'
+import { BASE_URL } from '../../../lib/api'
+import { SPACE, TYPE } from '../../../theme'
+
+export default function ParentAccount(): JSX.Element {
+  const c = usePalette()
+  const { fullName, email, getToken } = useSession()
+
+  const [push, setPush] = useState<PushState | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    void pushState().then(setPush)
+  }, [])
+
+  return (
+    <Screen>
+      <ScrollView
+        contentContainerStyle={{ padding: SPACE.gutter, gap: SPACE.md, paddingBottom: SPACE.xxl }}
+      >
+        <View style={{ gap: 2 }}>
+          <Title>{fullName ?? 'Your account'}</Title>
+          <Caption>{email ?? ''}</Caption>
+        </View>
+
+        {/* ---- Notifications ---- */}
+        <Card>
+          <Row gap={SPACE.sm}>
+            {push === 'on' ? (
+              <Bell size={21} color={c.primaryMark} strokeWidth={2} />
+            ) : (
+              <BellOff size={21} color={c.textSubtle} strokeWidth={2} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Body>Notifications</Body>
+              <Caption>
+                {push === 'on'
+                  ? 'This phone will be told when your school sends a notice.'
+                  : push === 'declined'
+                    ? 'Turned off. Switch notifications on for ZSMS in your phone settings.'
+                    : push === 'unavailable'
+                      ? 'Not available on this device.'
+                      : 'Get told when your school sends a notice.'}
+              </Caption>
+            </View>
+          </Row>
+
+          {push === 'unasked' && (
+            <Button
+              label={busy ? 'Asking…' : 'Turn on notifications'}
+              onPress={() => {
+                setBusy(true)
+                void enablePush(getToken)
+                  .then(setPush)
+                  .finally(() => setBusy(false))
+              }}
+              busy={busy}
+              full
+            />
+          )}
+        </Card>
+
+        {/* ---- Data rights ---- */}
+        <Card>
+          <Row gap={SPACE.sm}>
+            <ShieldCheck size={21} color={c.primaryMark} strokeWidth={2} />
+            <View style={{ flex: 1 }}>
+              <Body>Your data</Body>
+              <Caption>
+                You can download everything ZSMS holds about you and your children, or
+                ask us to erase it.
+              </Caption>
+            </View>
+          </Row>
+
+          <Text style={[TYPE.caption, { color: c.textSubtle }]}>
+            Erasing keeps payment records for six years with your name removed, because
+            schools are required to keep business records. The full explanation is on the
+            website, where there is room for it.
+          </Text>
+
+          <Button
+            label="Open my account on the web"
+            tone="outline"
+            onPress={() => void Linking.openURL(`${BASE_URL}/account`)}
+            full
+          />
+        </Card>
+      </ScrollView>
+    </Screen>
+  )
+}

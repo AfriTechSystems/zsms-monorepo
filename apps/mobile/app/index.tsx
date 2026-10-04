@@ -44,10 +44,28 @@ export default function Index(): JSX.Element {
       through to the teacher app rather than stranding anybody on a splash screen.
     */
     void api
-      .get<{ count: number }>('/api/session/portals', getToken)
+      .get<{ count: number; portals?: Array<{ kind: string }> }>(
+        '/api/session/portals',
+        getToken,
+      )
       .then((result) => {
-        router.replace((result.data?.count ?? 1) > 1 ? '/portal' : '/(teacher)/(tabs)')
+        if ((result.data?.count ?? 1) > 1) {
+          router.replace('/portal')
+          return
+        }
+
+        /*
+          One portal, so go straight there — but to the RIGHT one.
+
+          This used to send everybody to the teacher app, which was correct while that
+          was the only one built. Now a parent-only account would land in a teacher's
+          register. Routed on the portal's own kind instead.
+        */
+        const only = result.data?.portals?.[0]?.kind
+        router.replace(only === 'parent' ? '/(parent)/(tabs)' : '/(teacher)/(tabs)')
       })
+      // The portal list is a convenience, not a gate. If it cannot be read, fall
+      // through to the teacher app rather than stranding anybody on a splash screen.
       .catch(() => router.replace('/(teacher)/(tabs)'))
   }, [isLoaded, isSignedIn, router, getToken])
 

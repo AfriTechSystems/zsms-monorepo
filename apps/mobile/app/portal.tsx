@@ -71,7 +71,7 @@ export default function PortalPicker(): JSX.Element {
               accessibilityRole="button"
               onPress={() => {
                 if (native) {
-                  router.replace('/(teacher)')
+                  router.replace('/(teacher)/(tabs)')
                   return
                 }
                 // Not built natively yet. Opening the web portal is honest and useful —

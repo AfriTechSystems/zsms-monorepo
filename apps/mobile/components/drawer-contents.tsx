@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router'
 import {
   DrawerContentScrollView,
   type DrawerContentComponentProps,
-} from 'expo-router/build/react-navigation/drawer'
+} from 'expo-router/drawer'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LayoutGrid, LogOut } from 'lucide-react-native'
 
@@ -35,11 +35,18 @@ import { RADIUS, SPACE, TAP, TYPE } from '../theme'
 const GROUPS: Array<Feature['group']> = ['Teaching', 'My tools', 'School', 'Account']
 
 /*
-  Everything drawer-related comes from expo-router's own vendored copy.
+  Everything drawer-related comes from `expo-router/drawer`, the PUBLIC entry.
 
-  As of SDK 56 importing `@react-navigation/drawer` is a hard bundling error —
-  "expo-router is no longer compatible with react-navigation" — and the two packages
-  declare incompatible `DrawerNavigationHelpers` besides. One source avoids both.
+  Two wrong turns got here, and both are worth recording:
+
+    * `@react-navigation/drawer` is a hard bundling error as of SDK 56 — "expo-router is
+      no longer compatible with react-navigation".
+    * `expo-router/build/react-navigation/drawer`, the internal module, RESOLVES — so the
+      bundle succeeded and type-check passed — and then fails to initialise on device
+      with "undefined is not a function", which Hermes reports against the module's first
+      import line rather than the offending one. A green bundle is not a running app.
+
+  `expo-router/drawer` re-exports `Drawer`, the views and the types together.
 */
 export function DrawerContents(props: DrawerContentComponentProps): JSX.Element {
   const c = usePalette()

@@ -85,7 +85,7 @@ export default function Attendance(): JSX.Element {
         {classes.map((entry) => (
           <Link
             key={entry.classId}
-            href={{ pathname: '/(teacher)/register/[classId]', params: { classId: entry.classId } }}
+            href={{ pathname: '/(teacher)/(tabs)/register/[classId]', params: { classId: entry.classId } }}
             asChild
           >
             <Pressable

@@ -46,9 +46,9 @@ export default function Index(): JSX.Element {
     void api
       .get<{ count: number }>('/api/session/portals', getToken)
       .then((result) => {
-        router.replace((result.data?.count ?? 1) > 1 ? '/portal' : '/(teacher)')
+        router.replace((result.data?.count ?? 1) > 1 ? '/portal' : '/(teacher)/(tabs)')
       })
-      .catch(() => router.replace('/(teacher)'))
+      .catch(() => router.replace('/(teacher)/(tabs)'))
   }, [isLoaded, isSignedIn, router, getToken])
 
   if (isLoaded && !isSignedIn) return <Redirect href="/(auth)/sign-in" />

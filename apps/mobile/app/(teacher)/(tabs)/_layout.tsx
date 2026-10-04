@@ -28,7 +28,7 @@
 
 import type { JSX } from 'react'
 import { Tabs } from 'expo-router'
-import { DrawerToggleButton } from 'expo-router/build/react-navigation/drawer'
+import { DrawerToggleButton } from 'expo-router/drawer'
 import { CalendarCheck, ClipboardList, FolderOpen, LayoutGrid, WandSparkles } from 'lucide-react-native'
 import { View } from 'react-native'
 
@@ -45,8 +45,9 @@ export default function TeacherTabs(): JSX.Element {
     them is the thing a drawer exists to avoid. The swipe works too, but a visible
     control is what tells somebody it is there.
 
-    expo-router's own `DrawerToggleButton` rather than dispatching a navigation action:
-    importing `@react-navigation/native` is a hard bundling error as of SDK 56.
+    `DrawerToggleButton` from `expo-router/drawer` — the public entry. Importing
+    `@react-navigation/native` is a hard bundling error as of SDK 56, and the internal
+    `expo-router/build/...` path bundles but does not initialise on device.
   */
   const drawerButton = (): JSX.Element => <DrawerToggleButton tintColor={c.text} />
 

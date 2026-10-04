@@ -90,7 +90,7 @@ export default function SignIn(): JSX.Element {
 
       if (attempt.status === 'complete') {
         await setActive?.({ session: attempt.createdSessionId })
-        router.replace('/(teacher)')
+        router.replace('/(teacher)/(tabs)')
         return
       }
 

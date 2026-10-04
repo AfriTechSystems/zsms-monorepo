@@ -33,6 +33,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
+import { SectionNav } from '../../../../../components/ui/section-nav'
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, Receipt } from 'lucide-react'
 
@@ -208,7 +209,16 @@ export default function StudentFeesPage({
           />
 
           <div className="space-y-cards">
-            <Card>
+            {/* Payment history is below the statement and the payment form. */}
+            <SectionNav
+              sections={[
+                { id: 'statement', label: 'Statement' },
+                { id: 'record-payment', label: 'Record a payment' },
+                { id: 'payment-history', label: 'History' },
+              ]}
+            />
+
+            <Card id="statement" className="scroll-mt-20">
               <CardHeader>
                 <CardTitle>Statement</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -273,6 +283,7 @@ export default function StudentFeesPage({
 
             {data.canRecord ? (
               <FormSection
+                id="record-payment"
                 title="Record a payment"
                 description="Recorded now, confirmed by whoever checks the bank. The balance moves on verification, not here."
               >
@@ -407,7 +418,7 @@ export default function StudentFeesPage({
             )}
 
             {data.payments.length > 0 && (
-              <Card>
+              <Card id="payment-history" className="scroll-mt-20">
                 <CardHeader>
                   <CardTitle>Payment history</CardTitle>
                 </CardHeader>

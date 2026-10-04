@@ -25,6 +25,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
+import { SectionNav } from '../../../../components/ui/section-nav'
 import { use, useCallback, useState } from 'react'
 import { Loader2, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
 
@@ -114,6 +115,7 @@ function InviteForm({ roles, onSent }: { roles: string[]; onSent: () => void }):
 
   return (
     <FormSection
+      id="invite-someone"
       title="Invite someone"
       description="They receive an email, choose a password, and land in this school with the role you pick."
     >
@@ -265,6 +267,16 @@ export default function StaffPage({
         note="A person needs a ROLE to sign in and a STAFF RECORD to appear on registers and mark sheets. Inviting someone creates the first; the second is filled in separately. Removing access never deletes their record or the work attached to it."
       />
 
+      {/* The invite form sits below both lists, so inviting somebody means scrolling
+          past every member of staff to reach it. */}
+      <SectionNav
+        sections={[
+          { id: 'on-the-staff', label: 'On the staff' },
+          { id: 'invited', label: 'Invited' },
+          { id: 'invite-someone', label: 'Invite someone' },
+        ]}
+      />
+
       {/* Renders nothing when there are none — see the component. Placed above the
           staff list because an unanswered request is the thing on this screen that
           somebody is waiting on. */}
@@ -316,7 +328,7 @@ export default function StaffPage({
             </Alert>
           )}
 
-          <Card>
+          <Card id="on-the-staff" className="scroll-mt-20">
             <CardHeader>
               <CardTitle>On the staff</CardTitle>
               <p className="text-sm text-muted-foreground">
@@ -453,7 +465,7 @@ export default function StaffPage({
           </Card>
 
           {canManage && data.invitations.length > 0 && (
-            <Card>
+            <Card id="invited" className="scroll-mt-20">
               <CardHeader>
                 <CardTitle>Invited, not yet joined</CardTitle>
                 <p className="text-sm text-muted-foreground">

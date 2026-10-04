@@ -24,6 +24,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
+import { SectionNav } from '../../../../components/ui/section-nav'
 import { useCallback, useState } from 'react'
 import { use } from 'react'
 import {
@@ -497,8 +498,20 @@ export default function AdminSchoolDetailPage({
             }
           />
 
+          {/* The longest screen in the product: an operator looking for the override
+              table scrolls past onboarding and the whole feature matrix to reach it. */}
+          <SectionNav
+            sections={[
+              { id: 'at-a-glance', label: 'At a glance' },
+              { id: 'onboarding', label: 'Onboarding' },
+              { id: 'feature-access', label: 'Feature access' },
+              { id: 'overrides', label: 'Overrides' },
+              { id: 'impersonation', label: 'Impersonation' },
+            ]}
+          />
+
           <div className="space-y-cards">
-            <Card>
+            <Card id="at-a-glance" className="scroll-mt-20">
               <CardContent className="pt-card">
                 <dl className="grid grid-cols-2 gap-stack lg:grid-cols-4">
                   <div>
@@ -547,16 +560,18 @@ export default function AdminSchoolDetailPage({
               </CardContent>
             </Card>
 
-            <OnboardingPanel
-              schoolId={data.school.id}
-              schoolCode={data.school.school_id}
-              status={data.school.status}
-              isProvisioned={data.isProvisioned}
-              onboarding={data.onboarding}
-              checklist={data.checklist}
-              progress={data.progress}
-              onChanged={reload}
+            <div id="onboarding" className="scroll-mt-20">
+                <OnboardingPanel
+                schoolId={data.school.id}
+                schoolCode={data.school.school_id}
+                status={data.school.status}
+                isProvisioned={data.isProvisioned}
+                onboarding={data.onboarding}
+                checklist={data.checklist}
+                progress={data.progress}
+                onChanged={reload}
             />
+            </div>
 
             <SubscriptionPanel school={data.school} onSaved={reload} />
 
@@ -568,7 +583,7 @@ export default function AdminSchoolDetailPage({
                 because AfriTech has no organisation of its own to resolve from. */}
             <SettingsHistory schoolId={data.school.id} />
 
-            <Card>
+            <Card id="feature-access" className="scroll-mt-20">
               <CardHeader>
                 <CardTitle>Resolved feature access</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -625,7 +640,7 @@ export default function AdminSchoolDetailPage({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card id="overrides" className="scroll-mt-20">
               <CardHeader>
                 <CardTitle>Overrides</CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -718,7 +733,7 @@ export default function AdminSchoolDetailPage({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card id="impersonation" className="scroll-mt-20">
               <CardHeader>
                 <CardTitle>Impersonation</CardTitle>
               </CardHeader>

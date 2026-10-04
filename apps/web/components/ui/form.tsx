@@ -81,12 +81,15 @@ export function FormGrid({
  * padding in another.
  */
 export function FormSection({
+  id,
   title,
   description,
   actions,
   className,
   children,
 }: {
+  /** Anchors the section so `SectionNav` can jump to it. */
+  id?: string
   title?: string
   description?: ReactNode
   /** Rendered on the title row — badges, counts, a secondary action. */
@@ -95,7 +98,15 @@ export function FormSection({
   children: ReactNode
 }): JSX.Element {
   return (
-    <section className={cn('rounded-lg border border-border bg-card text-card-foreground', className)}>
+    <section
+      id={id}
+      // Clears the sticky `SectionNav` when jumped to; harmless when there is none.
+      className={cn(
+        'rounded-lg border border-border bg-card text-card-foreground',
+        id && 'scroll-mt-20',
+        className,
+      )}
+    >
       {(title || description || actions) && (
         <div className="flex flex-col gap-1.5 p-card pb-0">
           {(title || actions) && (

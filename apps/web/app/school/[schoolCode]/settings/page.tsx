@@ -33,6 +33,7 @@ import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
+import { SectionNav } from '../../../../components/ui/section-nav'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { SettingsHistory } from '../../../../components/ui/settings-history'
@@ -192,9 +193,19 @@ export default function SchoolSettingsPage(): JSX.Element {
         note="Your subscription tier and school identifier are shown but cannot be changed here — AfriTech sets the first, and the second appears inside every pupil number and receipt ever issued."
       />
 
+      {/* Three sections on one screen, the third below two long forms. Without this
+          nothing tells somebody that term dates are even here. */}
+      <SectionNav
+        sections={[
+          { id: 'school-profile', label: 'School profile' },
+          { id: 'academic-structure', label: 'Academic structure' },
+          { id: 'term-dates', label: 'Term dates' },
+        ]}
+      />
+
       <div className="space-y-cards">
         {/* ---------------- Profile ---------------- */}
-        <Card>
+        <Card id="school-profile" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>School profile</CardTitle>
             <CardDescription>
@@ -374,7 +385,7 @@ export default function SchoolSettingsPage(): JSX.Element {
         </Card>
 
         {/* ---------------- Academic structure ---------------- */}
-        <Card>
+        <Card id="academic-structure" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Academic structure</CardTitle>
             <CardDescription>
@@ -467,7 +478,7 @@ export default function SchoolSettingsPage(): JSX.Element {
         </Card>
 
         {/* ---------------- Term dates ---------------- */}
-        <Card>
+        <Card id="term-dates" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Term dates</CardTitle>
             <CardDescription>

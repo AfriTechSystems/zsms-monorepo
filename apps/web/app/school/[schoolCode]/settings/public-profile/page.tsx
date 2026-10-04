@@ -28,6 +28,7 @@
  */
 
 import type { JSX } from 'react'
+import { SectionNav } from '../../../../../components/ui/section-nav'
 import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { BadgeCheck, ExternalLink, Eye, EyeOff } from 'lucide-react'
@@ -165,7 +166,18 @@ export default function PublicProfileSettingsPage({
 
       {!error && data && (
         <div className="space-y-cards">
+          {/* Four sections, and Facilities sits below three long forms. */}
+          <SectionNav
+            sections={[
+              { id: 'listing-status', label: 'Status' },
+              { id: 'verified', label: 'Verified by ZSMS' },
+              { id: 'fees', label: 'Fees' },
+              { id: 'facilities', label: 'Facilities' },
+            ]}
+          />
+
           <FormSection
+            id="listing-status"
             title={published ? 'Your extra details are live' : 'Your extra details are hidden'}
             description={
               published
@@ -198,6 +210,7 @@ export default function PublicProfileSettingsPage({
           </FormSection>
 
           <FormSection
+            id="verified"
             title="Verified by ZSMS"
             description="We calculate these from your own pupil and staff records — you cannot edit them, and neither can we. Choose which to show."
           >
@@ -260,6 +273,7 @@ export default function PublicProfileSettingsPage({
           </FormSection>
 
           <FormSection
+            id="fees"
             title="Fees"
             description="A range parents should expect, in your own words. We do not read this from your fee structures, and we do not label it as verified."
           >
@@ -311,6 +325,7 @@ export default function PublicProfileSettingsPage({
           </FormSection>
 
           <FormSection
+            id="facilities"
             title="Facilities"
             description="Shown as a list on your page, and parents can filter on boarding and transport."
           >

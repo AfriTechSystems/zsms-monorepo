@@ -29,6 +29,7 @@
  */
 
 import type { JSX } from 'react'
+import { SectionNav } from '../../../components/ui/section-nav'
 import { useCallback, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, Play, Receipt, Send, Wallet, X } from 'lucide-react'
 
@@ -185,6 +186,15 @@ export default function AdminBillingPage(): JSX.Element {
         note="This is AfriTech's revenue, not a school's fee income — separate money in separate tables. A run creates drafts; issuing is what sends a bill, and only an issued invoice can take a payment. Payments are money that has already arrived, recorded here with its bank or mobile-money reference."
       />
 
+      {/* Recording a payment means scrolling past the billing run every time. */}
+      <SectionNav
+        sections={[
+          { id: 'run-billing', label: 'Run billing' },
+          { id: 'record-payment', label: 'Record a payment' },
+          { id: 'invoices', label: 'Invoices' },
+        ]}
+      />
+
       <div className="space-y-cards">
         {/* First, loudest. A silently skipped school is lost revenue. */}
         {problems.length > 0 && (
@@ -251,6 +261,7 @@ export default function AdminBillingPage(): JSX.Element {
         </div>
 
         <FormSection
+          id="run-billing"
           title="Run billing"
           description="Creates one draft invoice per active school for the period. Safe to repeat — schools already invoiced are skipped."
         >
@@ -303,6 +314,7 @@ export default function AdminBillingPage(): JSX.Element {
         </FormSection>
 
         <FormSection
+          id="record-payment"
           title="Record a payment"
           description="Money that has already arrived. This does not take a payment — there is no gateway here yet."
         >
@@ -388,7 +400,7 @@ export default function AdminBillingPage(): JSX.Element {
           </FormActions>
         </FormSection>
 
-        <Card>
+        <Card id="invoices" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Invoices</CardTitle>
           </CardHeader>

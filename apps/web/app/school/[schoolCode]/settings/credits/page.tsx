@@ -28,6 +28,7 @@
  */
 
 import type { JSX } from 'react'
+import { SectionNav } from '../../../../../components/ui/section-nav'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
@@ -224,9 +225,19 @@ function CreditsScreen(): JSX.Element {
         description="Buy credits for your teachers and choose who gets them. Each teacher's credits are their own — one teacher cannot spend another's."
       />
 
+      {/* Four sections, and the one that says who holds credits is last. */}
+      <SectionNav
+        sections={[
+          { id: 'in-force', label: 'In force' },
+          { id: 'buy-credits', label: 'Buy' },
+          { id: 'assign-credits', label: 'Assign' },
+          { id: 'who-holds', label: 'Who holds them' },
+        ]}
+      />
+
       {/* ---- What is in force right now ---- */}
       {live ? (
-        <Card>
+        <Card id="in-force" className="scroll-mt-20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Coins aria-hidden="true" className="size-5 text-primary" />
@@ -262,7 +273,7 @@ function CreditsScreen(): JSX.Element {
 
       {/* ---- Buy ---- */}
       {data.canBuy && (
-        <Card>
+        <Card id="buy-credits" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Buy credits</CardTitle>
             <CardDescription>
@@ -347,7 +358,7 @@ function CreditsScreen(): JSX.Element {
 
       {/* ---- Assign ---- */}
       {live && data.canBuy && (
-        <Card>
+        <Card id="assign-credits" className="scroll-mt-20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users aria-hidden="true" className="size-5 text-primary" />
@@ -444,7 +455,7 @@ function CreditsScreen(): JSX.Element {
 
       {/* ---- Who holds credits now ---- */}
       {assignments.length > 0 && (
-        <Card>
+        <Card id="who-holds" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Teachers with credits</CardTitle>
           </CardHeader>

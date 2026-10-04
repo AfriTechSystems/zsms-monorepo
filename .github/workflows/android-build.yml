@@ -1,0 +1,140 @@
+# Build an installable Android APK of the ZSMS mobile app.
+#
+# ## Why here rather than EAS
+#
+# This needs no Expo account, no build queue and no Android Studio on anybody's laptop.
+# GitHub's Ubuntu runners already ship the Android SDK and a JDK, which is the whole of
+# what a React Native build wants. The APK comes out as a workflow artifact.
+#
+# ## Why a development build at all
+#
+# Expo Go cannot run this app's native modules. Push notifications were removed from it
+# in SDK 53, so the account screen's notification control can never work there whatever
+# we fix. A development build is our own binary containing our exact native modules,
+# with the same fast-refresh experience — installed once, and only rebuilt when a native
+# package is added or upgraded.
+#
+# ## Run it by hand
+#
+# Actions → "Android development build" → Run workflow. It is deliberately not on push:
+# a ten-minute build on every commit would be waste, and the APK only needs rebuilding
+# when the native side changes.
+
+name: Android development build
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Which build to produce'
+        type: choice
+        default: development
+        options:
+          # Connects to a Metro server you run with `npx expo start --dev-client`.
+          # This is the one for day-to-day testing.
+          - development
+          # Self-contained: the JavaScript is bundled in. Slower to build, nothing to
+          # run alongside it — for handing to somebody who is not a developer.
+          - standalone
+
+# Only one build at a time; a second run supersedes the first rather than queueing
+# behind it, because an APK from a commit you have moved past is of no use.
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    # Gradle on a cold cache is slow, and failing at 60 minutes tells you nothing the
+    # log does not already say.
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          # React Native 0.86's Gradle plugin needs 17. The runner has several; this
+          # pins the one Gradle will use rather than inheriting whatever is default.
+          java-version: '17'
+          distribution: temurin
+
+      - name: Install dependencies
+        # `npm ci` so the lockfile decides, and the native-module versions the overrides
+        # pin are exactly the ones that get built. An `npm install` here could resolve
+        # differently from the laptop that tested the change.
+        run: npm ci
+
+      - name: Write the app's environment
+        # These are inlined into the bundle at build time, so they have to exist before
+        # prebuild runs. A Clerk PUBLISHABLE key is public by design — it ships in every
+        # client — but it lives in a repository secret anyway so it is set in one place.
+        working-directory: apps/mobile
+        run: |
+          {
+            echo "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
+            echo "EXPO_PUBLIC_API_URL=${{ vars.EXPO_PUBLIC_API_URL }}"
+          } > .env
+          echo "Wrote .env with ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && 'a Clerk key' || 'NO Clerk key — sign-in will fail' }}"
+
+      - name: Generate the native project
+        # `android/` is not in the repository: it is generated from app.json, so what
+        # ships always matches the configuration rather than a committed copy somebody
+        # forgot to regenerate. `--clean` because a cached one would defeat that.
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --clean
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/package.json', 'package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x ./gradlew
+          if [ "${{ inputs.variant }}" = "standalone" ]; then
+            # Release, but signed with the debug key — installable for testing without
+            # a keystore. Not for the Play Store; that needs a real signing key.
+            ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+          else
+            ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a
+          fi
+
+      # arm64-v8a alone: every Android phone made in the last several years is arm64,
+      # and building all four ABIs roughly quadruples both the time and the APK size.
+
+      - name: Find the APK
+        id: apk
+        working-directory: apps/mobile/android
+        run: |
+          APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
+          if [ -z "$APK" ]; then
+            echo "No APK was produced — the Gradle step above will say why."
+            exit 1
+          fi
+          echo "path=apps/mobile/android/$APK" >> "$GITHUB_OUTPUT"
+          echo "Built $(du -h "$APK" | cut -f1): $APK"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: zsms-${{ inputs.variant }}-${{ github.sha }}
+          path: ${{ steps.apk.outputs.path }}
+          # Long enough to keep testing against, short enough not to accumulate.
+          retention-days: 14
+          if-no-files-found: error

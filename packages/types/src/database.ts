@@ -670,6 +670,48 @@ export type Database = {
         }
         Relationships: []
       }
+      data_erasure_requests: {
+        Row: {
+          action_after: string
+          email: string | null
+          id: string
+          reason: string | null
+          requested_at: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          subject_kind: string
+          user_id: string
+        }
+        Insert: {
+          action_after: string
+          email?: string | null
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject_kind: string
+          user_id: string
+        }
+        Update: {
+          action_after?: string
+          email?: string | null
+          id?: string
+          reason?: string | null
+          requested_at?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject_kind?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       exam_results: {
         Row: {
           academic_year: string
@@ -5400,6 +5442,17 @@ export type Database = {
           out_student_uuid: string
         }[]
       }
+      my_erasure_status: {
+        Args: never
+        Returns: {
+          out_action_after: string
+          out_blocked_why: string
+          out_can_request: boolean
+          out_pending: boolean
+          out_requested_at: string
+          out_retain_years: number
+        }[]
+      }
       my_network_access: {
         Args: never
         Returns: {
@@ -5566,6 +5619,7 @@ export type Database = {
           students_total: number
         }[]
       }
+      platform_setting: { Args: { p_key: string }; Returns: string }
       promote_students: {
         Args: { p_dry_run?: boolean }
         Returns: {
@@ -5708,6 +5762,14 @@ export type Database = {
           out_id: string
           out_school_id: string
           out_trial_ends_at: string
+        }[]
+      }
+      request_my_erasure: {
+        Args: { p_reason?: string }
+        Returns: {
+          out_action_after: string
+          out_done: boolean
+          out_message: string
         }[]
       }
       request_parent_link_by_phone: {
@@ -6289,6 +6351,13 @@ export type Database = {
       wcag_contrast_ratio: {
         Args: { p_a: string; p_b: string }
         Returns: number
+      }
+      withdraw_my_erasure: {
+        Args: never
+        Returns: {
+          out_done: boolean
+          out_message: string
+        }[]
       }
       withdraw_school_link_request: {
         Args: { p_request_id: string }

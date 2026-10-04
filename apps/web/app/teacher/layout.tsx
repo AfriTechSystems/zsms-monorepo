@@ -23,6 +23,7 @@ import type { JSX, ReactNode } from 'react'
 
 import { SignedIn, SignedOut } from '@zsms/auth-provider/react'
 
+import { NotificationBell } from '../../components/ui/notification-bell'
 import { AccountMenu } from '../../components/ui/account-menu'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { TeacherShell } from './teacher-shell'
@@ -66,7 +67,8 @@ export default function TeacherHubLayout({ children }: { children: ReactNode }):
           headerActions={
             <>
               <ThemeToggle />
-              <AccountMenu />
+              <NotificationBell endpoint="/api/session/notices" />
+            <AccountMenu />
             </>
           }
         >

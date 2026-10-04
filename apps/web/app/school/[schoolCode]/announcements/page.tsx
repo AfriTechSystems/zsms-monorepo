@@ -259,14 +259,23 @@ export default function AnnouncementsPage(): JSX.Element {
         return
       }
 
+      /*
+        "Queued" was wrong and was reported as a bug.
+
+        In-app delivery is immediate — the notice is in the portal and the phone app the
+        moment it is saved — so saying "queued" described a wait that does not exist.
+        What IS queued is the external half, and only when a channel was asked for.
+      */
+      const wantsExternal = extraChannels.length > 0
       toast(
         action === 'draft'
           ? 'Saved as a draft. Nothing has gone out.'
-          : data?.deliveryConfigured
-            ? 'Queued for sending.'
-            : // The honest message on a machine that cannot deliver.
-              'Queued — but message delivery is not set up here, so it will not go out yet.',
-        action !== 'draft' && !data?.deliveryConfigured ? 'danger' : 'success',
+          : action === 'schedule'
+            ? 'Scheduled. It will appear at the time you set.'
+            : wantsExternal && !data?.deliveryConfigured
+              ? 'Sent — it is in the portal and the app now. WhatsApp, SMS and email are not switched on, so nothing went to phones.'
+              : 'Sent. It is in the portal and the app now.',
+        'success',
       )
 
       setTitle('')

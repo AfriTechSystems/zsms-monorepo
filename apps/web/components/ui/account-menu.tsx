@@ -46,14 +46,14 @@
  */
 
 import type { JSX } from 'react'
+import Link from 'next/link'
 import { useState } from 'react'
-import { Loader2, LogOut } from 'lucide-react'
+import { Loader2, LogOut, UserCog } from 'lucide-react'
 
 import { SignOutButton, useAuth, useOrganizationList } from '@zsms/auth-provider/react'
 
 import { cn } from '../../lib/utils'
 import { PortalSwitch } from './portal-switch'
-import { DownloadMyData } from './download-my-data'
 import { clearAllDrafts } from '../../lib/use-form-draft'
 
 export function AccountMenu({ className }: { className?: string }): JSX.Element | null {
@@ -127,11 +127,27 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
       */}
       <PortalSwitch />
 
-      {/* The right to portability (ZDPA), self-service. `export_my_data()` resolves the
-          caller from the token and takes no identifier, so it works for a parent, a
-          member of staff or a Hub teacher alike — which is why it belongs here rather
-          than in one portal. */}
-      <DownloadMyData />
+      {/*
+        Was a "My data" button here, and that was the wrong place.
+
+        A download that erases nothing and a request that erases EVERYTHING should not
+        be one click apart in a top bar, and neither can be explained in a tooltip. Both
+        now live on `/account`, with what is kept and for how long stated above the
+        button. One page for every portal, because these rights belong to a person
+        rather than a role — the same account can be a parent at one school and a
+        teacher at another, and that is one data subject.
+      */}
+      <Link
+        href="/account"
+        className={cn(
+          'inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-md border border-border',
+          'px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground',
+        )}
+      >
+        <UserCog aria-hidden="true" className="size-4 shrink-0" />
+        <span className="hidden sm:inline">Account</span>
+        <span className="sr-only sm:hidden">Account</span>
+      </Link>
 
       <SignOutButton redirectUrl="/sign-in">
         <button

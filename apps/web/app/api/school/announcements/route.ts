@@ -290,10 +290,32 @@ export async function POST(request: NextRequest): Promise<Response> {
         // than a constraint violation.
         channels: Array.from(new Set(['in_app', ...(v.channels ?? [])])),
         created_by: caller.userId,
-        // 'sending' and 'sent' are the worker's to set. An API that wrote 'sent'
-        // would be asserting a delivery it has not performed.
-        status: v.action === 'draft' ? 'draft' : 'scheduled',
+        /*
+          Sent now means SENT, because in-app delivery needs no queue.
+
+          This used to write 'scheduled' and wait for a worker, and
+          `/api/session/notices` only returns `status = 'sent'` — so an announcement a
+          head teacher had just sent was invisible in the parent portal and the phone
+          app, for ever, and the screen said "Queued". That was the report.
+
+          A notice is readable the instant the row exists; there is nothing for a queue
+          to do. The old comment said writing 'sent' would assert a delivery that had
+          not happened, and for WhatsApp that is true — those jobs are still the
+          worker's, counted in `whatsapp_jobs_queued`, and the composer labels every
+          external channel as not switched on. For the in-app channel the row IS the
+          delivery.
+
+          A future-dated announcement stays 'scheduled': it genuinely has not been sent.
+        */
+        status:
+          v.action === 'draft'
+            ? 'draft'
+            : v.action === 'now'
+              ? 'sent'
+              : 'scheduled',
         scheduled_at: scheduledAt,
+        // The CHECK on this table requires `sent_at` whenever status is 'sent'.
+        sent_at: v.action === 'now' ? new Date().toISOString() : null,
       })
       .select('id, title, status, scheduled_at, target_audience, target_scope, created_at')
       .maybeSingle()

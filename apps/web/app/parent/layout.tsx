@@ -31,6 +31,7 @@
 
 import type { JSX, ReactNode } from 'react'
 
+import { NotificationBell } from '../../components/ui/notification-bell'
 import { AccountMenu } from '../../components/ui/account-menu'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { ParentShell } from './parent-shell'
@@ -45,6 +46,7 @@ export default function ParentLayout({ children }: { children: ReactNode }): JSX
         headerActions={
           <>
             <ThemeToggle />
+            <NotificationBell endpoint="/api/parent/notices" allHref="/parent/notices" />
             <AccountMenu />
           </>
         }

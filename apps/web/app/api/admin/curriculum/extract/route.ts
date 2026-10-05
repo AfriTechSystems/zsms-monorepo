@@ -101,15 +101,6 @@ export async function POST(request: Request): Promise<Response> {
     const session = await getAuthProvider().getSessionUser()
     if (!session) return fail('UNAUTHORIZED', 'Authentication required.')
 
-    if (!liveGenerationEnabled()) {
-      // Named plainly. The alternative is an operator uploading a file and getting an empty table
-      // with no idea that the model was never switched on.
-      return fail(
-        'SERVER_ERROR',
-        'AI extraction is switched off. Set AI_GENERATOR=live to enable it.',
-      )
-    }
-
     const form = await request.formData().catch(() => null)
     if (!form) return fail('VALIDATION_ERROR', 'Send the file as multipart form data.')
 
@@ -192,6 +183,30 @@ export async function POST(request: Request): Promise<Response> {
 
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    /*
+      Is live generation switched on?
+
+      Read from the database (`0210`) rather than from `AI_GENERATOR`, so AfriTech can
+      turn extraction on for ten minutes to import a syllabus and off again without a
+      deployment. The environment variable is now only a ceiling: `AI_GENERATOR=off`
+      forces this false whatever the toggle says.
+
+      Checked AFTER the client exists, which is why this gate moved down the function —
+      there is nothing to ask before that line.
+    */
+    const live = await client.rpc('ai_live_generation')
+    if (live.error) return fromPostgrestError(live.error)
+
+    if (!liveGenerationEnabled(live.data === true)) {
+      // Named plainly, and now naming the remedy a person can actually act on. The
+      // alternative is an operator uploading a file and getting an empty table with no
+      // idea the model was never switched on.
+      return fail(
+        'CONFLICT',
+        'AI extraction is switched off. Turn it on under Admin → AI, then try again.',
+      )
+    }
 
     const cfg = await client.rpc('ai_generation_config', { p_feature_key: 'ai_lesson_planner' })
     if (cfg.error) return fromPostgrestError(cfg.error)

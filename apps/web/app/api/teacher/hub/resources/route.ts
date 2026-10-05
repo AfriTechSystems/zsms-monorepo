@@ -160,7 +160,18 @@ export async function POST(request: Request): Promise<Response> {
 
     let liveConfig: LiveGeneratorConfig | null = null
 
-    if (liveGenerationEnabled()) {
+    /*
+      The platform AI toggle (`0210`), rather than `AI_GENERATOR`.
+
+      A failure reading it degrades to the template generator instead of failing the
+      request — a teacher gets a structured plan rather than an error, which is a
+      working product. Treated as off, the conservative direction, because the other
+      way round spends money on a flag nobody could read.
+    */
+    const liveRead = await client.rpc('ai_live_generation')
+    const liveFlag = liveRead.error ? false : liveRead.data === true
+
+    if (liveGenerationEnabled(liveFlag)) {
       const cfg = await client.rpc('ai_generation_config', { p_feature_key: feature })
       const config = cfg.data as {
         models?: LiveGeneratorConfig['models']
@@ -245,7 +256,9 @@ export async function POST(request: Request): Promise<Response> {
       questionStyle: body.questionStyle,
       difficulty: body.difficulty,
       context: body.context,
-    }, liveConfig).catch((error: unknown) => {
+      // The toggle is passed too: omitting it means OFF, so without this the generator
+      // would silently fall back to the scaffold even with a config resolved.
+    }, liveConfig, liveFlag).catch((error: unknown) => {
       /**
        * Every provider failed. The chain has already raised the incident, so the teacher is
        * told the one thing that matters to them: nothing was generated and nothing was charged.

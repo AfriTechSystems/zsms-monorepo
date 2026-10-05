@@ -126,6 +126,9 @@ export function AdminShell({
       // curriculum store does not stop generation, it makes it ungrounded and uncited.
       label: 'AI',
       items: [
+        // The switch first: whether AI runs at all is the question asked before any
+        // question about what it is grounded in.
+        { path: '/ai', label: 'AI settings', icon: Sparkles },
         { path: '/curriculum', label: 'Curriculum', icon: BookMarked },
       ],
     },

@@ -57,6 +57,17 @@ export async function GET(): Promise<Response> {
 
     const payload = (data ?? { account: null, entitlement: null, plans: [] }) as HubPayload
 
+    /*
+      The platform AI toggle (`0210`).
+
+      A failure here is NOT fatal: the Hub still works with the template generator, and
+      refusing to render a teacher's dashboard because one flag could not be read would
+      be a worse outcome than understating what the generator does. Unreadable is
+      treated as off, which is the conservative direction.
+    */
+    const liveRead = await client.rpc('ai_live_generation')
+    const liveFlag = liveRead.error ? false : liveRead.data
+
     return ok({
       ...payload,
       /**
@@ -75,7 +86,13 @@ export async function GET(): Promise<Response> {
        * AI-written" notice, because a teacher paying for AI planning who is handed a scaffold
        * unlabelled has been misled.
        */
-      modelBacked: liveGenerationEnabled(),
+      /*
+        Whether this teacher's generator is actually model-backed.
+
+        Resolved from the database toggle (`0210`), so a Hub screen stops promising AI
+        the moment AfriTech switches it off — rather than at the next deployment.
+      */
+      modelBacked: liveGenerationEnabled(liveFlag === true),
     })
   })
 }

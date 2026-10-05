@@ -59,9 +59,42 @@ import { createLiveGenerator, type LiveGeneratorConfig } from './providers/live'
 
 export { templateGenerator }
 
-/** Whether configuration permits the model chain to run at all. */
-export function liveGenerationEnabled(): boolean {
-  return process.env.AI_GENERATOR?.trim().toLowerCase() === 'live'
+/**
+ * Whether the ENVIRONMENT forbids live generation outright.
+ *
+ * `AI_GENERATOR=off` is a ceiling, not a switch. It exists so an instance that must
+ * never call a model — a staging deployment sharing production keys, a developer's
+ * machine — cannot be switched on from a web page by somebody who does not know which
+ * environment they are looking at.
+ *
+ * Anything else, including unset, leaves the decision to the database.
+ */
+export function liveGenerationForbidden(): boolean {
+  return process.env.AI_GENERATOR?.trim().toLowerCase() === 'off'
+}
+
+/**
+ * Whether configuration permits the model chain to run at all.
+ *
+ * `enabled` comes from `public.ai_live_generation()` — the toggle AfriTech moves from
+ * the admin dashboard (migration `0210`). This package has no database client, so the
+ * caller resolves it and passes it in.
+ *
+ * ## It used to read the environment variable alone
+ *
+ * `AI_GENERATOR=live` was a DEPLOYMENT setting, which is the wrong grain for a switch
+ * whose purpose is operational: "stop spending money right now" should not wait for a
+ * build, and neither should "the curriculum importer needs the model for ten minutes".
+ * It was also invisible — nothing in the product said whether AI was on, so the answer
+ * lived in a file one person could read.
+ *
+ * Omitting `enabled` is treated as OFF rather than as "ask the environment". A caller
+ * that forgets to resolve the flag must degrade to the template scaffold, which is a
+ * working product, rather than start spending because a variable happened to be set.
+ */
+export function liveGenerationEnabled(enabled?: boolean): boolean {
+  if (liveGenerationForbidden()) return false
+  return enabled === true
 }
 
 /**
@@ -72,8 +105,11 @@ export function liveGenerationEnabled(): boolean {
  * model on, and setting the switch on an environment with no prompt row degrades to a working
  * scaffold rather than to a 500.
  */
-export function resolveGenerator(config?: LiveGeneratorConfig | null): Generator {
-  if (!liveGenerationEnabled()) return templateGenerator
+export function resolveGenerator(
+  config?: LiveGeneratorConfig | null,
+  enabled?: boolean,
+): Generator {
+  if (!liveGenerationEnabled(enabled)) return templateGenerator
 
   if (!config || config.models.length === 0 || !config.prompt) {
     /**
@@ -82,8 +118,9 @@ export function resolveGenerator(config?: LiveGeneratorConfig | null): Generator
      * the `turbo.json` globalEnv gap, where a variable was set and had no effect.
      */
     console.warn(
-      '[@zsms/ai] AI_GENERATOR=live but no model chain or active prompt was supplied. '
-        + 'Falling back to the scaffold. Check afritech.ai_models and ai_prompt_templates.',
+      '[@zsms/ai] Live generation is switched ON but no model chain or active prompt was '
+        + 'supplied. Falling back to the scaffold. Check afritech.ai_models and '
+        + 'ai_prompt_templates.',
     )
     return templateGenerator
   }
@@ -95,8 +132,10 @@ export function resolveGenerator(config?: LiveGeneratorConfig | null): Generator
 export async function generateTeachingResource(
   request: GenerationRequest,
   config?: LiveGeneratorConfig | null,
+  /** From `public.ai_live_generation()`. Omitted means OFF — see above. */
+  enabled?: boolean,
 ): Promise<GenerationResult> {
-  return resolveGenerator(config).generate(request)
+  return resolveGenerator(config, enabled).generate(request)
 }
 
 /**

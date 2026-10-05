@@ -9,6 +9,7 @@
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
 
+import { schoolFeatures } from '../../../../../lib/features'
 import { createUserClient } from '../../../../../lib/supabase'
 import { resolveAdminContext } from '../../../../../lib/admin-context'
 import {
@@ -71,15 +72,23 @@ export async function GET(
 
     if (featureError) return fromPostgrestError(featureError)
 
-    const resolved = await Promise.all(
-      (features ?? []).map(async (f) => {
-        const { data: has } = await client.rpc('school_has_feature', {
-          p_school_id: id,
-          p_feature_key: f.feature_key as string,
-        })
-        return { ...f, enabled: has === true }
-      }),
-    )
+    /*
+      One round trip, not one per feature.
+
+      This loop was 13 PostgREST requests and grew with the catalogue — an N+1 over the
+      network that CLAUDE.md carried as an open item since `0095`. `schoolFeatures()`
+      resolves the whole map through `school_feature_resolution()` (`0215`) and caches it
+      for five minutes.
+
+      The resolution order is unchanged: that function reuses `school_has_feature()`
+      rather than restating it, so this screen cannot disagree with what a gate enforces.
+    */
+    const featureMap = await schoolFeatures(client, id)
+
+    const resolved = (features ?? []).map((f) => ({
+      ...f,
+      enabled: featureMap[f.feature_key as string] === true,
+    }))
 
     // The ceiling is resolved by the same function the enrolment trigger reads,
     // so the number an operator sees here is the number a school will actually

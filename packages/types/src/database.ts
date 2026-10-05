@@ -5226,6 +5226,16 @@ export type Database = {
           out_school_names: string[]
         }[]
       }
+      admin_platform_settings: {
+        Args: never
+        Returns: {
+          out_description: string
+          out_key: string
+          out_updated_at: string
+          out_updated_by: string
+          out_value: string
+        }[]
+      }
       admin_publish_prompt_template: {
         Args: {
           p_change_note?: string
@@ -5311,6 +5321,10 @@ export type Database = {
           out_assigned_to: string
           out_task_status: string
         }[]
+      }
+      admin_set_platform_setting: {
+        Args: { p_key: string; p_reason: string; p_value: string }
+        Returns: string
       }
       admin_set_tier_feature: {
         Args: {
@@ -6376,6 +6390,15 @@ export type Database = {
         Returns: {
           out_decided: boolean
           out_linked: boolean
+        }[]
+      }
+      school_feature_resolution: {
+        Args: { p_school_id: string }
+        Returns: {
+          out_category: string
+          out_display_name: string
+          out_feature_key: string
+          out_included: boolean
         }[]
       }
       school_fee_summary: {

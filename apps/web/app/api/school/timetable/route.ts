@@ -14,6 +14,7 @@
 
 import { z } from 'zod'
 
+import { schoolHasFeature } from '../../../../lib/features'
 import { createUserClient } from '../../../../lib/supabase'
 import { getAuthProvider, type Role } from '@zsms/auth-provider'
 import { can } from '../../../../lib/roles'
@@ -25,6 +26,29 @@ export async function GET(request: Request): Promise<Response> {
   return guard(async () => {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    /*
+      The first real feature gate in ZSMS.
+
+      `timetable` has been in `afritech.feature_flags` since `0095` and nothing has ever
+      consulted it — the three callers of the resolver all did so to DISPLAY what a
+      school has, so a flag could be off and the feature still worked. ADR-014's whole
+      model depends on this check existing.
+
+      A product gate, NOT a security boundary: it decides whether the timetable is sold
+      to this school, and RLS decides which rows they see. A route relying on this for
+      tenant isolation would be bypassable by calling PostgREST directly.
+
+      Checked on the read as well as the write, because a school that has not bought the
+      module should not be shown a grid it cannot use.
+    */
+    if (!(await schoolHasFeature(client, 'timetable'))) {
+      return fail(
+        'FORBIDDEN',
+        'Timetabling is not included in your plan. AfriTech can add it — ask them about the Timetable module.',
+      )
+    }
+
 
     const url = new URL(request.url)
     const timetableId = url.searchParams.get('timetableId')
@@ -129,6 +153,29 @@ export async function POST(request: Request): Promise<Response> {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
 
+    /*
+      The first real feature gate in ZSMS.
+
+      `timetable` has been in `afritech.feature_flags` since `0095` and nothing has ever
+      consulted it — the three callers of the resolver all did so to DISPLAY what a
+      school has, so a flag could be off and the feature still worked. ADR-014's whole
+      model depends on this check existing.
+
+      A product gate, NOT a security boundary: it decides whether the timetable is sold
+      to this school, and RLS decides which rows they see. A route relying on this for
+      tenant isolation would be bypassable by calling PostgREST directly.
+
+      Checked on the read as well as the write, because a school that has not bought the
+      module should not be shown a grid it cannot use.
+    */
+    if (!(await schoolHasFeature(client, 'timetable'))) {
+      return fail(
+        'FORBIDDEN',
+        'Timetabling is not included in your plan. AfriTech can add it — ask them about the Timetable module.',
+      )
+    }
+
+
     const { data, error } = await client
       .rpc('set_timetable_slot', {
         p_timetable_id: parsed.data.timetableId,
@@ -231,6 +278,29 @@ export async function PATCH(request: Request): Promise<Response> {
 
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    /*
+      The first real feature gate in ZSMS.
+
+      `timetable` has been in `afritech.feature_flags` since `0095` and nothing has ever
+      consulted it — the three callers of the resolver all did so to DISPLAY what a
+      school has, so a flag could be off and the feature still worked. ADR-014's whole
+      model depends on this check existing.
+
+      A product gate, NOT a security boundary: it decides whether the timetable is sold
+      to this school, and RLS decides which rows they see. A route relying on this for
+      tenant isolation would be bypassable by calling PostgREST directly.
+
+      Checked on the read as well as the write, because a school that has not bought the
+      module should not be shown a grid it cannot use.
+    */
+    if (!(await schoolHasFeature(client, 'timetable'))) {
+      return fail(
+        'FORBIDDEN',
+        'Timetabling is not included in your plan. AfriTech can add it — ask them about the Timetable module.',
+      )
+    }
+
 
     if (parsed.data.action === 'create') {
       const { data, error } = await client

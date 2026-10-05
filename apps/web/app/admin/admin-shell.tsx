@@ -20,7 +20,21 @@
 
 import type { JSX, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import { BookMarked, Building2, Gauge, HeartPulse, Network, PhoneCall, Receipt, ShieldAlert, Siren, Sparkles, ToggleRight, Wallet } from 'lucide-react'
+import {
+  BookMarked,
+  Building2,
+  Gauge,
+  HeartPulse,
+  Network,
+  PhoneCall,
+  Receipt,
+  ShieldAlert,
+  Siren,
+  SlidersHorizontal,
+  Sparkles,
+  ToggleRight,
+  Wallet,
+} from 'lucide-react'
 
 import { AppShell } from '../../components/layout/app-shell'
 import type { NavGroup } from '../../components/layout/nav-config'
@@ -119,6 +133,14 @@ export function AdminShell({
         { path: '/billing', label: 'Invoices & billing', icon: Receipt },
         { path: '/pricing', label: 'Plans & pricing', icon: Wallet },
         { path: '/features', label: 'Feature matrix', icon: ToggleRight },
+        /*
+          Every platform-wide switch, in one place.
+
+          The AI toggle lived on its own page for a day. Toggles were going to keep
+          arriving — payment gateways, the loan module — and one place to look is worth
+          more than each being perfectly sited.
+        */
+        { path: '/settings', label: 'Platform settings', icon: SlidersHorizontal },
       ],
     },
     {
@@ -126,9 +148,6 @@ export function AdminShell({
       // curriculum store does not stop generation, it makes it ungrounded and uncited.
       label: 'AI',
       items: [
-        // The switch first: whether AI runs at all is the question asked before any
-        // question about what it is grounded in.
-        { path: '/ai', label: 'AI settings', icon: Sparkles },
         { path: '/curriculum', label: 'Curriculum', icon: BookMarked },
       ],
     },

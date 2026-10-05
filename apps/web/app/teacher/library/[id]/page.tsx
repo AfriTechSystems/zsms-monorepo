@@ -24,7 +24,7 @@
 import type { JSX, ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Download, Printer, Trash2 } from 'lucide-react'
+import { Download, Printer, Trash2, Users } from 'lucide-react'
 
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
@@ -94,6 +94,7 @@ export default function ResourcePage(): JSX.Element {
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [format, setFormat] = useState('pdf')
 
   /**
@@ -137,6 +138,39 @@ export default function ResourcePage(): JSX.Element {
     })
     setSavingNotes(false)
     toast(saveError ?? 'Notes saved.', saveError ? 'danger' : 'success')
+  }
+
+  /**
+   * Publish to the Community Library, or withdraw.
+   *
+   * Through `/api/teacher/community` rather than the resource PATCH, because
+   * `share_teaching_resource()` sets `is_shared` and `shared_at` in ONE statement — a
+   * row shared with no share time sorts last in a list ordered by it, forever.
+   *
+   * The message says what other teachers will see. A teacher deciding whether to share
+   * their work is entitled to know that before they do, not after.
+   */
+  const toggleShare = async (): Promise<void> => {
+    if (!resource) return
+    setSharing(true)
+    const { data, error: shareError } = await hubFetch<{ message?: string }>(
+      '/api/teacher/community',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          action: 'share',
+          id: params.id,
+          shared: !resource.is_shared,
+        }),
+      },
+    )
+    setSharing(false)
+    if (shareError) {
+      toast(shareError, 'danger')
+      return
+    }
+    toast(data?.message ?? 'Updated.', 'success')
+    void load()
   }
 
   /**
@@ -378,6 +412,33 @@ export default function ResourcePage(): JSX.Element {
           <p className="text-xs text-muted-text">
             Built by {resource.generator_name} {resource.generator_version}.
           </p>
+          {/*
+            Sharing, beside removing, because both are decisions about where this
+            resource lives rather than about its content.
+          */}
+          <Button
+            variant={resource.is_shared ? 'outline' : 'default'}
+            size="sm"
+            onClick={() => void toggleShare()}
+            disabled={sharing}
+          >
+            <Users className="size-4" aria-hidden />
+            {sharing
+              ? 'Saving…'
+              : resource.is_shared
+                ? 'Withdraw from Community Library'
+                : 'Share to Community Library'}
+          </Button>
+
+          {resource.is_shared && (
+            <p className="text-xs text-muted-text">
+              {/* Said where the decision is made. Other teachers see a first name and
+                  the subject — never a full name, a school or a contact detail. */}
+              Other teachers can see this and copy it. They see your first name and the
+              subject, nothing else.
+            </p>
+          )}
+
           <Button variant="ghost" size="sm" onClick={() => void remove()} disabled={removing}>
             <Trash2 className="size-4" aria-hidden />
             {removing ? 'Removing…' : 'Remove from library'}

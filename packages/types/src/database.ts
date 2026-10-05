@@ -4236,6 +4236,80 @@ export type Database = {
           },
         ]
       }
+      teaching_resource_ratings: {
+        Row: {
+          created_at: string
+          id: string
+          rated_by: string
+          rating: number
+          resource_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          rated_by: string
+          rating: number
+          resource_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          rated_by?: string
+          rating?: number
+          resource_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teaching_resource_ratings_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teaching_resource_uses: {
+        Row: {
+          copy_id: string | null
+          created_at: string
+          id: string
+          source_id: string
+          used_by: string
+        }
+        Insert: {
+          copy_id?: string | null
+          created_at?: string
+          id?: string
+          source_id: string
+          used_by: string
+        }
+        Update: {
+          copy_id?: string | null
+          created_at?: string
+          id?: string
+          source_id?: string
+          used_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teaching_resource_uses_copy_id_fkey"
+            columns: ["copy_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teaching_resource_uses_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teaching_resources: {
         Row: {
           content: Json
@@ -4255,6 +4329,7 @@ export type Database = {
           prompt_template_version: number | null
           resource_kind: string
           school_id: string | null
+          shared_at: string | null
           subject: string
           teacher_notes: string | null
           title: string
@@ -4279,6 +4354,7 @@ export type Database = {
           prompt_template_version?: number | null
           resource_kind: string
           school_id?: string | null
+          shared_at?: string | null
           subject: string
           teacher_notes?: string | null
           title: string
@@ -4303,6 +4379,7 @@ export type Database = {
           prompt_template_version?: number | null
           resource_kind?: string
           school_id?: string | null
+          shared_at?: string | null
           subject?: string
           teacher_notes?: string | null
           title?: string
@@ -5573,6 +5650,51 @@ export type Database = {
           out_message: string
         }[]
       }
+      community_library: {
+        Args: {
+          p_curriculum_type?: string
+          p_grade_level?: string
+          p_limit?: number
+          p_min_rating?: number
+          p_resource_kind?: string
+          p_sort?: string
+          p_subject?: string
+        }
+        Returns: {
+          out_author_first: string
+          out_author_subject: string
+          out_curriculum_type: string
+          out_duration: number
+          out_grade_level: string
+          out_id: string
+          out_my_rating: number
+          out_rating_avg: number
+          out_rating_count: number
+          out_resource_kind: string
+          out_shared_at: string
+          out_subject: string
+          out_title: string
+          out_topic: string
+          out_use_count: number
+        }[]
+      }
+      community_resource: {
+        Args: { p_id: string }
+        Returns: {
+          out_author_first: string
+          out_content: Json
+          out_curriculum_type: string
+          out_duration: number
+          out_grade_level: string
+          out_id: string
+          out_rating_avg: number
+          out_rating_count: number
+          out_resource_kind: string
+          out_subject: string
+          out_title: string
+          out_topic: string
+        }[]
+      }
       complete_generated_document: {
         Args: {
           p_byte_size?: number
@@ -6063,6 +6185,10 @@ export type Database = {
           out_message: string
           out_unstaffed: number
         }[]
+      }
+      rate_teaching_resource: {
+        Args: { p_id: string; p_rating: number }
+        Returns: number
       }
       record_generated_document: {
         Args: {
@@ -6711,6 +6837,10 @@ export type Database = {
           out_slot_id: string
         }[]
       }
+      share_teaching_resource: {
+        Args: { p_id: string; p_shared: boolean }
+        Returns: boolean
+      }
       srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }
       student_in_current_school: {
         Args: { p_student_id: string }
@@ -6833,6 +6963,7 @@ export type Database = {
           out_unlocked: boolean
         }[]
       }
+      use_community_resource: { Args: { p_id: string }; Returns: string }
       verify_payment: {
         Args: { p_decision: string; p_payment_id: string; p_reason?: string }
         Returns: {

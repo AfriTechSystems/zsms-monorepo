@@ -16,7 +16,7 @@
 import type { JSX, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, LayoutDashboard, School, Sparkles, UserCog } from 'lucide-react'
+import { BookOpen, LayoutDashboard, School, Sparkles, UserCog, Users } from 'lucide-react'
 
 import { AppShell } from '../../components/layout/app-shell'
 import type { NavGroup } from '../../components/layout/nav-config'
@@ -63,6 +63,9 @@ export function TeacherShell({
       items: [
         { path: '/create', label: 'Create', icon: Sparkles },
         { path: '/library', label: 'My library', icon: BookOpen },
+        // Other teachers' shared work. Under "Make" rather than its own group,
+        // because taking somebody's plan and editing it IS making one.
+        { path: '/community', label: 'Community Library', icon: Users },
       ],
     },
     {

@@ -46,16 +46,26 @@ export interface PeriodRow {
   order: number
   appliesDays: number[]
   teaching: boolean
+  /** Grades this period belongs to. Empty means every grade. */
+  levels: string[]
+}
+
+export interface GradeLevel {
+  level_id: string
+  display_name: string
+  level_order: number
 }
 
 const hhmm = (t: string): string => t.slice(0, 5)
 
 export function TimetableSetup({
   periods,
+  levels,
   hasTimetable,
   onChanged,
 }: {
   periods: PeriodRow[]
+  levels: GradeLevel[]
   hasTimetable: boolean
   onChanged: () => void
 }): JSX.Element {
@@ -101,6 +111,7 @@ export function TimetableSetup({
         order: editing.order,
         appliesDays: editing.appliesDays,
         teaching: editing.teaching,
+        levels: editing.levels,
       })
       if (result.error) {
         toast(result.error, 'danger')
@@ -207,6 +218,15 @@ export function TimetableSetup({
                         {p.appliesDays.map((d) => DAYS.find((x) => x.n === d)?.short).join(' ')}
                       </Badge>
                     )}
+                    {/* Only when it is NOT every grade — "all grades" on every row is
+                        noise a reader filters out. */}
+                    {p.levels.length > 0 && (
+                      <Badge variant="neutral">
+                        {p.levels
+                          .map((id) => levels.find((l) => l.level_id === id)?.display_name ?? id)
+                          .join(', ')}
+                      </Badge>
+                    )}
                     <span className="ml-auto flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
                         Edit
@@ -239,6 +259,9 @@ export function TimetableSetup({
                   order: (periods.at(-1)?.order ?? 0) + 1,
                   appliesDays: [1, 2, 3, 4, 5],
                   teaching: true,
+                  // Every grade by default, which is what most schools want and what
+                  // every period created before `0206` means.
+                  levels: [],
                 })
               }
             >
@@ -321,6 +344,40 @@ export function TimetableSetup({
                 </div>
               )}
             </Field>
+
+            {levels.length > 0 && (
+              <Field
+                id="p-levels"
+                label="Which grades use this period"
+                hint="Leave all unticked for every grade — most schools run one school day. Tick some when a grade differs, such as primary finishing earlier."
+              >
+                {() => (
+                  <div className="flex flex-wrap gap-2">
+                    {levels.map((l) => (
+                      <label
+                        key={l.level_id}
+                        className="flex min-h-tap cursor-pointer items-center gap-1.5 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-4"
+                          checked={editing.levels.includes(l.level_id)}
+                          onChange={(e) =>
+                            setEditing({
+                              ...editing,
+                              levels: e.target.checked
+                                ? [...editing.levels, l.level_id]
+                                : editing.levels.filter((x) => x !== l.level_id),
+                            })
+                          }
+                        />
+                        {l.display_name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            )}
 
             <label className="flex min-h-tap cursor-pointer items-center gap-2 text-sm">
               <input

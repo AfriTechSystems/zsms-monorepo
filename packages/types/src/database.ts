@@ -4242,6 +4242,7 @@ export type Database = {
       timetable_periods: {
         Row: {
           applies_days: number[]
+          applies_to_levels: string[] | null
           created_at: string
           end_time: string
           id: string
@@ -4254,6 +4255,7 @@ export type Database = {
         }
         Insert: {
           applies_days?: number[]
+          applies_to_levels?: string[] | null
           created_at?: string
           end_time: string
           id?: string
@@ -4266,6 +4268,7 @@ export type Database = {
         }
         Update: {
           applies_days?: number[]
+          applies_to_levels?: string[] | null
           created_at?: string
           end_time?: string
           id?: string
@@ -6163,7 +6166,9 @@ export type Database = {
           out_class_id: string
           out_level_id: string
           out_level_name: string
+          out_level_order: number
           out_pupils: number
+          out_stream: string
         }[]
       }
       school_class_readiness: {
@@ -6389,14 +6394,16 @@ export type Database = {
         }[]
       }
       school_timetable: {
-        Args: { p_timetable_id?: string }
+        Args: { p_class_id?: string; p_timetable_id?: string }
         Returns: {
           out_academic_year: string
           out_applies_days: number[]
+          out_applies_to_levels: string[]
           out_class_id: string
           out_day_of_week: number
           out_end_time: string
           out_name: string
+          out_notes: string
           out_period_id: string
           out_period_name: string
           out_period_order: number
@@ -6526,6 +6533,7 @@ export type Database = {
         Args: {
           p_applies_days?: number[]
           p_end_time: string
+          p_levels?: string[]
           p_name: string
           p_order: number
           p_period_id: string

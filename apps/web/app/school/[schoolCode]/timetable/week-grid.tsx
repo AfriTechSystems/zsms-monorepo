@@ -43,6 +43,8 @@ export interface Period {
   order: number
   teaching: boolean
   appliesDays: number[]
+  /** Grades this period belongs to. Empty means every grade. */
+  levels: string[]
 }
 
 export interface Slot {

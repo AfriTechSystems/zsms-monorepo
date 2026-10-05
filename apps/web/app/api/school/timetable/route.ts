@@ -39,8 +39,13 @@ export async function GET(request: Request): Promise<Response> {
     */
     const classId = url.searchParams.get('classId')
 
-    const [grid, timetables, classes, options] = await Promise.all([
-      client.rpc('school_timetable', { p_timetable_id: timetableId }),
+    const [grid, timetables, classes, levels, options] = await Promise.all([
+      client.rpc('school_timetable', {
+        p_timetable_id: timetableId,
+        // Filters the period rows to the ones this class's GRADE uses — a primary day
+        // often ends two periods before a secondary one.
+        p_class_id: classId,
+      }),
       client
         .from('timetables')
         .select('id, name, academic_year, term_number, is_active, published, published_at')
@@ -49,6 +54,12 @@ export async function GET(request: Request): Promise<Response> {
       // them from slots meant a new timetable had no classes, so no cell could be
       // opened, so no slot could ever be created.
       client.rpc('school_class_list'),
+      // The school's grades, so a period can be scoped to some of them.
+      client
+        .from('school_grade_levels')
+        .select('level_id, display_name, level_order')
+        .eq('is_active', true)
+        .order('level_order', { ascending: true }),
       classId
         ? client.rpc('timetable_slot_options', { p_class_id: classId })
         : Promise.resolve({ data: [], error: null }),
@@ -75,6 +86,7 @@ export async function GET(request: Request): Promise<Response> {
       grid: grid.data ?? [],
       timetables: timetables.data ?? [],
       classes: classes.data ?? [],
+      levels: levels.data ?? [],
       subjects: opts
         .filter((o) => o.out_kind === 'subject')
         .map((o) => ({ id: o.out_id, name: o.out_label, detail: o.out_detail })),
@@ -169,6 +181,15 @@ const patchSchema = z.discriminatedUnion('action', [
     order: z.number().int().min(1).max(99),
     appliesDays: z.array(z.number().int().min(1).max(5)).min(1),
     teaching: z.boolean().default(true),
+    /*
+      Which grades this period belongs to. Omitted or empty means EVERY grade, which
+      is what every period created before `0206` means and what most schools want.
+
+      This is also how "replicate the periods to selected grades" is expressed: one
+      row naming several grades, not a copy per grade. Copies drift — somebody moves
+      lunch for Grade 8 and the identical Grade 9 row is left behind.
+    */
+    levels: z.array(z.string().trim().min(1).max(60)).optional(),
   }),
   z.object({ action: z.literal('deletePeriod'), periodId: z.string().uuid() }),
   z.object({
@@ -214,6 +235,7 @@ export async function PATCH(request: Request): Promise<Response> {
           p_order: parsed.data.order,
           p_applies_days: parsed.data.appliesDays,
           p_teaching: parsed.data.teaching,
+          p_levels: parsed.data.levels?.length ? parsed.data.levels : null,
         })
         .maybeSingle()
 

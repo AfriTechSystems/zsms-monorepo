@@ -44,6 +44,7 @@ import {
   CardTitle,
 } from '../../../../components/ui/card'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
+import { Dialog } from '../../../../components/ui/dialog'
 import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
 import { useToast } from '../../../../components/ui/toast'
 import { apiSend, useApi } from '../../../../lib/use-api'
@@ -63,12 +64,14 @@ interface GridRow {
   out_period_order: number
   out_teaching: boolean
   out_applies_days: number[]
+  out_applies_to_levels: string[] | null
   out_day_of_week: number | null
   out_subject_id: string | null
   out_subject_name: string | null
   out_staff_user_id: string | null
   out_slot_type: string | null
   out_room: string | null
+  out_notes: string | null
 }
 
 interface Option {
@@ -88,7 +91,14 @@ interface Payload {
     is_active: boolean
     published: boolean
   }>
-  classes: Array<{ out_class_id: string; out_pupils: number; out_level_name: string | null }>
+  classes: Array<{
+    out_class_id: string
+    out_pupils: number
+    out_level_name: string | null
+    out_level_order: number | null
+    out_stream: string | null
+  }>
+  levels: Array<{ level_id: string; display_name: string; level_order: number }>
   subjects: Option[]
   staff: Option[]
   canEdit: boolean
@@ -145,6 +155,7 @@ export default function TimetablePage(): JSX.Element {
         order: r.out_period_order,
         teaching: r.out_teaching,
         appliesDays: r.out_applies_days,
+        levels: r.out_applies_to_levels ?? [],
       })
     }
     return [...seen.values()].sort((a, b) => a.order - b.order)
@@ -160,6 +171,7 @@ export default function TimetablePage(): JSX.Element {
         order: p.order,
         appliesDays: p.appliesDays,
         teaching: p.teaching,
+        levels: p.levels,
       })),
     [periods],
   )
@@ -279,6 +291,7 @@ export default function TimetablePage(): JSX.Element {
       {data?.canEdit && (
         <TimetableSetup
           periods={periodRows}
+          levels={data?.levels ?? []}
           hasTimetable={(data?.timetables.length ?? 0) > 0}
           onChanged={reload}
         />
@@ -390,7 +403,7 @@ export default function TimetablePage(): JSX.Element {
                   subjectId: row?.out_subject_id ?? '',
                   staffUserId: row?.out_staff_user_id ?? '',
                   room: row?.out_room ?? '',
-                  notes: '',
+                  notes: row?.out_notes ?? '',
                 })
               }}
             />
@@ -398,16 +411,46 @@ export default function TimetablePage(): JSX.Element {
         </Card>
       )}
 
-      {/* ---- the side panel the spec describes ---- */}
-      {editing && (
-        <Card className="mt-cards">
-          <CardHeader>
-            <CardTitle>
-              {editing.slotId ? 'Edit lesson' : 'Add lesson'} · {shownClass} ·{' '}
-              {DAYS.find((d) => d.n === editing.dayOfWeek)?.label} · {editing.periodName}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-stack">
+      {/*
+        A modal, not a panel below the grid.
+
+        Asked for on 2026-10-05: the editor appeared under the table, so choosing a
+        subject meant losing sight of the cell being edited and scrolling back to check
+        which one it was. `<dialog>` keeps the question and its context together, and
+        brings focus trapping and Escape with it rather than reimplementing them.
+      */}
+      <Dialog
+        open={editing !== null}
+        title={editing?.slotId ? 'Edit lesson' : 'Add lesson'}
+        description={
+          editing
+            ? `${shownClass} · ${DAYS.find((d) => d.n === editing.dayOfWeek)?.label} · ${editing.periodName}`
+            : undefined
+        }
+        onClose={() => setEditing(null)}
+        footer={
+          editing && (
+            <>
+              <Button disabled={busy || !editing.subjectId} onClick={() => void save()}>
+                <Check aria-hidden="true" />
+                {busy ? 'Saving…' : editing.slotId ? 'Save lesson' : 'Add lesson'}
+              </Button>
+              {editing.slotId && (
+                <Button variant="outline" disabled={busy} onClick={() => void clear()}>
+                  <Trash2 aria-hidden="true" />
+                  Clear slot
+                </Button>
+              )}
+              <Button variant="ghost" disabled={busy} onClick={() => setEditing(null)}>
+                <X aria-hidden="true" />
+                Cancel
+              </Button>
+            </>
+          )
+        }
+      >
+        {editing && (
+          <div className="flex flex-col gap-stack">
             <Field
               id="slot-subject"
               label="Subject"
@@ -423,10 +466,10 @@ export default function TimetablePage(): JSX.Element {
                   }
                 >
                   <option value="">Choose a subject</option>
-                  {(data?.subjects ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                      {s.detail ? ` · ${s.detail}` : ''}
+                  {(data?.subjects ?? []).map((sb) => (
+                    <option key={sb.id} value={sb.id}>
+                      {sb.name}
+                      {sb.detail ? ` · ${sb.detail}` : ''}
                     </option>
                   ))}
                 </Select>
@@ -445,10 +488,10 @@ export default function TimetablePage(): JSX.Element {
                   onChange={(e) => setEditing({ ...editing, staffUserId: e.target.value })}
                 >
                   <option value="">Not assigned</option>
-                  {eligibleStaff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name ?? s.id}
-                      {s.detail ? ` · ${s.detail}` : ''}
+                  {eligibleStaff.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.name ?? st.id}
+                      {st.detail ? ` · ${st.detail}` : ''}
                     </option>
                   ))}
                 </Select>
@@ -487,26 +530,9 @@ export default function TimetablePage(): JSX.Element {
                 />
               )}
             </Field>
-
-            <div className="flex flex-wrap gap-2">
-              <Button disabled={busy || !editing.subjectId} onClick={() => void save()}>
-                <Check aria-hidden="true" />
-                {busy ? 'Saving…' : editing.slotId ? 'Save lesson' : 'Add lesson'}
-              </Button>
-              {editing.slotId && (
-                <Button variant="outline" disabled={busy} onClick={() => void clear()}>
-                  <Trash2 aria-hidden="true" />
-                  Clear slot
-                </Button>
-              )}
-              <Button variant="ghost" disabled={busy} onClick={() => setEditing(null)}>
-                <X aria-hidden="true" />
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </Dialog>
 
       {periods.length > 0 && (
         <p className="mt-stack text-sm text-muted-foreground">

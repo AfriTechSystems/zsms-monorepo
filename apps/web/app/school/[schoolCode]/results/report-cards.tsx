@@ -43,6 +43,7 @@ import {
   CardTitle,
 } from '../../../../components/ui/card'
 import { apiSend, useApi } from '../../../../lib/use-api'
+import { DocumentDownload } from '../../../../components/ui/document-download'
 import { useToast } from '../../../../components/ui/toast'
 
 interface Summary {
@@ -66,6 +67,23 @@ export function ReportCards({
 }): JSX.Element {
   const { toast } = useToast()
   const [starting, setStarting] = useState(false)
+
+  /*
+    The cards for this term, refetched alongside the summary.
+
+    Scoped by year and term so a school looking at term 2 is not handed term 1's cards —
+    the worker records both on every row for exactly this.
+  */
+  const { data: docs } = useApi<{
+    documents: Array<{
+      id: string
+      status: string
+      failureReason: string | null
+      studentName: string | null
+    }>
+  }>(
+    `/api/documents?docType=report_card&academicYear=${encodeURIComponent(academicYear)}&termNumber=${termNumber}&limit=100`,
+  )
 
   const { data, reload } = useApi<{ summary: Summary }>(
     `/api/school/report-cards?year=${encodeURIComponent(academicYear)}&term=${termNumber}`,
@@ -155,6 +173,40 @@ export function ReportCards({
               Refresh
             </Button>
           </div>
+        )}
+
+        {/*
+          The cards themselves.
+
+          The counts alone told a school that 400 cards were ready and gave them no way
+          to open one — the renderer, the worker and the storage all worked and the
+          result was unreachable. Listed per pupil, because "download all" is a zip
+          nothing in this stack builds yet and one card at a time is what a parent at
+          the counter actually asks for.
+        */}
+        {(docs?.documents.length ?? 0) > 0 && (
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {(docs?.documents ?? []).map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center gap-2 p-stack">
+                <span className="font-medium">
+                  {/* The id is a poor label, but a missing name is worse than an ugly
+                      one: without it there is no way to tell which card failed. */}
+                  {d.studentName ?? 'Unnamed pupil'}
+                </span>
+                <span className="ml-auto">
+                  <DocumentDownload
+                    documentId={d.id}
+                    label="Open"
+                    knownFailure={
+                      d.status === 'failed'
+                        ? (d.failureReason ?? 'Could not be produced')
+                        : null
+                    }
+                  />
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
 
         {summary && summary.failed > 0 && (

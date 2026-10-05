@@ -110,7 +110,12 @@ const ACCEPTED_ROUTES = new Map([
   // `ENDPOINTS.md` names it and the mobile parent client may use it; the duplication
   // is the thing to watch, not the absence.
   ['announcements/[id]/read', 'duplicate of POST /api/parent/notices, which the portal uses'],
-  ['documents/[id]', 'blocked on R2 credentials, not on a screen'],
+  /*
+    No longer excepted — R2 works as of 2026-10-05 and three screens now call it:
+    the school and parent fees tables for receipts, and the results screen for report
+    cards. Left as a comment rather than deleted so the next person reading this list
+    sees that an exception was retired rather than lost.
+  */
   // Half superseded, half a tracked gap. `/welcome` calls `claim_parent_links()`
   // directly server-side, so the email retry is redundant there — but this route also
   // raises a PHONE-ONLY claim for a parent whose school recorded no email, and that

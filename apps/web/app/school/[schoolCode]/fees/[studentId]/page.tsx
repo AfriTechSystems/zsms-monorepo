@@ -47,6 +47,7 @@ import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components
 import { Field, PrefixedInput, Select } from '../../../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
 import { InfoHint } from '../../../../../components/ui/info-hint'
+import { DocumentDownload } from '../../../../../components/ui/document-download'
 import { useToast } from '../../../../../components/ui/toast'
 import { formatDate, formatKwacha } from '../../school-shared'
 
@@ -121,6 +122,32 @@ export default function StudentFeesPage({
   // other spans three.
   const url = `/api/school/fees/${studentId}${parsedAmount > 0 ? `?amount=${parsedAmount}` : ''}`
   const { data, loading, error, code, reload } = useApi<Payload>(url)
+
+  /*
+    This pupil's receipts, in one request rather than one per row.
+
+    The bursar is the person who most needs the file — a parent at the counter asking
+    for a copy of a receipt from last term is the whole reason the renderer exists.
+  */
+  const { data: docs } = useApi<{
+    documents: Array<{
+      id: string
+      paymentId: string | null
+      status: string
+      failureReason: string | null
+    }>
+  }>(`/api/documents?docType=payment_receipt&studentId=${studentId}`)
+
+  const receiptFor = useMemo(() => {
+    const map = new Map<
+      string,
+      { id: string; status: string; failureReason: string | null }
+    >()
+    for (const d of docs?.documents ?? []) {
+      if (d.paymentId) map.set(d.paymentId, d)
+    }
+    return map
+  }, [docs])
   const [section, setSection] = useSectionTabs<'statement' | 'payment' | 'history'>('statement', ['statement', 'payment', 'history'])
 
   // Seeded from the suggestion and then owned by the operator. Reset whenever a
@@ -437,9 +464,34 @@ export default function StudentFeesPage({
                         key: 'receipt',
                         header: 'Receipt',
                         primary: true,
-                        cell: (p) => (
-                          <span className="font-mono text-sm">{p.receipt_number ?? '—'}</span>
-                        ),
+                        cell: (p) => {
+                          const doc = receiptFor.get(p.id)
+                          return (
+                            <span className="flex flex-col items-start gap-1">
+                              <span className="font-mono text-sm">
+                                {p.receipt_number ?? '—'}
+                              </span>
+                              {/*
+                                A receipt is rendered by a worker after verification, so a
+                                payment awaiting the office has a number and no file yet.
+                                The failure reason IS shown to the school, because the
+                                remedy is usually theirs.
+                              */}
+                              {doc && (
+                                <DocumentDownload
+                                  documentId={doc.id}
+                                  label="PDF"
+                                  variant="ghost"
+                                  knownFailure={
+                                    doc.status === 'failed'
+                                      ? (doc.failureReason ?? 'Could not be produced')
+                                      : null
+                                  }
+                                />
+                              )}
+                            </span>
+                          )
+                        },
                       },
                       {
                         key: 'amount',

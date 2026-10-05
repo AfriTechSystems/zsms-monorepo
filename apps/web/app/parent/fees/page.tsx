@@ -26,7 +26,7 @@
  */
 
 import type { FormEvent, JSX } from 'react'
-import { Suspense, useCallback, useState } from 'react'
+import { Suspense, useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Send, Wallet } from 'lucide-react'
 
@@ -36,6 +36,7 @@ import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
 import { DataTable } from '../../../components/ui/data-table'
+import { DocumentDownload } from '../../../components/ui/document-download'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, TableSkeleton } from '../../../components/ui/data-states'
 import { Field, Input, PrefixedInput, Select } from '../../../components/ui/field'
@@ -102,6 +103,29 @@ function ParentFees(): JSX.Element {
 
   const url = childId ? `/api/parent/fees?childId=${childId}` : '/api/parent/fees'
   const { data, loading, error, code, reload } = useApi<Payload>(url)
+
+  /*
+    The receipts for this child, in ONE request.
+
+    A fetch per payment row would be an N+1 over the network for a table a parent
+    scrolls past. Fetched as a list and matched by payment id instead; a payment with
+    no row simply has no button, which is the normal state while the worker renders.
+  */
+  const { data: docs } = useApi<{
+    documents: Array<{ id: string; paymentId: string | null; status: string; failureReason: string | null }>
+  }>(
+    data?.selected
+      ? `/api/documents?docType=payment_receipt&studentId=${data.selected.id}`
+      : null,
+  )
+
+  const receiptFor = useMemo(() => {
+    const map = new Map<string, { id: string; status: string; failureReason: string | null }>()
+    for (const d of docs?.documents ?? []) {
+      if (d.paymentId) map.set(d.paymentId, d)
+    }
+    return map
+  }, [docs])
 
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<string>('bank_deposit')
@@ -398,9 +422,23 @@ function ParentFees(): JSX.Element {
                 {
                   key: 'receipt',
                   header: 'Receipt',
-                  cell: (p) => (
-                    <span className="font-mono text-xs">{p.receipt_number ?? '—'}</span>
-                  ),
+                  cell: (p) => {
+                    const doc = receiptFor.get(p.id)
+                    return (
+                      <span className="flex flex-col items-start gap-1">
+                        <span className="font-mono text-xs">{p.receipt_number ?? '—'}</span>
+                        {/*
+                          Only when a document actually exists. A receipt is rendered by a
+                          worker AFTER the school verifies the payment, so the normal state
+                          for a fresh payment is a number and no file yet — and a button
+                          that could only fail would be worse than no button.
+                        */}
+                        {doc && doc.status !== 'failed' && (
+                          <DocumentDownload documentId={doc.id} label="PDF" variant="ghost" />
+                        )}
+                      </span>
+                    )
+                  },
                 },
               ]}
             />

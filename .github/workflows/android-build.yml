@@ -177,4 +177,3 @@ jobs:
           # Long enough to keep testing against, short enough not to accumulate.
           retention-days: 14
           if-no-files-found: error
-          if-no-files-found: error

@@ -25,6 +25,17 @@ name: Android development build
 on:
   workflow_dispatch:
     inputs:
+      abi:
+        description: 'Which phone architecture'
+        type: choice
+        default: both
+        options:
+          # Two separate APKs, each about half the size. A phone only needs one.
+          - both
+          # Almost every phone sold since about 2018.
+          - arm64-v8a
+          # Older and budget handsets, still ordinary in Zambia.
+          - armeabi-v7a
       variant:
         description: 'Which build to produce'
         type: choice
@@ -118,36 +129,52 @@ jobs:
 
       - name: Build
         working-directory: apps/mobile/android
+        # One APK PER ARCHITECTURE, not one carrying both.
+        #
+        # A combined debug build measured 131 MB, and roughly 100 MB of that was
+        # unstripped native libraries — half of which the phone downloading it can
+        # never execute. Building each separately halves the download and costs only a
+        # second Gradle pass over an already-warm cache.
+        #
+        # x86 and x86_64 stay omitted: those are emulators, and an emulator can reach
+        # Metro directly without an APK at all.
         run: |
           chmod +x ./gradlew
+          TASK=assembleDebug
           if [ "${{ inputs.variant }}" = "standalone" ]; then
             # Release, but signed with the debug key — installable for testing without
             # a keystore. Not for the Play Store; that needs a real signing key.
-            ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
-          else
-            ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+            TASK=assembleRelease
           fi
 
-      # arm64-v8a alone: every Android phone made in the last several years is arm64,
-      # and building all four ABIs roughly quadruples both the time and the APK size.
+          case "${{ inputs.abi }}" in
+            both) ABIS="arm64-v8a armeabi-v7a" ;;
+            *)    ABIS="${{ inputs.abi }}" ;;
+          esac
 
-      - name: Find the APK
-        id: apk
-        working-directory: apps/mobile/android
-        run: |
-          APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
-          if [ -z "$APK" ]; then
-            echo "No APK was produced — the Gradle step above will say why."
-            exit 1
-          fi
-          echo "path=apps/mobile/android/$APK" >> "$GITHUB_OUTPUT"
-          echo "Built $(du -h "$APK" | cut -f1): $APK"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          for ABI in $ABIS; do
+            echo "::group::Building $ABI"
+            ./gradlew "$TASK" -PreactNativeArchitectures="$ABI"
+            APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
+            if [ -z "$APK" ]; then
+              echo "No APK for $ABI — the Gradle output above will say why."
+              exit 1
+            fi
+            cp "$APK" "$GITHUB_WORKSPACE/out/zsms-$ABI.apk"
+            echo "::endgroup::"
+            echo "$ABI -> $(du -h "$APK" | cut -f1)"
+          done
+          ls -lh "$GITHUB_WORKSPACE/out"
 
-      - name: Upload the APK
+      - name: Upload the APKs
         uses: actions/upload-artifact@v4
         with:
           name: zsms-${{ inputs.variant }}-${{ github.sha }}
-          path: ${{ steps.apk.outputs.path }}
+          # One file per architecture. Install the one matching the phone — arm64-v8a
+          # for almost anything sold since about 2018, armeabi-v7a otherwise.
+          path: out/*.apk
           # Long enough to keep testing against, short enough not to accumulate.
           retention-days: 14
+          if-no-files-found: error
           if-no-files-found: error

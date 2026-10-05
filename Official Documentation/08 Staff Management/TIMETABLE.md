@@ -356,3 +356,35 @@ VALUES (school_id, 'timetable', 'active', 100.00);
 | 2026-04-26 | Added timetable_periods table | Schools need configurable school day structure |
 | 2026-04-26 | Added feature add-on pricing | Timetable is Growth tier base feature or Starter add-on |
 | 2026-04-26 | Added conflict detection with error response | Teacher double-booking prevention |
+
+---
+
+## Implementation notes (2026-10-05)
+
+Built across `0197` (tables, clash indexes), `0200` (read and edit) and `0201`
+(creating a timetable, defining the school day). Three departures from the DDL above,
+each because the schema had already decided otherwise:
+
+| This document | Built | Why |
+|---|---|---|
+| `timetable_slots.subject_code TEXT` | `subject_id UUID` | Every other table referencing a subject uses the id. A code here would have no referential integrity and would not follow a rename. |
+| `checkTeacherConflict()` in TypeScript | Partial unique indexes | A SELECT before writing is a race: two deputies dragging at the same moment both read "clear" and both write. An index cannot be raced and cannot be skipped by a caller that forgets. |
+| Teacher conflicts only | Teacher **and room** | A room is as physical as a teacher, and a school with one laboratory needs this more. |
+
+`set_timetable_slot()` catches the unique violation and composes the message — the index
+guarantees correctness, the function supplies the explanation a deputy can act on.
+
+**Publishing reports unstaffed lessons rather than refusing one.** A lesson with no
+teacher is a normal state in the week before term.
+
+**Deleting a period is refused while lessons sit in it.** The foreign key cascades, so
+deleting would silently take every lesson in that period across every timetable.
+
+Surfaces: `/school/[code]/timetable` (builder), `/school/[code]/my-timetable`,
+`/parent/timetable`, and both mobile apps.
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-10-05 | Implemented. Three departures from the DDL recorded above. |

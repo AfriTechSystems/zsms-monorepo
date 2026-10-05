@@ -128,6 +128,7 @@ export default function ParentTabs(): JSX.Element {
       {/* Reachable from the Home grid and the drawer, not from the bar. Five is the
           most a phone bar holds before the labels stop being readable. */}
       <Tabs.Screen name="account" options={{ href: null, title: 'Account' }} />
+      <Tabs.Screen name="timetable" options={{ href: null, title: 'Timetable' }} />
       <Tabs.Screen name="children" options={{ href: null, title: 'My children' }} />
     </Tabs>
   )

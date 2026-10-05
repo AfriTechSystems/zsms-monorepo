@@ -149,6 +149,7 @@ export default function TeacherTabs(): JSX.Element {
       <Tabs.Screen name="more" options={{ href: null, title: 'More' }} />
       <Tabs.Screen name="notices" options={{ href: null, title: 'Notices' }} />
       <Tabs.Screen name="account" options={{ href: null, title: 'Account' }} />
+      <Tabs.Screen name="timetable" options={{ href: null, title: 'Timetable' }} />
     </Tabs>
   )
 }

@@ -106,11 +106,11 @@ export const FEATURES: Feature[] = [
     key: 'timetable',
     label: 'Timetable',
     icon: CalendarDays,
-    href: null,
+    href: '/(teacher)/(tabs)/timetable',
     schoolOnly: true,
-    built: false,
+    built: true,
     group: 'Teaching',
-    hint: 'Your week',
+    hint: 'Your week, today first',
   },
 
   // ---- My tools: the Hub, which belongs to the teacher -------------------

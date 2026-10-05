@@ -5413,6 +5413,20 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      child_timetable: {
+        Args: { p_student_id: string }
+        Returns: {
+          out_day_of_week: number
+          out_end_time: string
+          out_period_name: string
+          out_period_order: number
+          out_room: string
+          out_slot_type: string
+          out_start_time: string
+          out_subject_name: string
+          out_teacher_name: string
+        }[]
+      }
       claim_parent_links: {
         Args: never
         Returns: {
@@ -5424,6 +5438,13 @@ export type Database = {
       clear_student_custom_values: {
         Args: { p_field_ids: string[]; p_student_id: string }
         Returns: number
+      }
+      clear_timetable_slot: {
+        Args: { p_slot_id: string }
+        Returns: {
+          out_done: boolean
+          out_message: string
+        }[]
       }
       complete_generated_document: {
         Args: {
@@ -5476,6 +5497,18 @@ export type Database = {
         }
         Returns: string
       }
+      create_timetable: {
+        Args: {
+          p_academic_year: string
+          p_make_active?: boolean
+          p_name?: string
+          p_term_number: number
+        }
+        Returns: {
+          out_message: string
+          out_timetable_id: string
+        }[]
+      }
       current_grading_scale_version: {
         Args: { p_scale_id: string }
         Returns: string
@@ -5525,6 +5558,13 @@ export type Database = {
           syllabus_year: number
           topic_code: string
           topic_name: string
+        }[]
+      }
+      delete_timetable_period: {
+        Args: { p_period_id: string }
+        Returns: {
+          out_done: boolean
+          out_message: string
         }[]
       }
       detach_school_from_network: {
@@ -5758,6 +5798,20 @@ export type Database = {
           plans: Json
         }[]
       }
+      my_timetable: {
+        Args: never
+        Returns: {
+          out_class_id: string
+          out_day_of_week: number
+          out_end_time: string
+          out_period_name: string
+          out_period_order: number
+          out_room: string
+          out_slot_type: string
+          out_start_time: string
+          out_subject_name: string
+        }[]
+      }
       network_billing_summary: {
         Args: never
         Returns: {
@@ -5858,6 +5912,14 @@ export type Database = {
           p_term_number: number
         }
         Returns: number
+      }
+      publish_timetable: {
+        Args: { p_published?: boolean; p_timetable_id: string }
+        Returns: {
+          out_done: boolean
+          out_message: string
+          out_unstaffed: number
+        }[]
       }
       record_generated_document: {
         Args: {
@@ -6317,6 +6379,31 @@ export type Database = {
           out_unit_price: number
         }[]
       }
+      school_timetable: {
+        Args: { p_timetable_id?: string }
+        Returns: {
+          out_academic_year: string
+          out_applies_days: number[]
+          out_class_id: string
+          out_day_of_week: number
+          out_end_time: string
+          out_name: string
+          out_period_id: string
+          out_period_name: string
+          out_period_order: number
+          out_published: boolean
+          out_room: string
+          out_slot_id: string
+          out_slot_type: string
+          out_staff_user_id: string
+          out_start_time: string
+          out_subject_id: string
+          out_subject_name: string
+          out_teaching: boolean
+          out_term_number: number
+          out_timetable_id: string
+        }[]
+      }
       school_verified_metrics: {
         Args: { p_school_id: string }
         Returns: {
@@ -6425,6 +6512,37 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_timetable_period: {
+        Args: {
+          p_applies_days?: number[]
+          p_end_time: string
+          p_name: string
+          p_order: number
+          p_period_id: string
+          p_start_time: string
+          p_teaching?: boolean
+        }
+        Returns: {
+          out_message: string
+          out_period_id: string
+        }[]
+      }
+      set_timetable_slot: {
+        Args: {
+          p_class_id: string
+          p_day_of_week: number
+          p_period_id: string
+          p_room?: string
+          p_slot_type?: string
+          p_staff_user_id?: string
+          p_subject_id?: string
+          p_timetable_id: string
+        }
+        Returns: {
+          out_message: string
+          out_slot_id: string
+        }[]
       }
       srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }
       student_in_current_school: {

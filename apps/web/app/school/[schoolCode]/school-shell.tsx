@@ -24,6 +24,8 @@
 import type { JSX, ReactNode } from 'react'
 import {
   CalendarCheck,
+  CalendarDays,
+  CalendarRange,
   ClipboardList,
   Cog,
   Coins,
@@ -108,6 +110,16 @@ export function SchoolShell({
       items: [
         // A teacher's own scope, first in the group they open every morning.
         { path: '/teaching/my', label: 'My classes', icon: GraduationCap, needs: 'teaching:own' },
+        /*
+          Two timetable entries, because they answer different questions.
+
+          "My timetable" is where a teacher is this week; "Timetable" is the whole
+          school's grid. The second carries no `needs` on purpose — the screen renders
+          read-only for anybody without `settings:write`, and seeing the school's week
+          is useful even when editing it is not yours to do.
+        */
+        { path: '/my-timetable', label: 'My timetable', icon: CalendarDays, needs: 'teaching:own' },
+        { path: '/timetable', label: 'Timetable', icon: CalendarRange },
         { path: '/attendance', label: 'Attendance', icon: CalendarCheck, needs: 'attendance:read' },
         { path: '/results', label: 'Results', icon: ClipboardList, needs: 'results:read' },
       ],

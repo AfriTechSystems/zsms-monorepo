@@ -33,7 +33,13 @@ import type { JSX } from 'react'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { CalendarCheck, ClipboardList, Megaphone, Wallet } from 'lucide-react'
+import {
+  CalendarCheck,
+  CalendarDays,
+  ClipboardList,
+  Megaphone,
+  Wallet,
+} from 'lucide-react'
 
 import { useApi } from '../../lib/use-api'
 import { Alert } from '../../components/ui/alert'
@@ -204,6 +210,21 @@ function ParentHome(): JSX.Element {
           hint={data.results.length === 0 ? 'Nothing published yet' : 'Marks you can see'}
           tone="neutral"
           icon={<ClipboardList />}
+          href={`/parent/results${childId ? `?childId=${childId}` : ''}`}
+        />
+
+        {/*
+          The timetable is not in the bottom bar — five tabs is the limit before the
+          labels stop being readable, and that was a deliberate decision. It is reached
+          from here instead, where a parent is already looking at the week's shape.
+        */}
+        <StatCard
+          label="Timetable"
+          value="This week"
+          hint="Where your child is, lesson by lesson"
+          tone="neutral"
+          icon={<CalendarDays />}
+          href={`/parent/timetable${childId ? `?childId=${childId}` : ''}`}
         />
       </div>
 

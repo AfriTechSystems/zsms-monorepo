@@ -28,13 +28,22 @@ on:
       abi:
         description: 'Which phone architecture'
         type: choice
-        default: both
+        default: universal
         options:
-          # Two separate APKs, each about half the size. A phone only needs one.
+          # ONE file that installs on every phone. The default, and what to hand to a
+          # school.
+          #
+          # Splitting by ABI means knowing which file a given phone needs, and that is
+          # not knowable for a school's staff. Proved on 2026-10-06: the arm64-v8a APK
+          # would not install on the tester's phone and the armeabi-v7a one did —
+          # the opposite of the advice written here, which said arm64 covered
+          # "almost every phone sold since about 2018". A wrong guess reads as
+          # "the app is broken".
+          - universal
+          # Both splits, each about half the size. For measuring, not for handing out.
           - both
-          # Almost every phone sold since about 2018.
+          # One split, when you know the target.
           - arm64-v8a
-          # Older and budget handsets, still ordinary in Zambia.
           - armeabi-v7a
       variant:
         description: 'Which build to produce'
@@ -163,8 +172,11 @@ jobs:
           fi
 
           case "${{ inputs.abi }}" in
-            both) ABIS="arm64-v8a armeabi-v7a" ;;
-            *)    ABIS="${{ inputs.abi }}" ;;
+            # One Gradle pass containing every architecture, so the output is a single
+            # installable file. Bigger than a split — that is the whole trade.
+            universal) ABIS="arm64-v8a,armeabi-v7a,x86_64" ;;
+            both)      ABIS="arm64-v8a armeabi-v7a" ;;
+            *)         ABIS="${{ inputs.abi }}" ;;
           esac
 
           mkdir -p "$GITHUB_WORKSPACE/out"
@@ -176,9 +188,15 @@ jobs:
               echo "No APK for $ABI — the Gradle output above will say why."
               exit 1
             fi
-            cp "$APK" "$GITHUB_WORKSPACE/out/zsms-$ABI.apk"
+            # A comma-joined list is one build, not several, so it is named for what
+            # it is rather than after its architecture string.
+            case "$ABI" in
+              *,*) NAME="universal" ;;
+              *)   NAME="$ABI" ;;
+            esac
+            cp "$APK" "$GITHUB_WORKSPACE/out/zsms-$NAME.apk"
             echo "::endgroup::"
-            echo "$ABI -> $(du -h "$APK" | cut -f1)"
+            echo "$NAME -> $(du -h "$APK" | cut -f1)"
           done
           ls -lh "$GITHUB_WORKSPACE/out"
 
@@ -186,8 +204,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zsms-${{ inputs.variant }}-${{ github.sha }}
-          # One file per architecture. Install the one matching the phone — arm64-v8a
-          # for almost anything sold since about 2018, armeabi-v7a otherwise.
+          # `universal` produces ONE file that installs on any phone — install that
+          # and stop thinking about architectures. The splits are for measuring size.
           path: out/*.apk
           # Long enough to keep testing against, short enough not to accumulate.
           retention-days: 14

@@ -28,6 +28,15 @@
  */
 
 export interface ExtractedTopic {
+  /**
+   * Which subject and grade this topic belongs to, from the sets the request named.
+   *
+   * Per topic, not per extraction, because `curriculum_topics` is unique on
+   * (country, curriculum, subject, grade_level, topic_code) — the table's grain is one
+   * topic in one subject in one grade.
+   */
+  subject: string
+  grade_level: string
   topic_code: string
   /** TRUE when the document had no code and the position was used instead. */
   code_inferred: boolean
@@ -57,9 +66,35 @@ export const CURRICULUM_EXTRACTION_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['topic_code', 'code_inferred', 'topic_name', 'sub_topics',
-                   'learning_outcomes', 'suggested_periods', 'display_order'],
+        required: ['subject', 'grade_level', 'topic_code', 'code_inferred', 'topic_name',
+                   'sub_topics', 'learning_outcomes', 'suggested_periods', 'display_order'],
         properties: {
+          /*
+            Which subject and grade this topic belongs to.
+
+            Added 2026-10-05, when extraction stopped being one-subject-one-grade. An ECZ
+            syllabus covers a subject across a band of grades, and a single document is
+            often the only copy a school has — so an operator must be able to say
+            "Mathematics, Grades 8 to 9" once rather than run the same PDF four times.
+
+            Per TOPIC rather than per extraction, because `curriculum_topics` is unique on
+            (country, curriculum, subject, grade_level, topic_code): the grain of the table
+            is one topic in one subject in one grade, and that is what the model must
+            produce. Tagging the extraction as a whole would make every row ambiguous.
+          */
+          subject: {
+            type: 'string',
+            description:
+              'EXACTLY one of the subjects named in the request, spelled as the request '
+              + 'spells it. Never a subject the request did not name.',
+          },
+          grade_level: {
+            type: 'string',
+            description:
+              'EXACTLY one of the grades named in the request, spelled as the request '
+              + 'spells it. A topic taught across two grades is returned TWICE, once per '
+              + 'grade, because a syllabus row belongs to a grade.',
+          },
           topic_code: {
             type: 'string',
             description:
@@ -130,23 +165,48 @@ from a multi-grade syllabus, say — note that too.
 ORDER
 Preserve the document's order. That is teaching order, and it matters.`
 
+/** A literal newline, named so it survives being edited by a script. */
+const NEWLINE = String.fromCharCode(10)
+
 export function curriculumExtractionPrompt(params: {
   curriculumType: string
-  subject: string
-  gradeLevel: string
+  /** One or more. A syllabus often covers a band of grades, sometimes several subjects. */
+  subjects: string[]
+  grades: string[]
   documentText: string
 }): string {
-  return `Extract the syllabus topics for ONE subject and grade from the document below.
+  const subjects = params.subjects.map((x) => `- ${x}`).join(NEWLINE)
+  const grades = params.grades.map((x) => `- ${x}`).join(NEWLINE)
+
+  /*
+    The instruction is deliberately about EXCLUSION first.
+
+    The failure that matters is not a missed topic — an operator checks the table before
+    importing and can see a gap. It is a FABRICATED one, or a real topic filed under the
+    wrong grade, because both look correct in the review table and become a citation the
+    lesson planner presents to a teacher as the national syllabus.
+  */
+  return `Extract syllabus topics from the document below.
 
 Curriculum: ${params.curriculumType}
-Subject: ${params.subject}
-Grade: ${params.gradeLevel}
 
-Return ONLY topics for that subject and grade. A syllabus document often covers several grades or
-several subjects; everything outside the one named above must be left out, not summarised.
+Subjects to extract (use these spellings exactly):
+${subjects}
 
-If the document contains nothing for that subject and grade, return an empty topics array and say
-so in notes. An empty result is a correct answer — inventing topics to fill the table is not.
+Grades to extract (use these spellings exactly):
+${grades}
+
+Tag EVERY topic with the one subject and the one grade it belongs to, chosen from the lists above.
+
+Rules, in order of importance:
+
+1. A topic whose subject or grade is not in the lists above must be LEFT OUT. Not summarised,
+   not reassigned to the nearest listed grade, not merged. Left out.
+2. Never invent a topic, a code or an outcome. If the document is unclear, return less.
+3. A topic the document teaches across two of the listed grades is returned TWICE, once per
+   grade — the table's grain is one topic in one subject in one grade.
+4. If the document contains nothing for a listed subject or grade, simply return nothing for it
+   and say so in notes. An empty result is a correct answer. Filling the table is not.
 
 --- DOCUMENT ---
 ${params.documentText}

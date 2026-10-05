@@ -115,17 +115,49 @@ export async function POST(request: Request): Promise<Response> {
 
     const file = form.get('file')
     const curriculumType = String(form.get('curriculumType') ?? '').trim()
-    const subject = String(form.get('subject') ?? '').trim()
-    const gradeLevel = String(form.get('gradeLevel') ?? '').trim()
+    /*
+      Sets, not single values.
+
+      An ECZ syllabus covers a subject across a band of grades, and a school usually has
+      exactly one copy of the PDF — so running the same document four times to get Grades
+      8 to 11 was the cost of the old one-subject-one-grade contract.
+
+      Sent as repeated form fields, which is what a multi-select produces natively.
+    */
+    const subjects = form
+      .getAll('subjects')
+      .map((v) => String(v).trim())
+      .filter((v) => v !== '')
+    const grades = form
+      .getAll('grades')
+      .map((v) => String(v).trim())
+      .filter((v) => v !== '')
 
     if (!(file instanceof File)) return fail('VALIDATION_ERROR', 'No file was uploaded.')
-    if (!curriculumType || !subject || !gradeLevel) {
+    if (!curriculumType || subjects.length === 0 || grades.length === 0) {
       /**
        * All three are required BEFORE extraction, not after. A syllabus document usually covers
        * several grades and sometimes several subjects, and telling the model which slice to take
        * is the difference between a clean extract and a merged one nobody can untangle.
        */
-      return fail('VALIDATION_ERROR', 'Choose the curriculum, subject and grade first.')
+      return fail(
+        'VALIDATION_ERROR',
+        'Choose the curriculum, at least one subject and at least one grade first.',
+      )
+    }
+
+    /*
+      Capped. The cross product is what the model is asked to tag against, and a request
+      naming nine subjects across twelve grades is 108 combinations in one call — which
+      produces a worse extraction than four careful ones and costs more.
+    */
+    if (subjects.length * grades.length > 24) {
+      return fail(
+        'VALIDATION_ERROR',
+        `That is ${subjects.length * grades.length} subject-and-grade combinations in one pass. ` +
+          'Keep it under 24 — a smaller extraction is more accurate, and you can run the same ' +
+          'document again for the rest.',
+      )
     }
     if (file.size > MAX_BYTES) {
       return fail('VALIDATION_ERROR', `That file is larger than ${MAX_BYTES / 1024 / 1024}MB.`)
@@ -176,8 +208,8 @@ export async function POST(request: Request): Promise<Response> {
           systemPrompt: CURRICULUM_EXTRACTION_SYSTEM_PROMPT,
           userPrompt: curriculumExtractionPrompt({
             curriculumType,
-            subject,
-            gradeLevel,
+            subjects,
+            grades,
             documentText,
           }),
           schema: CURRICULUM_EXTRACTION_SCHEMA,
@@ -207,14 +239,32 @@ export async function POST(request: Request): Promise<Response> {
 
       return ok({
         // Rows the operator edits. NOTHING is written until they press import.
-        topics: (extraction.topics ?? []).map((t, i) => ({
-          ...t,
-          display_order: t.display_order || i + 1,
-        })),
+        /*
+          Rows the operator edits. NOTHING is written until they press import.
+
+          Anything the model tagged with a subject or grade the request did not name is
+          dropped here rather than shown. The prompt forbids it, but a model that ignores
+          that instruction would otherwise put a row the operator never asked for into a
+          review table they are likely to approve wholesale — and the result is a
+          fabricated syllabus citation presented to a teacher as national curriculum.
+        */
+        topics: (extraction.topics ?? [])
+          .filter((t) => subjects.includes(t.subject) && grades.includes(t.grade_level))
+          .map((t, i) => ({
+            ...t,
+            display_order: t.display_order || i + 1,
+          })),
+        /*
+          Said out loud rather than silently dropped, so an operator who gets 40 topics
+          from a 60-topic document knows why instead of assuming the extraction is thin.
+        */
+        discarded: (extraction.topics ?? []).filter(
+          (t) => !subjects.includes(t.subject) || !grades.includes(t.grade_level),
+        ).length,
         detectedSource: extraction.detected_source ?? '',
         detectedSyllabusYear: extraction.detected_syllabus_year ?? null,
         notes: extraction.notes ?? '',
-        context: { curriculumType, subject, gradeLevel },
+        context: { curriculumType, subjects, grades },
         document: {
           name: file.name,
           kind,

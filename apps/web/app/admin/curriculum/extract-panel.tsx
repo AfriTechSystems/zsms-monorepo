@@ -21,13 +21,15 @@
  */
 
 import type { JSX } from 'react'
+import type { ChangeEvent } from 'react'
 import { useState } from 'react'
-import { FileUp, Info, Trash2, TriangleAlert } from 'lucide-react'
+import { FileUp, Info, Trash2, TriangleAlert, X } from 'lucide-react'
 
 import { Alert } from '../../../components/ui/alert'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card'
+import { Dialog } from '../../../components/ui/dialog'
 import { Field, Input, Select, Textarea } from '../../../components/ui/field'
 import { useToast } from '../../../components/ui/toast'
 
@@ -39,6 +41,9 @@ interface Topic {
   learning_outcomes: string[]
   suggested_periods: number | null
   display_order: number
+  /** Which slice this row belongs to. Varies within one extraction now. */
+  subject: string
+  grade_level: string
 }
 
 interface Extraction {
@@ -46,7 +51,9 @@ interface Extraction {
   detectedSource: string
   detectedSyllabusYear: number | null
   notes: string
-  context: { curriculumType: string; subject: string; gradeLevel: string }
+  context: { curriculumType: string; subjects: string[]; grades: string[] }
+  /** Rows the model tagged outside the requested slice, dropped by the route. */
+  discarded: number
   document: { name: string; kind: string; characters: number; truncated: boolean }
   cost: {
     provider: string
@@ -80,8 +87,30 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
   const { toast } = useToast()
 
   const [curriculumType, setCurriculumType] = useState('ecz')
-  const [subject, setSubject] = useState('')
-  const [gradeLevel, setGradeLevel] = useState('')
+
+  /*
+    Sets, not single values.
+
+    An ECZ syllabus covers a subject across a band of grades — "Mathematics, Grades 8 to
+    9" is one document, and under the old one-at-a-time contract an operator ran the same
+    PDF once per grade. Asked for on 2026-10-05.
+  */
+  const [subjects, setSubjects] = useState<string[]>([])
+  const [grades, setGrades] = useState<string[]>([])
+  const [ownSubject, setOwnSubject] = useState('')
+
+  /** The slice picker is a popup; the card shows a summary of what was chosen. */
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  /*
+    The range selects, held separately from the chosen set.
+
+    They are an INPUT to the set rather than the set itself, so "Add range" can be
+    pressed twice to combine Grades 8-9 with Form 1 — which a school mid-reform really
+    does have.
+  */
+  const [rangeFrom, setRangeFrom] = useState('')
+  const [rangeTo, setRangeTo] = useState('')
   const [file, setFile] = useState<File | null>(null)
 
   const [extracting, setExtracting] = useState(false)
@@ -91,7 +120,25 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
   const [year, setYear] = useState('')
   const [importing, setImporting] = useState(false)
 
-  const ready = subject.trim() !== '' && gradeLevel.trim() !== '' && file !== null
+  const combinations = subjects.length * grades.length
+  const ready = subjects.length > 0 && grades.length > 0 && file !== null && combinations <= 24
+
+  /**
+   * Fills in every grade between two, inclusive, in the order GRADES lists them.
+   *
+   * A range is how a syllabus describes itself ("Grades 8–9"), and picking each one
+   * separately is the step an operator forgets. Order-independent, because somebody will
+   * choose the later grade first.
+   */
+  const applyRange = (from: string, to: string): void => {
+    const a = GRADES.indexOf(from)
+    const b = GRADES.indexOf(to)
+    if (a < 0 || b < 0) return
+    const [lo, hi] = a <= b ? [a, b] : [b, a]
+    // Merged with what is already chosen rather than replacing it, so two ranges can be
+    // combined — Grades 8-9 plus Form 1, which a reform-transition school really has.
+    setGrades((prev) => [...new Set([...prev, ...GRADES.slice(lo, hi + 1)])])
+  }
 
   const extract = async (): Promise<void> => {
     if (!file) return
@@ -101,8 +148,9 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
     const form = new FormData()
     form.append('file', file)
     form.append('curriculumType', curriculumType)
-    form.append('subject', subject)
-    form.append('gradeLevel', gradeLevel)
+    // Repeated fields, which is what `form.getAll()` reads on the route.
+    for (const x of subjects) form.append('subjects', x)
+    for (const x of grades) form.append('grades', x)
 
     try {
       const response = await fetch('/api/admin/curriculum/extract', { method: 'POST', body: form })
@@ -120,7 +168,7 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
       setYear(body.data.detectedSyllabusYear ? String(body.data.detectedSyllabusYear) : '')
       toast(
         body.data.topics.length === 0
-          ? 'Nothing was found for that subject and grade.'
+          ? 'Nothing was found for those subjects and grades.'
           : `Found ${body.data.topics.length} topics. Check them before importing.`,
         body.data.topics.length === 0 ? 'danger' : 'success',
       )
@@ -137,8 +185,16 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
     const rows = topics.map((t) => ({
       country_code: 'ZM',
       curriculum_type: extraction.context.curriculumType,
-      subject: extraction.context.subject,
-      grade_level: extraction.context.gradeLevel,
+      /*
+        The TOPIC's own subject and grade, not the extraction's.
+
+        One document can now produce rows across several of both, and
+        `curriculum_topics` is unique on (country, curriculum, subject, grade_level,
+        topic_code) — so taking the slice from the extraction would collapse every grade
+        onto one and silently overwrite as it went.
+      */
+      subject: t.subject,
+      grade_level: t.grade_level,
       topic_code: t.topic_code,
       topic_name: t.topic_name,
       sub_topics: t.sub_topics,
@@ -198,60 +254,57 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
 
       <CardContent className="space-y-5">
         {/* ---------- Step 1: which slice ---------- */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field id="curriculum" label="Curriculum" required>
-            {(props) => (
-              <Select
-                {...props}
-                value={curriculumType}
-                onChange={(e) => setCurriculumType(e.target.value)}
-              >
-                {CURRICULA.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
+        {/*
+          A summary and a button, not the three fields.
 
-          <Field id="subject" label="Subject" required hint="Type your own if it is not listed.">
-            {(props) => (
-              <>
-                <Input
-                  {...props}
-                  list="subject-options"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                />
-                <datalist id="subject-options">
-                  {SUBJECTS.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-              </>
-            )}
-          </Field>
+          The fields were a 3-column grid above the upload, and multi-select plus a grade
+          range does not fit there — it would push the file picker and the Extract button
+          off a laptop screen. The popup also makes the ORDER explicit: the slice is
+          chosen, then the document is uploaded against it.
+        */}
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-card">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="text-sm font-medium">What to extract</span>
 
-          <Field id="grade" label="Grade or form" required>
-            {(props) => (
-              <Select {...props} value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)}>
-                <option value="">Choose a grade</option>
-                {GRADES.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
+            {subjects.length === 0 || grades.length === 0 ? (
+              <span className="text-sm text-muted-text">
+                Nothing chosen yet. The slice comes first — it is what stops one document&apos;s
+                grades merging into a table nobody can untangle.
+              </span>
+            ) : (
+              <span className="flex flex-wrap items-center gap-1.5">
+                {subjects.map((x) => (
+                  <Badge key={`s-${x}`} variant="neutral">
+                    {x}
+                  </Badge>
                 ))}
-              </Select>
+                <span aria-hidden="true" className="text-muted-text">
+                  ·
+                </span>
+                {grades.map((x) => (
+                  <Badge key={`g-${x}`} variant="neutral">
+                    {x}
+                  </Badge>
+                ))}
+              </span>
             )}
-          </Field>
+
+            {combinations > 0 && (
+              <span className="text-xs text-muted-text">
+                {combinations} subject-and-grade combination{combinations === 1 ? '' : 's'}
+                {combinations > 24 && ' — too many for one pass, keep it under 24'}
+              </span>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            className="ml-auto"
+            onClick={() => setPickerOpen(true)}
+          >
+            {subjects.length === 0 || grades.length === 0 ? 'Choose' : 'Change'}
+          </Button>
         </div>
-
-        <Alert variant="info" title="One subject and grade at a time">
-          A syllabus document usually covers several grades and sometimes several subjects. Naming
-          the slice first is what stops the extraction merging them into a table nobody can
-          untangle — and it is why these three come before the upload rather than after it.
-        </Alert>
 
         {/* ---------- Step 2: the file ---------- */}
         <Field
@@ -282,9 +335,22 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
               <h3 className="font-semibold text-text">
                 {topics.length} topic{topics.length === 1 ? '' : 's'} found
               </h3>
+              {/* A count, not a name: one extraction now spans several subjects and
+                  grades, and the table below carries the per-row detail. */}
               <Badge variant="neutral">
-                {extraction.context.subject} · {extraction.context.gradeLevel}
+                {extraction.context.subjects.length} subject
+                {extraction.context.subjects.length === 1 ? '' : 's'} ·{' '}
+                {extraction.context.grades.length} grade
+                {extraction.context.grades.length === 1 ? '' : 's'}
               </Badge>
+              {extraction.discarded > 0 && (
+                <Badge variant="warning">
+                  {/* Said out loud. Otherwise an operator who gets 40 topics from a
+                      60-topic document assumes the extraction was thin, when in fact the
+                      model tagged 20 rows outside the slice they asked for. */}
+                  {extraction.discarded} outside the slice, dropped
+                </Badge>
+              )}
               <span className="text-xs text-muted-text">
                 {/* What it cost, so a 200-page syllabus is a known quantity before doing eleven
                     more. Not charged to anyone's credits — this is AfriTech's own platform work. */}
@@ -346,6 +412,20 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
             <ul className="space-y-3">
               {topics.map((topic, index) => (
                 <li key={index} className="rounded-lg border border-border p-4">
+                  {/*
+                    Which slice this row will be filed under.
+
+                    Shown because an extraction now spans several subjects and grades, and
+                    this is the field an operator must actually check: a topic filed under
+                    the wrong grade looks perfectly correct in a review table and becomes a
+                    syllabus citation the lesson planner shows a teacher as national
+                    curriculum. A missing topic is visible; a misfiled one is not.
+                  */}
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <Badge variant="neutral">{topic.subject}</Badge>
+                    <Badge variant="neutral">{topic.grade_level}</Badge>
+                  </div>
+
                   <div className="flex flex-wrap items-start gap-3">
                     <div className="w-28 shrink-0">
                       <Field id={`code-${index}`} label="Code">
@@ -446,6 +526,223 @@ export function ExtractPanel({ onImported }: { onImported: () => void }): JSX.El
           </div>
         )}
       </CardContent>
+
+      {/* ---------- the slice picker ---------- */}
+      <Dialog
+        open={pickerOpen}
+        title="What to extract"
+        description="One document can cover several subjects and a band of grades. Name them, and every topic is filed under the right one."
+        onClose={() => setPickerOpen(false)}
+        footer={
+          <>
+            <Button
+              disabled={subjects.length === 0 || grades.length === 0 || combinations > 24}
+              onClick={() => setPickerOpen(false)}
+            >
+              Done
+            </Button>
+            <Button variant="ghost" onClick={() => setPickerOpen(false)}>
+              Cancel
+            </Button>
+            {(subjects.length > 0 || grades.length > 0) && (
+              <Button
+                variant="ghost"
+                className="ml-auto"
+                onClick={() => {
+                  setSubjects([])
+                  setGrades([])
+                }}
+              >
+                Clear all
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="flex flex-col gap-cards">
+          <Field id="curriculum" label="Curriculum" required>
+            {(props) => (
+              <Select
+                {...props}
+                value={curriculumType}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setCurriculumType(e.target.value)}
+              >
+                {CURRICULA.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          {/* ---- subjects ---- */}
+          <Field
+            id="subjects"
+            label="Subjects"
+            required
+            hint="Tick every subject this document covers. Add your own if it is not listed."
+          >
+            {() => (
+              <div className="flex flex-col gap-stack">
+                <div className="flex flex-wrap gap-2">
+                  {SUBJECTS.map((x) => (
+                    <label
+                      key={x}
+                      className="flex min-h-tap cursor-pointer items-center gap-1.5 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        className="size-4"
+                        checked={subjects.includes(x)}
+                        onChange={(e) =>
+                          setSubjects((prev) =>
+                            e.target.checked ? [...prev, x] : prev.filter((y) => y !== x),
+                          )
+                        }
+                      />
+                      {x}
+                    </label>
+                  ))}
+                </div>
+
+                {/*
+                  A subject the list does not have.
+
+                  The spelling is load-bearing: it goes into the prompt AND becomes the
+                  `subject` column, and `curriculum_topics` is unique on it — so "Civic
+                  Education" and "Civics" would be two subjects with two sets of topics,
+                  and the lesson planner would find only one of them.
+                */}
+                <div className="flex flex-wrap items-end gap-2">
+                  <Input
+                    aria-label="Another subject"
+                    placeholder="Another subject"
+                    value={ownSubject}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setOwnSubject(e.target.value)}
+                    maxLength={60}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={ownSubject.trim() === '' || subjects.includes(ownSubject.trim())}
+                    onClick={() => {
+                      setSubjects((prev) => [...new Set([...prev, ownSubject.trim()])])
+                      setOwnSubject('')
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+
+                {subjects.filter((x) => !SUBJECTS.includes(x)).length > 0 && (
+                  <span className="flex flex-wrap items-center gap-1.5 text-sm">
+                    <span className="text-muted-text">Added:</span>
+                    {subjects
+                      .filter((x) => !SUBJECTS.includes(x))
+                      .map((x) => (
+                        <button
+                          key={x}
+                          type="button"
+                          onClick={() => setSubjects((prev) => prev.filter((y) => y !== x))}
+                          className="inline-flex min-h-tap items-center gap-1 rounded-md border border-border px-2 text-sm hover:bg-muted"
+                        >
+                          {x}
+                          <X aria-hidden="true" className="size-3" />
+                          <span className="sr-only">Remove {x}</span>
+                        </button>
+                      ))}
+                  </span>
+                )}
+              </div>
+            )}
+          </Field>
+
+          {/* ---- grades, as a range ---- */}
+          <Field
+            id="grades"
+            label="Grades or forms"
+            required
+            hint="Pick a range — an ECZ syllabus usually names one, such as Grades 8 to 9. Add a second range if the document spans the reform."
+          >
+            {() => (
+              <div className="flex flex-col gap-stack">
+                <div className="flex flex-wrap items-end gap-2">
+                  <Select
+                    aria-label="From grade"
+                    value={rangeFrom}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setRangeFrom(e.target.value)}
+                  >
+                    <option value="">From…</option>
+                    {GRADES.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </Select>
+
+                  <Select
+                    aria-label="To grade"
+                    value={rangeTo}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setRangeTo(e.target.value)}
+                  >
+                    <option value="">To…</option>
+                    {GRADES.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </Select>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={rangeFrom === '' || rangeTo === ''}
+                    onClick={() => {
+                      applyRange(rangeFrom, rangeTo)
+                      setRangeFrom('')
+                      setRangeTo('')
+                    }}
+                  >
+                    Add range
+                  </Button>
+                </div>
+
+                {/* Chosen grades, each removable — a range that caught one grade too many
+                    is corrected here rather than by clearing and starting again. */}
+                {grades.length > 0 && (
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {/* Sorted the way GRADES lists them, so Grade 10 follows Grade 9
+                        rather than Grade 1 — a plain string sort gets this wrong. */}
+                    {[...grades]
+                      .sort((a, b) => GRADES.indexOf(a) - GRADES.indexOf(b))
+                      .map((x) => (
+                        <button
+                          key={x}
+                          type="button"
+                          onClick={() => setGrades((prev) => prev.filter((y) => y !== x))}
+                          className="inline-flex min-h-tap items-center gap-1 rounded-md border border-border px-2 text-sm hover:bg-muted"
+                        >
+                          {x}
+                          <X aria-hidden="true" className="size-3" />
+                          <span className="sr-only">Remove {x}</span>
+                        </button>
+                      ))}
+                  </span>
+                )}
+              </div>
+            )}
+          </Field>
+
+          {combinations > 24 && (
+            <Alert variant="warning" title="Too many combinations for one pass">
+              {combinations} subject-and-grade combinations. A smaller extraction is more
+              accurate and costs less — run the document again for the rest.
+            </Alert>
+          )}
+        </div>
+      </Dialog>
     </Card>
   )
 }
+

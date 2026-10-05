@@ -111,12 +111,56 @@ jobs:
           } > .env
           echo "Wrote .env with ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && 'a Clerk key' || 'NO Clerk key — sign-in will fail' }}"
 
+      - name: Give the build a fresh version
+        # Android refuses to replace an installed app when the incoming versionCode is
+        # lower, and several OEM installers (common on budget handsets) also refuse an
+        # EQUAL one — reported as a bare "App not installed" with no reason. Every
+        # build was versionCode 1, so the second APK could never replace the first.
+        #
+        # The run number is monotonic per workflow, which is exactly the property
+        # versionCode needs.
+        working-directory: apps/mobile
+        run: |
+          node -e "
+            const fs = require('fs');
+            const a = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            a.expo.android = a.expo.android || {};
+            a.expo.android.versionCode = ${{ github.run_number }};
+            fs.writeFileSync('app.json', JSON.stringify(a, null, 2) + '
+');
+            console.log('versionCode', a.expo.android.versionCode);
+          "
+
       - name: Generate the native project
         # `android/` is not in the repository: it is generated from app.json, so what
         # ships always matches the configuration rather than a committed copy somebody
         # forgot to regenerate. `--clean` because a cached one would defeat that.
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --clean
+
+      - name: Sign with v1 as well as v2
+        # `assembleDebug` signs v2-only once minSdk is 24+. Android 7+ accepts that,
+        # but several OEM package installers still want the v1 (JAR) signature for a
+        # sideloaded APK and reject it otherwise — again as a bare "App not installed".
+        #
+        # Edited after prebuild because `android/` is generated and not in the
+        # repository; doing it here keeps app.json the single source of configuration.
+        working-directory: apps/mobile/android
+        run: |
+          python3 - <<'PY'
+          import re, pathlib
+          p = pathlib.Path('app/build.gradle')
+          s = p.read_text()
+          # The debug signingConfig always exists in the React Native template.
+          s = re.sub(
+              r"(signingConfigs\s*\{\s*debug\s*\{)",
+              r"
+            enableV1Signing true
+            enableV2Signing true",
+              s, count=1)
+          p.write_text(s)
+          print('v1 signing enabled' if 'enableV1Signing' in s else 'WARNING: could not patch')
+          PY
 
       - name: Cache Gradle
         uses: actions/cache@v4

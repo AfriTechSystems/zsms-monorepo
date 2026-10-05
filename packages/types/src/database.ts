@@ -1743,7 +1743,7 @@ export type Database = {
           paid_at: string
           payment_method: string
           proof_of_payment_url: string | null
-          receipt_number: string
+          receipt_number: string | null
           receipt_url: string | null
           recorded_by_user_id: string
           rejection_reason: string | null
@@ -1751,6 +1751,8 @@ export type Database = {
           school_id: string
           status: string
           student_id: string
+          submission_reference: string | null
+          transaction_reference: string | null
           verified_at: string | null
           verified_by: string | null
           webhook_verified: boolean
@@ -1772,7 +1774,7 @@ export type Database = {
           paid_at?: string
           payment_method: string
           proof_of_payment_url?: string | null
-          receipt_number: string
+          receipt_number?: string | null
           receipt_url?: string | null
           recorded_by_user_id: string
           rejection_reason?: string | null
@@ -1780,6 +1782,8 @@ export type Database = {
           school_id: string
           status?: string
           student_id: string
+          submission_reference?: string | null
+          transaction_reference?: string | null
           verified_at?: string | null
           verified_by?: string | null
           webhook_verified?: boolean
@@ -1801,7 +1805,7 @@ export type Database = {
           paid_at?: string
           payment_method?: string
           proof_of_payment_url?: string | null
-          receipt_number?: string
+          receipt_number?: string | null
           receipt_url?: string | null
           recorded_by_user_id?: string
           rejection_reason?: string | null
@@ -1809,6 +1813,8 @@ export type Database = {
           school_id?: string
           status?: string
           student_id?: string
+          submission_reference?: string | null
+          transaction_reference?: string | null
           verified_at?: string | null
           verified_by?: string | null
           webhook_verified?: boolean
@@ -3165,6 +3171,94 @@ export type Database = {
           },
           {
             foreignKeyName: "school_onboarding_contacts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_payment_details: {
+        Row: {
+          account_name: string | null
+          account_number: string | null
+          bank_name: string | null
+          branch: string | null
+          created_at: string
+          created_by: string | null
+          display_order: number
+          gateway_account_ref: string | null
+          gateway_name: string | null
+          id: string
+          instructions: string | null
+          is_active: boolean
+          label: string
+          method_kind: string
+          phone_number: string | null
+          provider: string | null
+          school_id: string
+          swift_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          gateway_account_ref?: string | null
+          gateway_name?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          label: string
+          method_kind: string
+          phone_number?: string | null
+          provider?: string | null
+          school_id: string
+          swift_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          gateway_account_ref?: string | null
+          gateway_name?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          label?: string
+          method_kind?: string
+          phone_number?: string | null
+          provider?: string | null
+          school_id?: string
+          swift_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payment_details_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_payment_details_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_payment_details_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -5021,6 +5115,15 @@ export type Database = {
           status: string
         }[]
       }
+      admin_ai_generation_status: {
+        Args: never
+        Returns: {
+          out_description: string
+          out_enabled: boolean
+          out_updated_at: string
+          out_updated_by: string
+        }[]
+      }
       admin_ai_usage_breakdown: {
         Args: { p_dimension?: string; p_school_id?: string }
         Returns: {
@@ -5194,6 +5297,10 @@ export type Database = {
           out_teachers_assigned: number
         }[]
       }
+      admin_set_ai_generation: {
+        Args: { p_enabled: boolean; p_reason: string }
+        Returns: boolean
+      }
       admin_set_onboarding_task: {
         Args: {
           p_assigned_to?: string
@@ -5356,6 +5463,7 @@ export type Database = {
         Returns: string
       }
       ai_generation_config: { Args: { p_feature_key: string }; Returns: Json }
+      ai_live_generation: { Args: never; Returns: boolean }
       allocate_payment: {
         Args: {
           p_allocations?: Json
@@ -5690,6 +5798,13 @@ export type Database = {
         Returns: string
       }
       mask_audit_values: { Args: { p_values: Json }; Returns: Json }
+      move_timetable_slot: {
+        Args: { p_day_of_week: number; p_period_id: string; p_slot_id: string }
+        Returns: {
+          out_moved: string
+          out_swapped_with: string
+        }[]
+      }
       my_ai_credits: { Args: never; Returns: Json }
       my_children: {
         Args: never
@@ -6639,6 +6754,14 @@ export type Database = {
         Args: { p_resource_kind: string }
         Returns: string
       }
+      timetable_move_conflicts: {
+        Args: { p_day_of_week: number; p_period_id: string; p_slot_id: string }
+        Returns: {
+          out_class_id: string
+          out_detail: string
+          out_kind: string
+        }[]
+      }
       timetable_slot_options: {
         Args: { p_class_id: string }
         Returns: {
@@ -6695,7 +6818,7 @@ export type Database = {
           paid_at: string
           payment_method: string
           proof_of_payment_url: string | null
-          receipt_number: string
+          receipt_number: string | null
           receipt_url: string | null
           recorded_by_user_id: string
           rejection_reason: string | null
@@ -6703,6 +6826,8 @@ export type Database = {
           school_id: string
           status: string
           student_id: string
+          submission_reference: string | null
+          transaction_reference: string | null
           verified_at: string | null
           verified_by: string | null
           webhook_verified: boolean

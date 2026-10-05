@@ -5468,10 +5468,12 @@ export type Database = {
         Args: {
           p_allocations?: Json
           p_amount: number
+          p_confirmation_at?: string
           p_notes?: string
           p_payment_method: string
           p_proof_url?: string
           p_student_id: string
+          p_transaction_reference?: string
         }
         Returns: {
           out_amount: number
@@ -5995,6 +5997,15 @@ export type Database = {
       parent_has_student_in_current_school: {
         Args: { p_parent_id: string }
         Returns: boolean
+      }
+      payment_reference_already_used: {
+        Args: { p_reference: string; p_student_id: string }
+        Returns: {
+          out_amount: number
+          out_payment_id: string
+          out_status: string
+          out_submitted: string
+        }[]
       }
       platform_metrics: {
         Args: never

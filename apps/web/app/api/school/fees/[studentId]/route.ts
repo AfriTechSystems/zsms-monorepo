@@ -185,6 +185,19 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
         : null,
       p_notes: v.notes ?? null,
       p_proof_url: null,
+      /*
+        NULL, deliberately.
+
+        `confirmation_checkbox_at` records that a PERSON ticked a declaration —
+        "I confirm that this payment has been made". An accountant recording cash
+        over the counter ticked nothing, and until `0213` this function wrote
+        `NOW()` on every row regardless, so the column said yes for payments
+        nobody had ever confirmed. Absent is the honest answer.
+      */
+      p_confirmation_at: null,
+      // The accountant path has its own fields for a bank or cheque reference;
+      // this column is what a PAYER typed, which here is nobody.
+      p_transaction_reference: null,
     })
 
     if (error) {

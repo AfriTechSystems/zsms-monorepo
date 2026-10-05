@@ -110,9 +110,9 @@ jobs:
           if [ "${{ inputs.variant }}" = "standalone" ]; then
             # Release, but signed with the debug key — installable for testing without
             # a keystore. Not for the Play Store; that needs a real signing key.
-            ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+            ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
           else
-            ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a
+            ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
           fi
 
       # arm64-v8a alone: every Android phone made in the last several years is arm64,

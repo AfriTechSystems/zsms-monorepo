@@ -14,16 +14,21 @@
 import type { JSX } from 'react'
 import { useEffect } from 'react'
 import { Redirect, useRouter } from 'expo-router'
+import { useAuth, useOrganizationList } from '@clerk/clerk-expo'
 import { View } from 'react-native'
 
 import { api } from '../lib/api'
 import { useSession } from '../lib/auth'
+import { activateOnlySchool } from '../lib/active-school'
 import { Loading, Screen, usePalette } from '../components/ui'
 import { SPACE } from '../theme'
 import { Wordmark } from '../components/wordmark'
 
 export default function Index(): JSX.Element {
   const { isLoaded, isSignedIn, getToken } = useSession()
+  // Clerk's own view of the session, for the organisation the token's `o` claim needs.
+  const { orgId } = useAuth()
+  const orgList = useOrganizationList({ userMemberships: true })
   const router = useRouter()
   const c = usePalette()
 
@@ -43,7 +48,19 @@ export default function Index(): JSX.Element {
       the two cannot disagree about how many portals somebody has. A failure here falls
       through to the teacher app rather than stranding anybody on a splash screen.
     */
-    void api
+    /*
+      Put the account in its school BEFORE asking where it can go.
+
+      Every school-scoped query resolves through `current_school_uuid()`, which reads
+      the `o` claim — and Clerk only sets that claim when an organisation is ACTIVE.
+      The phone app called `setActive({ session })` and never activated an
+      organisation, so a teacher who belonged to a school signed in carrying no school
+      at all and saw none of its features. Nothing was wrong with their account.
+
+      Awaited rather than fired off: the portal list itself depends on the answer.
+    */
+    void activateOnlySchool(orgList, orgId).then(() =>
+      api
       .get<{ count: number; portals?: Array<{ kind: string }> }>(
         '/api/session/portals',
         getToken,
@@ -66,8 +83,9 @@ export default function Index(): JSX.Element {
       })
       // The portal list is a convenience, not a gate. If it cannot be read, fall
       // through to the teacher app rather than stranding anybody on a splash screen.
-      .catch(() => router.replace('/(teacher)/(tabs)'))
-  }, [isLoaded, isSignedIn, router, getToken])
+      .catch(() => router.replace('/(teacher)/(tabs)')),
+    )
+  }, [isLoaded, isSignedIn, router, getToken, orgList, orgId])
 
   if (isLoaded && !isSignedIn) return <Redirect href="/(auth)/sign-in" />
 

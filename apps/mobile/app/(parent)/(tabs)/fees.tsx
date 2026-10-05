@@ -16,16 +16,23 @@
  */
 
 import type { JSX } from 'react'
+import { useState } from 'react'
 import { RefreshControl, ScrollView, Text, View } from 'react-native'
 import { Receipt } from 'lucide-react-native'
 
 import { ChildSwitcher } from '../../../components/child-switcher'
+import {
+  PayFeesSheet,
+  type OutstandingRecord,
+  type SchoolAccount,
+} from '../../../components/pay-fees-sheet'
 import {
   Badge,
   Body,
   Caption,
   Card,
   Empty,
+  Button,
   ErrorNote,
   Loading,
   Row,
@@ -60,6 +67,10 @@ interface Payload {
   balance: { outstanding?: number | null; total_billed?: number | null; total_paid?: number | null } | null
   statement: StatementRow[]
   payments: Payment[]
+  /** Per-term balances, so a parent can say which term they are paying for. */
+  records?: OutstandingRecord[]
+  /** Where the school wants to be paid (`0212`). */
+  accounts?: SchoolAccount[]
 }
 
 const kwacha = (n: number): string =>
@@ -71,9 +82,19 @@ const shortDate = (iso: string): string =>
 export default function ParentFees(): JSX.Element {
   const c = usePalette()
   const { childId, setChildId } = useChild()
+  const [paying, setPaying] = useState(false)
+
   const { data, loading, error, reload } = useApi<Payload>(
     `/api/parent/fees${childQuery(childId)}`,
   )
+
+  /*
+    Which child this is for.
+
+    `childId` is null until the switcher has resolved one, in which case the first child
+    is the one on screen — the same rule the API applies when no `childId` is sent.
+  */
+  const chosen = (data?.children ?? []).find((x) => x.id === childId) ?? data?.children?.[0]
 
   const outstanding = data?.balance?.outstanding ?? 0
 
@@ -87,6 +108,19 @@ export default function ParentFees(): JSX.Element {
           <RefreshControl refreshing={loading} onRefresh={reload} tintColor={c.primary} />
         }
       >
+        {chosen && (
+          <PayFeesSheet
+            open={paying}
+            onClose={() => setPaying(false)}
+            childId={chosen.id}
+            childName={chosen.firstName ?? 'your child'}
+            /* Only terms with something owing: a settled term is not a choice. */
+            outstanding={(data?.records ?? []).filter((r) => Number(r.outstanding ?? 0) > 0)}
+            accounts={data?.accounts ?? []}
+            onRecorded={reload}
+          />
+        )}
+
         {error && <ErrorNote message={error} onRetry={reload} />}
         {loading && !data && <Loading label="Loading fees" />}
 
@@ -99,6 +133,21 @@ export default function ParentFees(): JSX.Element {
               >
                 {kwacha(outstanding)}
               </Text>
+              {/*
+                The action, immediately under the number it acts on.
+
+                A parent opens this tab to find out what they owe and then to pay it, so
+                the button belongs beside the figure rather than below a statement they
+                have to scroll past.
+              */}
+              <View style={{ marginTop: SPACE.stack }}>
+                <Button
+                  label="Pay school fees"
+                  onPress={() => setPaying(true)}
+                  disabled={!chosen}
+                />
+              </View>
+
               <Row gap={SPACE.lg}>
                 <View>
                   <Caption>Billed</Caption>

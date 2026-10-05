@@ -79,7 +79,16 @@ export async function apiCall<T>(
       ...init,
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        /*
+          JSON unless the body is FormData.
+
+          A multipart body must set its OWN Content-Type, because the header has to
+          carry the boundary string the runtime generated. Forcing
+          `application/json` here made every upload arrive as unparseable — and
+          spreading `init.headers` over it does not help, since there is no value that
+          REMOVES a header.
+        */
+        ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...(init.headers ?? {}),
       },
     })
@@ -120,6 +129,14 @@ export const api = {
   get: <T>(path: string, getToken: TokenGetter) => apiCall<T>(path, getToken),
   post: <T>(path: string, getToken: TokenGetter, body: unknown) =>
     apiCall<T>(path, getToken, { method: 'POST', body: JSON.stringify(body) }),
+  /**
+   * A multipart POST, for a file.
+   *
+   * Separate from `post` so the body is passed through untouched — `JSON.stringify` on
+   * a FormData produces `{}`, which uploads nothing and reports success.
+   */
+  postForm: <T>(path: string, getToken: TokenGetter, body: FormData) =>
+    apiCall<T>(path, getToken, { method: 'POST', body }),
   patch: <T>(path: string, getToken: TokenGetter, body: unknown) =>
     apiCall<T>(path, getToken, { method: 'PATCH', body: JSON.stringify(body) }),
   /*

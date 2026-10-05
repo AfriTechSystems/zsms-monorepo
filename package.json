@@ -84,7 +84,8 @@
     "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "4.26.2",
     "react-native-svg": "15.15.4",
-    "react-native-worklets": "0.13.0"
+    "react-native-worklets": "0.13.0",
+    "expo-image-picker": "57.0.20"
   },
   "//native-singletons": "The react-native-* and expo-* entries in `overrides` exist because each holds singleton state on the native side and MUST appear exactly once. `@clerk/clerk-expo` and `expo-router` hoist a dozen Expo packages to the root, where loose peers like `react-native-gesture-handler: \"*\"` resolved to 3.3.0 while apps/mobile pinned 2.32.0 — incompatible majors, with expo-router/drawer using one and the app initialising the other. Every drawer and tab layout threw. Versions are whatever `expo install` picks for SDK 57, which is the set Expo tests together."
 }

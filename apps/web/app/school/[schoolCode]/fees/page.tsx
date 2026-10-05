@@ -26,7 +26,7 @@ import type { FormEvent, JSX } from 'react'
 import { Suspense, use, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ClipboardCheck, Receipt, Search, Wallet } from 'lucide-react'
+import { ClipboardCheck, Landmark, Receipt, Search, Wallet } from 'lucide-react'
 
 import { Pagination } from '../../../../components/ui/pagination'
 import { useApi } from '../../../../lib/use-api'
@@ -127,6 +127,15 @@ function FeesList({ base }: { base: string }): JSX.Element {
               <Link href={`${base}/fees/structures`}>
                 <Receipt aria-hidden="true" />
                 Fee structures
+              </Link>
+            </Button>
+            {/* Where parents pay. Beside the structures, because one says what is owed
+                and the other says where to send it, and a school setting up fees needs
+                both in the same sitting. */}
+            <Button variant="outline" asChild>
+              <Link href={`${base}/fees/accounts`}>
+                <Landmark aria-hidden="true" />
+                Where parents pay
               </Link>
             </Button>
             <Button variant={data.pendingVerification > 0 ? 'default' : 'outline'} asChild>

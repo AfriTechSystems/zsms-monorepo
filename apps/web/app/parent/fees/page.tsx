@@ -28,7 +28,7 @@
 import type { FormEvent, JSX } from 'react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, Send, Wallet } from 'lucide-react'
+import { Landmark, Loader2, Send, Wallet } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
@@ -76,6 +76,18 @@ interface Payload {
    * a total and a ledger, but never what the total was FOR.
    */
   records: FeeRecordRow[]
+  accounts: Array<{
+    id: string
+    method_kind: string
+    label: string
+    bank_name: string | null
+    account_name: string | null
+    account_number: string | null
+    branch: string | null
+    provider: string | null
+    phone_number: string | null
+    instructions: string | null
+  }>
   payments: Payment[]
 }
 
@@ -130,6 +142,39 @@ function ParentFees(): JSX.Element {
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<string>('bank_deposit')
   const [reference, setReference] = useState('')
+
+  /*
+    The confirmation box, and the moment it was ticked.
+
+    The timestamp is captured when the box is TICKED, not when the form is submitted,
+    because that is what it records — `allocate_payment()` refuses one older than ten
+    minutes, so a form left open on a shared machine cannot be submitted on somebody
+    else's tick.
+  */
+  const [confirmed, setConfirmed] = useState(false)
+  const [confirmedAt, setConfirmedAt] = useState<string | null>(null)
+
+  /** Which terms this payment is for. Empty means oldest-first, i.e. arrears first. */
+  const [chosenTerms, setChosenTerms] = useState<string[]>([])
+
+  /** Proof: the stored path, and the name to show back. */
+  const [proof, setProof] = useState<{ path: string; fileName: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  /*
+    Terms with something still owing, newest last.
+
+    `fee_record_status` already arrives from the GET ordered by due date, so this is a
+    filter rather than a second request.
+  */
+  const outstanding = useMemo(
+    () =>
+      (data?.records ?? []).filter((r) => Number(r.outstanding) > 0),
+    [data],
+  )
+
+  /** Current term first, which is what a parent paying on time wants. */
+  const currentTermId = outstanding.at(-1)?.id ?? null
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -145,6 +190,33 @@ function ParentFees(): JSX.Element {
         amount: num(amount),
         paymentMethod: method,
         reference: reference.trim() || undefined,
+        proofPath: proof?.path,
+        // Never `new Date()` here: the declaration was made when the box was ticked.
+        confirmedAt: confirmedAt ?? new Date().toISOString(),
+        /*
+          Only when the parent actually chose. Sending an allocation for every
+          outstanding term would override the oldest-first default with the same
+          thing spelled out, and would then be wrong the moment a balance changed
+          between loading the page and submitting.
+        */
+        allocations:
+          chosenTerms.length > 0
+            ? chosenTerms.map((id, i) => {
+                const rec = outstanding.find((r) => r.id === id)
+                const owed = Number(rec?.outstanding ?? 0)
+                // The last chosen term takes whatever is left, so the amounts always
+                // total the payment even when it does not divide evenly.
+                const spentBefore = chosenTerms
+                  .slice(0, i)
+                  .reduce(
+                    (t, prev) =>
+                      t + Math.min(Number(outstanding.find((r) => r.id === prev)?.outstanding ?? 0), num(amount) - t),
+                    0,
+                  )
+                const left = num(amount) - spentBefore
+                return { feeRecordId: id, amount: Math.min(owed, left) }
+              }).filter((a) => a.amount > 0)
+            : undefined,
       })
 
       setSaving(false)
@@ -156,9 +228,24 @@ function ParentFees(): JSX.Element {
       toast(result.data?.message ?? 'The school has been told about your payment.')
       setAmount('')
       setReference('')
+      setProof(null)
+      setConfirmed(false)
+      setConfirmedAt(null)
+      setChosenTerms([])
       reload()
     },
-    [data?.selected, amount, method, reference, toast, reload],
+    [
+      data?.selected,
+      amount,
+      method,
+      reference,
+      proof,
+      confirmedAt,
+      chosenTerms,
+      outstanding,
+      toast,
+      reload,
+    ],
   )
 
   const switchChild = useCallback(
@@ -240,9 +327,100 @@ function ParentFees(): JSX.Element {
         </Alert>
       ))}
 
+      {/*
+        Where to pay, before the form that records having paid.
+
+        In this order deliberately: a parent arriving to pay needs the account number
+        first, and a parent arriving to record a payment already has it. Putting the
+        claim form first would make the common case scroll past the thing it needs.
+      */}
+      {(data.accounts?.length ?? 0) > 0 && (
+        <Card className="mb-cards">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Landmark aria-hidden="true" className="size-5 text-primary" />
+              How to pay {data.selected.firstName}&apos;s fees
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-stack">
+            <p className="text-sm text-muted-foreground">
+              Pay the school directly using one of these, then record it below so they can
+              confirm it. ZSMS does not take the money.
+            </p>
+
+            <ul className="flex flex-col gap-stack">
+              {data.accounts.map((a) => (
+                <li key={a.id} className="rounded-md border border-border p-card">
+                  <p className="font-medium">{a.label}</p>
+
+                  <dl className="mt-1 grid gap-x-cards gap-y-1 text-sm sm:grid-cols-2">
+                    {a.bank_name && (
+                      <div>
+                        <dt className="text-muted-foreground">Bank</dt>
+                        <dd>{a.bank_name}</dd>
+                      </div>
+                    )}
+                    {a.account_name && (
+                      <div>
+                        <dt className="text-muted-foreground">Account name</dt>
+                        <dd>{a.account_name}</dd>
+                      </div>
+                    )}
+                    {a.account_number && (
+                      <div>
+                        <dt className="text-muted-foreground">Account number</dt>
+                        {/* Monospaced and spaced out: this gets copied by hand into a
+                            banking app, and a transposed digit sends the fees to a
+                            stranger. */}
+                        <dd data-numeric className="font-mono tracking-wide">
+                          {a.account_number}
+                        </dd>
+                      </div>
+                    )}
+                    {a.branch && (
+                      <div>
+                        <dt className="text-muted-foreground">Branch</dt>
+                        <dd>{a.branch}</dd>
+                      </div>
+                    )}
+                    {a.provider && (
+                      <div>
+                        <dt className="text-muted-foreground">Provider</dt>
+                        <dd>{a.provider}</dd>
+                      </div>
+                    )}
+                    {a.phone_number && (
+                      <div>
+                        <dt className="text-muted-foreground">Number</dt>
+                        <dd data-numeric className="font-mono tracking-wide">
+                          {a.phone_number}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+
+                  {a.instructions && (
+                    <p className="mt-stack text-sm text-muted-foreground">{a.instructions}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <FormSection
-        title="Tell the school you have paid"
-        description="Use this after paying at the bank or at the school office. It is not a card payment."
+        title="Pay school fees"
+        /*
+          The heading says "Pay"; the checkbox says "claim".
+
+          A parent looking for how to pay their child's fees looks for the word pay, so
+          hiding the feature behind "tell the school you have paid" made it hard to
+          find. But ZSMS takes no money here, so the thing actually being recorded is a
+          DECLARATION — and the confirmation box below says so in the parent's own
+          words before they can submit.
+        */
+        description="Pay the school directly using the details below, then record it here so they can confirm it."
       >
         <form onSubmit={submit} noValidate>
           <FormGrid columns={2}>
@@ -277,7 +455,7 @@ function ParentFees(): JSX.Element {
             <Field
               id="p-ref"
               label="Deposit slip or reference number"
-              hint="Helps the school find your payment on their statement."
+              hint="Helps the school find your payment on their statement, and warns you if you have already recorded this one."
             >
               {(props) => (
                 <Input
@@ -290,6 +468,138 @@ function ParentFees(): JSX.Element {
             </Field>
           </FormGrid>
 
+          {/* ---- which term this payment is for ---- */}
+          {outstanding.length > 1 && (
+            <fieldset className="mt-cards">
+              <legend className="text-sm font-medium">What is this payment for?</legend>
+              <p className="mb-stack text-sm text-muted-foreground">
+                Leave these unticked and the school will put it against your oldest
+                balance first, which clears arrears before the current term. Tick one or
+                more to say otherwise.
+              </p>
+
+              <div className="flex flex-col gap-2">
+                {outstanding.map((r) => (
+                  <label
+                    key={r.id}
+                    className="flex min-h-tap cursor-pointer items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4"
+                      checked={chosenTerms.includes(r.id)}
+                      onChange={(e) =>
+                        setChosenTerms((prev) =>
+                          e.target.checked
+                            ? [...prev, r.id]
+                            : prev.filter((x) => x !== r.id),
+                        )
+                      }
+                    />
+                    <span>
+                      {r.fee_label ?? 'Fees'} — Term {r.term_number}, {r.academic_year}
+                      {r.id === currentTermId && (
+                        <span className="ml-1.5 align-middle">
+                          <Badge variant="info">This term</Badge>
+                        </span>
+                      )}
+                    </span>
+                    <span data-numeric className="ml-auto text-muted-foreground">
+                      {kwacha(r.outstanding)} owing
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          {/* ---- proof of payment ---- */}
+          <div className="mt-cards flex flex-col gap-stack">
+            <Field
+              id="p-proof"
+              label="Proof of payment"
+              hint="A photo or screenshot of your mobile money message, or the bank slip. Not needed if you paid cash at the school office."
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                  disabled={uploading || !data?.selected}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file || !data?.selected) return
+                    setUploading(true)
+                    setFormError(null)
+
+                    /*
+                      Uploaded as soon as it is chosen, not at submit.
+
+                      A parent on a slow connection should spend the upload time while
+                      they are still filling the form, and a validation error must not
+                      make them photograph the receipt again.
+                    */
+                    const body = new FormData()
+                    body.append('file', file)
+                    body.append('childId', data.selected.id)
+
+                    void fetch('/api/parent/fees/proof', { method: 'POST', body })
+                      .then(async (res) => {
+                        const parsed = (await res.json().catch(() => null)) as
+                          | { data?: { path: string; fileName: string }; error?: string }
+                          | null
+                        if (res.ok && parsed?.data) {
+                          setProof(parsed.data)
+                        } else {
+                          setFormError(parsed?.error ?? 'That file could not be uploaded.')
+                        }
+                      })
+                      .catch(() =>
+                        setFormError('Could not upload the file. Check your connection.'),
+                      )
+                      .finally(() => setUploading(false))
+                  }}
+                />
+              )}
+            </Field>
+
+            {uploading && (
+              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                Uploading…
+              </p>
+            )}
+
+            {proof && !uploading && (
+              <p className="text-sm text-success">{proof.fileName} uploaded</p>
+            )}
+          </div>
+
+          {/* ---- the declaration ---- */}
+          <label className="mt-cards flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 shrink-0"
+              checked={confirmed}
+              onChange={(e) => {
+                setConfirmed(e.target.checked)
+                // Stamped when TICKED. `allocate_payment()` refuses one older than ten
+                // minutes, so a form left open cannot be submitted on this tick.
+                setConfirmedAt(e.target.checked ? new Date().toISOString() : null)
+              }}
+            />
+            <span>
+              {/*
+                The exact words from PAYMENTS.md, plus the one thing the heading does not
+                say: this is a CLAIM. The school decides whether it is true, and a parent
+                should know that before they tick rather than after a rejection.
+              */}
+              I confirm that this payment has been made and the information provided is
+              accurate. I understand this is a claim the school will check against their
+              records, and that false submissions may result in account suspension.
+            </span>
+          </label>
+
           {formError && (
             <Alert variant="danger" title="Not recorded" className="mt-stack">
               {formError}
@@ -297,13 +607,16 @@ function ParentFees(): JSX.Element {
           )}
 
           <FormActions>
-            <Button type="submit" disabled={saving || num(amount) <= 0}>
+            <Button
+              type="submit"
+              disabled={saving || uploading || !confirmed || num(amount) <= 0}
+            >
               {saving ? (
                 <Loader2 aria-hidden="true" className="animate-spin" />
               ) : (
                 <Send aria-hidden="true" />
               )}
-              Tell the school
+              Record this payment
             </Button>
           </FormActions>
         </form>

@@ -51,6 +51,8 @@ export default function ParentTimetable(): JSX.Element {
     // Clerk id — that is a handle for addressing somebody elsewhere in the system.
     subtitle: s.out_teacher_name,
     room: s.out_room,
+    // Break, lunch and assembly are drawn flat, so the lessons stand out.
+    teaching: s.out_slot_type === 'lesson' || s.out_slot_type === 'exam',
   }))
 
   return (

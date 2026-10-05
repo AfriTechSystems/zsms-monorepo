@@ -29,23 +29,29 @@ export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const timetableId = url.searchParams.get('timetableId')
 
-    const [grid, timetables, subjects, staff] = await Promise.all([
+    /*
+      `classId` decides what the subject and teacher dropdowns may offer.
+
+      The spec scopes subjects to the class's grade level and teachers to a matching
+      `teacher_assignments` row — "cannot assign an unrelated teacher". Both come from
+      `timetable_slot_options()`, which knows the mapping between two level-type
+      vocabularies that do not share a value set.
+    */
+    const classId = url.searchParams.get('classId')
+
+    const [grid, timetables, classes, options] = await Promise.all([
       client.rpc('school_timetable', { p_timetable_id: timetableId }),
       client
         .from('timetables')
         .select('id, name, academic_year, term_number, is_active, published, published_at')
         .order('created_at', { ascending: false }),
-      client
-        .from('school_subjects')
-        .select('id, subject_code, subject_name')
-        .order('subject_name', { ascending: true }),
-      // Who can be put in front of a class. A `clerk_user_id` is needed to save the
-      // slot; the name is what the builder shows.
-      client
-        .from('staff_members')
-        .select('clerk_user_id, first_name, last_name, is_active')
-        .eq('is_active', true)
-        .order('last_name', { ascending: true }),
+      // The school's classes come from its PUPILS, not from timetable slots. Deriving
+      // them from slots meant a new timetable had no classes, so no cell could be
+      // opened, so no slot could ever be created.
+      client.rpc('school_class_list'),
+      classId
+        ? client.rpc('timetable_slot_options', { p_class_id: classId })
+        : Promise.resolve({ data: [], error: null }),
     ])
 
     if (grid.error) {
@@ -56,11 +62,32 @@ export async function GET(request: Request): Promise<Response> {
     const caller = await getAuthProvider().getSessionUser()
     const canEdit = can(caller?.role as Role, 'settings:write')
 
+    type Option = {
+      out_kind: string
+      out_id: string
+      out_label: string | null
+      out_detail: string | null
+      out_subject_id: string | null
+    }
+    const opts = (options.data ?? []) as unknown as Option[]
+
     return ok({
       grid: grid.data ?? [],
       timetables: timetables.data ?? [],
-      subjects: subjects.data ?? [],
-      staff: staff.data ?? [],
+      classes: classes.data ?? [],
+      subjects: opts
+        .filter((o) => o.out_kind === 'subject')
+        .map((o) => ({ id: o.out_id, name: o.out_label, detail: o.out_detail })),
+      staff: opts
+        .filter((o) => o.out_kind === 'teacher')
+        .map((o) => ({
+          id: o.out_id,
+          name: o.out_label,
+          detail: o.out_detail,
+          // Which subject the assignment covers — null for a form teacher, who covers
+          // any. Lets the screen narrow the list once a subject is chosen.
+          subjectId: o.out_subject_id,
+        })),
       // The screen renders read-only for a teacher rather than hiding itself: seeing
       // the school's week is useful even when editing it is not yours to do.
       canEdit,
@@ -77,6 +104,9 @@ const slotSchema = z.object({
   staffUserId: z.string().trim().max(120).nullable().optional(),
   slotType: z.enum(['lesson', 'break', 'assembly', 'free', 'exam']).default('lesson'),
   room: z.string().trim().max(60).nullable().optional(),
+  // The spec's panel includes it; `0205` added the parameter it had been missing, so
+  // a note typed here used to be saved into nothing.
+  notes: z.string().trim().max(500).nullable().optional(),
 })
 
 export async function POST(request: Request): Promise<Response> {
@@ -97,6 +127,7 @@ export async function POST(request: Request): Promise<Response> {
         p_staff_user_id: parsed.data.staffUserId ?? null,
         p_slot_type: parsed.data.slotType,
         p_room: parsed.data.room ?? null,
+        p_notes: parsed.data.notes ?? null,
       })
       .maybeSingle()
 

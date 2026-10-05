@@ -1,28 +1,34 @@
 /**
  * A week of lessons, on a phone.
  *
- * Spec: `Official Documentation/08 Staff Management/TIMETABLE.md`
+ * Spec: `Official Documentation/08 Staff Management/TIMETABLE.md`, and the agreed
+ *       mobile design.
  *
- * ## Days stacked, not a grid
+ * ## One day at a time, chosen from a strip
  *
- * A five-column grid on a phone is five unreadable columns. The week is stacked by day
- * instead, with today first — because the question somebody opens this to answer is
- * almost always "what have I got now", and scrolling to Thursday is the rare case.
+ * A five-column grid on a phone is five unreadable columns. The design picks a day
+ * from a row of chips and lists that day's lessons — which is also how somebody thinks
+ * about it: "what have I got today", then occasionally "what about Thursday".
  *
- * ## Shared by both apps
+ * The strip opens on today, and a Today button returns there once you have wandered.
+ * At the weekend it opens on Monday, which is what somebody checking on a Sunday
+ * evening wants.
  *
- * A teacher's week shows the class; a parent's shows the teacher. Everything else —
- * the ordering, today-first, the empty days, the times — is the same question asked
- * about a different person, so it is one component with a `subtitle` the caller
- * supplies rather than two that drift.
+ * ## Colour carries the subject
+ *
+ * The same palette as the web grid, derived from the subject name rather than stored,
+ * so a school gets a full set without configuring one and Mathematics is the same
+ * colour on both.
  */
 
 import type { JSX } from 'react'
-import { useMemo } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { useMemo, useState } from 'react'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { ChevronLeft, ChevronRight } from 'lucide-react-native'
 
-import { Badge, Caption, Card, usePalette } from './ui'
-import { SPACE, TYPE } from '../theme'
+import { Caption, usePalette } from './ui'
+import { subjectTone } from '../lib/subject-tone'
+import { RADIUS, SPACE, TAP, TYPE } from '../theme'
 
 export interface WeekSlot {
   day: number
@@ -34,85 +40,245 @@ export interface WeekSlot {
   /** The class, for a teacher; the teacher, for a parent. */
   subtitle: string | null
   room: string | null
+  /** False for break, lunch and assembly — drawn flat, with no colour. */
+  teaching: boolean
 }
 
 const DAYS = [
-  { n: 1, label: 'Monday' },
-  { n: 2, label: 'Tuesday' },
-  { n: 3, label: 'Wednesday' },
-  { n: 4, label: 'Thursday' },
-  { n: 5, label: 'Friday' },
+  { n: 1, short: 'Mon', label: 'Monday' },
+  { n: 2, short: 'Tue', label: 'Tuesday' },
+  { n: 3, short: 'Wed', label: 'Wednesday' },
+  { n: 4, short: 'Thu', label: 'Thursday' },
+  { n: 5, short: 'Fri', label: 'Friday' },
 ] as const
 
 const hhmm = (t: string): string => t.slice(0, 5)
 
+/** Monday-based date for a weekday number, in the current week. */
+function dateFor(day: number): Date {
+  const now = new Date()
+  const todayIso = now.getDay() === 0 ? 7 : now.getDay()
+  const d = new Date(now)
+  d.setDate(now.getDate() + (day - todayIso))
+  return d
+}
+
 export function WeekGrid({ slots }: { slots: WeekSlot[] }): JSX.Element {
   const c = usePalette()
 
-  /*
-    Today first, then the rest of the week in order.
+  // Today, or Monday at the weekend.
+  const todayIso = new Date().getDay()
+  const [day, setDay] = useState(todayIso >= 1 && todayIso <= 5 ? todayIso : 1)
 
-    `getDay()` is 0 for Sunday; the schema uses 1–5 for Monday–Friday. At the weekend
-    there is no "today" in that range, so the week simply starts at Monday — which is
-    what somebody checking on a Sunday evening wants anyway.
-  */
-  const ordered = useMemo(() => {
-    const today = new Date().getDay()
-    const start = today >= 1 && today <= 5 ? today : 1
-    const rotated = [...DAYS]
-    while (rotated[0] && rotated[0].n !== start) rotated.push(rotated.shift()!)
-    return rotated
-  }, [])
+  const forDay = useMemo(
+    () => slots.filter((s) => s.day === day).sort((a, b) => a.periodOrder - b.periodOrder),
+    [slots, day],
+  )
 
-  const byDay = useMemo(() => {
-    const map = new Map<number, WeekSlot[]>()
-    for (const s of slots) {
-      const list = map.get(s.day) ?? []
-      list.push(s)
-      map.set(s.day, list)
-    }
-    for (const list of map.values()) list.sort((a, b) => a.periodOrder - b.periodOrder)
-    return map
-  }, [slots])
-
-  const todayN = new Date().getDay()
+  const chosen = dateFor(day)
+  const isToday = day === todayIso
 
   return (
-    <ScrollView
-      contentContainerStyle={{ padding: SPACE.gutter, gap: SPACE.md, paddingBottom: SPACE.xxl }}
-    >
-      {ordered.map((d) => {
-        const list = byDay.get(d.n) ?? []
-        const isToday = d.n === todayN
+    <View style={{ flex: 1 }}>
+      {/* ---- the day strip ---- */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: SPACE.xs,
+          paddingHorizontal: SPACE.gutter,
+          paddingVertical: SPACE.sm,
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous day"
+          disabled={day <= 1}
+          onPress={() => setDay((d) => Math.max(1, d - 1))}
+          style={{
+            width: TAP,
+            height: TAP,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: RADIUS.md,
+            opacity: day <= 1 ? 0.3 : 1,
+          }}
+        >
+          <ChevronLeft size={20} color={c.textMuted} />
+        </Pressable>
 
-        return (
-          <View key={d.n} style={{ gap: SPACE.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
-              <Text style={[TYPE.heading, { color: c.text }]}>{d.label}</Text>
-              {isToday && <Badge label="Today" tone="primary" />}
-            </View>
+        {DAYS.map((d) => {
+          const active = d.n === day
+          const date = dateFor(d.n)
+          return (
+            <Pressable
+              key={d.n}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={d.label}
+              onPress={() => setDay(d.n)}
+              style={{
+                flex: 1,
+                minHeight: TAP,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: SPACE.xs,
+                borderRadius: RADIUS.md,
+                backgroundColor: active ? c.primary : c.surface,
+                borderWidth: 1,
+                borderColor: active ? c.primary : c.border,
+              }}
+            >
+              <Text
+                style={[TYPE.caption, { color: active ? c.onPrimary : c.textMuted }]}
+              >
+                {d.short}
+              </Text>
+              <Text
+                style={[
+                  TYPE.body,
+                  { color: active ? c.onPrimary : c.text, fontWeight: '700' },
+                ]}
+              >
+                {date.getDate()}
+              </Text>
+            </Pressable>
+          )
+        })}
 
-            {list.length === 0 ? (
-              <Caption>Nothing scheduled.</Caption>
-            ) : (
-              list.map((s, i) => (
-                <Card key={`${s.periodOrder}-${i}`}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next day"
+          disabled={day >= 5}
+          onPress={() => setDay((d) => Math.min(5, d + 1))}
+          style={{
+            width: TAP,
+            height: TAP,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: RADIUS.md,
+            opacity: day >= 5 ? 0.3 : 1,
+          }}
+        >
+          <ChevronRight size={20} color={c.textMuted} />
+        </Pressable>
+      </View>
+
+      {/* ---- the chosen day ---- */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: SPACE.gutter,
+          paddingBottom: SPACE.sm,
+        }}
+      >
+        <Text style={[TYPE.heading, { color: c.text }]}>
+          {DAYS.find((d) => d.n === day)?.label},{' '}
+          {chosen.toLocaleDateString('en-ZM', { day: 'numeric', month: 'long' })}
+        </Text>
+
+        {/* Only when it would do something — a button that returns you where you
+            already are is noise. */}
+        {!isToday && todayIso >= 1 && todayIso <= 5 && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setDay(todayIso)}
+            style={{
+              minHeight: TAP,
+              justifyContent: 'center',
+              paddingHorizontal: SPACE.md,
+              borderRadius: RADIUS.full,
+              backgroundColor: c.primaryTint,
+            }}
+          >
+            <Text style={[TYPE.label, { color: c.primaryMark }]}>Today</Text>
+          </Pressable>
+        )}
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: SPACE.gutter,
+          gap: SPACE.sm,
+          paddingBottom: SPACE.xxl,
+        }}
+      >
+        {forDay.length === 0 ? (
+          <Caption>Nothing scheduled.</Caption>
+        ) : (
+          forDay.map((s, i) => {
+            const tone = subjectTone(s.teaching ? s.title : null, c)
+
+            return (
+              <View
+                key={`${s.periodOrder}-${i}`}
+                style={{ flexDirection: 'row', alignItems: 'stretch', gap: SPACE.sm }}
+              >
+                {/* The time, stacked, in its own column — so the eye runs down the
+                    day rather than reading each row twice. */}
+                <View
+                  style={{
+                    width: 62,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: SPACE.sm,
+                    borderRadius: RADIUS.md,
+                    backgroundColor: c.surfaceSunken,
+                  }}
+                >
                   <Text style={[TYPE.caption, { color: c.textMuted }]}>
-                    {hhmm(s.startTime)}–{hhmm(s.endTime)} · {s.periodName}
+                    {hhmm(s.startTime)}
                   </Text>
-                  <Text style={[TYPE.body, { color: c.text, fontWeight: '600' }]}>
-                    {s.title}
+                  <Text style={[TYPE.caption, { color: c.textSubtle }]}>–</Text>
+                  <Text style={[TYPE.caption, { color: c.textMuted }]}>
+                    {hhmm(s.endTime)}
                   </Text>
-                  {s.subtitle && (
-                    <Text style={[TYPE.body, { color: c.textMuted }]}>{s.subtitle}</Text>
+                </View>
+
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: SPACE.sm,
+                    padding: SPACE.card,
+                    borderRadius: RADIUS.lg,
+                    backgroundColor: tone.background,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[TYPE.body, { color: tone.text, fontWeight: '700' }]}>
+                      {s.title}
+                    </Text>
+                    {s.subtitle && (
+                      <Text style={[TYPE.caption, { color: tone.text, opacity: 0.85 }]}>
+                        {s.subtitle}
+                      </Text>
+                    )}
+                  </View>
+
+                  {s.room && (
+                    <View
+                      style={{
+                        paddingHorizontal: SPACE.sm,
+                        paddingVertical: 4,
+                        borderRadius: RADIUS.md,
+                        backgroundColor: tone.badge,
+                      }}
+                    >
+                      <Text style={[TYPE.caption, { color: tone.text, fontWeight: '600' }]}>
+                        {s.room}
+                      </Text>
+                    </View>
                   )}
-                  {s.room && <Badge label={s.room} tone="neutral" />}
-                </Card>
-              ))
-            )}
-          </View>
-        )
-      })}
-    </ScrollView>
+                </View>
+              </View>
+            )
+          })
+        )}
+      </ScrollView>
+    </View>
   )
 }

@@ -6157,6 +6157,15 @@ export type Database = {
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }
+      school_class_list: {
+        Args: never
+        Returns: {
+          out_class_id: string
+          out_level_id: string
+          out_level_name: string
+          out_pupils: number
+        }[]
+      }
       school_class_readiness: {
         Args: { p_academic_year?: string; p_term_number?: number }
         Returns: {
@@ -6532,6 +6541,7 @@ export type Database = {
         Args: {
           p_class_id: string
           p_day_of_week: number
+          p_notes?: string
           p_period_id: string
           p_room?: string
           p_slot_type?: string
@@ -6620,6 +6630,16 @@ export type Database = {
       teaching_resource_feature_key: {
         Args: { p_resource_kind: string }
         Returns: string
+      }
+      timetable_slot_options: {
+        Args: { p_class_id: string }
+        Returns: {
+          out_detail: string
+          out_id: string
+          out_kind: string
+          out_label: string
+          out_subject_id: string
+        }[]
       }
       transfer_student: {
         Args: {

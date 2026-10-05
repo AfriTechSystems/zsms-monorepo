@@ -53,6 +53,8 @@ export default function TeacherTimetable(): JSX.Element {
     // A teacher's week is defined by WHICH CLASS they are with.
     subtitle: s.out_class_id,
     room: s.out_room,
+    // Break, lunch and assembly are drawn flat, so the lessons stand out.
+    teaching: s.out_slot_type === 'lesson' || s.out_slot_type === 'exam',
   }))
 
   if (error) {

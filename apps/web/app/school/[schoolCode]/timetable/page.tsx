@@ -5,24 +5,28 @@
  *
  * Spec: `Official Documentation/08 Staff Management/TIMETABLE.md`
  *
- * ## A grid of cells, edited one at a time
+ * ## What the first version got wrong
  *
- * The spec describes drag-and-drop. This is a grid where a cell opens an editor, which
- * does the same job on a laptop and still works on the tablet a deputy actually carries
- * round a staffroom. Drag-and-drop can be added over the same endpoint later; the
- * saving, the clash detection and the permissions do not change.
+ * Reported from use: "dropdowns are not working, required fields are not showing."
+ * Three faults, all mine:
  *
- * ## Clashes come from the database, phrased for a person
+ *   * The CLASS list was derived from existing timetable slots. A new timetable has
+ *     none, so the list was empty, so no cell could be opened and no slot could ever
+ *     be created. Classes come from the school's PUPILS, which exist first.
+ *   * The SUBJECT list offered every subject the school has. The spec says "subjects
+ *     for this grade level", and a Grade 2 class was being offered A-Level Biology.
+ *   * The TEACHER list offered every active member of staff, including the bursar.
+ *     The spec is explicit: only teachers with a matching `teacher_assignments` row.
  *
- * Partial unique indexes make a double-booking impossible, and `set_timetable_slot()`
- * turns the violation into "That teacher is already taking 9B at this time". This
- * screen shows that sentence. It does not check for clashes itself — a check here would
- * race two deputies editing at once and would be the copy that drifts.
+ * All three now come from `school_class_list()` and `timetable_slot_options()`.
+ * `notes`, which the spec's panel includes and I had omitted, is here too.
  *
- * ## Draft and published are a real distinction
+ * ## Clashes are the database's answer
  *
- * Nobody but management sees a draft, which is the point: next term's grid can be built
- * in front of this term's without a teacher reading a version that will change.
+ * Partial unique indexes make a double-booking impossible and `set_timetable_slot()`
+ * phrases the violation — "That teacher is already taking 9B at this time". This
+ * screen shows that sentence and checks nothing itself: a check here would race two
+ * deputies editing at once and would be the copy that drifts.
  */
 
 import type { JSX } from 'react'
@@ -32,20 +36,19 @@ import { CalendarDays, Check, Eye, EyeOff, Trash2, X } from 'lucide-react'
 import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../../../../components/ui/card'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
-import { Field, Input, Select } from '../../../../components/ui/field'
+import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
 import { useToast } from '../../../../components/ui/toast'
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { TimetableSetup, type PeriodRow } from './setup'
-
-const DAYS = [
-  { n: 1, label: 'Monday', short: 'Mon' },
-  { n: 2, label: 'Tuesday', short: 'Tue' },
-  { n: 3, label: 'Wednesday', short: 'Wed' },
-  { n: 4, label: 'Thursday', short: 'Thu' },
-  { n: 5, label: 'Friday', short: 'Fri' },
-] as const
+import { DAYS, WeekGrid, hhmm, type Period, type Slot } from './week-grid'
 
 interface GridRow {
   out_timetable_id: string
@@ -68,6 +71,13 @@ interface GridRow {
   out_room: string | null
 }
 
+interface Option {
+  id: string
+  name: string | null
+  detail: string | null
+  subjectId?: string | null
+}
+
 interface Payload {
   grid: GridRow[]
   timetables: Array<{
@@ -78,13 +88,13 @@ interface Payload {
     is_active: boolean
     published: boolean
   }>
-  subjects: Array<{ id: string; subject_code: string; subject_name: string }>
-  staff: Array<{ clerk_user_id: string; first_name: string; last_name: string }>
+  classes: Array<{ out_class_id: string; out_pupils: number; out_level_name: string | null }>
+  subjects: Option[]
+  staff: Option[]
   canEdit: boolean
 }
 
 interface Editing {
-  classId: string
   periodId: string
   periodName: string
   dayOfWeek: number
@@ -92,10 +102,8 @@ interface Editing {
   subjectId: string
   staffUserId: string
   room: string
-  slotType: string
+  notes: string
 }
-
-const hhmm = (t: string): string => t.slice(0, 5)
 
 export default function TimetablePage(): JSX.Element {
   const { toast } = useToast()
@@ -104,73 +112,104 @@ export default function TimetablePage(): JSX.Element {
   const [editing, setEditing] = useState<Editing | null>(null)
   const [busy, setBusy] = useState(false)
 
+  /*
+    `classId` is part of the request, not just a filter.
+
+    Subjects are scoped to the class's grade level and teachers to its assignments, so
+    changing the class has to re-ask the server rather than filter what is already here.
+  */
+  const query = new URLSearchParams()
+  if (timetableId) query.set('timetableId', timetableId)
+  if (classId) query.set('classId', classId)
+
   const { data, loading, error, code, reload } = useApi<Payload>(
-    `/api/school/timetable${timetableId ? `?timetableId=${timetableId}` : ''}`,
+    `/api/school/timetable${query.toString() ? `?${query.toString()}` : ''}`,
   )
 
-  // Memoised: `data?.grid ?? []` builds a new array on every render, so the three
-  // hooks below would recompute each time and `slotAt` would change identity.
   const grid = useMemo(() => data?.grid ?? [], [data])
   const current = data?.timetables.find((t) => t.id === (timetableId ?? grid[0]?.out_timetable_id))
 
-  // Every period, once. The grid returns a row per period-slot pairing, so the row
-  // labels have to be collapsed out of it.
-  const periods = useMemo(() => {
-    const seen = new Map<string, GridRow>()
-    for (const r of grid) if (!seen.has(r.out_period_id)) seen.set(r.out_period_id, r)
-    return [...seen.values()].sort((a, b) => a.out_period_order - b.out_period_order)
-  }, [grid])
+  // Default to the first class once the list arrives, so the grid is never blank for
+  // want of a selection nobody was asked to make.
+  const shownClass = classId || data?.classes[0]?.out_class_id || ''
 
-  /*
-    Which classes to show as columns.
-
-    Taken from the slots that exist, plus whatever the user types in. A school with no
-    timetable yet has no classes to infer, so the field is how the first one is added —
-    rather than a separate "create a class" step for something that is only a label.
-  */
-  const classes = useMemo(() => {
-    const set = new Set(grid.map((r) => r.out_class_id).filter((c): c is string => Boolean(c)))
-    return [...set].sort()
+  const periods: Period[] = useMemo(() => {
+    const seen = new Map<string, Period>()
+    for (const r of grid) {
+      if (seen.has(r.out_period_id)) continue
+      seen.set(r.out_period_id, {
+        id: r.out_period_id,
+        name: r.out_period_name,
+        startTime: r.out_start_time,
+        endTime: r.out_end_time,
+        order: r.out_period_order,
+        teaching: r.out_teaching,
+        appliesDays: r.out_applies_days,
+      })
+    }
+    return [...seen.values()].sort((a, b) => a.order - b.order)
   }, [grid])
 
   const periodRows: PeriodRow[] = useMemo(
     () =>
       periods.map((p) => ({
-        id: p.out_period_id,
-        name: p.out_period_name,
-        startTime: p.out_start_time,
-        endTime: p.out_end_time,
-        order: p.out_period_order,
-        appliesDays: p.out_applies_days,
-        teaching: p.out_teaching,
+        id: p.id,
+        name: p.name,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        order: p.order,
+        appliesDays: p.appliesDays,
+        teaching: p.teaching,
       })),
     [periods],
   )
 
-  const slotAt = useCallback(
-    (periodId: string, day: number, cls: string): GridRow | undefined =>
-      grid.find(
-        (r) => r.out_period_id === periodId && r.out_day_of_week === day && r.out_class_id === cls,
-      ),
-    [grid],
+  const slots: Slot[] = useMemo(
+    () =>
+      grid
+        .filter((r) => r.out_slot_id && r.out_class_id === shownClass && r.out_day_of_week)
+        .map((r) => ({
+          id: r.out_slot_id as string,
+          periodId: r.out_period_id,
+          day: r.out_day_of_week as number,
+          subjectName: r.out_subject_name,
+          teacherName: data?.staff.find((s) => s.id === r.out_staff_user_id)?.name ?? null,
+          room: r.out_room,
+          slotType: r.out_slot_type ?? 'lesson',
+        })),
+    [grid, shownClass, data],
   )
 
+  /*
+    Teachers this subject's assignment covers.
+
+    A form teacher (`subjectId: null`) covers any subject; a subject teacher covers
+    one. Narrowed in the browser because the server already sent both facts — a round
+    trip on every dropdown change would be slower and no more correct.
+  */
+  const eligibleStaff = useMemo(() => {
+    const all = data?.staff ?? []
+    if (!editing?.subjectId) return all
+    return all.filter((s) => !s.subjectId || s.subjectId === editing.subjectId)
+  }, [data, editing])
+
   const save = useCallback(async () => {
-    if (!editing || !current) return
+    if (!editing || !current || !shownClass) return
     setBusy(true)
     try {
       const result = await apiSend('/api/school/timetable', 'POST', {
         timetableId: current.id,
-        classId: editing.classId,
+        classId: shownClass,
         periodId: editing.periodId,
         dayOfWeek: editing.dayOfWeek,
         subjectId: editing.subjectId || null,
         staffUserId: editing.staffUserId || null,
-        slotType: editing.slotType,
+        slotType: 'lesson',
         room: editing.room || null,
+        notes: editing.notes || null,
       })
       if (result.error) {
-        // The clash sentence the database composed, shown as-is.
+        // The clash sentence the database composed, shown unchanged.
         toast(result.error, 'danger')
         return
       }
@@ -179,7 +218,7 @@ export default function TimetablePage(): JSX.Element {
     } finally {
       setBusy(false)
     }
-  }, [editing, current, toast, reload])
+  }, [editing, current, shownClass, toast, reload])
 
   const clear = useCallback(async () => {
     if (!editing?.slotId) return
@@ -226,74 +265,17 @@ export default function TimetablePage(): JSX.Element {
     }
   }, [current, toast, reload])
 
-  if (loading) return <TableSkeleton rows={8} columns={6} />
+  if (loading && !data) return <TableSkeleton rows={8} columns={6} />
   if (error) return <ErrorState message={error} code={code} onRetry={reload} />
-
-  const shownClass = classId || classes[0] || ''
 
   return (
     <>
       <PageHeader
-        title="Timetable"
-        description="The weekly lesson grid for each class."
-        note="A teacher cannot be in two places at once, and nor can a room — the database refuses a clash and names where the conflict already is. Nobody outside management sees a timetable until you publish it."
+        title="Weekly timetable"
+        description="The lesson grid for each class."
+        note="A teacher cannot be in two places at once, and nor can a room — the database refuses a clash and names where the conflict already is. Only teachers assigned to a class can be put in front of it. Nobody outside management sees a timetable until you publish it."
       />
 
-      {/* ---- which timetable, and its state ---- */}
-      <Card className="mb-cards">
-        <CardContent className="flex flex-wrap items-end gap-stack pt-card">
-          <Field id="tt-which" label="Timetable">
-            {(props) => (
-              <Select
-                {...props}
-                value={current?.id ?? ''}
-                onChange={(e) => setTimetableId(e.target.value)}
-              >
-                {(data?.timetables ?? []).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} · {t.academic_year} term {t.term_number}
-                    {t.published ? '' : ' (draft)'}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-
-          <Field id="tt-class" label="Class" hint="Type a new one to start its grid.">
-            {(props) => (
-              <Input
-                {...props}
-                list="tt-classes"
-                value={shownClass}
-                onChange={(e) => setClassId(e.target.value)}
-                placeholder="grade_8a"
-              />
-            )}
-          </Field>
-          <datalist id="tt-classes">
-            {classes.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-
-          {current && (
-            <div className="flex items-center gap-2">
-              <Badge variant={current.published ? 'success' : 'neutral'}>
-                {current.published ? 'Published' : 'Draft'}
-              </Badge>
-              {data?.canEdit && (
-                <Button variant="outline" disabled={busy} onClick={() => void togglePublish()}>
-                  {current.published ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-                  {current.published ? 'Withdraw' : 'Publish'}
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Creating the timetable and the school day. Shown only to somebody who can
-          edit — for everybody else it would be a panel of refusals. */}
       {data?.canEdit && (
         <TimetableSetup
           periods={periodRows}
@@ -309,148 +291,142 @@ export default function TimetablePage(): JSX.Element {
         </Alert>
       )}
 
-      {/* ---- the grid ---- */}
+      {(data?.classes.length ?? 0) === 0 && (data?.timetables.length ?? 0) > 0 && (
+        <Alert variant="warning" title="No classes yet">
+          Classes come from your pupils. Enrol a pupil and their class appears here — a
+          timetable is laid out per class, so there is nothing to build until then.
+        </Alert>
+      )}
+
       {periods.length > 0 && shownClass && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays aria-hidden="true" className="size-5 text-primary" />
-              {shownClass}
-            </CardTitle>
-            <CardDescription>
-              {data?.canEdit
-                ? 'Tap a cell to put a lesson in it.'
-                : 'Read only — your role does not include editing the timetable.'}
-            </CardDescription>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-stack">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays aria-hidden="true" className="size-5 text-primary" />
+                {shownClass}
+              </CardTitle>
+              <CardDescription>
+                {data?.canEdit
+                  ? 'Tap a cell to put a lesson in it.'
+                  : 'Read only — your role does not include editing the timetable.'}
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* A real dropdown of the school's classes. The first version was a
+                  free-text box backed by a list derived from slots that did not exist,
+                  so it was always empty. */}
+              <Select
+                id="tt-class"
+                aria-label="Class"
+                value={shownClass}
+                onChange={(e) => setClassId(e.target.value)}
+                className="w-auto"
+              >
+                {(data?.classes ?? []).map((c) => (
+                  <option key={c.out_class_id} value={c.out_class_id}>
+                    {c.out_class_id}
+                    {c.out_pupils ? ` · ${c.out_pupils} pupils` : ''}
+                  </option>
+                ))}
+              </Select>
+
+              {(data?.timetables.length ?? 0) > 1 && (
+                <Select
+                  id="tt-which"
+                  aria-label="Timetable"
+                  value={current?.id ?? ''}
+                  onChange={(e) => setTimetableId(e.target.value)}
+                  className="w-auto"
+                >
+                  {(data?.timetables ?? []).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} · {t.academic_year} T{t.term_number}
+                      {t.published ? '' : ' (draft)'}
+                    </option>
+                  ))}
+                </Select>
+              )}
+
+              {current && (
+                <>
+                  <Badge variant={current.published ? 'success' : 'neutral'}>
+                    {current.published ? 'Published' : 'Draft'}
+                  </Badge>
+                  {data?.canEdit && (
+                    <Button variant="outline" disabled={busy} onClick={() => void togglePublish()}>
+                      {current.published ? (
+                        <EyeOff aria-hidden="true" />
+                      ) : (
+                        <Eye aria-hidden="true" />
+                      )}
+                      {current.published ? 'Withdraw' : 'Publish'}
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           </CardHeader>
 
-          <CardContent className="overflow-x-auto">
-            <table className="w-full min-w-[42rem] border-collapse text-sm">
-              <caption className="sr-only">Weekly timetable for {shownClass}</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="p-2 text-left font-medium text-muted-foreground">
-                    Period
-                  </th>
-                  {DAYS.map((d) => (
-                    <th
-                      key={d.n}
-                      scope="col"
-                      className="p-2 text-left font-medium text-muted-foreground"
-                    >
-                      {d.short}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {periods.map((p) => (
-                  <tr key={p.out_period_id} className="border-t border-border">
-                    <th scope="row" className="p-2 text-left align-top font-medium">
-                      {p.out_period_name}
-                      <span className="block text-sm font-normal text-muted-foreground">
-                        {hhmm(p.out_start_time)}–{hhmm(p.out_end_time)}
-                      </span>
-                    </th>
-
-                    {DAYS.map((d) => {
-                      // A period that does not run on this day is not an empty cell —
-                      // it is not a cell at all, and must not invite a lesson.
-                      if (!p.out_applies_days.includes(d.n)) {
-                        return (
-                          <td key={d.n} className="bg-sunken p-2 align-top text-subtle">
-                            —
-                          </td>
-                        )
-                      }
-
-                      const slot = slotAt(p.out_period_id, d.n, shownClass)
-                      const editable = data?.canEdit && p.out_teaching
-
-                      return (
-                        <td key={d.n} className="p-1 align-top">
-                          <button
-                            type="button"
-                            disabled={!editable}
-                            onClick={() =>
-                              setEditing({
-                                classId: shownClass,
-                                periodId: p.out_period_id,
-                                periodName: p.out_period_name,
-                                dayOfWeek: d.n,
-                                slotId: slot?.out_slot_id ?? null,
-                                subjectId: slot?.out_subject_id ?? '',
-                                staffUserId: slot?.out_staff_user_id ?? '',
-                                room: slot?.out_room ?? '',
-                                slotType: slot?.out_slot_type ?? 'lesson',
-                              })
-                            }
-                            className={`flex min-h-tap w-full flex-col items-start gap-0.5 rounded-md border p-2 text-left transition-colors ${
-                              slot
-                                ? 'border-border bg-surface'
-                                : 'border-dashed border-border text-muted-foreground'
-                            } ${editable ? 'hover:border-primary hover:bg-muted' : 'cursor-default'}`}
-                          >
-                            {slot ? (
-                              <>
-                                <span className="font-medium">
-                                  {slot.out_subject_name ?? slot.out_slot_type}
-                                </span>
-                                {slot.out_staff_user_id ? (
-                                  <span className="text-sm text-muted-foreground">
-                                    {data?.staff.find(
-                                      (s) => s.clerk_user_id === slot.out_staff_user_id,
-                                    )
-                                      ? `${data.staff.find((s) => s.clerk_user_id === slot.out_staff_user_id)?.first_name} ${data.staff.find((s) => s.clerk_user_id === slot.out_staff_user_id)?.last_name}`
-                                      : 'Staff member'}
-                                  </span>
-                                ) : (
-                                  /* Named, not left blank: an unstaffed lesson is the
-                                     thing a deputy is looking for before term starts. */
-                                  <Badge variant="warning">No teacher</Badge>
-                                )}
-                                {slot.out_room && (
-                                  <span className="text-sm text-subtle">{slot.out_room}</span>
-                                )}
-                              </>
-                            ) : p.out_teaching ? (
-                              <span className="text-sm">{editable ? 'Add' : '—'}</span>
-                            ) : (
-                              <span className="text-sm">{p.out_period_name}</span>
-                            )}
-                          </button>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <CardContent>
+            <WeekGrid
+              periods={periods}
+              slots={slots}
+              canEdit={Boolean(data?.canEdit)}
+              onOpen={(periodId, day, slot) => {
+                const p = periods.find((x) => x.id === periodId)
+                const row = grid.find(
+                  (r) =>
+                    r.out_period_id === periodId &&
+                    r.out_day_of_week === day &&
+                    r.out_class_id === shownClass,
+                )
+                setEditing({
+                  periodId,
+                  periodName: p?.name ?? '',
+                  dayOfWeek: day,
+                  slotId: slot?.id ?? null,
+                  subjectId: row?.out_subject_id ?? '',
+                  staffUserId: row?.out_staff_user_id ?? '',
+                  room: row?.out_room ?? '',
+                  notes: '',
+                })
+              }}
+            />
           </CardContent>
         </Card>
       )}
 
-      {/* ---- the cell editor ---- */}
+      {/* ---- the side panel the spec describes ---- */}
       {editing && (
         <Card className="mt-cards">
           <CardHeader>
             <CardTitle>
-              {editing.classId} · {editing.periodName} ·{' '}
-              {DAYS.find((d) => d.n === editing.dayOfWeek)?.label}
+              {editing.slotId ? 'Edit lesson' : 'Add lesson'} · {shownClass} ·{' '}
+              {DAYS.find((d) => d.n === editing.dayOfWeek)?.label} · {editing.periodName}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-stack">
-            <Field id="slot-subject" label="Subject">
+            <Field
+              id="slot-subject"
+              label="Subject"
+              required
+              hint="Only subjects your school offers at this grade level."
+            >
               {(props) => (
                 <Select
                   {...props}
                   value={editing.subjectId}
-                  onChange={(e) => setEditing({ ...editing, subjectId: e.target.value })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, subjectId: e.target.value, staffUserId: '' })
+                  }
                 >
-                  <option value="">No subject</option>
+                  <option value="">Choose a subject</option>
                   {(data?.subjects ?? []).map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.subject_name}
+                      {s.name}
+                      {s.detail ? ` · ${s.detail}` : ''}
                     </option>
                   ))}
                 </Select>
@@ -460,7 +436,7 @@ export default function TimetablePage(): JSX.Element {
             <Field
               id="slot-teacher"
               label="Teacher"
-              hint="Leave blank for now if it is not decided — the lesson still appears on the grid."
+              hint="Only teachers assigned to this class. Leave blank if it is not decided — the lesson still appears on the grid."
             >
               {(props) => (
                 <Select
@@ -469,14 +445,24 @@ export default function TimetablePage(): JSX.Element {
                   onChange={(e) => setEditing({ ...editing, staffUserId: e.target.value })}
                 >
                   <option value="">Not assigned</option>
-                  {(data?.staff ?? []).map((s) => (
-                    <option key={s.clerk_user_id} value={s.clerk_user_id}>
-                      {s.first_name} {s.last_name}
+                  {eligibleStaff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name ?? s.id}
+                      {s.detail ? ` · ${s.detail}` : ''}
                     </option>
                   ))}
                 </Select>
               )}
             </Field>
+
+            {(data?.staff.length ?? 0) === 0 && (
+              /* The likeliest reason the dropdown is empty, and what to do about it —
+                 rather than a control that silently offers nothing. */
+              <Alert variant="info" title="No teachers assigned to this class">
+                A teacher appears here once they have a teaching assignment for{' '}
+                {shownClass}. Those are set on the Teaching assignments screen.
+              </Alert>
+            )}
 
             <Field id="slot-room" label="Room" hint="Optional. Two classes cannot share one.">
               {(props) => (
@@ -485,20 +471,32 @@ export default function TimetablePage(): JSX.Element {
                   value={editing.room}
                   onChange={(e) => setEditing({ ...editing, room: e.target.value })}
                   maxLength={60}
-                  placeholder="Lab 1"
+                  placeholder="R101"
+                />
+              )}
+            </Field>
+
+            <Field id="slot-notes" label="Notes" hint="Optional. Seen by staff, not by parents.">
+              {(props) => (
+                <Textarea
+                  {...props}
+                  value={editing.notes}
+                  onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
+                  rows={2}
+                  maxLength={500}
                 />
               )}
             </Field>
 
             <div className="flex flex-wrap gap-2">
-              <Button disabled={busy} onClick={() => void save()}>
+              <Button disabled={busy || !editing.subjectId} onClick={() => void save()}>
                 <Check aria-hidden="true" />
-                {busy ? 'Saving…' : 'Save'}
+                {busy ? 'Saving…' : editing.slotId ? 'Save lesson' : 'Add lesson'}
               </Button>
               {editing.slotId && (
                 <Button variant="outline" disabled={busy} onClick={() => void clear()}>
                   <Trash2 aria-hidden="true" />
-                  Clear
+                  Clear slot
                 </Button>
               )}
               <Button variant="ghost" disabled={busy} onClick={() => setEditing(null)}>
@@ -508,6 +506,13 @@ export default function TimetablePage(): JSX.Element {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {periods.length > 0 && (
+        <p className="mt-stack text-sm text-muted-foreground">
+          {periods.filter((p) => p.teaching).length} teaching periods,{' '}
+          {hhmm(periods[0]?.startTime ?? '00:00')} to {hhmm(periods.at(-1)?.endTime ?? '00:00')}.
+        </p>
       )}
     </>
   )

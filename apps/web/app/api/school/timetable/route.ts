@@ -197,6 +197,31 @@ const patchSchema = z.discriminatedUnion('action', [
     timetableId: z.string().uuid(),
     published: z.boolean(),
   }),
+  /*
+    Dragging a lesson to another cell, which swaps when the destination is full.
+
+    No `classId`: `move_timetable_slot()` takes the class from the slot, because
+    accepting one would let a drag in Grade 1's grid rewrite Grade 7's.
+  */
+  z.object({
+    action: z.literal('move'),
+    slotId: z.string().uuid(),
+    periodId: z.string().uuid(),
+    day: z.number().int().min(1).max(5),
+  }),
+  /*
+    What a drop WOULD break, asked before it is attempted.
+
+    Separate from the move so the screen can warn and let the user decide, rather
+    than performing it and reporting a refusal — a deputy who has already let go of
+    the mouse reads a refusal as the app losing their work.
+  */
+  z.object({
+    action: z.literal('checkMove'),
+    slotId: z.string().uuid(),
+    periodId: z.string().uuid(),
+    day: z.number().int().min(1).max(5),
+  }),
 ])
 
 export async function PATCH(request: Request): Promise<Response> {
@@ -265,6 +290,45 @@ export async function PATCH(request: Request): Promise<Response> {
       // error. CONFLICT rather than NOT_FOUND: the period exists and is in use.
       if (!row.out_done) return fail('CONFLICT', row.out_message ?? 'Could not remove it.')
       return ok({ removed: true })
+    }
+
+    if (parsed.data.action === 'checkMove') {
+      const { data, error } = await client.rpc('timetable_move_conflicts', {
+        p_slot_id: parsed.data.slotId,
+        p_period_id: parsed.data.periodId,
+        p_day_of_week: parsed.data.day,
+      })
+      if (error) return fromPostgrestError(error)
+
+      const rows = (data ?? []) as Array<{
+        out_kind: string
+        out_class_id: string | null
+        out_detail: string
+      }>
+      return ok({
+        conflicts: rows.map((r) => ({
+          kind: r.out_kind,
+          classId: r.out_class_id,
+          detail: r.out_detail,
+        })),
+      })
+    }
+
+    if (parsed.data.action === 'move') {
+      const { data, error } = await client.rpc('move_timetable_slot', {
+        p_slot_id: parsed.data.slotId,
+        p_period_id: parsed.data.periodId,
+        p_day_of_week: parsed.data.day,
+      })
+      if (error) return fromPostgrestError(error)
+
+      const row = ((data ?? []) as Array<{ out_moved: string; out_swapped_with: string | null }>)[0]
+      return ok({
+        moved: row?.out_moved ?? parsed.data.slotId,
+        // Named so the screen can say "swapped" rather than "moved", which is a
+        // different thing and the user did a different gesture to get it.
+        swappedWith: row?.out_swapped_with ?? null,
+      })
     }
 
     if (parsed.data.action === 'clear') {

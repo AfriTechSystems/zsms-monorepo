@@ -251,6 +251,84 @@ export default function TimetablePage(): JSX.Element {
     }
   }, [editing, toast, reload])
 
+  /**
+   * A dragged lesson, pending the user's answer about the clashes it would cause.
+   *
+   * Null when nothing is pending. The move is NOT performed while this is set: a
+   * deputy who has let go of the mouse has not yet agreed to anything.
+   */
+  const [pendingMove, setPendingMove] = useState<{
+    slotId: string
+    periodId: string
+    day: number
+    conflicts: Array<{ kind: string; classId: string | null; detail: string }>
+  } | null>(null)
+
+  /** Performs the move, having either found no clash or been told to go ahead. */
+  const doMove = useCallback(
+    async (slotId: string, periodId: string, day: number) => {
+      setBusy(true)
+      try {
+        const result = await apiSend<{ moved: string; swappedWith: string | null }>(
+          '/api/school/timetable',
+          'PATCH',
+          { action: 'move', slotId, periodId, day },
+        )
+        if (result.error) {
+          toast(result.error, 'danger')
+          return
+        }
+        // Named differently because the user made a different gesture to get it.
+        toast(result.data?.swappedWith ? 'Lessons swapped.' : 'Lesson moved.', 'success')
+        reload()
+      } finally {
+        setBusy(false)
+      }
+    },
+    [toast, reload],
+  )
+
+  /**
+   * Asks what the drop would break, then either moves or warns.
+   *
+   * The warning is advisory — `0197`'s partial unique indexes are what actually refuse
+   * a double-booked teacher. But asking first means a clash is a question with a Cancel
+   * button rather than an error message after the fact.
+   */
+  const onMove = useCallback(
+    async (slotId: string, periodId: string, day: number) => {
+      setBusy(true)
+      try {
+        const check = await apiSend<{
+          conflicts: Array<{ kind: string; classId: string | null; detail: string }>
+        }>('/api/school/timetable', 'PATCH', { action: 'checkMove', slotId, periodId, day })
+
+        const conflicts = check.data?.conflicts ?? []
+
+        /*
+          A failed CHECK does not block the move.
+
+          The database refuses a real clash on its own, so treating an unavailable
+          warning as a refusal would stop a legitimate drag for want of advice.
+        */
+        if (check.error) {
+          await doMove(slotId, periodId, day)
+          return
+        }
+
+        if (conflicts.length === 0) {
+          await doMove(slotId, periodId, day)
+          return
+        }
+
+        setPendingMove({ slotId, periodId, day, conflicts })
+      } finally {
+        setBusy(false)
+      }
+    },
+    [doMove],
+  )
+
   const togglePublish = useCallback(async () => {
     if (!current) return
     setBusy(true)
@@ -293,6 +371,12 @@ export default function TimetablePage(): JSX.Element {
           periods={periodRows}
           levels={data?.levels ?? []}
           hasTimetable={(data?.timetables.length ?? 0) > 0}
+          hasClasses={(data?.classes.length ?? 0) > 0}
+          /* Lessons across the WHOLE timetable, not just the class on screen — step 3
+             is about the timetable having content, and a deputy who has filled Grade 1
+             should not be told to start. */
+          lessonCount={grid.filter((r) => r.out_slot_type === 'lesson').length}
+          published={current?.published ?? false}
           onChanged={reload}
         />
       )}
@@ -387,6 +471,7 @@ export default function TimetablePage(): JSX.Element {
               periods={periods}
               slots={slots}
               canEdit={Boolean(data?.canEdit)}
+              onMove={(slotId, periodId, day) => void onMove(slotId, periodId, day)}
               onOpen={(periodId, day, slot) => {
                 const p = periods.find((x) => x.id === periodId)
                 const row = grid.find(
@@ -532,6 +617,51 @@ export default function TimetablePage(): JSX.Element {
             </Field>
           </div>
         )}
+      </Dialog>
+
+      {/* ---- what a drop would break ---- */}
+      <Dialog
+        open={pendingMove !== null}
+        title="That creates a clash"
+        description="The move has not been made yet."
+        onClose={() => setPendingMove(null)}
+        footer={
+          <>
+            <Button
+              disabled={busy}
+              onClick={() => {
+                const m = pendingMove
+                setPendingMove(null)
+                if (m) void doMove(m.slotId, m.periodId, m.day)
+              }}
+            >
+              Move it anyway
+            </Button>
+            <Button variant="ghost" disabled={busy} onClick={() => setPendingMove(null)}>
+              Leave it where it was
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-stack">
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+            {(pendingMove?.conflicts ?? []).map((c, i) => (
+              <li key={`${c.kind}-${i}`}>{c.detail}</li>
+            ))}
+          </ul>
+
+          {/*
+            Said plainly, because "Move it anyway" would otherwise look like a way to
+            override a rule that cannot be overridden. A teacher clash is refused by a
+            unique index, not by this screen.
+          */}
+          <Alert variant="warning" title="Some of these cannot be overridden">
+            A teacher cannot be in two places at once and nor can a room — the database
+            refuses those outright, so the move will fail and nothing will change. A
+            clash over a period&apos;s shape is the same. Use this when the warning is
+            about something you have already arranged around.
+          </Alert>
+        </div>
       </Dialog>
 
       {periods.length > 0 && (

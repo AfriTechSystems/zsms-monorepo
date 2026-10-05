@@ -15,6 +15,21 @@
  * found by colour before a word is read. Derived from the subject's name rather than
  * stored, so every school gets a full palette without configuring one.
  *
+ * ## Dragging
+ *
+ * Asked for on 2026-10-05. A filled cell can be dragged to another cell; dropping it on
+ * an empty one moves the lesson, and dropping it on a full one exchanges the two. The
+ * gesture is how a deputy actually rearranges a week — the alternative was opening two
+ * editors and retyping both.
+ *
+ * Native HTML5 drag and drop rather than a pointer-event library: it gives the drag
+ * image, the cursor and the keyboard-accessible fallback for free, and the grid is a
+ * table of buttons rather than a canvas, so there is nothing a library would add.
+ *
+ * A drop target is only marked when it can actually accept the thing being dragged, so
+ * a break never lights up and a day the period skips never does either. The database
+ * refuses those too; marking them would invite a gesture that is going to fail.
+ *
  * ## A non-teaching period spans the week
  *
  * Break and lunch are the same for every day, so they are drawn as one band rather
@@ -23,6 +38,7 @@
  */
 
 import type { JSX } from 'react'
+import { useRef, useState } from 'react'
 import { UtensilsCrossed } from 'lucide-react'
 
 import { subjectColour, NON_TEACHING } from '../../../../components/ui/subject-colour'
@@ -64,14 +80,31 @@ export function WeekGrid({
   slots,
   canEdit,
   onOpen,
+  onMove,
 }: {
   periods: Period[]
   slots: Slot[]
   canEdit: boolean
   onOpen: (periodId: string, day: number, slot: Slot | null) => void
+  /** Omitted on a read-only grid, which is what makes a teacher's week undraggable. */
+  onMove?: (slotId: string, toPeriodId: string, toDay: number) => void
 }): JSX.Element {
   const at = (periodId: string, day: number): Slot | null =>
     slots.find((s) => s.periodId === periodId && s.day === day) ?? null
+
+  const dragging = useRef<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+
+  const canDrag = canEdit && typeof onMove === 'function'
+
+  /*
+    Whether a cell may receive the lesson currently being dragged.
+
+    Checked here as well as in the database so a cell that cannot accept it is never
+    marked as a target. `0208`'s probe and `0197`'s indexes remain the enforcement.
+  */
+  const canDrop = (p: Period, day: number): boolean =>
+    canDrag && dragging.current !== null && p.teaching && p.appliesDays.includes(day)
 
   return (
     <div className="overflow-x-auto">
@@ -148,12 +181,45 @@ export function WeekGrid({
 
                   const slot = at(p.id, d.n)
                   const colour = subjectColour(slot?.subjectName)
+                  const cellKey = `${p.id}:${d.n}`
+                  const isOver = over === cellKey
 
                   return (
-                    <td key={d.n}>
+                    <td
+                      key={d.n}
+                      onDragOver={(e) => {
+                        if (!canDrop(p, d.n)) return
+                        // Without preventDefault the browser refuses the drop and shows
+                        // the "no entry" cursor, which reads as the app being broken.
+                        e.preventDefault()
+                        setOver(cellKey)
+                      }}
+                      onDragLeave={() => setOver((k) => (k === cellKey ? null : k))}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const id = dragging.current
+                        setOver(null)
+                        dragging.current = null
+                        // Dropping a lesson on itself is not a move.
+                        if (!id || !onMove || id === slot?.id) return
+                        onMove(id, p.id, d.n)
+                      }}
+                    >
                       <button
                         type="button"
                         disabled={!canEdit}
+                        draggable={canDrag && slot !== null}
+                        onDragStart={(e) => {
+                          if (!slot) return
+                          dragging.current = slot.id
+                          e.dataTransfer.effectAllowed = 'move'
+                          // Firefox ignores a drag with no payload set.
+                          e.dataTransfer.setData('text/plain', slot.id)
+                        }}
+                        onDragEnd={() => {
+                          dragging.current = null
+                          setOver(null)
+                        }}
                         onClick={() => onOpen(p.id, d.n, slot)}
                         aria-label={
                           slot
@@ -164,7 +230,9 @@ export function WeekGrid({
                           slot
                             ? colour.cell
                             : 'border-dashed border-border bg-transparent'
-                        } ${canEdit ? 'hover:shadow-sm' : 'cursor-default'}`}
+                        } ${canEdit ? 'hover:shadow-sm' : 'cursor-default'} ${
+                          canDrag && slot ? 'cursor-grab active:cursor-grabbing' : ''
+                        } ${isOver ? 'ring-2 ring-primary ring-offset-1' : ''}`}
                       >
                         {slot ? (
                           <>

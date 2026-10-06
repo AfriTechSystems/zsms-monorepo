@@ -37,6 +37,7 @@ import {
   Megaphone,
   Receipt,
   ScrollText,
+  ShieldCheck,
   SlidersHorizontal,
   UserCog,
   Users,
@@ -173,6 +174,19 @@ export function SchoolShell({
           log they can be pressured over.
         */
         { path: '/settings/audit', label: 'Audit trail', icon: ScrollText, needs: 'settings:write' },
+        /*
+          School-defined staff roles (ADR-012).
+
+          `settings:write` is the nearest the matrix has to "leadership", and the POLICY
+          is narrower still — `org:owner` and `org:principal` only, not even
+          `org:admin`, because ticking a box here GRANTS a capability and whoever can
+          tick can grant themselves anything.
+
+          So an administrator sees the link and the database refuses the write. That is
+          the right way round: the gate is the policy, and this only keeps the nav
+          roughly honest.
+        */
+        { path: '/settings/roles', label: 'Staff roles', icon: ShieldCheck, needs: 'settings:write' },
         // Outward-facing rather than internal configuration, and the only settings row a
         // parent ever sees the result of. Kept beside the others because that is where a head
         // teacher looks for it, not because it is the same kind of thing.

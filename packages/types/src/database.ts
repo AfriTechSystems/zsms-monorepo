@@ -2700,6 +2700,64 @@ export type Database = {
           },
         ]
       }
+      school_custom_roles: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_active: boolean
+          permissions: Json
+          role_name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          permissions?: Json
+          role_name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          permissions?: Json
+          role_name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_custom_roles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_custom_roles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_custom_roles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_grade_levels: {
         Row: {
           created_at: string
@@ -3846,6 +3904,62 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "subscription_tier_catalogue"
             referencedColumns: ["tier_name"]
+          },
+        ]
+      }
+      staff_custom_role_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          custom_role_id: string
+          id: string
+          school_id: string
+          staff_user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          custom_role_id: string
+          id?: string
+          school_id: string
+          staff_user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          custom_role_id?: string
+          id?: string
+          school_id?: string
+          staff_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_custom_role_assignments_custom_role_id_fkey"
+            columns: ["custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "school_custom_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_custom_role_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "staff_custom_role_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "staff_custom_role_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6221,6 +6335,7 @@ export type Database = {
           out_student_uuid: string
         }[]
       }
+      my_custom_permissions: { Args: never; Returns: Json }
       my_erasure_status: {
         Args: never
         Returns: {
@@ -6782,6 +6897,10 @@ export type Database = {
           out_last_used_at: string
           out_teacher_name: string
         }[]
+      }
+      school_custom_role_limit: {
+        Args: { p_school_id: string }
+        Returns: number
       }
       school_data_completeness: {
         Args: { p_school_id?: string }

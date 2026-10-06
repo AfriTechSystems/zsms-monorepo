@@ -27,8 +27,9 @@
 
 import type { FormEvent, JSX } from 'react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Landmark, Loader2, Send, Wallet } from 'lucide-react'
+import { Banknote, Landmark, Loader2, Send, Wallet } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
@@ -423,6 +424,39 @@ function ParentFees(): JSX.Element {
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/*
+        Help paying — `APPLICATION.md`'s "Entry Point 1 — From a Fee Record".
+
+        Here rather than in the navigation bar, which holds five tabs and is full. It is
+        also the right place: a parent looks for help with fees while looking AT the fees,
+        and the link carries which term they need help with so the form already knows.
+
+        Offered only when something is actually owed; a settled account needs no loan.
+      */}
+      {outstanding.length > 0 && (
+        <Card className="mb-cards">
+          <CardContent className="flex flex-wrap items-center gap-stack pt-card">
+            <span className="flex min-w-0 flex-col">
+              <span className="font-medium">Struggling with this term?</span>
+              <span className="text-sm text-muted-foreground">
+                You can apply to a lending partner. They pay the school directly and you
+                repay them — ZSMS does not lend money.
+              </span>
+            </span>
+            <Button variant="outline" className="ml-auto" asChild>
+              <Link
+                href={`/parent/loans?feeRecordId=${encodeURIComponent(
+                  currentTermId ?? outstanding[0]?.id ?? '',
+                )}`}
+              >
+                <Banknote aria-hidden="true" />
+                Ask about a fee loan
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       )}

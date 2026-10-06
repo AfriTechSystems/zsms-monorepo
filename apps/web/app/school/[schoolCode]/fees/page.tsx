@@ -26,7 +26,7 @@ import type { FormEvent, JSX } from 'react'
 import { Suspense, use, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ClipboardCheck, Landmark, Receipt, Search, Wallet } from 'lucide-react'
+import { Banknote, ClipboardCheck, Landmark, Receipt, Search, Wallet } from 'lucide-react'
 
 import { Pagination } from '../../../../components/ui/pagination'
 import { useApi } from '../../../../lib/use-api'
@@ -136,6 +136,18 @@ function FeesList({ base }: { base: string }): JSX.Element {
               <Link href={`${base}/fees/accounts`}>
                 <Landmark aria-hidden="true" />
                 Where parents pay
+              </Link>
+            </Button>
+            {/*
+              Fee loans, beside the other fee destinations.
+
+              Not gated here: the route refuses a school without the module and says so,
+              which is more useful than a link that silently is not there.
+            */}
+            <Button variant="outline" asChild>
+              <Link href={`${base}/fees/loans`}>
+                <Banknote aria-hidden="true" />
+                Fee loans
               </Link>
             </Button>
             <Button variant={data.pendingVerification > 0 ? 'default' : 'outline'} asChild>

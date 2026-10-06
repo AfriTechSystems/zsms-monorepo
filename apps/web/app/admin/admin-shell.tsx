@@ -21,6 +21,7 @@
 import type { JSX, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import {
+  Banknote,
   BookMarked,
   Building2,
   Gauge,
@@ -135,6 +136,12 @@ export function AdminShell({
       items: [
         { path: '/billing', label: 'Invoices & billing', icon: Receipt },
         { path: '/pricing', label: 'Plans & pricing', icon: Wallet },
+        /*
+          The loan queue and its partners, under Revenue because that is what they are
+          to AfriTech: origination commission, not a school feature.
+        */
+        { path: '/loans', label: 'Loan applications', icon: Banknote },
+        { path: '/lenders', label: 'Lending partners', icon: Building2 },
         { path: '/features', label: 'Feature matrix', icon: ToggleRight },
         /*
           Every platform-wide switch, in one place.

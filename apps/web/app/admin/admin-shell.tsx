@@ -28,6 +28,7 @@ import {
   Network,
   PhoneCall,
   Receipt,
+  ScrollText,
   ShieldAlert,
   Siren,
   SlidersHorizontal,
@@ -125,6 +126,8 @@ export function AdminShell({
         // 30-day clock — which is why they sit beside incidents rather than in
         // settings somewhere.
         { path: '/data-requests', label: 'Data requests', icon: ShieldAlert },
+        // The trail has been written since `0131` and nothing has ever read it.
+        { path: '/audit', label: 'Audit trail', icon: ScrollText },
       ],
     },
     {

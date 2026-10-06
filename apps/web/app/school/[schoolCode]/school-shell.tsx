@@ -36,6 +36,7 @@ import {
   ListChecks,
   Megaphone,
   Receipt,
+  ScrollText,
   SlidersHorizontal,
   UserCog,
   Users,
@@ -159,6 +160,19 @@ export function SchoolShell({
         { path: '/settings/readiness', label: 'Setup checklist', icon: ListChecks, needs: 'settings:write' },
         // Defining what is recorded about a pupil is a pupil-write act.
         { path: '/settings/fields', label: 'Pupil fields', icon: SlidersHorizontal, needs: 'students:write' },
+        /*
+          The audit trail.
+
+          `settings:write` is the closest the matrix has to "leadership" — the POLICY
+          admits only `org:owner` and `org:principal`, and an accountant with
+          `settings:write` would see an empty list rather than a refusal. Gating the link
+          to roughly the right audience is a convenience; the policy is the rule.
+
+          Deliberately NOT readable by the accountant, which the policy enforces: the
+          trail is partly a record of what they did, and a log its subject can read is a
+          log they can be pressured over.
+        */
+        { path: '/settings/audit', label: 'Audit trail', icon: ScrollText, needs: 'settings:write' },
         // Outward-facing rather than internal configuration, and the only settings row a
         // parent ever sees the result of. Kept beside the others because that is where a head
         // teacher looks for it, not because it is the same kind of thing.

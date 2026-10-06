@@ -157,6 +157,15 @@ function ParentFees(): JSX.Element {
   /** Which terms this payment is for. Empty means oldest-first, i.e. arrears first. */
   const [chosenTerms, setChosenTerms] = useState<string[]>([])
 
+  /*
+    A duplicate reference the parent has been shown and may proceed past.
+
+    `PAYMENTS.md` is explicit that this is a warning, not a refusal: a parent who
+    genuinely paid twice with one mistyped reference must still be able to record the
+    second payment.
+  */
+  const [duplicateSeen, setDuplicateSeen] = useState(false)
+
   /** Proof: the stored path, and the name to show back. */
   const [proof, setProof] = useState<{ path: string; fileName: string } | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -191,6 +200,7 @@ function ParentFees(): JSX.Element {
         paymentMethod: method,
         reference: reference.trim() || undefined,
         proofPath: proof?.path,
+        acknowledgeDuplicate: duplicateSeen || undefined,
         // Never `new Date()` here: the declaration was made when the box was ticked.
         confirmedAt: confirmedAt ?? new Date().toISOString(),
         /*
@@ -222,6 +232,12 @@ function ParentFees(): JSX.Element {
       setSaving(false)
       if (result.error) {
         setFormError(result.error)
+        /*
+          A CONFLICT here is the duplicate-reference warning. Remembering that it was
+          shown is what lets the next submit through — the message names what was found,
+          so pressing the button again is a deliberate acknowledgement.
+        */
+        if (result.code === 'CONFLICT') setDuplicateSeen(true)
         return
       }
 
@@ -229,6 +245,7 @@ function ParentFees(): JSX.Element {
       setAmount('')
       setReference('')
       setProof(null)
+      setDuplicateSeen(false)
       setConfirmed(false)
       setConfirmedAt(null)
       setChosenTerms([])
@@ -240,6 +257,7 @@ function ParentFees(): JSX.Element {
       method,
       reference,
       proof,
+      duplicateSeen,
       confirmedAt,
       chosenTerms,
       outstanding,
@@ -601,8 +619,18 @@ function ParentFees(): JSX.Element {
           </label>
 
           {formError && (
-            <Alert variant="danger" title="Not recorded" className="mt-stack">
+            <Alert
+              variant={duplicateSeen ? 'warning' : 'danger'}
+              title={duplicateSeen ? 'Already recorded?' : 'Not recorded'}
+              className="mt-stack"
+            >
               {formError}
+              {duplicateSeen && (
+                <span className="mt-1 block">
+                  If this really is a separate payment, press the button again and it will
+                  be recorded.
+                </span>
+              )}
             </Alert>
           )}
 

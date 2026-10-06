@@ -59,6 +59,15 @@ const submitSchema = z.object({
   proofPath: z.string().trim().max(500).optional(),
 
   /*
+    Set when the parent has seen the duplicate warning and means it anyway.
+
+    `PAYMENTS.md`: "the submit button still works after the parent acknowledges." A
+    parent who genuinely paid twice with one mistyped reference must not be blocked from
+    recording the second payment.
+  */
+  acknowledgeDuplicate: z.boolean().optional(),
+
+  /*
     When the parent ticked the confirmation box, from their own clock.
 
     Required. This is the declaration — "I confirm that this payment has been made...
@@ -200,6 +209,52 @@ export async function POST(request: NextRequest): Promise<Response> {
     const children = await listParentChildren(client)
     const child = children.find((c) => c.id === v.childId)
     if (!child) return fail('NOT_FOUND', 'That pupil is not one of your children.')
+
+    /*
+      Has this reference been recorded before?
+
+      `PAYMENTS.md` specifies a duplicate WARNING the parent may acknowledge and proceed
+      past, so this reports rather than refuses. `0213` built
+      `payment_reference_already_used()` and nothing called it — found by `npm run gaps`,
+      which is exactly the failure that script exists to catch: a function that is
+      correct and unreachable.
+
+      A failed check does NOT block the claim. The warning is advice, and losing the
+      advice must not lose the payment.
+    */
+    let duplicateOf: Array<{ amount: number; status: string; submittedAt: string }> = []
+
+    if (v.reference && !v.acknowledgeDuplicate) {
+      const dup = await client.rpc('payment_reference_already_used', {
+        p_student_id: child.id,
+        p_reference: v.reference,
+      })
+
+      const rows = (dup.data ?? []) as Array<{
+        out_amount: number
+        out_status: string
+        out_submitted: string
+      }>
+
+      if (!dup.error && rows.length > 0) {
+        duplicateOf = rows.map((r) => ({
+          amount: Number(r.out_amount),
+          status: r.out_status,
+          submittedAt: r.out_submitted,
+        }))
+
+        /*
+          CONFLICT, not VALIDATION_ERROR: the request is well formed and the parent may
+          legitimately mean it. The screen shows what it found and offers to go ahead,
+          which resends with `acknowledgeDuplicate`.
+        */
+        return fail(
+          'CONFLICT',
+          `You have already recorded a payment with the reference ${v.reference}. Check below, then confirm if this is a different payment.`,
+          { duplicateOf },
+        )
+      }
+    }
 
     /*
       A claim is recorded through `allocate_payment()`, not a direct insert.

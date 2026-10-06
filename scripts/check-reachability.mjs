@@ -65,6 +65,21 @@ const CALLED_BY_POSTGRES = [
  * a place to hide things.
  * ------------------------------------------------------------------------- */
 const ACCEPTED = new Map([
+  /*
+    A trigger function. Called by `a_assign_payment_references_on_insert_on_payments`
+    and the matching update trigger (`0211`) — the catalogue knows about those and a
+    source grep cannot.
+  */
+  ['assign_payment_references', 'trigger function on payments (0211)'],
+  /*
+    Called from SQL rather than from source.
+
+    `school_feature_resolution()` (`0215`) invokes it once per feature key, so the
+    revoke/grant/tier-override/matrix order lives in exactly one place. The TypeScript
+    wrapper calls the set-returning function instead, which is why nothing greps for
+    this one any more — and widening the grep would hide a real orphan.
+  */
+  ['school_has_feature', 'called by school_feature_resolution() (0215)'],
   ['worker_parent_push_tokens', 'worker boundary, called by apps/workers'],
   ['worker_retire_push_token', 'worker boundary, called by apps/workers'],
   ['ai_credit_consume', 'called by other SQL functions, not by a route'],

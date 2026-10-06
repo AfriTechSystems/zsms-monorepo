@@ -19,6 +19,7 @@ import { getAuthProvider } from '@zsms/auth-provider'
 import { platformTheme, ThemeStyle } from '../../lib/theme'
 import { AccountMenu } from '../../components/ui/account-menu'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
+import { AskAi } from '../../components/assistant/ask-ai'
 import { AdminShell } from './admin-shell'
 
 export const metadata = {
@@ -52,6 +53,15 @@ export default async function AdminLayout({
       <AdminShell
         headerActions={
           <>
+            {/*
+              Ask AI, which the AfriTech admin was missing entirely.
+
+              The school, teacher and parent shells each got it when the assistant was
+              built; this one was simply never done, so the icon did not appear in the
+              top navigation at all. Audience `school`, because an AfriTech operator asks
+              the same operational questions a head teacher does.
+            */}
+            <AskAi audience="school" />
             <ThemeToggle />
             <AccountMenu />
           </>

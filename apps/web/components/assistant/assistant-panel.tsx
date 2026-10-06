@@ -25,10 +25,24 @@
  *
  * A prepared action renders as a card with Confirm and Cancel and goes no further. The
  * assistant never performs one, whatever the model returned.
+ *
+ * ## It renders through a PORTAL, and has to
+ *
+ * Reported on 2026-10-06: the panel opened as "a very small box" and looked transparent.
+ *
+ * `AskAi` lives in the shell's `headerActions`, and that header carries `backdrop-blur`.
+ * **A `backdrop-filter` ancestor creates a containing block for `position: fixed`
+ * descendants** — so `fixed inset-y-0 right-0` resolved against the header's thin strip
+ * instead of the viewport, and the header's `bg-surface/95` showed through around it.
+ *
+ * Nothing was wrong with the panel's own styling, which is why it was not obvious. A
+ * portal to `document.body` takes it out of that subtree entirely, and is the only fix
+ * that does not require the header to give up its blur.
  */
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowUp,
@@ -131,6 +145,13 @@ export function AssistantPanel({
   const [confirming, setConfirming] = useState<string | null>(null)
 
   const endRef = useRef<HTMLDivElement>(null)
+
+  /*
+    `createPortal` needs a DOM node, which does not exist during the server render. One
+    tick after mount is enough, and the panel is only ever opened by a click anyway.
+  */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   const { data, reload } = useApi<{
     conversations: Conversation[]
@@ -322,12 +343,12 @@ export function AssistantPanel({
     [busy, conversationId, pathname, searchParams, basePath, router, onClose, reload],
   )
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
   // `SUGGESTIONS.school` is always present, but the index signature cannot know that.
   const suggestions = SUGGESTIONS[audience] ?? SUGGESTIONS['school'] ?? []
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop. Only on small screens — on a desktop the panel sits beside the work
           rather than over it, and dimming the page would say otherwise. */}
@@ -340,7 +361,7 @@ export function AssistantPanel({
       <aside
         role="dialog"
         aria-label="Ask AI"
-        className={`fixed inset-y-0 right-0 z-50 flex flex-col border-l border-border bg-card shadow-xl transition-[width] ${
+        className={`fixed inset-y-0 right-0 z-50 flex h-dvh flex-col border-l border-border bg-surface shadow-2xl transition-[width] ${
           expanded ? 'w-full lg:w-[48rem]' : 'w-full sm:w-[26rem]'
         }`}
       >
@@ -655,6 +676,7 @@ export function AssistantPanel({
           </p>
         </form>
       </aside>
-    </>
+    </>,
+    document.body,
   )
 }

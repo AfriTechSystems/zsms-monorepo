@@ -25,6 +25,22 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export interface ExecutorContext {
   client: SupabaseClient
   role: string
+  /**
+   * Where the user is, beyond the bare path.
+   *
+   * `AI_ASSISTANT.md` specifies section, entity type and id, and the active filters —
+   * which is what makes "approve this one" and "who is missing marks here" resolve.
+   *
+   * Derived from the URL rather than passed down from every screen: the sub-section tabs
+   * already put `?section=` in the query string and an entity page already has its id in
+   * the path, so the information is there to be read. Requiring 67 screens to cooperate
+   * would mean the ones nobody updated silently lose the context.
+   */
+  page?: {
+    section?: string | null
+    entityId?: string | null
+    filters?: Record<string, string>
+  }
   /** What the model pulled out of the utterance. Never trusted for scoping. */
   params: {
     subject: string | null
@@ -390,44 +406,192 @@ const EXECUTORS: Record<string, Executor> = {
     }
   },
 
+  announcement_reach: async (ctx) => {
+    const { data, error } = await ctx.client
+      .from('announcements')
+      .select('id, title, created_at, status')
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (error) throw new Error(error.message)
+
+    const rows = data ?? []
+    return {
+      data: rows,
+      rowCount: rows.length,
+      citations: [{ source: 'Announcements', detail: `${rows.length} recent notice(s)` }],
+    }
+  },
+
+  staff_data_completeness: async (ctx) => {
+    /*
+      Who is behind, measured by what is MISSING rather than by what exists.
+
+      A teacher with no rows at all looks identical to one who is finished if you count
+      rows, so the useful figure is unentered marks against entered ones.
+    */
+    const { data, error } = await ctx.client
+      .from('exam_results')
+      .select('entered_by_user_id, marks_obtained')
+      .limit(2000)
+
+    if (error) throw new Error(error.message)
+
+    const rows = data ?? []
+    const byStaff = new Map<string, { entered: number; missing: number }>()
+    for (const r of rows) {
+      const k = String(r.entered_by_user_id ?? 'unassigned')
+      const cur = byStaff.get(k) ?? { entered: 0, missing: 0 }
+      if (r.marks_obtained == null) cur.missing += 1
+      else cur.entered += 1
+      byStaff.set(k, cur)
+    }
+
+    return {
+      data: {
+        byStaff: [...byStaff.entries()].map(([k, v]) => ({ staff: k, ...v })),
+        totalRows: rows.length,
+      },
+      rowCount: byStaff.size,
+      citations: [{ source: 'Exam results', detail: `${rows.length} row(s)` }],
+    }
+  },
+
   /* ------------------------------------------------------------- navigate */
   navigate_to_module: async (ctx) => navigate(ctx),
   navigate_to_action: async (ctx) => navigate(ctx),
+  navigate_to_filtered_view: async (ctx) => navigate(ctx),
+  navigate_to_report: async (ctx) => navigate(ctx),
+  navigate_to_settings: async (ctx) => navigate(ctx),
 
   /* ---------------------------------------------------------------- write */
-  record_attendance: async (ctx) => ({
-    data: null,
-    rowCount: 0,
-    citations: [],
+
+  /*
+    PREPARED, never performed.
+
+    `AI_ASSISTANT.md`: the assistant "never executes one without explicit user
+    confirmation of a rendered preview. This holds regardless of role, operation, model
+    confidence, or user preference. There is no configuration that disables it."
+
+    The preview is RESOLVED here — real pupils, their real current status, the exact
+    change. A preview built from the model's words rather than from the database would
+    show a pupil who does not exist, or a change that is already true, and a person
+    confirming it would be agreeing to something other than what happens.
+  */
+  record_attendance: async (ctx) => {
+    const name = ctx.params.student_name?.trim()
+    const today = new Date().toISOString().slice(0, 10)
+
+    if (!name || !ctx.params.status) {
+      return {
+        data: { missing: !name ? 'student_name' : 'status' },
+        rowCount: 0,
+        citations: [],
+      }
+    }
+
     /*
-      PREPARED, never performed.
+      Resolved as the caller, so a teacher can only name a pupil they teach.
 
-      `AI_ASSISTANT.md`: the assistant "never executes one without explicit user
-      confirmation of a rendered preview. This holds regardless of role, operation, model
-      confidence, or user preference. There is no configuration that disables it."
-
-      So the executor returns a description and the screen renders it with Confirm and
-      Cancel. The confirmation goes through the ordinary attendance route, which applies
-      the same RLS as the register screen.
+      Matched on either name part, because "mark Chanda absent" gives a first name and
+      "Bwalya was late" gives a surname.
     */
-    pendingAction: {
-      kind: 'record_attendance',
-      classId: ctx.params.class_id,
-      studentName: ctx.params.student_name,
-      status: ctx.params.status,
-      route: ctx.basePath ? `${ctx.basePath}/attendance` : '/',
-    },
-  }),
+    const { data: pupils, error } = await ctx.client
+      .from('students')
+      .select('id, first_name, last_name, class_id')
+      .or(`first_name.ilike.%${name}%,last_name.ilike.%${name}%`)
+      .eq('status', 'active')
+      .limit(5)
 
-  create_announcement: async (ctx) => ({
-    data: null,
-    rowCount: 0,
-    citations: [],
-    pendingAction: {
-      kind: 'create_announcement',
-      route: ctx.basePath ? `${ctx.basePath}/announcements` : '/',
-    },
-  }),
+    if (error) throw new Error(error.message)
+
+    const found = pupils ?? []
+
+    if (found.length === 0) {
+      return { data: { notFound: name }, rowCount: 0, citations: [] }
+    }
+
+    /*
+      More than one match is an ambiguity, and ambiguity is resolved by ASKING.
+
+      Marking the wrong child absent sends their parent a message about a day they were
+      in school, which is exactly the kind of error a confirmation step exists to catch —
+      so it is caught before the confirmation rather than inside it.
+    */
+    if (found.length > 1) {
+      return {
+        data: {
+          ambiguous: found.map((p) => `${p.first_name} ${p.last_name} (${p.class_id})`),
+        },
+        rowCount: found.length,
+        citations: [],
+      }
+    }
+
+    const pupil = found[0]!
+
+    // What it is now, so the preview can show a real before and after.
+    const { data: existing } = await ctx.client
+      .from('attendance_records')
+      .select('status')
+      .eq('student_id', pupil.id)
+      .eq('attendance_date', today)
+      .maybeSingle()
+
+    const term = await ctx.client.rpc('current_term', {
+      p_school_id: null,
+      p_on_date: today,
+    })
+    const termRow = ((term.data ?? []) as Array<Record<string, unknown>>)[0]
+
+    return {
+      data: null,
+      rowCount: 1,
+      citations: [{ source: 'Attendance records', detail: `${pupil.first_name} ${pupil.last_name}, ${today}` }],
+      pendingAction: {
+        kind: 'record_attendance',
+        date: today,
+        classId: pupil.class_id,
+        academicYear: termRow?.['academic_year'] ?? null,
+        termNumber: termRow?.['term_number'] ?? null,
+        changes: [
+          {
+            studentId: pupil.id,
+            name: `${pupil.first_name} ${pupil.last_name}`,
+            from: existing?.status ?? 'not marked',
+            to: ctx.params.status,
+          },
+        ],
+      },
+    }
+  },
+
+  /*
+    An announcement is PREPARED to the point of naming its audience and then handed to
+    the composer.
+
+    `AI_ASSISTANT.md` wants the preview to show the audience size before sending. It is
+    not executed from here even after confirmation: an announcement carries a channel
+    choice, a schedule and a template, and a one-line utterance cannot express those —
+    so the honest preview is the audience, and the composer is where the rest is decided.
+  */
+  create_announcement: async (ctx) => {
+    const { count } = await ctx.client
+      .from('students')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active')
+
+    return {
+      data: { activePupils: count ?? 0 },
+      rowCount: 0,
+      citations: [{ source: 'Pupil roll', detail: `${count ?? 0} active pupil(s)` }],
+      pendingAction: {
+        kind: 'create_announcement',
+        audienceHint: count ?? 0,
+        route: ctx.basePath ? `${ctx.basePath}/announcements` : '/',
+      },
+    }
+  },
 
   /* ----------------------------------------------------------------- chat */
   chat: async () => ({ data: null, rowCount: 0, citations: [] }),

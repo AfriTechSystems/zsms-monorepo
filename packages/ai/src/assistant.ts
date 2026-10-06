@@ -21,6 +21,15 @@
  * says it cannot answer rather than an action nobody designed.
  */
 
+/**
+ * A literal newline, named so it survives being edited by a script.
+ *
+ * `curriculum.ts` learned this the hard way: a `
+` inside a template literal was
+ * expanded by an editing script and broke the file.
+ */
+const NEWLINE = String.fromCharCode(10)
+
 /** What a classified request is for. */
 export type IntentClass = 'read' | 'navigate' | 'write' | 'chat' | 'unknown'
 
@@ -129,6 +138,19 @@ export const INTENTS: IntentSpec[] = [
     roles: EVERYONE,
   },
 
+  {
+    intent: 'announcement_reach',
+    kind: 'read',
+    description: 'How many people saw or read a notice we sent.',
+    roles: MANAGEMENT,
+  },
+  {
+    intent: 'staff_data_completeness',
+    kind: 'read',
+    description: 'Which staff are behind on entering marks or marking registers.',
+    roles: MANAGEMENT,
+  },
+
   // ---- navigate ----
   {
     intent: 'navigate_to_module',
@@ -141,6 +163,24 @@ export const INTENTS: IntentSpec[] = [
     kind: 'navigate',
     description: 'I want to DO something — enter marks, mark the register, record a payment.',
     roles: EVERYONE,
+  },
+  {
+    intent: 'navigate_to_filtered_view',
+    kind: 'navigate',
+    description: 'Show me a filtered list — unpaid fees for Grade 10, absent pupils today.',
+    roles: EVERYONE,
+  },
+  {
+    intent: 'navigate_to_report',
+    kind: 'navigate',
+    description: "Show me last term's results, a past report, an archive.",
+    roles: EVERYONE,
+  },
+  {
+    intent: 'navigate_to_settings',
+    kind: 'navigate',
+    description: 'Where do I change something — the grading scale, terms, our details.',
+    roles: MANAGEMENT,
   },
 
   // ---- write ----
@@ -315,14 +355,36 @@ export function narrationPrompt(params: {
   schoolName: string | null
   data: unknown
   rowCount: number
+  /**
+   * What the school's data is missing (ADR-029).
+   *
+   * `AI_DATA_REQUIREMENTS.md` is explicit that the assistant "never refuses to respond
+   * due to low completeness. It always answers with what data is available and is
+   * explicit about gaps." So these are handed to the narrator to QUALIFY the answer, not
+   * to block it — "the at-risk list may be incomplete" is the shape the document asks
+   * for.
+   */
+  completeness?: {
+    overall: number
+    status: string
+    gaps: Array<{ area: string; detail: string }>
+  } | null
 }): string {
+  const gaps =
+    params.completeness && params.completeness.gaps.length > 0
+      ? `
+DATA GAPS (mention any that affect THIS answer, briefly, at the end):
+${params.completeness.gaps.map((g) => `- ${g.area}: ${g.detail}`).join(NEWLINE)}
+Overall completeness: ${params.completeness.overall}%`
+      : ''
+
   return `USER ROLE: ${params.role}
 SCHOOL: ${params.schoolName ?? '(none)'}
 
 THE USER ASKED: "${params.message}"
 
 DATA ZSMS FETCHED (${params.rowCount} row${params.rowCount === 1 ? '' : 's'}):
-${JSON.stringify(params.data, null, 2)}
+${JSON.stringify(params.data, null, 2)}${gaps}
 
 Answer using only that data.`
 }

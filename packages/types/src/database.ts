@@ -5709,6 +5709,7 @@ export type Database = {
             }
             Returns: boolean
           }
+      archive_old_ai_conversations: { Args: never; Returns: number }
       attach_own_registered_school: {
         Args: { p_clerk_org_id: string; p_school_id: string }
         Returns: boolean
@@ -6616,6 +6617,17 @@ export type Database = {
           out_from_reserve: number
           out_last_used_at: string
           out_teacher_name: string
+        }[]
+      }
+      school_data_completeness: {
+        Args: { p_school_id?: string }
+        Returns: {
+          out_attendance_pct: number
+          out_gaps: Json
+          out_marks_pct: number
+          out_overall: number
+          out_parent_link_pct: number
+          out_status: string
         }[]
       }
       school_decide_join_request: {

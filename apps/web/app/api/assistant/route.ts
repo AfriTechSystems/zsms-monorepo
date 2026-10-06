@@ -135,6 +135,21 @@ export async function GET(request: Request): Promise<Response> {
       })
     }
 
+    /*
+      Housekeeping, opportunistically.
+
+      `AI_ASSISTANT.md` archives after 30 days and there is no scheduler on this project
+      — no pg_cron, and the worker set has no maintenance runner. One cheap UPDATE
+      against an indexed predicate when somebody opens the panel costs less than the
+      machinery to schedule it, and a list briefly a day stale harms nobody.
+
+      Not awaited for its result and never allowed to fail the request.
+    */
+    void client.rpc('archive_old_ai_conversations').then(
+      () => undefined,
+      () => undefined,
+    )
+
     const [conversations, quota] = await Promise.all([
       client
         .from('ai_conversations')
@@ -185,6 +200,15 @@ const postSchema = z.object({
     .object({
       route: z.string().max(300).optional(),
       basePath: z.string().max(200).optional(),
+      section: z.string().max(60).nullable().optional(),
+      entityId: z.string().max(60).nullable().optional(),
+      /*
+        The active filters on the view.
+
+        Capped at 20 keys: these arrive from a query string a caller controls, and an
+        unbounded object would go straight into a prompt.
+      */
+      filters: z.record(z.string().max(100)).optional(),
     })
     .optional(),
 })
@@ -335,7 +359,13 @@ export async function POST(request: Request): Promise<Response> {
           userPrompt: intentPrompt({
             message,
             role: role ?? 'unknown',
-            currentPage: page?.route ?? null,
+            currentPage: [
+              page?.route,
+              page?.section ? `section=${page.section}` : null,
+              page?.entityId ? `record=${page.entityId}` : null,
+            ]
+              .filter(Boolean)
+              .join(' '),
             availableIntents: available,
             history: (history.data ?? []).reverse().map((m) => ({
               role: String(m.role),
@@ -421,6 +451,11 @@ export async function POST(request: Request): Promise<Response> {
         role: role ?? '',
         params: classified.parameters,
         basePath: page?.basePath ?? null,
+        page: {
+          section: page?.section ?? null,
+          entityId: page?.entityId ?? null,
+          filters: page?.filters ?? {},
+        },
       })
     } catch (err) {
       console.error('[assistant] executor failed', chosen.intent, err)
@@ -489,6 +524,35 @@ export async function POST(request: Request): Promise<Response> {
         ? 'Taking you there now.'
         : 'I am not sure which part of ZSMS you mean. Try naming it — fees, attendance, results, pupils or the timetable.'
     } else {
+      /*
+        The completeness gate (ADR-029), which does NOT gate.
+
+        `AI_DATA_REQUIREMENTS.md`: "The assistant never refuses to respond due to low
+        completeness. It always answers with what data is available and is explicit about
+        gaps." So the score qualifies the answer rather than blocking it — and a school at
+        30% can still ask, which is one of the better ways for them to find out what is
+        missing.
+
+        A failure here loses the qualification, not the answer.
+      */
+      let completeness: {
+        overall: number
+        status: string
+        gaps: Array<{ area: string; detail: string }>
+      } | null = null
+
+      if (schoolScoped) {
+        const dc = await client.rpc('school_data_completeness', { p_school_id: null })
+        const row = ((dc.data ?? []) as Array<Record<string, unknown>>)[0]
+        if (!dc.error && row) {
+          completeness = {
+            overall: Number(row['out_overall'] ?? 0),
+            status: String(row['out_status'] ?? 'locked'),
+            gaps: (row['out_gaps'] ?? []) as Array<{ area: string; detail: string }>,
+          }
+        }
+      }
+
       try {
         const result = await runChain({
           models,
@@ -500,6 +564,7 @@ export async function POST(request: Request): Promise<Response> {
               schoolName: null,
               data: executed.data,
               rowCount: executed.rowCount,
+              completeness,
             }),
             schema: NARRATION_SCHEMA,
             schemaName: 'assistant_answer',

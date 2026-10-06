@@ -29,7 +29,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowUp,
   Check,
@@ -85,6 +85,9 @@ const SUGGESTIONS: Record<string, Array<{ title: string; sub: string }>> = {
   ],
 }
 
+/** A UUID anywhere in the path — the record the user currently has open. */
+const UUID_IN_PATH = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
 function greeting(): string {
   const h = new Date().getHours()
   if (h < 12) return 'Good morning.'
@@ -114,6 +117,7 @@ export function AssistantPanel({
   basePath?: string
 }): JSX.Element | null {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
 
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -124,6 +128,7 @@ export function AssistantPanel({
   const [historyQuery, setHistoryQuery] = useState('')
   const [expanded, setExpanded] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<string | null>(null)
 
   const endRef = useRef<HTMLDivElement>(null)
 
@@ -184,6 +189,52 @@ export function AssistantPanel({
     setHistoryOpen(false)
   }, [])
 
+  /**
+   * Perform a prepared write.
+   *
+   * The request carries only the MESSAGE ID. The action itself lives on that row, so a
+   * confirmation cannot carry something other than what was previewed — which is exactly
+   * the failure the approval gate exists to prevent.
+   */
+  const confirm = useCallback(
+    async (messageId: string) => {
+      setConfirming(messageId)
+      try {
+        const result = await apiSend<{ done: boolean; message: string; route?: string }>(
+          '/api/assistant/confirm',
+          'POST',
+          { messageId },
+        )
+
+        if (result.error) {
+          setNotice(result.error)
+          return
+        }
+
+        // Mark it acted-on locally so the card collapses immediately rather than after a
+        // refetch — a Confirm button that stays live reads as not having worked.
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId ? { ...m, actedAt: new Date().toISOString() } : m,
+          ),
+        )
+
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: result.data?.message ?? 'Done.' },
+        ])
+
+        if (result.data?.route) {
+          router.push(result.data.route)
+          onClose()
+        }
+      } finally {
+        setConfirming(null)
+      }
+    },
+    [router, onClose],
+  )
+
   const send = useCallback(
     async (text: string) => {
       const trimmed = text.trim()
@@ -206,7 +257,23 @@ export function AssistantPanel({
         }>('/api/assistant', 'POST', {
           message: trimmed,
           conversationId: conversationId ?? undefined,
-          page: { route: pathname, basePath },
+          /*
+            Read from the URL rather than passed down from every screen.
+
+            The sub-section tabs already put `?section=` in the query string and an entity
+            page already carries its id in the path, so the context is there to be read —
+            and requiring 67 screens to cooperate would mean the ones nobody updated
+            silently lose it.
+          */
+          page: {
+            route: pathname,
+            basePath,
+            section: searchParams.get('section'),
+            entityId: UUID_IN_PATH.exec(pathname)?.[0] ?? null,
+            filters: Object.fromEntries(
+              [...searchParams.entries()].filter(([k]) => k !== 'section'),
+            ),
+          },
         })
 
         if (result.error) {
@@ -252,7 +319,7 @@ export function AssistantPanel({
         setBusy(false)
       }
     },
-    [busy, conversationId, pathname, basePath, router, onClose, reload],
+    [busy, conversationId, pathname, searchParams, basePath, router, onClose, reload],
   )
 
   if (!open) return null
@@ -434,28 +501,87 @@ export function AssistantPanel({
                       </ul>
                     )}
 
-                    {/* A prepared write. It stops here. */}
+                    {/*
+                      A prepared write, with the exact change.
+
+                      `AI_ASSISTANT.md` shows a table of field-level changes, not prose:
+                      the person confirming must see WHICH pupil and WHAT changes, because
+                      they are the last check before a parent is told their child was
+                      absent.
+                    */}
                     {m.pendingAction && !m.actedAt && (
                       <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2">
-                        <p className="text-xs font-medium">Nothing has been saved yet.</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          I can take you to the right screen to do this — the assistant does
-                          not make changes on its own.
-                        </p>
-                        {typeof m.pendingAction['route'] === 'string' && (
+                        <p className="text-xs font-semibold">Nothing has been saved yet.</p>
+
+                        {Array.isArray(m.pendingAction['changes']) && (
+                          <table className="mt-1.5 w-full text-xs">
+                            <caption className="sr-only">Changes awaiting confirmation</caption>
+                            <tbody>
+                              {(
+                                m.pendingAction['changes'] as Array<{
+                                  name: string
+                                  from: string
+                                  to: string
+                                }>
+                              ).map((ch, k) => (
+                                <tr key={k}>
+                                  <td className="pr-2 font-medium">{ch.name}</td>
+                                  <td className="text-muted-foreground">{ch.from}</td>
+                                  <td className="px-1 text-muted-foreground" aria-label="becomes">
+                                    &rarr;
+                                  </td>
+                                  <td className="font-medium">{ch.to}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+
+                        {typeof m.pendingAction['date'] === 'string' && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {String(m.pendingAction['classId'] ?? '')} ·{' '}
+                            {String(m.pendingAction['date'])}
+                          </p>
+                        )}
+
+                        {typeof m.pendingAction['audienceHint'] === 'number' && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Around {String(m.pendingAction['audienceHint'])} pupils&apos;
+                            families would receive this.
+                          </p>
+                        )}
+
+                        <div className="mt-2 flex flex-wrap gap-2">
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="mt-2"
-                            onClick={() => {
-                              router.push(String(m.pendingAction?.['route']))
-                              onClose()
-                            }}
+                            disabled={confirming === m.id || !m.id}
+                            onClick={() => m.id && void confirm(m.id)}
                           >
-                            <Check aria-hidden="true" />
-                            Take me there
+                            {confirming === m.id ? (
+                              <Loader2 aria-hidden="true" className="animate-spin" />
+                            ) : (
+                              <Check aria-hidden="true" />
+                            )}
+                            Confirm
                           </Button>
-                        )}
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={confirming === m.id}
+                            onClick={() =>
+                              /* Discarded locally. Nothing was ever written, so there is
+                                 nothing to undo — the row simply stops offering. */
+                              setMessages((prev) =>
+                                prev.map((x) =>
+                                  x.id === m.id ? { ...x, pendingAction: null } : x,
+                                ),
+                              )
+                            }
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>

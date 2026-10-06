@@ -29,6 +29,7 @@ import {
   Wallet,
 } from 'lucide-react-native'
 
+import { AskAiFab } from '../../../components/ask-ai-fab'
 import { usePalette } from '../../../components/ui'
 import { RADIUS, TAP } from '../../../theme'
 
@@ -40,6 +41,7 @@ export default function ParentTabs(): JSX.Element {
   const drawerButton = (): JSX.Element => <DrawerToggleButton tintColor={c.text} />
 
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: c.surface },
@@ -131,5 +133,15 @@ export default function ParentTabs(): JSX.Element {
       <Tabs.Screen name="timetable" options={{ href: null, title: 'Timetable' }} />
       <Tabs.Screen name="children" options={{ href: null, title: 'My children' }} />
     </Tabs>
+
+      {/*
+        Ask AI, once per portal rather than per screen.
+
+        Five tabs each drawing their own header would mean five copies that drift — the
+        same mistake the parent child-picker was. Here every tab gets it, including any
+        added later.
+      */}
+      <AskAiFab audience="parent" />
+    </View>
   )
 }

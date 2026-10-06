@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          school_id: string | null
+          started_as: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          school_id?: string | null
+          started_as?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          school_id?: string | null
+          started_as?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "ai_conversations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "ai_conversations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_credit_accounts: {
         Row: {
           created_at: string
@@ -180,6 +235,62 @@ export type Database = {
             columns: ["lot_id"]
             isOneToOne: false
             referencedRelation: "ai_credit_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_messages: {
+        Row: {
+          acted_at: string | null
+          charged: boolean
+          citations: Json
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          input_tokens: number | null
+          intent: string | null
+          output_tokens: number | null
+          pending_action: Json | null
+          role: string
+          route: string | null
+        }
+        Insert: {
+          acted_at?: string | null
+          charged?: boolean
+          citations?: Json
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          output_tokens?: number | null
+          pending_action?: Json | null
+          role: string
+          route?: string | null
+        }
+        Update: {
+          acted_at?: string | null
+          charged?: boolean
+          citations?: Json
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          output_tokens?: number | null
+          pending_action?: Json | null
+          role?: string
+          route?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -5192,15 +5303,6 @@ export type Database = {
           status: string
         }[]
       }
-      admin_ai_generation_status: {
-        Args: never
-        Returns: {
-          out_description: string
-          out_enabled: boolean
-          out_updated_at: string
-          out_updated_by: string
-        }[]
-      }
       admin_ai_usage_breakdown: {
         Args: { p_dimension?: string; p_school_id?: string }
         Returns: {
@@ -5384,10 +5486,6 @@ export type Database = {
           out_teachers_assigned: number
         }[]
       }
-      admin_set_ai_generation: {
-        Args: { p_enabled: boolean; p_reason: string }
-        Returns: boolean
-      }
       admin_set_onboarding_task: {
         Args: {
           p_assigned_to?: string
@@ -5508,6 +5606,26 @@ export type Database = {
         Returns: {
           allowance_credits: number
           allowance_period: string
+        }[]
+      }
+      ai_assistant_begin: {
+        Args: { p_conversation_id: string; p_idempotency_key: string }
+        Returns: {
+          out_allowed: boolean
+          out_charged: boolean
+          out_reason: string
+          out_user_limit: number
+          out_user_used: number
+        }[]
+      }
+      ai_assistant_quota: {
+        Args: never
+        Returns: {
+          out_school_limit: number
+          out_school_used: number
+          out_user_limit: number
+          out_user_used: number
+          out_within_free: boolean
         }[]
       }
       ai_credit_account_for_caller: { Args: never; Returns: string }
@@ -6842,6 +6960,7 @@ export type Database = {
         Returns: boolean
       }
       srgb_relative_luminance: { Args: { p_hex: string }; Returns: number }
+      start_ai_conversation: { Args: never; Returns: string }
       student_in_current_school: {
         Args: { p_student_id: string }
         Returns: boolean

@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { BookOpen, LayoutDashboard, School, Sparkles, UserCog, Users } from 'lucide-react'
 
+import { AskAi } from '../../components/assistant/ask-ai'
 import { AppShell } from '../../components/layout/app-shell'
 import type { NavGroup } from '../../components/layout/nav-config'
 
@@ -80,7 +81,19 @@ export function TeacherShell({
       title="ZSMS Teacher Hub"
       subtitle="Your planning tools"
       groups={groups}
-      headerActions={headerActions}
+      headerActions={
+        <>
+          {/*
+            Ask AI, in the shell rather than per screen.
+
+            A control on every page belongs in the layout. The parent child-picker and
+            the Hub signed-out branch were both bugs caused by copying a control per
+            page; the fix each time was to move the single copy up a level.
+          */}
+          <AskAi audience="teacher" />
+          {headerActions}
+        </>
+      }
       footer={
         schools.length > 0 ? (
           <Link

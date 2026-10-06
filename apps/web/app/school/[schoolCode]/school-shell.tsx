@@ -44,6 +44,7 @@ import {
 
 import type { Role } from '@zsms/auth-provider'
 
+import { AskAi } from '../../../components/assistant/ask-ai'
 import { AppShell } from '../../../components/layout/app-shell'
 import type { NavGroup } from '../../../components/layout/nav-config'
 import { can } from '../../../lib/roles'
@@ -182,7 +183,20 @@ export function SchoolShell({
       title={schoolName}
       subtitle={roleLabel}
       groups={visible}
-      headerActions={headerActions}
+      headerActions={
+        <>
+          {/*
+            Ask AI, in the shell rather than per screen.
+
+            A control on every page belongs in the layout. The parent child-picker and
+            the Hub signed-out branch were both bugs caused by copying a control per
+            page; the fix each time was to move the single copy up a level.
+          */}
+          <AskAi audience="school"
+            basePath={base} />
+          {headerActions}
+        </>
+      }
     >
       {children}
     </AppShell>

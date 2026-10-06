@@ -22,6 +22,7 @@
  */
 
 import type { JSX, ReactNode } from 'react'
+import { AskAi } from '../../components/assistant/ask-ai'
 import { ChildSwitcher } from './child-switcher'
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -195,7 +196,17 @@ export function ParentShell({
             */}
             <ChildSwitcher />
 
-            <div className="ml-auto flex items-center gap-2">{headerActions}</div>
+            <div className="ml-auto flex items-center gap-2">
+              {/*
+                Ask AI, in the shell for the same reason the child picker is: a control on
+                every page belongs in the layout, not copied per screen.
+
+                The parent portal has its own shell rather than `AppShell` — bottom tabs on
+                a phone — so it mounts its own copy.
+              */}
+              <AskAi audience="parent" />
+              {headerActions}
+            </div>
           </div>
         </header>
 

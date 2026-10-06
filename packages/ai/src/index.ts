@@ -59,6 +59,18 @@ import { createLiveGenerator, type LiveGeneratorConfig } from './providers/live'
 
 export { templateGenerator }
 
+/* The role-based assistant: intents, classification and narration (`AI_ASSISTANT.md`). */
+export type { IntentSpec, IntentClass, ClassifiedIntent } from './assistant'
+export {
+  INTENTS,
+  INTENT_SCHEMA,
+  INTENT_SYSTEM_PROMPT,
+  NARRATION_SYSTEM_PROMPT,
+  intentsForRole,
+  intentPrompt,
+  narrationPrompt,
+} from './assistant'
+
 /**
  * Whether the ENVIRONMENT forbids live generation outright.
  *

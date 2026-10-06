@@ -33,6 +33,7 @@ import { CalendarCheck, ClipboardList, FolderOpen, LayoutGrid, WandSparkles } fr
 import { View } from 'react-native'
 
 import { useSession } from '../../../lib/auth'
+import { AskAiFab } from '../../../components/ask-ai-fab'
 import { Loading, Screen, usePalette } from '../../../components/ui'
 import { RADIUS, TAP } from '../../../theme'
 
@@ -53,6 +54,7 @@ export default function TeacherTabs(): JSX.Element {
 
   // Auth is settled by the drawer layout above, which wraps this.
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: c.surface },
@@ -151,5 +153,15 @@ export default function TeacherTabs(): JSX.Element {
       <Tabs.Screen name="account" options={{ href: null, title: 'Account' }} />
       <Tabs.Screen name="timetable" options={{ href: null, title: 'Timetable' }} />
     </Tabs>
+
+      {/*
+        Ask AI, once per portal rather than per screen.
+
+        Five tabs each drawing their own header would mean five copies that drift — the
+        same mistake the parent child-picker was. Here every tab gets it, including any
+        added later.
+      */}
+      <AskAiFab audience="teacher" />
+    </View>
   )
 }

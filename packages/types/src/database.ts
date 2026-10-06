@@ -1277,6 +1277,80 @@ export type Database = {
           },
         ]
       }
+      integration_log: {
+        Row: {
+          attempt: number
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          integration_id: string
+          request_payload: Json | null
+          response_code: number | null
+          response_summary: string | null
+          school_id: string
+          status: string
+          zsms_record_id: string | null
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          integration_id: string
+          request_payload?: Json | null
+          response_code?: number | null
+          response_summary?: string | null
+          school_id: string
+          status?: string
+          zsms_record_id?: string | null
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          integration_id?: string
+          request_payload?: Json | null
+          response_code?: number | null
+          response_summary?: string | null
+          school_id?: string
+          status?: string
+          zsms_record_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_log_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "school_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "integration_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "integration_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_runs: {
         Row: {
           attempts: number
@@ -1822,6 +1896,8 @@ export type Database = {
           full_name: string | null
           id: string
           last_login_at: string | null
+          marketing_opt_in: boolean
+          marketing_opt_in_at: string | null
           national_id: string | null
           phone_e164: string | null
           preferred_contact: string
@@ -1835,6 +1911,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_login_at?: string | null
+          marketing_opt_in?: boolean
+          marketing_opt_in_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
           preferred_contact?: string
@@ -1848,6 +1926,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_login_at?: string | null
+          marketing_opt_in?: boolean
+          marketing_opt_in_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
           preferred_contact?: string
@@ -2950,6 +3030,85 @@ export type Database = {
           },
           {
             foreignKeyName: "school_grading_scales_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_integrations: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string
+          credentials_enc: string | null
+          display_name: string
+          events_subscribed: string[]
+          id: string
+          integration_type: string
+          is_active: boolean
+          is_paused: boolean
+          last_error: string | null
+          last_sync_at: string | null
+          last_sync_status: string | null
+          pause_reason: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by: string
+          credentials_enc?: string | null
+          display_name: string
+          events_subscribed?: string[]
+          id?: string
+          integration_type: string
+          is_active?: boolean
+          is_paused?: boolean
+          last_error?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          pause_reason?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string
+          credentials_enc?: string | null
+          display_name?: string
+          events_subscribed?: string[]
+          id?: string
+          integration_type?: string
+          is_active?: boolean
+          is_paused?: boolean
+          last_error?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          pause_reason?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_integrations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_integrations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_integrations_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -5602,6 +5761,17 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_integration_health: {
+        Args: never
+        Returns: {
+          out_failures_7d: number
+          out_integration_type: string
+          out_is_paused: boolean
+          out_last_sync_at: string
+          out_last_sync_status: string
+          out_school_name: string
+        }[]
+      }
       admin_issue_invoice: { Args: { p_invoice_id: string }; Returns: Json }
       admin_loan_applications: {
         Args: { p_status?: string }
@@ -5615,6 +5785,13 @@ export type Database = {
           out_school_id: string
           out_score: number
           out_status: string
+        }[]
+      }
+      admin_marketing_consent_summary: {
+        Args: never
+        Returns: {
+          out_opted_in: number
+          out_total: number
         }[]
       }
       admin_network_suggestions: {

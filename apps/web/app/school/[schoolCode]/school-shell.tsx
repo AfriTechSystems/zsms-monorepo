@@ -35,6 +35,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Megaphone,
+  Plug,
   Receipt,
   ScrollText,
   ShieldCheck,
@@ -187,6 +188,15 @@ export function SchoolShell({
           roughly honest.
         */
         { path: '/settings/roles', label: 'Staff roles', icon: ShieldCheck, needs: 'settings:write' },
+        /*
+          Accounting and CRM connections (ADR-023).
+
+          `fees:write` rather than `settings:write`, because the POLICY admits the
+          accountant alongside the owner and principal — connecting Sage is their job,
+          and gating the link to leadership alone would hide it from the one person who
+          actually does it.
+        */
+        { path: '/settings/integrations', label: 'Connections', icon: Plug, needs: 'fees:write' },
         // Outward-facing rather than internal configuration, and the only settings row a
         // parent ever sees the result of. Kept beside the others because that is where a head
         // teacher looks for it, not because it is the same kind of thing.

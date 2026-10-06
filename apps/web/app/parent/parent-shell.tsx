@@ -27,7 +27,14 @@ import { ChildSwitcher } from './child-switcher'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { CalendarCheck, ClipboardList, LayoutDashboard, Megaphone, Wallet } from 'lucide-react'
+import {
+  CalendarCheck,
+  ClipboardList,
+  LayoutDashboard,
+  Megaphone,
+  UserRound,
+  Wallet,
+} from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 
@@ -205,6 +212,21 @@ export function ParentShell({
                 a phone — so it mounts its own copy.
               */}
               <AskAi audience="parent" />
+              {/*
+                The account link lives HERE rather than as a sixth bottom tab.
+
+                Five tabs is already the practical limit on the phones most Zambian
+                parents carry, and contact preferences are something you set once — not
+                somewhere you navigate to daily. A sixth tab would shrink the five that
+                matter to buy room for the one that does not.
+              */}
+              <Link
+                href="/parent/account"
+                aria-label="Your account and contact preferences"
+                className="flex min-h-tap min-w-tap items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <UserRound className="h-5 w-5" />
+              </Link>
               {headerActions}
             </div>
           </div>

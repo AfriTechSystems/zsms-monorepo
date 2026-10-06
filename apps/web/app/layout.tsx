@@ -15,7 +15,10 @@ import type { ReactNode } from 'react'
 import '@fontsource-variable/inter'
 import './globals.css'
 
+import { Suspense } from 'react'
+
 import { SessionProvider } from '@zsms/auth-provider/react'
+import { PageViews } from '../components/analytics/page-views'
 
 import { platformTheme, ThemeStyle } from '../lib/theme'
 import { ToastProvider } from '../components/ui/toast'
@@ -84,6 +87,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {/* Mounted at the root so any screen can confirm an action without
               each one rendering its own strip — and so the strip is in the same
               place on every page, which is the point of a toast. */}
+          {/*
+            Page views, once for the whole application.
+
+            `usePathname()` needs a Suspense boundary or the route opts out of static
+            rendering — the same reason the parent shell wraps its sidebar.
+
+            It sends a GENERIC path: dynamic segments are replaced before anything
+            leaves the browser, because `/school/ZM-LSK-0001/pupils/<uuid>` names a
+            school and a child in the path itself.
+          */}
+          <Suspense fallback={null}>
+            <PageViews />
+          </Suspense>
+
           <ToastProvider>{children}</ToastProvider>
         </body>
       </html>

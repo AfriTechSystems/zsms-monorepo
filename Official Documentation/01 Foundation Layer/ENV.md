@@ -57,7 +57,11 @@ FIELD_ENCRYPTION_KEY=...
 
 ```bash
 NEXT_PUBLIC_POSTHOG_KEY=phc_...
-NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
+# EU host by default. ZSMS keeps substantive personal data in `af-south-1`, and
+# PostHog has no region there — so analytics carries NO personal data at all
+# (see `apps/web/lib/analytics.ts`), and the host choice is about latency rather
+# than residency. `app.posthog.com` is the US cloud; prefer `eu.i.posthog.com`.
+NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 ```
 
 ### Sentry

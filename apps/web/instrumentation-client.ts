@@ -21,6 +21,8 @@
 
 import * as Sentry from '@sentry/nextjs'
 
+import { startAnalytics } from './lib/analytics'
+
 const dsn = process.env['NEXT_PUBLIC_SENTRY_DSN']
 
 if (dsn) {
@@ -80,3 +82,16 @@ if (dsn) {
 
 /** Reports a slow or failed route transition. Required by Next 15's navigation instrumentation. */
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
+
+/*
+  Product analytics, alongside error reporting rather than instead of it.
+
+  Both live in this one file because Next.js loads exactly one client instrumentation
+  module — which is also why `npx @posthog/wizard` was not used: it writes its own copy of
+  this file and would have removed the Sentry setup above.
+
+  `startAnalytics()` is silent when `NEXT_PUBLIC_POSTHOG_KEY` is absent, which is the
+  normal state in development. Autocapture, input capture and session recording are all
+  OFF — see `lib/analytics.ts` for why that is not a tuning choice.
+*/
+startAnalytics()

@@ -89,6 +89,76 @@ const nextConfig = {
   // markup. Moved rather than disabled: it reports route type, compilation
   // state, and errors, which are worth keeping.
   devIndicators: { position: 'bottom-right' },
+  /**
+   * Security headers, set at the ORIGIN.
+   *
+   * Spec: `03 Infrastructure Services/CLOUDFLARE_WAF.md` -> *Security Headers*
+   *
+   * That document puts these in Cloudflare Transform Rules. They are set here as well,
+   * and the reason is the document's own prohibition 1: "The Cloudflare WAF proxy must
+   * always be enabled (orange cloud ON) for zsms.co.zm. Disabling it bypasses all WAF
+   * protections and exposes Vercel's origin IP."
+   *
+   * A header that exists only at the edge disappears the moment somebody greys that
+   * cloud to debug something — which is exactly when a site is most exposed. Set at the
+   * origin they survive it, they are version-controlled, and they can be tested before
+   * the zone exists at all.
+   *
+   * Cloudflare will override with the same values where both apply, so there is no
+   * conflict in keeping both.
+   */
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          /*
+            No framing at all. ZSMS has no embedding use case, and a school portal in an
+            iframe is a clickjacking surface over fee approval and mark publishing.
+          */
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+          /*
+            `X-XSS-Protection` is in the document and is deliberately NOT set.
+
+            Every current browser ignores it, and in the versions that honoured it the
+            auditor itself introduced vulnerabilities — which is why it was removed.
+            `Content-Security-Policy` below is what actually prevents this class.
+          */
+          {
+            key: 'Content-Security-Policy',
+            /*
+              `unsafe-inline` for scripts is what Next's hydration bootstrap needs today;
+              removing it requires nonces threaded through the App Router and is its own
+              piece of work. Recorded here rather than silently accepted.
+
+              `frame-ancestors 'none'` duplicates X-Frame-Options for browsers that
+              prefer CSP, which is all of them now.
+            */
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://cdn.clerk.io",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.r2.dev https://img.clerk.com",
+              "font-src 'self' data:",
+              // Supabase over websockets for realtime, Clerk for auth, PostHog for
+              // analytics, Sentry for errors. Anything else is a bug or an exfiltration.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://clerk.zsms.co.zm https://*.posthog.com https://*.sentry.io",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
+          },
+        ],
+      },
+    ]
+  },
+
   // Workspace packages ship TypeScript source — Next compiles them.
   transpilePackages: [
     '@zsms/auth-provider',

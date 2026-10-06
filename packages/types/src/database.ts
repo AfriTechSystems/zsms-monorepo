@@ -1350,6 +1350,102 @@ export type Database = {
           },
         ]
       }
+      lenders: {
+        Row: {
+          api_endpoint: string | null
+          api_key_encrypted: string | null
+          collection_account: Json | null
+          collection_instructions: string | null
+          commission_rate: number
+          commission_terms: string | null
+          country_codes: string[]
+          description: string | null
+          display_name: string
+          eligibility_summary: string[] | null
+          id: string
+          intake_email: string | null
+          integration_type: string
+          interest_rate_display: string
+          is_active: boolean
+          is_featured: boolean
+          lender_name: string
+          loan_products: Json
+          logo_url: string | null
+          max_loan_amount: number
+          min_behaviour_score: number
+          min_loan_amount: number
+          notes: string | null
+          onboarded_at: string
+          onboarded_by: string
+          required_documents: string[] | null
+          tagline: string | null
+          turnaround_label: string
+          webhook_secret: string | null
+        }
+        Insert: {
+          api_endpoint?: string | null
+          api_key_encrypted?: string | null
+          collection_account?: Json | null
+          collection_instructions?: string | null
+          commission_rate: number
+          commission_terms?: string | null
+          country_codes?: string[]
+          description?: string | null
+          display_name: string
+          eligibility_summary?: string[] | null
+          id?: string
+          intake_email?: string | null
+          integration_type: string
+          interest_rate_display: string
+          is_active?: boolean
+          is_featured?: boolean
+          lender_name: string
+          loan_products?: Json
+          logo_url?: string | null
+          max_loan_amount: number
+          min_behaviour_score?: number
+          min_loan_amount?: number
+          notes?: string | null
+          onboarded_at?: string
+          onboarded_by: string
+          required_documents?: string[] | null
+          tagline?: string | null
+          turnaround_label: string
+          webhook_secret?: string | null
+        }
+        Update: {
+          api_endpoint?: string | null
+          api_key_encrypted?: string | null
+          collection_account?: Json | null
+          collection_instructions?: string | null
+          commission_rate?: number
+          commission_terms?: string | null
+          country_codes?: string[]
+          description?: string | null
+          display_name?: string
+          eligibility_summary?: string[] | null
+          id?: string
+          intake_email?: string | null
+          integration_type?: string
+          interest_rate_display?: string
+          is_active?: boolean
+          is_featured?: boolean
+          lender_name?: string
+          loan_products?: Json
+          logo_url?: string | null
+          max_loan_amount?: number
+          min_behaviour_score?: number
+          min_loan_amount?: number
+          notes?: string | null
+          onboarded_at?: string
+          onboarded_by?: string
+          required_documents?: string[] | null
+          tagline?: string | null
+          turnaround_label?: string
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
       message_log: {
         Row: {
           channel: string
@@ -5393,6 +5489,20 @@ export type Database = {
         Returns: Json
       }
       admin_issue_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      admin_loan_applications: {
+        Args: { p_status?: string }
+        Returns: {
+          out_amount: number
+          out_created_at: string
+          out_employment: string
+          out_id: string
+          out_lender_name: string
+          out_monthly_income: number
+          out_school_id: string
+          out_score: number
+          out_status: string
+        }[]
+      }
       admin_network_suggestions: {
         Args: never
         Returns: {
@@ -5533,6 +5643,17 @@ export type Database = {
           out_sort_order: number
           out_subscribers: number
         }[]
+      }
+      admin_update_loan_application: {
+        Args: {
+          p_decline_reason?: string
+          p_disbursed_amount?: number
+          p_id: string
+          p_lender_reference?: string
+          p_notes?: string
+          p_status: string
+        }
+        Returns: string
       }
       admin_update_school_commercial: {
         Args: {
@@ -5735,6 +5856,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      calculate_behaviour_score: {
+        Args: { p_monthly_income?: number; p_parent_user_id: string }
+        Returns: {
+          out_breakdown: Json
+          out_score: number
+        }[]
       }
       child_timetable: {
         Args: { p_student_id: string }
@@ -6026,6 +6154,23 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: boolean
       }
+      lenders_for_application: {
+        Args: { p_score?: number }
+        Returns: {
+          out_description: string
+          out_display_name: string
+          out_eligibility_summary: string[]
+          out_id: string
+          out_interest_rate_display: string
+          out_is_featured: boolean
+          out_logo_url: string
+          out_max_amount: number
+          out_min_amount: number
+          out_required_documents: string[]
+          out_tagline: string
+          out_turnaround_label: string
+        }[]
+      }
       link_parent_to_student: {
         Args: {
           p_email?: string
@@ -6085,6 +6230,25 @@ export type Database = {
           out_pending: boolean
           out_requested_at: string
           out_retain_years: number
+        }[]
+      }
+      my_loan_applications: {
+        Args: never
+        Returns: {
+          out_amount: number
+          out_breakdown: Json
+          out_collection_account: Json
+          out_collection_instructions: string
+          out_created_at: string
+          out_decline_reason: string
+          out_disbursed_amount: number
+          out_disbursed_at: string
+          out_id: string
+          out_lender_name: string
+          out_lender_reference: string
+          out_repayment_schedule: Json
+          out_score: number
+          out_status: string
         }[]
       }
       my_network_access: {
@@ -6689,6 +6853,19 @@ export type Database = {
           subscription_tier: string
         }[]
       }
+      school_loan_applications: {
+        Args: never
+        Returns: {
+          out_amount: number
+          out_created_at: string
+          out_disbursed_amount: number
+          out_disbursed_at: string
+          out_id: string
+          out_lender_name: string
+          out_status: string
+          out_student_id: string
+        }[]
+      }
       school_onboarding_completion: {
         Args: { p_school_id: string }
         Returns: {
@@ -6976,6 +7153,23 @@ export type Database = {
       student_in_current_school: {
         Args: { p_student_id: string }
         Returns: boolean
+      }
+      submit_loan_application: {
+        Args: {
+          p_amount: number
+          p_consent_text_hash: string
+          p_consent_version: string
+          p_consented_at: string
+          p_employer_name: string
+          p_employment_type: string
+          p_fee_record_id: string
+          p_ip_address?: string
+          p_lender_id: string
+          p_monthly_income: number
+          p_payslip_url: string
+          p_user_agent?: string
+        }
+        Returns: string
       }
       suggest_payment_allocation: {
         Args: { p_amount: number; p_student_id: string }

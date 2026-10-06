@@ -436,6 +436,44 @@ export async function POST(request: Request): Promise<Response> {
     let outputTokens = 0
     let inputTokens = 0
 
+    /*
+      Business rule 11: "Write intents are logged to `public.audit_logs` including the
+      originating natural-language utterance."
+
+      Logged when the write is PREPARED, not only when one is performed — the assistant
+      performs none today, and the interesting event for an auditor is that somebody
+      asked the system to change a record by typing a sentence. Without the utterance the
+      row says an action was prepared and not what was asked for.
+
+      A failed log does not fail the request: losing the audit row is bad, losing the
+      user's answer to protect it is worse, and the message row carries the same
+      utterance.
+    */
+    if (chosen.kind === 'write') {
+      await client
+        .rpc('log_audit_event', {
+          p_action: `assistant_prepared_${chosen.intent}`,
+          p_table_name: 'ai_messages',
+          p_record_id: null,
+          p_metadata: {
+            intent: chosen.intent,
+            utterance: message,
+            parameters: classified.parameters,
+            conversation_id: conversationId,
+            confidence: classified.confidence,
+          },
+          p_school_id: null,
+          p_ip_address: null,
+          p_user_agent: null,
+        })
+        .then(
+          () => undefined,
+          (err: unknown) => {
+            console.error('[assistant] could not audit a prepared write', err)
+          },
+        )
+    }
+
     if (chosen.kind === 'write') {
       /*
         A prepared write is not narrated by a model.

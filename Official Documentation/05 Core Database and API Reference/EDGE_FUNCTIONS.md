@@ -9,6 +9,37 @@
 
 ---
 
+## Status — superseded, pending confirmation (2026-10-06)
+
+> **`supabase/functions/` is empty and no Edge Function has ever been deployed.** A
+> Foundation Layer audit split the functions below into three groups and found them in
+> quite different states:
+>
+> | Group | Specified here | Reality |
+> |---|---|---|
+> | PDF generation — report cards, receipts, previews | Edge Function | **Built as Railway workers** |
+> | WhatsApp dispatch | Edge Function | **Built as a Railway worker** |
+> | Webhooks — WhatsApp, payment, loan, Clerk | Edge Function | **Nothing, anywhere** |
+>
+> **The recommendation is that Edge Functions are superseded entirely.** The first two
+> groups already work over BullMQ/Upstash with Railway workers; building them again in
+> Deno would mean two async systems doing one job, with separate deployments, secrets and
+> monitoring — and two systems doing one thing is how one of them silently drifts.
+>
+> **The webhooks are a genuine gap**, and the recommendation is that they are built as
+> **Next.js API routes** rather than Edge Functions. `apps/web` already has 116 routes
+> with authentication, the error envelope and Sentry wired in; a webhook is an HTTP
+> endpoint receiving a small JSON body, not heavy compute. A Deno runtime would add a
+> second deployment target and a second place for secrets to live, for no gain.
+>
+> They are blocked on credentials in any case — there is no Meta account and no payment
+> gateway — so nothing is lost by scheduling them.
+>
+> **This section is a recommendation awaiting a decision, not a decision.** Until one is
+> made, the specifications below stand as written.
+
+---
+
 ## Purpose
 
 This document lists every Supabase Edge Function in ZSMS — its trigger, what it does, its inputs and outputs, and which queued jobs invoke it. Every Claude Code session adding a new Edge Function must document it here.

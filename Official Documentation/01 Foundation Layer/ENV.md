@@ -280,6 +280,53 @@ The following are stored in the database per school, not in environment variable
 
 ---
 
+---
+
+## Status of Unset Variables
+
+As of **2026-10-06**: 57 variables documented, **23 set** on the development machine,
+**34 unset**.
+
+An unset variable is not automatically a gap. Most of these are waiting on a commercial
+decision or an account somebody has to go and open, and a few are genuinely blocking
+work that is otherwise finished. The difference is what this table records, so that
+"34 missing" does not read as 34 problems.
+
+### Blocking finished work — these are the ones that cost something today
+
+| Variable | What is blocked |
+|---|---|
+| `R2_PRIVATE_*`, `R2_PUBLIC_*` | **Report cards, receipts and school logos.** Every method of `R2StorageClient` is implemented; nothing can be stored or served. A school would reach the end of term and find its report cards were never saved. |
+| `FIELD_ENCRYPTION_KEY` | **Integration credentials cannot be stored at all.** `0230`'s CHECK refuses any value not already encrypted, deliberately — a token stored in plaintext ends up in every backup. |
+| `GATEWAY_ENCRYPTION_KEY` | Payment gateway credentials, same reasoning. |
+| `NEXT_PUBLIC_SENTRY_DSN` | **Browser error reporting.** The server half reports. Most of what a school calls in as "ZSMS is broken today" is a browser exception nobody else can see. A second, deliberate decision: a DSN in a browser bundle is public. |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Product analytics. Instrumented on 2026-10-06 with autocapture off; silent until the key exists. |
+| `CLERK_WEBHOOK_SECRET` | Clerk webhooks. No webhook endpoint exists in any form yet, so this is not the only thing missing. |
+| `NEXT_PUBLIC_ZSMS_URL` | Absolute links in generated documents and emails. |
+
+### Deferred by decision — not gaps
+
+| Variables | Why |
+|---|---|
+| `META_*` (5) | WhatsApp delivery. Needs a verified Meta Business account and the `zsms.co.zm` domain. **No message has ever left this machine**; every channel runs through the mock provider. |
+| `TWILIO_*` (3) | SMS fallback, same gate. |
+| `RESEND_*` (2) | Email, and it needs the domain first. |
+| `QSTASH_*` (3) | The **fallback** queue. BullMQ over Upstash is the default (ADR-035) and is proven working, so QStash is only needed if that choice is revisited. |
+| `PAWAPAY_*`, `FLUTTERWAVE_*` (4) | Payment gateways for schools and teachers paying AfriTech. Parents pay schools directly, outside ZSMS, so no parent flow is blocked. |
+| `GOOGLE_OAUTH_*`, `HUBSPOT_*`, `QUICKBOOKS_*`, `XERO_*` (8) | ADR-023 **tier 2** connectors. The schema is built (`0230`) so these need no schema change when the time comes; the dispatcher is not built either, so a key alone would not help. |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (3) | Source map upload at build time. Useful, not blocking — stack traces are readable without it, just minified. |
+| `RAILWAY_DATABASE_URL` | The hot standby, which is a Phase 6 concern. |
+
+### What to obtain first
+
+`03 Infrastructure Services/CREDENTIALS_CHECKLIST.md` holds the full unblocking order. The
+short version, by how much each unlocks:
+
+1. **R2 credentials** — unlocks a finished feature nobody can use.
+2. **The `zsms.co.zm` domain** — gates Resend, and Meta wants it too.
+3. **AI API credit** — both keys are out, so no model-backed feature can be demonstrated.
+4. **A paid Clerk plan** — the free tier caps organisations at 5 members, so a school with six staff cannot be fully onboarded. A launch prerequisite, not an optimisation.
+
 ## Change Log
 
 | Date | Change | Reason |

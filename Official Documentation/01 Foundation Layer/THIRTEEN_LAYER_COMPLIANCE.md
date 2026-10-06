@@ -29,6 +29,17 @@ This document is an audit, not a design. Each layer below states what ZSMS actua
 |---|---|
 | **Complete** | A dedicated document owns this layer and specifies it to build-ready detail |
 | **Adequate** | Covered sufficiently across existing documents; no dedicated document needed |
+
+**The `Coverage` column rates DOCUMENTATION, not the system.** "Complete" there means a
+document owns the layer and specifies it to build-ready detail — it says nothing about
+whether the thing is built. A reader scanning a column of "Complete" naturally draws a
+conclusion about the system instead, which is why the `Built` column was added on
+2026-10-06, from an audit against the live schema and the tree rather than against these
+documents.
+
+A 2026-10-06 audit pass initially scored this document poorly for "claiming Complete for
+layers that are not". That was measuring it against the wrong axis: the ratings were
+accurate for what they rate. The defect was the missing second axis, not the first.
 | **Thin** | Covered only in passing; a dedicated document is warranted but not blocking |
 | **Gap** | No meaningful coverage; must be closed before the milestone noted |
 
@@ -36,21 +47,21 @@ This document is an audit, not a design. Each layer below states what ZSMS actua
 
 ## Layer Map
 
-| # | Layer | ZSMS Implementation | Owning Document | Verdict |
-|---|---|---|---|---|
-| 1 | Frontend | Next.js 15 App Router, React Native/Expo | *(distributed)* | **Thin** |
-| 2 | APIs / Backend | Next.js API routes + Supabase Edge Functions | `05/ENDPOINTS.md`, `05/EDGE_FUNCTIONS.md` | **Complete** |
-| 3 | Database / Storage | Supabase PostgreSQL, Cloudflare R2 | `01/DATABASE.md`, `13/STORAGE.md` | **Complete** |
-| 4 | Auth / Permissions | Clerk + `packages/auth-provider`, DB permission grants | `02/AUTH.md`, `02/PERMISSIONS.md` | **Complete** |
-| 5 | Hosting / Deployment | Vercel, Supabase, per-country self-hosted option | `03/VERCEL.md`, `03/DEPLOYMENT_TOPOLOGY.md` | **Complete** |
-| 6 | Cloud / Compute | Vercel functions, Edge Functions, Railway workers | `03/COST_MANAGEMENT.md` | **Complete** |
-| 7 | CI-CD / Version Control | GitHub, two-branch workflow, Vercel preview deploys | `01/CONVENTIONS.md`, `03/VERCEL.md` | **Thin** |
-| 8 | Security / RLS | PostgreSQL RLS, Cloudflare WAF, field encryption | `01/RLS.md`, `01/SECURITY_POLICIES.md` | **Complete** |
-| 9 | Rate Limiting | Upstash Redis, Cloudflare Worker edge limits | `05/RATE_LIMITS.md`, `03/CLOUDFLARE_WAF.md` | **Complete** |
-| 10 | Caching / CDN | Upstash Redis, Cloudflare CDN, Next.js ISR | `03/CACHING_CDN.md` | **Complete** |
-| 11 | Load Balancing / Scaling | Vercel auto-scale, Railway workers, pooling | `03/SCALING.md` | **Complete** |
-| 12 | Error Tracking / Logs | Sentry, PostHog, `audit_logs`, `integration_log` | `03/SENTRY.md`, `09/AUDIT.md` | **Adequate** |
-| 13 | Availability / Recovery | Railway standby, PITR, uptime monitoring | `03/AVAILABILITY.md` | **Complete** |
+| # | Layer | ZSMS Implementation | Owning Document | Verdict | Built |
+|---|---|---|---|---|---|
+| 1 | Frontend | Next.js 15 App Router, React Native/Expo | *(distributed)* | **Thin** | **Built** — 73 web screens, 27 mobile screens, 5 portals |
+| 2 | APIs / Backend | Next.js API routes + Supabase Edge Functions | `05/ENDPOINTS.md`, `05/EDGE_FUNCTIONS.md` | **Complete** | **Partial** — 116 API routes built; **0 Edge Functions**, and the webhooks `EDGE_FUNCTIONS.md` specifies do not exist in any form |
+| 3 | Database / Storage | Supabase PostgreSQL, Cloudflare R2 | `01/DATABASE.md`, `13/STORAGE.md` | **Complete** | **Partial** — 93 tables, 230 migrations; R2 client implemented but **unconfigured**, so no PDF can be served |
+| 4 | Auth / Permissions | Clerk + `packages/auth-provider`, DB permission grants | `02/AUTH.md`, `02/PERMISSIONS.md` | **Complete** | **Built** — Clerk mounted, 9 roles, 214 policies. Needs a paid Clerk plan (5-member org cap) |
+| 5 | Hosting / Deployment | Vercel, Supabase, per-country self-hosted option | `03/VERCEL.md`, `03/DEPLOYMENT_TOPOLOGY.md` | **Complete** | **Partial** — dev only. `zsms-staging` and `zsms-zm` do not exist |
+| 6 | Cloud / Compute | Vercel functions, Edge Functions, Railway workers | `03/COST_MANAGEMENT.md` | **Complete** | **Built** — 4 Railway workers over BullMQ/Upstash, round-trip proven |
+| 7 | CI-CD / Version Control | GitHub, two-branch workflow, Vercel preview deploys | `01/CONVENTIONS.md`, `03/VERCEL.md` | **Thin** | **Built** — 2 CI jobs green, incl. every migration against an empty database |
+| 8 | Security / RLS | PostgreSQL RLS, Cloudflare WAF, field encryption | `01/RLS.md`, `01/SECURITY_POLICIES.md` | **Complete** | **Partial** — RLS forced on all 93 tables; **WAF unconfigured**, field encryption keys unset |
+| 9 | Rate Limiting | Upstash Redis, Cloudflare Worker edge limits | `05/RATE_LIMITS.md`, `03/CLOUDFLARE_WAF.md` | **Complete** | **Partial** — Upstash limits live; Cloudflare edge rules unconfigured |
+| 10 | Caching / CDN | Upstash Redis, Cloudflare CDN, Next.js ISR | `03/CACHING_CDN.md` | **Complete** | **Partial** — Upstash cache live (`lib/features.ts`); Cloudflare CDN unconfigured |
+| 11 | Load Balancing / Scaling | Vercel auto-scale, Railway workers, pooling | `03/SCALING.md` | **Complete** | **Untested** — no load has ever been applied |
+| 12 | Error Tracking / Logs | Sentry, PostHog, `audit_logs`, `integration_log` | `03/SENTRY.md`, `09/AUDIT.md` | **Adequate** | **Partial** — Sentry server half live, browser DSN unset; PostHog wired 2026-10-06, needs a key; `audit_logs` live |
+| 13 | Availability / Recovery | Railway standby, PITR, uptime monitoring | `03/AVAILABILITY.md` | **Complete** | **Not built** — no standby, no PITR verification, no uptime monitoring |
 
 ---
 

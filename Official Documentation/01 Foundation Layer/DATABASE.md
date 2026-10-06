@@ -18,9 +18,21 @@
 
 ## Purpose
 
-This document is the authoritative reference for the complete ZSMS database architecture. It defines every table, every column with its type and purpose, all relationships between tables, every index, the migration strategy, and the reasoning behind key design decisions. Every Claude Code session that touches the database — creating tables, writing migrations, building Edge Functions, or writing API routes — must read this document before writing any SQL or TypeScript that interacts with the database.
+This document holds the DDL and, more importantly, **the reasoning** behind the core ZSMS tables — why a column is shaped the way it is, which constraint exists because something went wrong once, and what a design deliberately refuses to do. That reasoning is what is worth writing by hand and worth reading before touching the schema.
 
-This document is the single source of truth for the database. If there is a conflict between this document and the code, this document takes precedence and the code must be corrected.
+Every session that touches the database must read this before writing SQL.
+
+### Two corrections, both made on 2026-10-06
+
+**This document does not define every table.** It documents **49**; the schema has **93**. The current, complete list lives in `SCHEMA_INVENTORY.md`, which is generated from the live database by `npm run db:inventory` and therefore cannot drift. Hand-transcribing the other 52 here was considered and rejected: they would have been accurate for about a week, and a confidently wrong schema document is the specific failure this repository has paid for most often.
+
+So the division is deliberate. **This file: why. `SCHEMA_INVENTORY.md`: what exists right now.**
+
+**This document is not the source of truth over the schema.** It used to say: *"If there is a conflict between this document and the code, this document takes precedence and the code must be corrected."* That instruction was wrong and is removed.
+
+The applied schema is the fact; a document is a claim about it. Repeatedly here, a document has described something the schema could not do — `class_enrolments` was referenced by four documents and defined by none; `GLOSSARY.md` promised a fee statement nothing could produce; this file's own `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, and in each case following the old instruction would have meant breaking working code to match a mistake.
+
+**When this document and the schema disagree, check the schema (`npm run db:cols -- <table>`), build what the specification *means*, and record which you followed and why** — in the migration header, where the next person will find it.
 
 ---
 

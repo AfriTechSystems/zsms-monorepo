@@ -40,6 +40,7 @@ ZSMS is a **modular monolith** with a serverless execution layer and event-drive
 │                                                                   │
 │  Next.js API Routes (server-side, Vercel Edge Network)           │
 │  Supabase Edge Functions (Deno, for heavy operations)            │
+│  ^ NOT BUILT. Railway workers do this work; see EDGE_FUNCTIONS.md │
 │  Rate limiting: Upstash Redis                                     │
 └───────────────────────────┬──────────────────────────────────────┘
                              │

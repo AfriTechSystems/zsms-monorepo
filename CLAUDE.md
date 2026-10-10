@@ -79,6 +79,8 @@ envelope), and **`zsms-review`** (auditing for gaps and tenant-isolation mistake
 
 **PostHog is live as of 2026-10-10**, EU region, verified with `npm run posthog:smoke`. Autocapture, input capture and session recording are all OFF and must stay off — the DOM of a ZSMS screen is a class register with children's names on it. See `apps/web/lib/analytics.ts`.
 
+**A documentation audit is in progress — read `DOC_AUDIT_PROGRESS.md` before starting one.** All 18 numbered folders are being walked one at a time, checking every claim against what is actually built and fixing whichever side is wrong. Folder 01 is done; folder 02 is assessed. The file carries the scores, the method, and a *Carried forward* list of gaps that must not quietly become permanent.
+
 **Read `JOURNAL.md` first.** It records what each session actually did, the defects found, and what was deliberately deferred — including several cases where a documented claim turned out not to match the schema.
 
 ---

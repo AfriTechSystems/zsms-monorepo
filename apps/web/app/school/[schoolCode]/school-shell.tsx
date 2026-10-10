@@ -32,6 +32,7 @@ import {
   FileSpreadsheet,
   Globe,
   GraduationCap,
+  KeyRound,
   LayoutDashboard,
   ListChecks,
   Megaphone,
@@ -188,6 +189,18 @@ export function SchoolShell({
           roughly honest.
         */
         { path: '/settings/roles', label: 'Staff roles', icon: ShieldCheck, needs: 'settings:write' },
+        /*
+          Permission grants (PERMISSIONS.md).
+
+          Beside Staff roles because they answer two halves of one question: a role is
+          what somebody does permanently, a grant is what they may do for three weeks
+          while a colleague is on leave.
+
+          `settings:write` gates the link; the POLICY and `grant_staff_permission()`
+          are narrower still — owner and principal only, and a principal cannot grant
+          financial write because they do not hold it themselves.
+        */
+        { path: '/settings/permissions', label: 'Permission grants', icon: KeyRound, needs: 'settings:write' },
         /*
           Accounting and CRM connections (ADR-023).
 

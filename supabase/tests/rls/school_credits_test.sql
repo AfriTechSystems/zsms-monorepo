@@ -224,7 +224,12 @@ SELECT is(
 SELECT is(
   (SELECT COUNT(*)::INT FROM public.school_credit_assignments),
   1,
-  'a teacher reads only their own assignment, not their colleagues''
+  -- Rephrased to avoid a trailing possessive. The original ended
+  -- `colleagues''`, where the doubled quote escapes an apostrophe AND closes
+  -- the string, so psql swallowed everything after it and reported a syntax
+  -- error 44 lines later at a bare word. A possessive at the very end of a
+  -- single-quoted SQL literal is worth avoiding for that reason alone.
+  'a teacher reads only their own assignment, not a colleague''s'
 );
 
 -- 21. The reserve is OFF until the school turns it on.

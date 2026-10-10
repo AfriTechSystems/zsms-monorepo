@@ -325,12 +325,28 @@ SELECT is(
   'ALLOCATE an explicit override targets the newer term, leaving the disputed debt alone'
 );
 
--- Paying into someone else's ledger is the attack this guard exists for.
+/*
+  Paying into someone else's ledger is the attack this guard exists for.
+
+  The guard is real and this assertion only started running once `0232` fixed
+  `allocate_payment`'s other branch — until then the suite died before reaching
+  it. What it got wrong is the code: the function raises `22023`, not `42501`.
+
+  `22023` is the better answer and the expectation is corrected rather than the
+  function. An accountant IS entitled to touch both pupils' records; what they
+  may not do is put this pupil's payment against that pupil's bill. That is an
+  incoherent pair of arguments, not a privilege they lack — and `42501` renders
+  as FORBIDDEN, which would tell them to ask for access they already have.
+
+  It also keeps "not found" and "not permitted" as one answer: a fee record in
+  another SCHOOL is hidden by RLS, so the LEFT JOIN finds nothing and the same
+  `22023` comes back. Neither reveals whether the row exists.
+*/
 SELECT throws_ok(
   $$SELECT public.allocate_payment(
       'aaaaaaaa-0000-0000-0000-000000000001', 100.00, 'cash',
       '[{"fee_record_id":"ffffffff-0000-0000-0000-000000000003","amount":100.00}]'::JSONB)$$,
-  '42501',
+  '22023',
   NULL,
   'ATTACK allocation cannot target another student''s fee record'
 );

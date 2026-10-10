@@ -5,11 +5,12 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "//exports": "Four entry points, split by execution context rather than by topic. `.` is server-only and safe to import from a Node worker. `./middleware` pulls in Clerk's edge runtime and belongs to exactly one file in apps/web. `./react` re-exports client components. `./organisations` is Backend-API administration and needs CLERK_SECRET_KEY, so it is server-only and deliberately separate from `.` — a worker importing the session helper must not pull in a client that can invite people. Keeping them apart means importing the session helper into a background worker does not drag React along with it.",
+  "//exports": "Four entry points, split by execution context rather than by topic. `.` is server-only and safe to import from a Node worker. `./middleware` pulls in Clerk's edge runtime and belongs to exactly one file in apps/web. `./react` re-exports client components. `./organisations` is Backend-API administration and needs CLERK_SECRET_KEY, so it is server-only and deliberately separate from `.`; `./impersonation` is the same, kept apart again because minting a token that lets one person act as another is a sharper capability than inviting somebody — a worker importing the session helper must not pull in a client that can invite people. Keeping them apart means importing the session helper into a background worker does not drag React along with it.",
   "exports": {
     ".": "./src/index.ts",
     "./middleware": "./src/middleware.ts",
     "./organisations": "./src/organisations.ts",
+    "./impersonation": "./src/impersonation.ts",
     "./react": "./src/react.ts"
   },
   "scripts": {

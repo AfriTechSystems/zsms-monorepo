@@ -251,8 +251,22 @@ SET LOCAL request.jwt.claims TO '{
   "o": {"id": "org_school_b", "rol": "owner", "slg": "beta-school"}
 }';
 
+/*
+  Not "sees nothing" — "sees nothing of SCHOOL A's".
+
+  This asserted a count of zero, which was right when it was written and stopped
+  being right once `schools` itself gained an audit trigger: creating Beta writes
+  a row attributed to Beta, and Beta's owner is entitled to read it. A count of
+  zero was therefore testing the absence of Beta's own history, not isolation
+  from Alpha's.
+
+  Asking the question the title always meant is both true and stronger — a later
+  row legitimately belonging to Beta no longer breaks it, and a leak from Alpha
+  still does.
+*/
 SELECT is(
-  (SELECT count(*)::int FROM public.audit_logs),
+  (SELECT count(*)::int FROM public.audit_logs
+    WHERE school_id = '11111111-1111-1111-1111-111111111111'),
   0,
   'another school''s owner reads nothing — the trail is tenant-isolated'
 );

@@ -52,6 +52,33 @@ interface Entry {
 }
 
 /**
+ * One word per act, whichever code path wrote the row.
+ *
+ * `audit_logs.action` holds two vocabularies. The row-change trigger wrote `insert` until
+ * `0233` and `create` after it, while the explicit `log_audit_event()` calls have always
+ * written `create`, `school_created`, `parent_linked` and so on.
+ *
+ * The history is deliberately NOT rewritten — an audit log edited to look tidier stops
+ * being evidence — so the two forms coexist permanently and the reader reconciles them.
+ *
+ * Anything unmapped is shown with its underscores turned to spaces rather than hidden: a
+ * new event type should read awkwardly, not vanish.
+ */
+function actionLabel(action: string): string {
+  const known: Record<string, string> = {
+    // Pre-0233 trigger rows and post-0233 rows mean the same thing.
+    insert: 'Created',
+    create: 'Created',
+    update: 'Updated',
+    delete: 'Deleted',
+    soft_delete: 'Removed',
+    restore: 'Restored',
+  }
+  return known[action] ?? action.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+}
+
+
+/**
  * The tables worth filtering by.
  *
  * Not every table in the schema — a list of sixty is a list nobody uses. These are the
@@ -239,7 +266,7 @@ export function AuditTrail({
 
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <span className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-medium">{e.action}</span>
+                            <span className="font-medium">{actionLabel(e.action)}</span>
                             <Badge variant="neutral">{e.table}</Badge>
 
                             {/*

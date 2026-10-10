@@ -29,7 +29,7 @@ BEGIN;
 -- `extensions` is appended only so the assertion functions are found.
 SET search_path TO public, extensions;
 
-SELECT plan(45);
+SELECT plan(47);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
@@ -221,10 +221,34 @@ SELECT is(
   'LIFECYCLE 7 the fee record is still unpaid while the payment is pending'
 );
 
+/*
+  `PAY-` while pending, not `REC-`.
+
+  This assertion used to want `REC-` here, and `0211` deliberately changed that.
+  A receipt is evidence that money was received; issuing one the moment a parent
+  CLAIMS to have paid means the school hands out receipts for money nobody has
+  confirmed. Five of 312 live payments were found holding exactly that.
+
+  The two live in different columns, which is better than one column changing
+  meaning: `submission_reference` carries `PAY-` from insert, and
+  `receipt_number` stays NULL until verification fills it with `REC-`. The
+  table's CHECK enforces the second half — `status <> 'verified' OR
+  receipt_number IS NOT NULL`.
+
+  Asserted at both points now: 8 and 8a here while pending, 8b after the
+  accountant verifies at LIFECYCLE 9.
+*/
 SELECT matches(
-  (SELECT receipt_number FROM public.payments LIMIT 1),
-  '^REC-ZM-LSK-0001-\d{6}$',
-  'LIFECYCLE 8 a receipt number is assigned automatically in the documented format'
+  (SELECT submission_reference FROM public.payments LIMIT 1),
+  '^PAY-ZM-LSK-0001-\d{6}$',
+  'LIFECYCLE 8 a pending payment carries a PAY- submission reference'
+);
+
+-- And NO receipt number at all, which the table's own CHECK encodes:
+-- `status <> 'verified' OR receipt_number IS NOT NULL`.
+SELECT ok(
+  (SELECT receipt_number IS NULL FROM public.payments LIMIT 1),
+  'LIFECYCLE 8a a pending payment has no receipt number — nobody has confirmed the money'
 );
 
 SET LOCAL ROLE authenticated;
@@ -233,6 +257,13 @@ SELECT pg_temp.act_as(pg_temp.accountant_a());
 SELECT lives_ok(
   $$SELECT public.verify_payment((SELECT id FROM public.payments LIMIT 1), 'verified')$$,
   'LIFECYCLE 9 the accountant verifies the payment'
+);
+
+-- The receipt number proper, issued only now that somebody has confirmed the money.
+SELECT matches(
+  (SELECT receipt_number FROM public.payments LIMIT 1),
+  '^REC-ZM-LSK-0001-\d{6}$',
+  'LIFECYCLE 8b verification turns the reference into a receipt number'
 );
 
 RESET ROLE;

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Sample school crest">
+  <title>Sample school crest</title>
+  <path d="M48 4 84 16v34c0 20-15 35-36 42C27 85 12 70 12 50V16Z" fill="#5B2333"/>
+  <path d="M48 12 76 21v29c0 16-12 28-28 34-16-6-28-18-28-34V21Z" fill="none" stroke="#E0C68B" stroke-width="2.5"/>
+  <path d="M28 40h40v4H28zM28 50h40v4H28zM28 60h26v4H28z" fill="#E0C68B" opacity="0.85"/>
+  <text x="48" y="32" font-family="Georgia, serif" font-size="16" font-weight="bold"
+        fill="#E0C68B" text-anchor="middle">TT</text>
+</svg>

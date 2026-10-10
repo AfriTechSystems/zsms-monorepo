@@ -69,9 +69,9 @@ Same marks entry form in a web table layout. All students in one scrollable tabl
 
 Teachers can only enter marks for their assigned subjects and classes. This is enforced at two levels:
 
-**Application layer:** The marks entry screen only shows the teacher's assigned subjects and classes. The subject and class selectors are pre-filtered by `staff_assignments`.
+**Application layer:** The marks entry screen only shows the teacher's assigned subjects and classes. The subject and class selectors are pre-filtered by `teacher_assignments` (ADR-037).
 
-**RLS layer:** The INSERT and UPDATE policies on `exam_results` validate that the teacher has a matching `staff_assignments` row for the subject and class being written to.
+**RLS layer:** The INSERT and UPDATE policies on `exam_results` call `teacher_teaches_subject(class_id, subject_code)`, which is TRUE when the teacher holds a `scope='class'` assignment for that class or a `scope='subject'` assignment for that subject.
 
 The school's admin, principal, and owner can enter marks for any class and subject — or can use the permission grant system to give a teacher temporary access to another teacher's class (e.g. when a teacher is ill and a substitute needs to enter marks).
 

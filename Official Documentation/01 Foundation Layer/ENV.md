@@ -57,7 +57,11 @@ FIELD_ENCRYPTION_KEY=...
 
 ```bash
 NEXT_PUBLIC_POSTHOG_KEY=phc_...
-NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
+# EU host by default. ZSMS keeps substantive personal data in `af-south-1`, and
+# PostHog has no region there — so analytics carries NO personal data at all
+# (see `apps/web/lib/analytics.ts`), and the host choice is about latency rather
+# than residency. `app.posthog.com` is the US cloud; prefer `eu.i.posthog.com`.
+NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 ```
 
 ### Sentry
@@ -69,6 +73,37 @@ SENTRY_AUTH_TOKEN=...
 SENTRY_ORG=afritech-systems
 SENTRY_PROJECT=zsms-web
 ```
+
+---
+
+### AI generators (`packages/ai`)
+
+```bash
+# WHICH generator runs. `template` (or unset) = the deterministic scaffold; `claude` =
+# Anthropic. Separate from the keys ON PURPOSE: `resolveGenerator()` deliberately ignores
+# ANTHROPIC_API_KEY, because a key appearing in an environment is not the same as a
+# curriculum knowledge base having been ingested and a prompt reviewed. A generator that
+# switches itself on when a variable appears is how an untested path reaches a paying teacher.
+AI_GENERATOR=template
+
+# Anthropic — generation: lesson plans, quizzes, homework, and later the AI assistant.
+ANTHROPIC_API_KEY=sk-ant-...
+
+# OpenAI — embeddings (`text-embedding-3-small`) for the lesson-planner RAG pipeline, and a
+# fallback generator if Anthropic is unavailable. Not required for `AI_GENERATOR=claude`:
+# the first curriculum store is relational, because subject + grade + topic are exact
+# lookups and similarity search is the wrong tool for a question with a known key.
+OPENAI_API_KEY=sk-...
+```
+
+**Local development puts these in the repo-root `.env.local`, not `apps/web/.env.local`** —
+Turborepo reads root env for everything in `turbo.json`'s `globalEnv`, and all three names are
+listed there. `env.local.template` section 7 is the committed reference.
+
+**A key here cannot produce an unbounded bill.** Every generation is metered against the AI
+credit ledger (`0132`), each row recording the model, token counts and real USD cost. An empty
+wallet is refused with the shortfall stated *before* the model is invoked, and the prices and
+allowances are configuration rows rather than code.
 
 ---
 
@@ -152,12 +187,15 @@ RAILWAY_DATABASE_URL=postgresql://...
 
 ### AI / Claude API
 
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-# Used for AI assistant (System 2) and lesson plan generation (System 3)
-OPENAI_API_KEY=sk-...
-# Used for text-embedding-3-small in the lesson planner RAG pipeline
-```
+> **These are NOT Edge Function secrets, despite this section's placement.** Corrected
+> 2026-09-28. `packages/ai` runs inside `apps/web`'s API routes — `supabase/functions/` is
+> still empty — so they belong with the **Web App** variables above, and that is where the
+> canonical listing now lives. Kept here because the AI module documents reference this
+> section.
+>
+> They must also appear in **`turbo.json`'s `globalEnv`**, or Turborepo neither passes them
+> to the build nor invalidates its cache when they change — so flipping `AI_GENERATOR` would
+> appear to do nothing against a warm cache.
 
 ### Integration Connectors OAuth
 
@@ -242,12 +280,60 @@ The following are stored in the database per school, not in environment variable
 
 ---
 
+---
+
+## Status of Unset Variables
+
+As of **2026-10-06**: 57 variables documented, **23 set** on the development machine,
+**34 unset**.
+
+An unset variable is not automatically a gap. Most of these are waiting on a commercial
+decision or an account somebody has to go and open, and a few are genuinely blocking
+work that is otherwise finished. The difference is what this table records, so that
+"34 missing" does not read as 34 problems.
+
+### Blocking finished work — these are the ones that cost something today
+
+| Variable | What is blocked |
+|---|---|
+| `R2_PRIVATE_*`, `R2_PUBLIC_*` | **Report cards, receipts and school logos.** Every method of `R2StorageClient` is implemented; nothing can be stored or served. A school would reach the end of term and find its report cards were never saved. |
+| `FIELD_ENCRYPTION_KEY` | **Integration credentials cannot be stored at all.** `0230`'s CHECK refuses any value not already encrypted, deliberately — a token stored in plaintext ends up in every backup. |
+| `GATEWAY_ENCRYPTION_KEY` | Payment gateway credentials, same reasoning. |
+| `NEXT_PUBLIC_SENTRY_DSN` | **Browser error reporting.** The server half reports. Most of what a school calls in as "ZSMS is broken today" is a browser exception nobody else can see. A second, deliberate decision: a DSN in a browser bundle is public. |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Product analytics. Instrumented on 2026-10-06 with autocapture off; silent until the key exists. |
+| `CLERK_WEBHOOK_SECRET` | Clerk webhooks. No webhook endpoint exists in any form yet, so this is not the only thing missing. |
+| `NEXT_PUBLIC_ZSMS_URL` | Absolute links in generated documents and emails. |
+
+### Deferred by decision — not gaps
+
+| Variables | Why |
+|---|---|
+| `META_*` (5) | WhatsApp delivery. Needs a verified Meta Business account and the `zsms.co.zm` domain. **No message has ever left this machine**; every channel runs through the mock provider. |
+| `TWILIO_*` (3) | SMS fallback, same gate. |
+| `RESEND_*` (2) | Email, and it needs the domain first. |
+| `QSTASH_*` (3) | The **fallback** queue. BullMQ over Upstash is the default (ADR-035) and is proven working, so QStash is only needed if that choice is revisited. |
+| `PAWAPAY_*`, `FLUTTERWAVE_*` (4) | Payment gateways for schools and teachers paying AfriTech. Parents pay schools directly, outside ZSMS, so no parent flow is blocked. |
+| `GOOGLE_OAUTH_*`, `HUBSPOT_*`, `QUICKBOOKS_*`, `XERO_*` (8) | ADR-023 **tier 2** connectors. The schema is built (`0230`) so these need no schema change when the time comes; the dispatcher is not built either, so a key alone would not help. |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (3) | Source map upload at build time. Useful, not blocking — stack traces are readable without it, just minified. |
+| `RAILWAY_DATABASE_URL` | The hot standby, which is a Phase 6 concern. |
+
+### What to obtain first
+
+`03 Infrastructure Services/CREDENTIALS_CHECKLIST.md` holds the full unblocking order. The
+short version, by how much each unlocks:
+
+1. **R2 credentials** — unlocks a finished feature nobody can use.
+2. **The `zsms.co.zm` domain** — gates Resend, and Meta wants it too.
+3. **AI API credit** — both keys are out, so no model-backed feature can be demonstrated.
+4. **A paid Clerk plan** — the free tier caps organisations at 5 members, so a school with six staff cannot be fully onboarded. A launch prerequisite, not an optimisation.
+
 ## Change Log
 
 | Date | Change | Reason |
 |---|---|---|
 | 2026-04-26 | Initial complete draft | Environment reference |
 | 2026-04-26 | Added ANTHROPIC_API_KEY and OPENAI_API_KEY | AI module — Claude API and embeddings |
+| 2026-09-28 | **Moved the AI variables to the Web App section and added `AI_GENERATOR`** | They were filed under Edge Function secrets, but `packages/ai` runs in `apps/web`'s API routes and `supabase/functions/` is empty. Also added all three to `turbo.json`'s `globalEnv`, without which Turborepo neither passes them to the build nor invalidates its cache when they change. |
 | 2026-04-26 | Added integration connector OAuth client credentials | Accounting and CRM connectors |
 | 2026-04-26 | Added META_APP_SECRET and HMAC variables | WhatsApp webhook signature verification |
 | 2026-04-26 | Added FIELD_ENCRYPTION_KEY | Loan module sensitive field encryption |

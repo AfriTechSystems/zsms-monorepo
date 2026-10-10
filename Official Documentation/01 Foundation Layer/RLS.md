@@ -146,6 +146,148 @@ $$;
 
 ## Core Tables
 
+### `teacher_assignments` and `class_subjects`
+
+The teaching-assignment model (ADR-037). `teacher_assignments` decides which students a teacher may read, so it is a security table, not merely a timetable one.
+
+```sql
+CREATE TABLE public.class_subjects (
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  school_id      UUID NOT NULL REFERENCES public.schools(id),
+  class_id       TEXT NOT NULL,
+  subject_id     UUID NOT NULL REFERENCES public.school_subjects(id),
+  academic_year  TEXT NOT NULL,
+  is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (school_id, class_id, subject_id, academic_year)
+);
+
+CREATE TABLE public.teacher_assignments (
+  id               UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  school_id        UUID NOT NULL REFERENCES public.schools(id),
+  teacher_user_id  TEXT NOT NULL,          -- Clerk user ID
+  scope            TEXT NOT NULL CHECK (scope IN ('class', 'subject')),
+  class_id         TEXT NOT NULL,          -- set for BOTH scopes
+  subject_id       UUID REFERENCES public.school_subjects(id),
+  academic_year    TEXT NOT NULL,
+  term_number      INT,
+  is_active        BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT teacher_assignment_scope_shape CHECK (
+    (scope = 'class'   AND subject_id IS NULL)
+    OR
+    (scope = 'subject' AND subject_id IS NOT NULL)
+  )
+);
+
+-- Partial indexes, not a table-level UNIQUE: a UNIQUE over a nullable
+-- subject_id would not deduplicate scope='class' rows, since NULLs are distinct.
+CREATE UNIQUE INDEX idx_teacher_assignments_class_scope
+  ON public.teacher_assignments(school_id, teacher_user_id, class_id, academic_year)
+  WHERE scope = 'class';
+CREATE UNIQUE INDEX idx_teacher_assignments_subject_scope
+  ON public.teacher_assignments(school_id, teacher_user_id, class_id, subject_id, academic_year)
+  WHERE scope = 'subject';
+```
+
+**`teacher_reaches_class()` is the single predicate behind all teacher scoping.** Because both scopes carry `class_id`, it needs no branch on scope — and therefore no branch on school type.
+
+```sql
+CREATE OR REPLACE FUNCTION public.teacher_reaches_class(p_class_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.teacher_assignments ta
+    WHERE ta.teacher_user_id = public.get_user_id()
+      AND ta.school_id       = public.current_school_uuid()
+      AND ta.class_id        = p_class_id
+      AND ta.is_active       = TRUE
+      AND ta.academic_year   = EXTRACT(YEAR FROM NOW())::TEXT
+  );
+$$;
+```
+
+`SECURITY DEFINER` is required, not stylistic: the `students` policy reads `teacher_assignments`, whose own policies read `students`, and PostgreSQL aborts mutually-recursive policy evaluation with *infinite recursion detected in policy*.
+
+**`teacher_teaches_subject()`** narrows the same model to a single subject, for the marks and results policies. A `scope='class'` teacher owns the whole class and therefore every subject in it; a `scope='subject'` teacher reaches only the subject they hold. It lands with the exam-results migration, not in Phase 1.
+
+```sql
+CREATE OR REPLACE FUNCTION public.teacher_teaches_subject(
+  p_class_id     TEXT,
+  p_subject_code TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.teacher_assignments ta
+    LEFT JOIN public.school_subjects ss ON ss.id = ta.subject_id
+    WHERE ta.teacher_user_id = public.get_user_id()
+      AND ta.school_id       = public.current_school_uuid()
+      AND ta.class_id        = p_class_id
+      AND ta.is_active       = TRUE
+      AND ta.academic_year   = EXTRACT(YEAR FROM NOW())::TEXT
+      AND (
+        ta.scope = 'class'                                  -- owns the class, so every subject in it
+        OR (ta.scope = 'subject' AND ss.subject_code = p_subject_code)
+      )
+  );
+$$;
+```
+
+```sql
+ALTER TABLE public.teacher_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_assignments FORCE  ROW LEVEL SECURITY;
+
+CREATE POLICY "afritech_admin_all_teacher_assignments"
+ON public.teacher_assignments FOR ALL
+USING (is_afritech_admin()) WITH CHECK (is_afritech_admin());
+
+CREATE POLICY "management_read_teacher_assignments"
+ON public.teacher_assignments FOR SELECT
+USING (
+  school_id = current_school_uuid()
+  AND get_user_role() IN ('org:owner', 'org:principal', 'org:admin')
+);
+
+CREATE POLICY "teacher_read_own_teacher_assignments"
+ON public.teacher_assignments FOR SELECT
+USING (teacher_user_id = get_user_id());
+
+-- Owner and principal only. A teacher who could write this table could grant
+-- themselves any class's students, since teacher reach is derived from it.
+CREATE POLICY "management_write_teacher_assignments"
+ON public.teacher_assignments FOR ALL
+USING (
+  school_id = current_school_uuid()
+  AND (get_user_role() IN ('org:owner', 'org:principal')
+       OR has_permission_grant('assignments', 'write'))
+)
+WITH CHECK (
+  school_id = current_school_uuid()
+  AND (get_user_role() IN ('org:owner', 'org:principal')
+       OR has_permission_grant('assignments', 'write'))
+);
+```
+
+> **`class_enrolments` never existed.** Earlier revisions of this document, `ASSIGNMENTS.md`, `POWERSYNC.md`, and `OFFLINE_SYNC.md` resolved teacher reach through a `public.class_enrolments` table that had no DDL, no `SCHEMA.md` entry, and no migration. `teacher_assignments` replaces it. Where those documents still reference `class_enrolments`, they are wrong and this section governs.
+
+---
+
+### `staff_assignments` — removed
+
+`staff_assignments` predated ADR-037 and was **dropped in migration `0069`**. `is_class_teacher = TRUE` maps to `scope = 'class'`; a class/subject pairing maps to `scope = 'subject'`. Any policy or query still referencing it is wrong — use `teacher_assignments`.
+
+---
+
 ### `staff_permission_grants`
 
 This table is the foundation of the permission grant system. It stores every explicit, audited, time-bounded permission granted to any user beyond their base role. RLS policies check this table using the `has_permission_grant()` helper when a user's base role alone does not permit an action.
@@ -245,20 +387,15 @@ USING (
   AND get_user_role() IN ('org:owner', 'org:principal', 'org:admin', 'org:accountant')
 );
 
--- Teachers can read students in their assigned classes only.
+-- Teachers can read students in the classes they teach, at either scope.
+-- Resolved through teacher_reaches_class() — see ADR-037 and the
+-- `teacher_assignments` section below.
 CREATE POLICY "teacher_read_assigned_students"
 ON public.students FOR SELECT
 USING (
-  school_id = (SELECT id FROM public.schools WHERE clerk_org_id = get_school_id())
+  school_id = current_school_uuid()
   AND get_user_role() = 'org:teacher'
-  AND id IN (
-    SELECT student_id FROM public.class_enrolments
-    WHERE class_id IN (
-      SELECT class_id FROM public.staff_assignments
-      WHERE staff_user_id = get_user_id()
-        AND academic_year = EXTRACT(YEAR FROM NOW())::TEXT
-    )
-  )
+  AND teacher_reaches_class(class_id)
 );
 
 -- Parents read only their own linked children.
@@ -606,10 +743,7 @@ ON public.attendance_records FOR SELECT
 USING (
   school_id = (SELECT id FROM public.schools WHERE clerk_org_id = get_school_id())
   AND get_user_role() = 'org:teacher'
-  AND class_id IN (
-    SELECT class_id FROM public.staff_assignments
-    WHERE staff_user_id = get_user_id()
-  )
+  AND teacher_reaches_class(class_id)
 );
 
 -- Parents can read attendance for their own children.
@@ -641,10 +775,7 @@ WITH CHECK (
   AND (
     (
       get_user_role() = 'org:teacher'
-      AND class_id IN (
-        SELECT class_id FROM public.staff_assignments
-        WHERE staff_user_id = get_user_id()
-      )
+      AND teacher_reaches_class(class_id)
     )
     OR get_user_role() IN ('org:owner', 'org:principal', 'org:admin')
     OR has_permission_grant('attendance', 'write')
@@ -693,10 +824,7 @@ ON public.exam_results FOR SELECT
 USING (
   school_id = (SELECT id FROM public.schools WHERE clerk_org_id = get_school_id())
   AND get_user_role() = 'org:teacher'
-  AND subject_code IN (
-    SELECT subject_code FROM public.staff_assignments
-    WHERE staff_user_id = get_user_id()
-  )
+  AND teacher_teaches_subject(class_id, subject_code)
 );
 
 -- Parents can read their children's results after results are published.
@@ -731,10 +859,7 @@ WITH CHECK (
   AND (
     (
       get_user_role() = 'org:teacher'
-      AND subject_code IN (
-        SELECT subject_code FROM public.staff_assignments
-        WHERE staff_user_id = get_user_id()
-      )
+      AND teacher_teaches_subject(class_id, subject_code)
     )
     OR get_user_role() IN ('org:owner', 'org:principal')
     OR has_permission_grant('results', 'write')
@@ -796,46 +921,9 @@ WITH CHECK (
 
 ---
 
-### `staff_assignments` table
+### `staff_assignments` table — REMOVED
 
-```sql
-ALTER TABLE public.staff_assignments ENABLE ROW LEVEL SECURITY;
-
--- AfriTech super admin full access.
-CREATE POLICY "afritech_admin_all_assignments"
-ON public.staff_assignments FOR ALL
-USING (is_afritech_admin())
-WITH CHECK (is_afritech_admin());
-
--- School management read all assignments.
-CREATE POLICY "management_read_assignments"
-ON public.staff_assignments FOR SELECT
-USING (
-  school_id = (SELECT id FROM public.schools WHERE clerk_org_id = get_school_id())
-  AND get_user_role() IN ('org:owner', 'org:principal', 'org:admin')
-);
-
--- Teachers can read their own assignments (to know which classes they have).
-CREATE POLICY "teacher_read_own_assignments"
-ON public.staff_assignments FOR SELECT
-USING (staff_user_id = get_user_id());
-
--- Owner and principal manage assignments.
-CREATE POLICY "management_write_assignments"
-ON public.staff_assignments FOR ALL
-USING (
-  school_id = (SELECT id FROM public.schools WHERE clerk_org_id = get_school_id())
-  AND (
-    get_user_role() IN ('org:owner', 'org:principal')
-    OR has_permission_grant('assignments', 'write')
-  )
-)
-WITH CHECK (
-  school_id = (SELECT id FROM public.schools WHERE clerk_org_id = get_school_id())
-);
-```
-
----
+Dropped in migration `0069`. Its policies went with it. See *`staff_assignments` — removed* above, and use `teacher_assignments` (ADR-037).
 
 ### `audit_logs` table
 

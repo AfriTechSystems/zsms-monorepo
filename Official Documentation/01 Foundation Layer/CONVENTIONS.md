@@ -207,7 +207,7 @@ interface Student {
 public.students
 public.fee_records
 public.student_parent_links
-public.staff_assignments
+public.teacher_assignments
 
 -- ❌ Incorrect
 public.Student
@@ -739,7 +739,7 @@ One file per country. The active country is determined by `NEXT_PUBLIC_COUNTRY_C
 
 These are absolute prohibitions. No exception, no matter the circumstance:
 
-1. The Supabase service role key is never used outside an Edge Function.
+1. The Supabase service role key is never used outside a **trusted server-side context** — an Edge Function, or a Railway background worker. It is never present in `apps/web`, `apps/mobile`, any browser or device bundle, or any code path a request from an end user can reach. *(Amended 2026-08-15 — ADR-042. The original wording named only Edge Functions, which made Phase 3's workers unimplementable: a cron firing at 08:00 has no end-user JWT to act under. The rule's intent was always to keep the key out of client-reachable code, and a Railway worker is no more client-reachable than an Edge Function. See ADR-042 for the conditions a worker must satisfy.)*
 2. Real credentials, API keys, or secrets are never committed to version control.
 3. Database types are never manually defined — always generated from the schema.
 4. New tables are never created without a corresponding RLS policy.

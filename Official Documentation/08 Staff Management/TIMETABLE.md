@@ -167,7 +167,7 @@ The admin selects which class to view/edit using a class dropdown above the grid
 
   Subject: [dropdown — school's configured subjects for this grade level]
   Teacher: [dropdown — teachers assigned to this subject for this class
-            via staff_assignments]
+            via teacher_assignments]
   Room: [text — optional]
   Notes: [text — optional]
 
@@ -339,7 +339,7 @@ VALUES (school_id, 'timetable', 'active', 100.00);
 
 ## Business Rules
 
-1. A timetable slot can only assign a teacher who has a matching entry in `staff_assignments` for that subject and class. The teacher dropdown enforces this — unassigned teachers are not shown.
+1. A timetable slot can only assign a teacher who has a matching entry in `teacher_assignments` for that subject and class. The teacher dropdown enforces this — unassigned teachers are not shown.
 2. A teacher cannot be assigned to two simultaneous slots (same day, same period, same timetable). The conflict check runs on every save.
 3. Non-teaching periods (breaks, assembly, lunch) cannot have lessons assigned. The slot_type check enforces this.
 4. Only published timetables are visible to teachers, students, and parents. Draft timetables are visible to admins and principals only.
@@ -356,3 +356,36 @@ VALUES (school_id, 'timetable', 'active', 100.00);
 | 2026-04-26 | Added timetable_periods table | Schools need configurable school day structure |
 | 2026-04-26 | Added feature add-on pricing | Timetable is Growth tier base feature or Starter add-on |
 | 2026-04-26 | Added conflict detection with error response | Teacher double-booking prevention |
+
+---
+
+## Implementation notes (2026-10-05)
+
+Built across `0197` (tables, clash indexes), `0200` (read and edit) and `0201`
+(creating a timetable, defining the school day). Three departures from the DDL above,
+each because the schema had already decided otherwise:
+
+| This document | Built | Why |
+|---|---|---|
+| `timetable_slots.subject_code TEXT` | `subject_id UUID` | Every other table referencing a subject uses the id. A code here would have no referential integrity and would not follow a rename. |
+| `checkTeacherConflict()` in TypeScript | Partial unique indexes | A SELECT before writing is a race: two deputies dragging at the same moment both read "clear" and both write. An index cannot be raced and cannot be skipped by a caller that forgets. |
+| Teacher conflicts only | Teacher **and room** | A room is as physical as a teacher, and a school with one laboratory needs this more. |
+
+`set_timetable_slot()` catches the unique violation and composes the message — the index
+guarantees correctness, the function supplies the explanation a deputy can act on.
+
+**Publishing reports unstaffed lessons rather than refusing one.** A lesson with no
+teacher is a normal state in the week before term.
+
+**Deleting a period is refused while lessons sit in it.** The foreign key cascades, so
+deleting would silently take every lesson in that period across every timetable.
+
+Surfaces: `/school/[code]/timetable` (builder), `/school/[code]/my-timetable`,
+`/parent/timetable`, and both mobile apps.
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-10-05 | Implemented. Three departures from the DDL recorded above. |
+| 2026-10-05 | **Guided setup, popups, and drag-and-drop.** The builder presented creating a timetable, defining the day and filling the grid as three equal buttons, when the order between them is strict — a period cannot exist without a timetable and a lesson cannot exist without a period. It is now a four-step sequence with each step's state derived from the data rather than stored, so a school that deletes every period correctly returns to step two. Both forms moved into modals (`components/ui/dialog.tsx`): the create form pushed the grid down the page, and the period form opened below a list that was already tall. The school day was one full row per period — twelve periods meant twelve rows of whitespace and a grid off the bottom of the screen — and is now a single horizontal strip of chips in time order, with only the exceptions labelled. **New:** `PATCH /api/school/timetable` takes `move` and `checkMove`, over `move_timetable_slot()` and `timetable_move_conflicts()` (`0208`/`0209`). A lesson can be dragged to an empty cell or onto another to exchange the two; the screen asks what the drop would break and offers Cancel, and says plainly that a teacher or room clash cannot be overridden because a unique index refuses it regardless of what this screen offers. A swap trades the two lessons' payloads rather than their positions, because two rows cannot exchange a unique key without colliding — see the `0209` entry in `MIGRATIONS.md`. |

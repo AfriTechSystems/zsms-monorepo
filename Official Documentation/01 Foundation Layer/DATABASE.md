@@ -18,9 +18,21 @@
 
 ## Purpose
 
-This document is the authoritative reference for the complete ZSMS database architecture. It defines every table, every column with its type and purpose, all relationships between tables, every index, the migration strategy, and the reasoning behind key design decisions. Every Claude Code session that touches the database — creating tables, writing migrations, building Edge Functions, or writing API routes — must read this document before writing any SQL or TypeScript that interacts with the database.
+This document holds the DDL and, more importantly, **the reasoning** behind the core ZSMS tables — why a column is shaped the way it is, which constraint exists because something went wrong once, and what a design deliberately refuses to do. That reasoning is what is worth writing by hand and worth reading before touching the schema.
 
-This document is the single source of truth for the database. If there is a conflict between this document and the code, this document takes precedence and the code must be corrected.
+Every session that touches the database must read this before writing SQL.
+
+### Two corrections, both made on 2026-10-06
+
+**This document does not define every table.** It documents **49**; the schema has **93**. The current, complete list lives in `SCHEMA_INVENTORY.md`, which is generated from the live database by `npm run db:inventory` and therefore cannot drift. Hand-transcribing the other 52 here was considered and rejected: they would have been accurate for about a week, and a confidently wrong schema document is the specific failure this repository has paid for most often.
+
+So the division is deliberate. **This file: why. `SCHEMA_INVENTORY.md`: what exists right now.**
+
+**This document is not the source of truth over the schema.** It used to say: *"If there is a conflict between this document and the code, this document takes precedence and the code must be corrected."* That instruction was wrong and is removed.
+
+The applied schema is the fact; a document is a claim about it. Repeatedly here, a document has described something the schema could not do — `class_enrolments` was referenced by four documents and defined by none; `GLOSSARY.md` promised a fee statement nothing could produce; this file's own `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, and in each case following the old instruction would have meant breaking working code to match a mistake.
+
+**When this document and the schema disagree, check the schema (`npm run db:cols -- <table>`), build what the specification *means*, and record which you followed and why** — in the migration header, where the next person will find it.
 
 ---
 
@@ -578,6 +590,29 @@ CREATE TABLE public.payments (
   notes                 TEXT,
   -- Optional notes by the accountant. For reversals: mandatory reason.
 
+  -- --- submission / verification workflow ---
+  -- ADDED 2026-08-15. SCHEMA.md and the 2026-04-26 CHANGELOG entry
+  -- ("Removed OTP for financial submissions — replaced with confirmation
+  -- workflow") specified these columns; this DDL was never updated to match.
+  -- Implemented in migration 0070.
+  status                TEXT NOT NULL DEFAULT 'pending_verification'
+                        CHECK (status IN (
+                          'pending_verification', 'verified', 'rejected', 'queried'
+                        )),
+  -- Only 'verified' payments count toward fee_records.amount_paid. A submitted
+  -- payment reduces nothing until someone with financial authority confirms it.
+
+  proof_of_payment_url  TEXT,
+  confirmation_checkbox_at TIMESTAMPTZ,
+  -- When the submitter affirmed the details. Replaces the removed OTP step.
+
+  verified_by           TEXT,
+  verified_at           TIMESTAMPTZ,
+  rejection_reason      TEXT,
+  -- CHECK constraints require a reason on rejection, and both verified_by and
+  -- verified_at on verification: "verified by nobody at no time" is not a valid
+  -- state for a money record.
+
   reversal_of_payment_id UUID REFERENCES public.payments(id),
   -- Populated when payment_method = 'reversal'.
   -- References the original payment being reversed.
@@ -859,7 +894,9 @@ CREATE INDEX idx_staff_active ON public.staff_members(school_id, is_active);
 
 ---
 
-### `public.staff_assignments`
+### `public.staff_assignments` — REMOVED (migration `0069`)
+
+> Superseded by `public.teacher_assignments` (ADR-037), defined earlier in this document. The DDL below is retained only so that older references resolve to an explanation. **Do not create this table.**
 
 Links teachers to the classes and subjects they are responsible for. One teacher can have multiple rows — one per class-subject combination. This table drives the RLS policies that scope teachers to their own classes and subjects.
 
@@ -892,6 +929,91 @@ CREATE INDEX idx_assignments_school ON public.staff_assignments(school_id);
 CREATE INDEX idx_assignments_staff ON public.staff_assignments(staff_user_id);
 CREATE INDEX idx_assignments_class ON public.staff_assignments(school_id, class_id);
 ```
+
+---
+
+### `public.class_subjects`
+
+Which subjects are taught to which class in a given academic year. The curriculum half of the teaching model (ADR-037); `teacher_assignments` is the staffing half.
+
+```sql
+CREATE TABLE public.class_subjects (
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  school_id      UUID NOT NULL REFERENCES public.schools(id),
+
+  class_id       TEXT NOT NULL,
+  -- Same identifier as students.class_id. TEXT and not a foreign key: classes
+  -- are a per-school naming convention, not a registry.
+
+  subject_id     UUID NOT NULL REFERENCES public.school_subjects(id),
+  academic_year  TEXT NOT NULL,
+  is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (school_id, class_id, subject_id, academic_year)
+);
+
+CREATE INDEX idx_class_subjects_school_class
+  ON public.class_subjects(school_id, class_id, academic_year);
+CREATE INDEX idx_class_subjects_subject ON public.class_subjects(subject_id);
+```
+
+---
+
+### `public.teacher_assignments`
+
+What a teacher teaches, at one of two scopes. **This is a security table** — it decides which students a teacher may read, via `teacher_reaches_class()` (see `RLS.md`).
+
+```sql
+CREATE TABLE public.teacher_assignments (
+  id               UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  school_id        UUID NOT NULL REFERENCES public.schools(id),
+
+  teacher_user_id  TEXT NOT NULL,
+  -- Clerk user ID. Matches staff_members.clerk_user_id at this school.
+
+  scope            TEXT NOT NULL CHECK (scope IN ('class', 'subject')),
+  -- 'class'   — owns the whole class (primary model, form teacher)
+  -- 'subject' — teaches ONE subject to ONE class (secondary model)
+  --
+  -- A teacher may hold any number of rows of either scope, including both.
+
+  class_id         TEXT NOT NULL,
+  -- Set for BOTH scopes. Every assignment reaches exactly one class, which is
+  -- what lets teacher reach be a single lookup rather than a branch.
+
+  subject_id       UUID REFERENCES public.school_subjects(id),
+  -- NULL for scope='class'; required for scope='subject'.
+
+  academic_year    TEXT NOT NULL,
+  term_number      INT,
+  is_active        BOOLEAN NOT NULL DEFAULT TRUE,
+
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT teacher_assignment_scope_shape CHECK (
+    (scope = 'class'   AND subject_id IS NULL)
+    OR
+    (scope = 'subject' AND subject_id IS NOT NULL)
+  )
+);
+
+CREATE UNIQUE INDEX idx_teacher_assignments_class_scope
+  ON public.teacher_assignments(school_id, teacher_user_id, class_id, academic_year)
+  WHERE scope = 'class';
+CREATE UNIQUE INDEX idx_teacher_assignments_subject_scope
+  ON public.teacher_assignments(school_id, teacher_user_id, class_id, subject_id, academic_year)
+  WHERE scope = 'subject';
+CREATE INDEX idx_teacher_assignments_teacher
+  ON public.teacher_assignments(teacher_user_id, school_id, academic_year) WHERE is_active;
+CREATE INDEX idx_teacher_assignments_class
+  ON public.teacher_assignments(school_id, class_id, academic_year) WHERE is_active;
+```
+
+**The scope constraint is a security control, not tidiness.** A `scope='subject'` row with a NULL `subject_id` would read to `teacher_reaches_class()` as an assignment reaching the whole class.
 
 ---
 
@@ -1103,7 +1225,17 @@ CREATE INDEX idx_doc_templates_school ON public.document_templates(school_id);
 
 ### `public.audit_logs`
 
-Immutable append-only record of every significant action in the system. Written exclusively by Edge Functions using the service role key. No user-facing INSERT policy. No UPDATE or DELETE policy for any user including AfriTech super admin.
+Immutable append-only record of every significant action in the system.
+
+**Implemented in `0131`, and three things differ from the paragraph this one replaced.**
+
+It said audit rows are *"written exclusively by Edge Functions using the service role key"*. There are no Edge Functions in this project, and the acts worth auditing happen inside SQL functions like `verify_payment()`. But the real problem is the word **every**: if auditing depends on each function remembering to call a logger, the first function that forgets is silently unaudited and nobody finds out until an investigation needs the row that was never written. **A trigger cannot forget.** So the record of what *changed* comes from AFTER triggers on the tables themselves — `payments`, `fee_records`, `fee_structures`, `exam_results`, `students`, `staff_members`, `teacher_assignments`, `standalone_teacher_accounts` — which no route, PostgREST call or future function can bypass. `log_audit_event()` records **intent** a trigger cannot infer: a publish, a verification decision, a bulk import, the start of an impersonation session.
+
+It also said *"no UPDATE or DELETE policy for any user"*, which is not sufficient. **`service_role` bypasses RLS entirely**, so every policy on this table is invisible to a worker or Edge Function holding that key. Immutability is therefore a trigger that raises `42501` on UPDATE, DELETE or TRUNCATE **for every caller, including the table owner**. The pgTAP suite asserts each of those refusals.
+
+And an UPDATE records **only the columns that changed**, with `mask_audit_values()` redacting `nrc_or_birth_cert` plus anything matching `%encrypted%`, `%secret%`, `%password%` or `%api_key%` — by pattern, so a column added later following the convention is covered without anyone remembering. The key is kept and only the value replaced: *that the identity number changed* is what an investigation needs; *what it changed to* is what the trail must not hold. A school owner can read this table, so without redaction it would be a second, less-protected copy of the PII it describes.
+
+**Read access is the owner and principal only.** An accountant generates most of the financial rows here and can read none of them — deliberate separation of duties, asserted in the suite: the person who performs a financial act cannot inspect the record of it.
 
 ```sql
 CREATE TABLE public.audit_logs (
@@ -1440,7 +1572,7 @@ schools
   ├── fee_structures (school_id)
   ├── grade_config (school_id)
   ├── staff_members (school_id)
-  │     └── staff_assignments (staff_user_id)
+  │     └── teacher_assignments (teacher_user_id)
   ├── staff_requests (school_id)
   ├── staff_permission_grants (school_id)
   ├── school_permissions (school_id)
@@ -2085,42 +2217,71 @@ CREATE INDEX idx_knowledge_base_curriculum
 
 ---
 
-### `public.lesson_plans`
+### `public.teaching_resources`
 
-Stores lesson plans generated by the AI lesson planner. Covers both school-linked teachers and standalone teacher account holders. `school_id` is NULL for standalone teachers.
+**Implemented in migration `0130`, replacing the `lesson_plans` table this section used to specify.** The Hub has three
+generators — lesson planner, quiz generator, homework creator — and they take the same inputs and produce the same shape.
+Three near-identical tables would triple the RLS surface for no behavioural difference, and one table named
+`lesson_plans` holding quizzes would be a name that lies. One table, with `resource_kind`.
+
+`school_id` is **provenance only and deliberately not an access path**: a school cannot read its own teachers'
+resources. `TEACHER_PORTAL.md` business rule 2 says plans belong to the teacher and survive their leaving, which is only
+true if the school never had access. `teacher_hub_test.sql` asserts that the principal of the school a plan was created
+at reads none of it.
+
+`generator_name` and `generator_version` are NOT NULL. There is no LLM and no knowledge base yet, so the first generator
+is a deterministic scaffold; recording it keeps resources made before the model is wired distinguishable from those made
+after. ADR-041's rule — a derived artefact carries its basis — in a third place.
 
 ```sql
-CREATE TABLE public.lesson_plans (
-  id                UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  school_id         UUID REFERENCES public.schools(id),
-  -- NULL for standalone teacher account holders
-  created_by        TEXT NOT NULL,
-  -- Clerk user ID — either org:teacher or platform:teacher
-  title             TEXT NOT NULL,
-  grade_level       TEXT NOT NULL,
-  subject           TEXT NOT NULL,
-  topic             TEXT NOT NULL,
-  curriculum_type   TEXT NOT NULL,
-  duration_minutes  INT,
-  lesson_type       TEXT CHECK (lesson_type IN ('introduction', 'core', 'revision', 'assessment_prep')),
-  content           JSONB NOT NULL,
-  -- Full lesson plan structure: objectives, outline, assessment, homework, differentiation
-  knowledge_sources JSONB,
-  -- Which knowledge_base chunks were retrieved — stored for transparency and debugging
-  is_shared         BOOLEAN DEFAULT FALSE,
-  -- Teacher can choose to make their plan visible to other teachers
-  teacher_notes     TEXT,
-  -- Teacher's own notes added after generation
-  created_at        TIMESTAMPTZ DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.teaching_resources (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- Clerk user id of the owner. The ONLY access path to the row.
+  created_by         TEXT NOT NULL,
+  resource_kind      TEXT NOT NULL CHECK (resource_kind IN ('lesson_plan', 'quiz', 'homework')),
+  -- Provenance only. NOT an access path — see above.
+  school_id          UUID REFERENCES public.schools(id),
+  title              TEXT NOT NULL,
+  subject            TEXT NOT NULL,
+  grade_level        TEXT NOT NULL,
+  topic              TEXT NOT NULL,
+  curriculum_type    TEXT NOT NULL,
+  duration_minutes   INT CHECK (duration_minutes IS NULL OR duration_minutes > 0),
+  lesson_type        TEXT CHECK (lesson_type IS NULL OR lesson_type IN
+                       ('introduction', 'core', 'revision', 'assessment_prep')),
+  content            JSONB NOT NULL,
+  -- What was asked for, kept beside what came out.
+  generation_params  JSONB NOT NULL DEFAULT '{}'::jsonb,
+  -- NULL until a knowledge base exists; its absence is how a reader knows this was not RAG.
+  knowledge_sources  JSONB,
+  generator_name     TEXT NOT NULL,
+  generator_version  TEXT NOT NULL,
+  is_shared          BOOLEAN NOT NULL DEFAULT FALSE,
+  teacher_notes      TEXT,
+  -- Soft delete: there is no DELETE grant on this table.
+  is_deleted         BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_lesson_plans_created_by ON public.lesson_plans(created_by);
-CREATE INDEX idx_lesson_plans_school ON public.lesson_plans(school_id)
-  WHERE school_id IS NOT NULL;
-CREATE INDEX idx_lesson_plans_curriculum ON public.lesson_plans(curriculum_type, subject, grade_level);
-CREATE INDEX idx_lesson_plans_shared ON public.lesson_plans(is_shared)
-  WHERE is_shared = TRUE;
+CREATE INDEX idx_teaching_resources_created_by
+  ON public.teaching_resources(created_by, created_at DESC) WHERE is_deleted = FALSE;
+CREATE INDEX idx_teaching_resources_kind
+  ON public.teaching_resources(created_by, resource_kind) WHERE is_deleted = FALSE;
+CREATE INDEX idx_teaching_resources_school
+  ON public.teaching_resources(school_id) WHERE school_id IS NOT NULL;
+
+-- Owner-scoped. No school clause, no role clause. There is deliberately NO policy
+-- admitting `is_shared = TRUE` rows to other teachers: that would expose `created_by`,
+-- and the Community Library must show a first name and a subject, never an identity.
+CREATE POLICY teacher_read_own_resources ON public.teaching_resources
+  FOR SELECT TO authenticated USING (created_by = public.get_user_id());
+
+-- `content`, `generator_name` and `generator_version` are absent from the UPDATE grant:
+-- a generated document is not editable in place, or the provenance becomes a lie.
+GRANT SELECT, INSERT ON public.teaching_resources TO authenticated;
+GRANT UPDATE (title, teacher_notes, is_shared, is_deleted)
+  ON public.teaching_resources TO authenticated;
 ```
 
 ---
@@ -2155,7 +2316,24 @@ CREATE INDEX idx_ai_conversations_school ON public.ai_conversations(school_id)
 
 ### `public.standalone_teacher_accounts`
 
-Platform-level accounts for teachers using the lesson planner B2C product independently of any school. Not school-scoped — these teachers have no access to school operational data.
+Platform-level accounts for teachers using the lesson planner B2C product independently of any school. **Not
+school-scoped — and that is the defining property, not a footnote.** A standalone teacher has no Clerk organisation, so
+`current_school_uuid()` returns NULL for them and all 75 school-scoped policies deny. These tables filter on
+`public.get_user_id()` instead: the unit of isolation is a person.
+
+**Implemented in `0130`, with three deviations from the DDL below, each deliberate:**
+
+- **No `linked_school_id`.** The column was a single UUID while business rule 4 says a teacher may be linked to several
+  schools — the column and the rule contradicted each other. `my_schools()` (`0117`) already answers "which schools is
+  this user in", is self-scoped on `get_user_id()`, and supports any number. A second source of truth that can disagree
+  with Clerk is worse than none.
+- **`plan_code` is a foreign key to `afritech.teacher_hub_plans`**, and the trial is a plan row priced zero with a
+  lifetime cap. Prices and the trial allowance are data, never literals; the allowance resolves
+  **account override → plan**, exactly as `school_student_limit()` resolves its own ceiling.
+- **The counters are not writable by their owner.** `trial_resources_used` decides whether this teacher gets a free
+  product, so the grants are **column-level**: profile columns only, with no privilege at all on `subscription_status`,
+  `plan_code` or either counter. `create_teaching_resource()` is the only writer, and it re-checks entitlement inside a
+  row lock so two simultaneous requests cannot both spend the last free resource.
 
 ```sql
 CREATE TABLE public.standalone_teacher_accounts (
@@ -2173,18 +2351,45 @@ CREATE TABLE public.standalone_teacher_accounts (
                         CHECK (subscription_status IN (
                           'trial', 'active', 'cancelled', 'suspended'
                         )),
-  trial_plans_used      INT DEFAULT 0,
-  -- Free trial: 5 plans. After 5, must subscribe.
-  trial_plans_limit     INT DEFAULT 5,
+  -- Renamed from `trial_plans_used`: it meters resources of all three kinds, not plans.
+  -- MONOTONIC. Never decremented, never reset, not writable by the account holder.
+  trial_resources_used  INT NOT NULL DEFAULT 0,
+  -- Per-account override of the plan's allowance. NULL means "use the plan".
+  trial_allowance_override INT CHECK (trial_allowance_override >= 0),
+  subscription_started_at TIMESTAMPTZ,
+  -- Read access outlives this date; generation does not (business rule 5).
   subscription_ends_at  TIMESTAMPTZ,
-  lesson_plans_count    INT DEFAULT 0,
-  -- Total plans generated — for usage analytics
-  linked_school_id      UUID REFERENCES public.schools(id),
-  -- Optionally linked to a ZSMS school when teacher's school registers
-  -- Lesson plans carry over on linking — no data loss
-  created_at            TIMESTAMPTZ DEFAULT NOW(),
-  updated_at            TIMESTAMPTZ DEFAULT NOW()
+  resources_created     INT NOT NULL DEFAULT 0,
+  -- NOTE: `linked_school_id` is deliberately absent — see above. Multi-school linkage is
+  -- answered by my_schools(), which already supports any number of schools.
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Added in 0130, and the reason the trial cannot be reset by the person it meters.
+CREATE TABLE afritech.teacher_hub_plans (
+  plan_code           TEXT PRIMARY KEY,
+  display_name        TEXT NOT NULL,
+  billing_period      TEXT NOT NULL CHECK (billing_period IN ('none', 'monthly', 'annual')),
+  price               NUMERIC(12,2) NOT NULL CHECK (price >= 0),
+  currency_code       TEXT NOT NULL DEFAULT 'ZMW',
+  -- NULL = unlimited. A number is a LIFETIME cap, not a per-period one.
+  included_resources  INT CHECK (included_resources >= 0),
+  is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order          INT NOT NULL DEFAULT 0,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Seeded: trial (K0, 5 resources) · monthly (K300) · annual (K3,000).
+
+GRANT SELECT ON public.standalone_teacher_accounts TO authenticated;
+-- Identity and profile only. `plan_code`, `subscription_status`, the allowance override and
+-- both counters are absent, so an INSERT naming them is refused before RLS is consulted.
+GRANT INSERT (clerk_user_id, full_name, email, phone_e164, country_code,
+              curriculum_types, subjects, grade_levels)
+  ON public.standalone_teacher_accounts TO authenticated;
+GRANT UPDATE (full_name, phone_e164, country_code, curriculum_types, subjects, grade_levels)
+  ON public.standalone_teacher_accounts TO authenticated;
 
 CREATE INDEX idx_standalone_teachers_clerk ON public.standalone_teacher_accounts(clerk_user_id);
 CREATE INDEX idx_standalone_teachers_status ON public.standalone_teacher_accounts(subscription_status)
@@ -2203,5 +2408,7 @@ CREATE INDEX idx_standalone_teachers_school ON public.standalone_teacher_account
 | 2026-04-26 | Added lesson_plans | Store generated lesson plans for school and standalone teachers |
 | 2026-04-26 | Added ai_conversations | AI assistant conversation history for context continuity |
 | 2026-04-26 | Added standalone_teacher_accounts | B2C lesson planner product — teachers independent of schools |
+| 2026-09-27 | **`0131` applied: `audit_logs` built at last** | Two BUILD_SEQUENCE gates could not pass and payments had no immutable record. Triggers rather than Edge Functions, because a trigger cannot forget; immutability by trigger rather than policy, because `service_role` bypasses RLS; changed-columns-only with pattern-based redaction, so the trail is not a second copy of the PII. |
+| 2026-09-27 | **`0130` applied: `teaching_resources` replaces `lesson_plans`, `standalone_teacher_accounts` built, `afritech.teacher_hub_plans` added** | Three tools share one shape, so one table with `resource_kind`. `linked_school_id` dropped as self-contradictory. Prices and the trial cap became rows. Counters moved behind column-level grants, because the meter must not be writable by the person it meters. |
 | 2026-08-13 | Corrected schema count from two to three (`public` 46, `private` 4, `afritech` 8 = 58 tables) | The document referenced `afritech.` 14 times in its own body while its overview claimed two schemas |
 | 2026-08-13 | Attendance trigger description made queue-provider-neutral | ADR-035 — BullMQ is the default, not QStash |

@@ -323,6 +323,80 @@ Each school card in the admin panel shows a "Contact" button that opens a quick 
 
 ---
 
+## What Is Built, and Where It Differs From The Above
+
+*Added 2026-09-29, when Path 1 was implemented. Everything above this section was written before
+development; this section is written from the applied schema.*
+
+**Both paths are built.** AfriTech creates a school through `POST /api/admin/schools/provision` and
+the *Add school* screen at `/admin/schools/new`. A school owner registers their own at `/register`
+through `POST /api/register/school`.
+
+### Path 2's two halves are deliberately swapped
+
+This document describes a fully public form that creates the school and *then* the Clerk account.
+Built in that order, the endpoint mints a school identifier and a Clerk organisation for anybody
+with `curl`, and there is no rate limiter to put in front of it — Upstash Redis does not exist yet.
+
+So the visitor signs up with Clerk **first** (email OTP, which Clerk verifies and rate-limits), and
+`register_school()` is granted to `authenticated` only, never `anon`. The end state is identical to
+the one described below; the verification that was going to happen anyway happens before anything is
+created rather than after. It also removes a step — the registrant *becomes* the owner rather than
+being emailed an invitation to a school they created ten seconds earlier.
+
+Two further limits this document does not specify, both added because a public tenant-creating
+endpoint needs them:
+
+- **One open trial per person**, against `school_onboarding.created_by`. Narrow on purpose: a
+  genuine multi-school owner converts the first trial, or AfriTech creates the second.
+- **An account already belonging to a school is refused.** Somebody signed in as a teacher
+  elsewhere cannot spawn a school from that session.
+
+Terms and privacy acceptance are stored as timestamps on `school_onboarding`, because a checkbox
+that gates a button and leaves no row behind is not consent anybody could later evidence.
+
+### Four differences from the flow described above
+
+| Documented | Built | Why |
+|---|---|---|
+| `school-onboard` Edge Function | `public.admin_create_school()` plus an API route | `supabase/functions/` is empty and PostgREST serves only `public`. A function is testable by pgTAP; an Edge Function is not. |
+| One flow creating school and Clerk org | Three steps: create → create org → attach | Postgres cannot roll back an HTTP call. Between steps the school holds a `pending_` placeholder for `clerk_org_id`, which matches no JWT — so it is reachable by nobody rather than half-open. |
+| "School owner Clerk user account created" | The owner is **invited** | Clerk is email-OTP only, so a created user has no credential to send and must verify anyway. An invitation expires by itself; an orphan user account does not. |
+| `get_next_school_sequence()` as `MAX + 1` | Same, under `pg_advisory_xact_lock` on country+city | The documented form lets two concurrent creations mint the same identifier, and the UNIQUE constraint then fails one rather than giving it the next number. |
+
+### Province
+
+Both forms above require Province; the schema had only `city_code`. `0142` adds
+`schools.province_code` using ZM.md's ten codes. **City codes were not touched** — a city code sits
+inside every school identifier, and every pupil number and receipt number derived from it.
+
+### Verification
+
+Decided 2026-09-29: verification is a **phone call recorded as a note**, not a document check.
+`admin_activate_school()` requires a non-empty note, because the note is the whole of the evidence
+and an activation without one is a tick box pretending to be a control.
+
+### The status effects table IS enforced, as of `0149` and `0153`
+
+`trial_expired`, `suspended` and `terminated` schools cannot write anything. Enforced by an AFTER
+STATEMENT trigger on every school-scoped table rather than by RLS, because on Supabase the `postgres`
+role carries BYPASSRLS and every `SECURITY DEFINER` function here is owned by it — a policy would be
+invisible to `import_students()`, `save_exam_marks()` and `verify_payment()`, and to every worker.
+
+**`pending_verification`'s "limited" write is resolved as: configuration yes, pupils no.** This
+document's business rule 4 and `ONBOARDING.md`'s pilot process contradicted each other; `0153` takes
+the stricter reading, because an unverified school loading children's personal data makes AfriTech
+their ZDPA processor before anybody has confirmed the school exists. Grade levels, subjects, grading
+scales, term dates and fee structures stay open — which is the whole point of admitting an unverified
+school, since it sets itself up while AfriTech verifies it. `ONBOARDING.md`'s pilot sequence has been
+amended to activate before importing.
+
+**Reads are not restricted for any status**, including `terminated`. `TRIAL.md` business rule 6
+preserves a school's ability to see and export its own data, and blocking reads is a data-retention
+decision with a legal clock on it rather than a subscription one.
+
+---
+
 ## Business Rules
 
 1. School IDs are permanent and immutable. Once assigned, a school ID never changes regardless of name changes, location changes, or ownership transfers.
@@ -354,3 +428,6 @@ Each school card in the admin panel shows a "Contact" button that opens a quick 
 | 2026-04-26 | Initial complete draft | Stage 6 school module documentation |
 | 2026-04-26 | Added custom role template on onboarding | Custom roles feature confirmed |
 | 2026-04-26 | Added school status lifecycle table | Clarity on what each status permits |
+| 2026-09-29 | Added *What Is Built, and Where It Differs* | Path 1 implemented in `0142`–`0144`. Four deviations recorded with reasons, plus the province addition and the explicit note that status effects are not enforced. |
+| 2026-09-30 | Path 2 implemented in `0150`/`0151` | Self-registration built, with the account-first reversal, the one-open-trial limit and timestamped consent all recorded above. |
+| 2026-09-30 | Status effects enforced; `pending_verification` resolved | `0149` blocks writes for lapsed statuses; `0153` blocks pupil enrolment for unverified schools while leaving configuration open. ONBOARDING.md's pilot sequence amended to match. |

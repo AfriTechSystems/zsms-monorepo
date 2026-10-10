@@ -404,3 +404,261 @@ The fix declares `react` and `react-dom` at `19.2.8` in the **root** `package.js
 
 **Alternatives considered:** Remaining on `14.2.35` and accepting the open advisories (rejected — the exposure is permanent, since no fix will ever be backported, and the affected classes are exactly those that breach tenant isolation); jumping to Next.js 16.3.x (rejected for now — no additional security benefit over 15.5.23, at higher migration cost).
 **Consequences:** `ARCHITECTURE.md`, `THIRTEEN_LAYER_COMPLIANCE.md`, and `CLAUDE.md` are updated to state Next.js 15. Phase 1 work must follow Next.js 15 conventions — most importantly that `cookies()`, `headers()`, `draftMode()`, `params`, and `searchParams` are **asynchronous** and must be awaited, and that `fetch` and `GET` route handlers are **no longer cached by default**. The Phase 0 scaffold used none of these APIs, so the upgrade required no code changes. The exact patch version stays pinned; `npm audit` is checked against `next` at every phase boundary.
+
+---
+
+## ADR-037 — Scope-Based Teaching Assignment Model
+
+**Status:** Confirmed — replaces the undefined `class_enrolments` and supersedes `staff_assignments`
+**Decision:** **A teacher's relationship to students is expressed by `public.teacher_assignments`, a single table carrying a `scope` field with two values — `'class'` and `'subject'` — where every row carries `class_id` regardless of scope.** `public.class_subjects` records which subjects a class is taught. RLS resolves teacher reach through one `SECURITY DEFINER` predicate, `teacher_reaches_class()`, which returns TRUE for an assignment at either scope.
+
+**Reason:**
+
+Four documents — `RLS.md`, `ASSIGNMENTS.md`, `POWERSYNC.md`, `OFFLINE_SYNC.md` — resolved a teacher's students through `public.class_enrolments`. That table had no `CREATE TABLE` in `DATABASE.md`, no entry in `SCHEMA.md`'s inventory, and no migration in `MIGRATIONS.md`. It was a reference with nothing behind it.
+
+The obvious repair — match `students.class_id` directly — is correct for a primary school, where one teacher owns one class, and wrong for a secondary school, where a subject teacher reaches many classes and a class is reached by many teachers. Zambia's private schools include both, and the 2023 reform leaves many mid-transition (`ZM.md`), so a school may be both at once across different grade bands.
+
+**Why `scope`, rather than two tables or a school-type flag:**
+
+- **A school-type flag would be a branch in security code.** `IF school.type = 'primary' THEN ... ELSE ...` inside an RLS predicate means two code paths, one of which is exercised far less often, both of which must stay correct. The shape of a school is data; it should not be a code path.
+- **Two tables — `class_teachers` and `subject_teachers` — would need a UNION in every policy** and would make "does this teacher reach this student" two lookups that can disagree. One table with a discriminator keeps the predicate a single `EXISTS`.
+- **Both scopes carrying `class_id` is the load-bearing detail.** It is what allows `teacher_reaches_class()` to ignore `scope` entirely. Adding a third scope later — a head of department reaching a whole grade, say — changes the helper only if that scope does not resolve to a set of classes.
+
+**Constraint, not convention.** `teacher_assignment_scope_shape` enforces that `scope='class'` carries no subject and `scope='subject'` carries one. This is a security control: a `scope='subject'` row with a NULL `subject_id` would read to the predicate as an assignment reaching the entire class, silently widening that teacher.
+
+**Write access is owner and principal only.** Teacher reach is derived from this table, so a teacher able to insert their own row could grant themselves any class's students. The pgTAP suite asserts this directly.
+
+**`students.class_id` is unchanged** and remains the student's home or registration class. Nothing about enrolment moves into these tables.
+
+**Alternatives considered:** defining `class_enrolments` as originally referenced (rejected — a student-to-class join table duplicates `students.class_id` and creates two answers to which class a student is in); a `teacher_class_subjects` table with a nullable `subject_id` and no `scope` field (rejected — the nullable column becomes the discriminator implicitly, with nothing preventing a row that means neither thing clearly); keeping `staff_assignments` and adding `is_class_teacher` semantics to RLS (rejected — `is_class_teacher` is an attribute of an assignment, not a scope, and a row with `is_class_teacher = TRUE` still names a single subject).
+
+**Consequences:** `teacher_read_assigned_students` is repointed at `teacher_reaches_class()` in migration `0021`, and `teacher_assigned_to_class()` — the interim helper from `0016` — is dropped so that only one predicate answers this question. `staff_assignments` is marked superseded and retained; it should be dropped in a dedicated migration once `ASSIGNMENTS.md` and the timetable module reference `teacher_assignments` only. The timetable, marks, and attendance modules in Phase 2 build on `teacher_assignments` and `class_subjects` rather than inventing their own scoping. The pgTAP isolation suite covers both scopes, the mixed case, and — the assertion that matters — that a subject teacher cannot see students in a class they do not teach.
+
+---
+
+## ADR-038 — Derived Arrears, Never Enforced
+
+**Status:** Confirmed
+**Decision:** **Outstanding fee balances are DERIVED from `public.fee_records`, never materialised as carry-forward rows, and the model computes and exposes only — it never gates any action.** `student_fee_balance` and `fee_record_status` are `security_invoker` views; `fee_statement()` renders a ledger with a computed *"Balance brought forward"* opening line.
+
+**Reason:**
+
+Before this decision, fee records existed per term with no cumulative view. Prior-term rows persisted, so debt did not reset — but there was no arrears concept at all: no linkage between terms, no running balance, no overdue signal, and no endpoint answering *"what does this student owe?"*. `GLOSSARY.md`, `PDF_GENERATION.md`, and `CHATBOT.md` all already promised a running balance the schema could not produce.
+
+**Derived, not brought-forward rows.** Writing a *"Balance brought forward"* line into each new term is how a bursar's ledger reads, and it was the tempting design. It double-counts the moment the original record still exists, and reconciling that requires settlement logic that can itself drift — two rows now claim the same debt, and any bug makes a family's balance wrong in a way nobody can reconstruct. `fee_records` stays the single source of truth; the brought-forward line is emitted by `fee_statement()` at render time. **One truth in the data, ledger-style on the page.**
+
+**`security_invoker` is load-bearing.** A PostgreSQL view runs with its *owner's* privileges by default, which would bypass RLS on `fee_records` entirely and show every parent every family's balance. Every view here sets `security_invoker = true`, and the isolation suite attacks that specific failure.
+
+**Overdue is a separate axis from payment progress.** `status` means how much has been paid; `is_overdue` / `days_overdue` / `arrears_amount` are derived from `due_date`. Adding `overdue` to the status enum would conflate the two and break the balance trigger's state machine — a record can be `partial` and overdue, or `partial` and not yet due, and both are meaningful.
+
+**Carry-forward spans terms AND academic years, and survives status changes.** Zambian school debt does not wipe at a year boundary, so `student_fee_balance` has no year filter. It also does not filter on `students.status`: a transferred, graduated, or alumni student keeps a visible balance, because schools withhold transfer letters and certificates until it is cleared. Hiding the balance when the status changed would make the debt disappear from exactly the screens that need it.
+
+**THE MODEL NEVER ENFORCES.** Nothing here refuses a result, a certificate, a transfer letter, or a re-registration because a balance is outstanding. In Zambia arrears commonly *do* gate those things — which is precisely why it must be a **per-school setting, admin-configurable and OFF by default**, rather than behaviour welded into the schema. A school that does not withhold results must not inherit the behaviour of one that does. That setting is not built here; when it is, it reads these columns and decides. The suite asserts that publishing results succeeds while a student is in arrears, so a future gate cannot be added silently.
+
+**Allocation is oldest-first by default and overridable.** `payments.fee_record_id` names one record, so a lump sum — the normal shape of mobile money, a bank transfer, or cash at the office — had no representation. `suggest_payment_allocation()` proposes an oldest-first split for one-tap acceptance; `allocate_payment()` accepts an explicit override. **The override is not a convenience.** Clearing the current term so a child can sit an exam while an older disputed amount stays open is a legitimate bursar instruction, and a system that silently swallowed that payment into the disputed debt would be wrong.
+
+**Revision is a distinct act.** `generate_fee_records()` is idempotent by `ON CONFLICT DO NOTHING`, which prevents double-billing but also silently blocked correcting a mis-keyed fee on an already-generated term. `revise_fee_records()` is the explicit path: it refuses to drop a fee below what has already been verified as paid, audits every change to `fee_record_revisions`, and re-derives status.
+
+**Loan linkage is enabled, not built.** `records_overdue`, `days_overdue`, `payments.paid_at`, and `fee_records.due_date` are the raw material a fee-payment reliability signal would need (`BEHAVIOUR_SCORE.md`). No loan coupling is created here; it is simply not precluded.
+
+**Alternatives considered:** materialised brought-forward rows (rejected — double-counting, as above); a stored `balance` column on `students` (rejected — a denormalised money total that must be kept in step with every payment, discount, and revision is a drift bug waiting to happen, and the trigger surface would be large); adding `overdue` to the `status` enum (rejected — conflates progress with time); auto-allocating lump sums oldest-first with no override (rejected — removes a decision that is legitimately the bursar's).
+
+**Consequences:** `GLOSSARY.md`, `PDF_GENERATION.md`, and `CHATBOT.md` now describe something the schema can produce. Phase 3 fee reminders read `arrears_amount` and `days_overdue` rather than recomputing them. Any future arrears gating is a separate, school-configurable feature and must not be added to these views or functions.
+
+---
+
+## ADR-039 — AI-Assisted Capture as a Planned Phase 4/5 Module
+
+**Status:** Planned — design recorded, **not built**
+**Decision:** **Teachers will be able to photograph paper mark sheets, registers, enrolment lists, and payment proofs; a queued vision-extraction job pre-fills a verification screen; and only teacher-approved data is written, through the existing RLS-gated APIs.** The module is credit-priced, with every limit and rate in dynamic configuration. Full design in `18 AI Module/AI_CAPTURE.md`.
+
+**Reason:**
+
+Zambian teachers mark on paper. Transcription into ZSMS is the slowest and most error-prone part of the workflow, and it is the single largest barrier to the data completeness that gates the analytics and assistant features (`AI_OVERVIEW.md` — systems 1 and 2 unlock at ≥70% completeness). Removing the typing without removing the teacher is the highest-leverage AI application in the product.
+
+**Assist, never autopilot.** Every extracted value is a draft. There is no confidence level, setting, or role that permits a direct write — the module inherits ADR-034's approval gate exactly. A mark written to the wrong student surfaces weeks later via a parent, after the report card has issued; the asymmetry between the cost of a wrong write and the cost of a second look is not close.
+
+**Context-anchored matching is the reason this is feasible.** Handwriting recognition against an open vocabulary is unreliable; recognition against a known roster of about thirty names is a constrained match. Extraction always runs inside a context the teacher already occupies — this class, this term, this subject — and matches only against that class's roster, resolved through `teacher_reaches_class()` (ADR-037). **The roster is never widened to the whole school to find a match**, because that is precisely how a mark lands on a same-named child in another grade. It is also a privacy control: the roster leaves the system in the prompt, so it must be the minimum set.
+
+**Credit-priced, because the cost is per use.** Each capture is a vision-API call. Metering it inside a flat subscription tier would either subsidise heavy users or cap the feature below usefulness. Trial allowance, school purchase, individual purchase, and per-capture rates are all `afritech` configuration per ADR-031 — hardcoding any of them would make a pricing correction a release.
+
+**Individual purchase is deliberate.** A teacher at a school that has not bought capture, and a standalone Teacher Hub user with no school at all, both need a path that does not depend on an institutional budget.
+
+**Balance is derived from an append-only ledger**, not stored as a mutable column — the same reasoning as ADR-038's derived arrears.
+
+**Compatibility confirmed, not assumed.** The Phase 2 marks and attendance schema was assessed against this flow. Drafts never enter domain tables; the existing unique keys already make repeated approval idempotent; `entered_by_user_id` correctly names the approving teacher rather than the model; and the payments verification workflow is already the right shape for payment-proof capture. **No schema change is required now.** Two changes land with the module: an added `sync_source` value, and an optional `source_capture_id` for provenance that cannot be backfilled.
+
+**Alternatives considered:** direct write above a confidence threshold (rejected — creates a class of error nobody reviews, and the threshold would inevitably be tuned down under time pressure); matching against the full student body (rejected — the accuracy gain is illusory and the failure mode is cross-grade misattribution); bundling capture into a subscription tier (rejected — transfers all volume risk to AfriTech and caps a metered feature at a flat price); building it in Phase 3 (rejected — it depends on BullMQ workers and on marks/attendance being settled, and it is not on the launch path).
+
+**Consequences:** `DYNAMIC_CONFIG.md` gains the capture-credit keys. `BUILD_SEQUENCE.md` lists the module in Phase 4/5. `PRICING.md` gains a usage-based revenue line alongside subscription tiers, and `COST_MANAGEMENT.md` must track cost-per-capture as a first-class metric once live — the credit price has to clear the vision-API cost with headroom for a provider price change. A pilot against real Zambian mark sheets is required before pricing is fixed, since the credit price depends on the retry rate.
+
+---
+
+## ADR-040 — Multi-Country Config Hardening (Deferred)
+
+**Status:** Open — deferred. **Decide when a second country becomes real.**
+**Decision:** **Recorded, not resolved.** Several schema constraints encode Zambia/Cambridge assumptions that contradict ADR-031's dynamic-configuration principle. They are catalogued here so the debt is visible and costed rather than rediscovered mid-expansion.
+
+**What is genuinely config-driven today** — and should not be disturbed:
+
+- Grading scales: `school_grading_scales.grade_bands` is JSONB, so a school defines its own bands, pass mark, and credit mark.
+- `exam_results.grade_letter` (TEXT) and `grade_points` (INT) are **scale-agnostic** — no Zambian grading is baked into the results table.
+- Grade and form structures: `school_grade_levels` is per school, supporting ECZ grades, Cambridge forms, and the transitional both-at-once case (`ZM.md`).
+- Class identifiers, report-card format, subject lists, and `marks_total` are all per school.
+
+**What is hardcoded** — each requires a migration to admit another country's system:
+
+| Column | Constrained to | Table(s) |
+|---|---|---|
+| `curriculum_type` | `ecz_grades`, `cambridge_forms`, `hybrid`, `custom` | `school_academic_config` |
+| `grading_system` | `ecz_percentage`, `cambridge_o_level`, `cambridge_a_level`, `custom` | `school_academic_config` |
+| `examination_type` | `ecz`, `cambridge`, `internal`, `none` | `school_grade_levels` |
+| `curriculum_type` | `ecz`, `cambridge`, `both` | `school_subjects`, `reference_subjects_zm` |
+| `level_type` | `primary` / `secondary` / `a_level` (+ junior/senior variants) | 3 tables |
+| `term_number` | `BETWEEN 1 AND 4` | `fee_structures`, `fee_records`, `attendance_records`, `exam_results` |
+
+Also: **`reference_subjects_zm` bakes the country into the table name** even though it carries a `country_code` column and a uniqueness key that already spans countries. The schema supports multi-country; the name implies one table per country.
+
+**Why this is deferred rather than fixed now.** The `custom` escape hatch means a new market is not blocked — it is degraded. A Kenyan school on CBC, or anywhere running two semesters rather than three or four terms, would either be forced into `custom` (losing the semantic value of the field) or wait for a migration. That is a real cost, but it is a cost paid once per country, and paying it now would mean designing a configuration vocabulary against a single known market — which usually produces the wrong abstraction. **The second country is what will reveal the right shape.**
+
+**What to do when that happens** — in preference order: promote the constrained values into `afritech` reference tables keyed by `country_code` (consistent with ADR-031); or, if only one or two markets are ever in scope, extend the CHECK constraints and accept the migration. Do **not** relax the constraints to free text without a reference table — the CHECKs are currently the only thing preventing a typo becoming a silently unmatched curriculum.
+
+**`term_number BETWEEN 1 AND 4` deserves separate thought.** It is a ceiling rather than a country assumption, and four accommodates every configuration currently documented. It is listed because it is still a hardcoded bound on an axis that varies by education system, not because it is known to be wrong.
+
+**Consequences:** No code changes now. `CLAUDE.md` carries this as a tracked open item. Any Phase 3+ work that adds a country-shaped enum should add it to this list rather than assuming it is fine.
+
+---
+
+## ADR-041 — Grading Scale Versioning for Exam Results
+
+**Status:** **Resolved 2026-09-26** — migrations `0106` and `0107`, 20 pgTAP assertions in `grading_scale_versioning_test.sql`.
+**Decision:** A stored grade records the grading-scale **version** that produced it. `public.exam_results.grading_scale_version_id` references `public.school_grading_scale_versions`, an immutable per-version snapshot of the bands. A scale revision creates a new version; existing results keep pointing at the version that graded them, so a March grade stays explainable in August.
+
+**The problem, concretely.** A school grades on ECZ percentages where 75 is a `B`. In Term 2 the board revises the bands and 75 becomes an `A`. `exam_results` now holds Term 1 rows saying `B` and Term 2 rows saying `A` for the same mark, with **nothing recording that the rule changed**. Nobody can answer *"why is this a B?"* — and a parent disputing a report card is asking exactly that. Recomputing from `marks_obtained` against the current scale silently rewrites history; not recomputing leaves two inconsistent letters with no explanation.
+
+**This is a solved problem elsewhere in ZSMS.** `afritech.score_config` versions loan scoring precisely so that a historical behaviour score remains explainable after weights change, and a loan application records the `config_version` it was scored under (ADR-020). Results need the same treatment and did not get it.
+
+**What was built.** The separate-table option, not the `version` column. A version column means a revision produces a new scale row with a new id, and `school_subjects.grading_scale_id` is a live FK that would need repointing on every revision. So the scale keeps a **stable identity** — "ECZ Secondary" is the same scale across revisions — and the bands move into immutable per-version snapshots.
+
+- `public.school_grading_scale_versions` — `grade_bands`, `pass_mark`, `credit_mark`, `version_number`, `effective_from`, `superseded_at`, `revision_reason`. A partial unique index on `superseded_at IS NULL` makes "exactly one current version" unambiguous while keeping the full history legal.
+- `public.exam_results.grading_scale_version_id` — nullable, and the nullability is deliberate (see below).
+- `public.revise_grading_scale(scale, bands, pass, credit, reason)` — the only way to change what a grade means. **A reason is mandatory**: a boundary change nobody can explain is the defect wearing a different hat.
+- `public.grade_from_scale_version(version, marks, total)` — takes a *version*, never a scale, because the question it must answer is "what did this mark mean in March". Bands match on percentage, so a subject marked out of 30 uses the same boundaries as one out of 100.
+- Two guards, both AFTER triggers per the rule established in `0101`: a version that has graded anything cannot be rewritten or deleted, and `school_grading_scales.grade_bands` — now a derived mirror of the current version — cannot be edited in place.
+
+**The product question the original ADR deferred, now settled: published results are never recomputed.** A published grade is a statement of record that has reached a parent. Silently restating it because a boundary moved is worse than a stale grade, and recomputation would make the version column decorative — it exists so an old grade can be *explained*, never so it can be quietly changed. A genuine error is corrected by an explicit, attributed re-grade. This is ADR-020's "snapshot calculated at application time only" applied to marks.
+
+**On the precedent this was asked to mirror.** ADR-041 originally pointed at `afritech.score_config` as the solved case. That table **does not exist in the applied schema** — it is documented in `DYNAMIC_CONFIG.md` and referenced here, and the loan module is unbuilt. So `0106` mirrors a documented *design*, not working code. Recorded because this is the exact "verify against the applied schema" trap `CLAUDE.md` warns about, and the next reader should not go looking for a table to copy.
+
+**Backfill was deliberately partial, and NULL means something.** A result whose `grading_scale_version_id` is NULL predates versioning and its grade genuinely cannot be explained. That is distinguishable from a known scale, which a plausible-looking guess would not be. On `zsms-dev` all 95 seeded results are NULL — the seed creates graded results with no grading scale at all, which is itself a seed defect worth fixing and a concrete demonstration of the problem this ADR describes.
+
+**One defect found in `0106` by probing the applied schema** rather than re-reading the migration: it backfilled existing scales but did not make a *new* scale create a version, so a scale added afterwards resolved to no current version and could silently grade nothing. Closed by `0107`, which puts the invariant in a trigger — an invariant that depends on every caller remembering a second INSERT is not an invariant.
+
+**Consequences:** The `CLAUDE.md` open-item row is removed. Mark entry must resolve a version and write it with the grade; `public.current_subject_scale_version(school, subject_code)` is the resolver.
+
+---
+
+## ADR-042 — The Service Role Key in Railway Workers
+
+**Status:** Confirmed — amends `CONVENTIONS.md` prohibition 1
+**Decision:** **The Supabase service role key may be used inside a trusted server-side context: an Edge Function, or a Railway background worker.** It remains forbidden in `apps/web`, `apps/mobile`, any client bundle, and any code path an end-user request can reach.
+
+**Reason:**
+
+Prohibition 1 originally read *"never used outside an Edge Function."* Phase 3 made that unimplementable. A worker must read a payment, its student, and the guardian in order to send a receipt, and it holds no end-user JWT — nobody has a session when a cron fires at 08:00 to send fee reminders. The rule as written left three options, none good: route every database read through an Edge Function, invent a second credential system, or quietly ignore the rule.
+
+**The rule's intent was never "Edge Functions are special."** It was to keep the key out of code a user can reach. Edge Functions were simply the only trusted server-side context that existed when it was written. A Railway worker is not client-reachable, is not bundled, and is not addressable by a user — it pulls jobs from Redis. On the property the rule actually protects, the two are equivalent.
+
+**Conditions a worker must satisfy to hold the key:**
+
+1. **It runs on Railway or an equivalent private compute service** — never in `apps/web`, never in a client bundle, never behind a public HTTP route.
+2. **Its data access goes through purpose-built `SECURITY DEFINER` functions**, not ad-hoc queries. `worker_payment_context()`, `worker_due_fee_reminders()`, and their siblings each scope every join to one school internally, so tenancy is a property of the function rather than of whoever writes the worker next.
+3. **Those functions are tested adversarially**, exactly as RLS policies are. A worker bypasses RLS by design, so the tenant boundary has to be asserted somewhere else — the pgTAP suite asserts that `worker_payment_context()` never returns a student or guardian from a different school than the payment.
+4. **The key is never logged, never returned in a response, and never placed in a job payload.** Job payloads carry IDs only, which is already the rule.
+
+**The trade this accepts.** A worker with the service role bypasses RLS, so the isolation guarantee that Phases 1–3 rest on does not protect it. That is a real reduction in defence in depth and the reason for conditions 2 and 3: the boundary moves from "RLS enforces it" to "these named functions enforce it, and tests prove they do." Any worker query written outside those functions loses the guarantee silently, which is why ad-hoc queries are prohibited rather than discouraged.
+
+**Alternatives considered:** workers calling Edge Functions for every database operation (rejected — honours the letter of the rule while adding a network hop per read and a second home for every query, and the Edge Function would hold the same key anyway); a dedicated Postgres role with narrow grants (not rejected on merit — it is strictly more precise, and remains the better long-term answer, but it requires designing a grant matrix per job type and Phase 3 needs a decision now; ADR-042 should be revisited if worker surface grows); leaving prohibition 1 unamended and shipping workers that violate it (rejected — a documented rule that everyone ignores is worse than no rule).
+
+**Consequences:** `CONVENTIONS.md` prohibition 1 is amended with a pointer here. `createWorkerDeps()` is implemented against the service role. All worker database access is funnelled through the `worker_*` functions in migrations `0090` and `0091`. `supabase/tests/rls/worker_boundary_test.sql` holds the tenant-correctness assertions for those functions (26). If a future worker needs data no `worker_*` function exposes, the answer is a new function with its own test — not a direct query.
+
+**Condition 2 is absolute, and enforcing it took a second migration.** `0090` created the read surface, but three statements in `apps/workers/src` still went at tables directly: an UPDATE of `message_log` by id and two reads of `schools`. None was exploitable — every id came from a `worker_*` call earlier in the same chain — but the UPDATE was an unanchored write on an unpoliced connection, which is precisely what this ADR exists to prevent. `0091` added `worker_update_dispatch()` and `worker_school_branding()` and removed all three.
+
+The rule is stated with no exceptions on purpose: **`.from(` anywhere in `apps/workers` is a defect.** A qualified version — "except reads of `schools` by primary key" — requires judgement from every future reviewer, and would not have caught the write that actually mattered. A rule that can be checked by grep is worth more than a rule that is merely more precise.
+
+---
+
+## ADR-043 — Per-School Theming: Colours and Logo Only, Refused Rather Than Warned
+
+**Status:** Confirmed
+**Decision:** **A school may configure two brand colours and two logo variants. Nothing else.** Layout, structure, typography, spacing, and semantic colours are fixed. A palette that fails WCAG AA is **refused at write time**, in both the application and the database. The AfriTech admin dashboard is never themed.
+
+**Reason:**
+
+Three questions had to be answered, and the interesting one is not the first.
+
+**How much may a school change?** The commercial pull is toward "as much as possible" — white-labelling sells. The product argument runs the other way and wins. Staff move between schools, and a bursar who learns ZSMS at one school should not relearn it at the next. One support team cannot answer *"where is the fees button"* for forty different layouts. And a school's own IT capacity is one person who also teaches. **Colours and a logo deliver essentially all of the felt ownership at essentially none of that cost:** a parent opening the portal sees their school's name, mark, and colours, which is what "our system" means to them. Moving the navigation adds nothing they would notice and removes something everyone else depends on.
+
+**Are semantic colours themeable?** No, and this is the sharper line. Green-means-paid and red-means-overdue are comprehension aids that a user learns once and reuses across fees, attendance, and results. A school that set "overdue" to green would not be expressing a brand; it would be creating a misreading of money, on the screen where misreading costs most. The two configurable colours are the *identity* colours — anchor and action. The semantic three are not offered.
+
+**What happens when a school picks an unreadable colour?** This is where the decision has teeth. The supplied ZSMS brand palette itself was measured before anything was designed, and **five of its six colours fail AA as text against white** — the primary blue at 3.47:1, amber at 1.95:1. If the product's own palette fails that test, a school picking a colour from its 1974 crest will certainly fail it. So the guardrail is not a nicety.
+
+**It refuses rather than warns.** A warning is dismissed by whoever is setting the school up at 9pm the night before launch, and the cost lands on parents who never chose the colour and cannot change it. The thresholds are the two that derivation cannot rescue: the anchor must reach 4.5:1 against white because white navigation text sits on it, and the primary must reach 3:1 because it is used unmodified as a button fill and below that the button's own edge disappears. Text steps are derived by darkening the supplied hue until they pass, so they need no gate.
+
+**The brand hex is preserved exactly, at step 500.** This is what makes the guardrail acceptable rather than merely correct — the school's actual colour appears on fills, bars, and status marks; only the text-bearing step is darkened, and it is the same hue. A school is not told its colour is wrong; it is told a colour is too pale to be a button.
+
+**Enforced in two places, deliberately.** `validateTheme()` in `packages/design-tokens` produces the readable error a school sees. CHECK constraints on `public.school_branding` hold when the API is not in the path — an admin tool, a support script, a bulk import. This required implementing the WCAG luminance formula a second time, in SQL, which is a real duplication cost; it is paid because a guardrail present in only one of two writers is one that will eventually be walked past. The two implementations are pinned to each other by assertions on fixed ratios.
+
+**The admin dashboard is excluded, and that is not an oversight.** An AfriTech operator moves between forty schools in a session and impersonates users inside them. If the platform's own tooling adopted each school's colours, *"am I in AfriTech admin or inside a school"* would become a question answered by reading the URL — precisely when getting it wrong is most costly.
+
+**The theme is not a web-UI feature.** It reaches the parent login screen before authentication, the receipts and statements and report cards, and the emails. A themed portal whose receipt for the same money arrives in ZSMS blue reads as coming from somewhere else — the wrong signal on proof of payment. This is why `worker_school_branding()` and `worker_payment_context()` were extended (0092, 0093) rather than the colours being resolved only in the browser.
+
+**Alternatives considered:** full white-labelling with configurable layout (rejected — see above; the cost is borne by support and by every user who moves between schools, and the benefit is not one parents perceive); a warn-only contrast check with an override for determined schools (rejected — the override would be used, and the person exercising it is never the person who pays for it); enforcing contrast only in the API (rejected — leaves the constraint absent from every other writer, and the second implementation is ~30 lines of SQL); a curated set of preset palettes instead of free colour choice (**not rejected on merit** — it is simpler, guarantees readability by construction, and should be reconsidered if support finds schools struggling with the refusal message; free choice was taken because a school's colour is usually already fixed by an existing crest and offering it a near-match is worse than offering it a check).
+
+**Consequences:** `public.school_branding` (0092) is the store, with RLS and the AA constraints. `school_branding_by_slug()` is the only `anon`-reachable path and exposes exactly five keys, pinned by test. `packages/design-tokens` is the single source of tokens for web, PDF, and email. `DESIGN_SYSTEM.md` is the authoritative document. `supabase/tests/rls/school_branding_test.sql` holds 36 assertions covering the guardrail, the SQL/TS agreement, tenancy, role scope, and the anon surface. Anything that renders a school's identity resolves it through `resolveTheme()` — a second resolution path would be a defect.
+
+---
+
+## ADR-044 — Supabase Edge Functions Superseded; Webhooks Are Next.js Routes
+
+**Status:** Confirmed (2026-10-10)
+**Decision:** ZSMS will not deploy Supabase Edge Functions. The work `EDGE_FUNCTIONS.md`
+assigns to them splits in two, and each half goes somewhere that already exists:
+
+1. **PDF generation and WhatsApp dispatch** — already built as Railway background workers
+   over BullMQ/Upstash (ADR-035, ADR-042). No further work; the document is amended to
+   record where they actually live.
+2. **Inbound webhooks** — WhatsApp, payment gateway, loan provider and Clerk — will be
+   built as **Next.js API routes** under `apps/web/app/api/webhooks/`.
+
+**Reason:** The first half would otherwise mean two async systems doing one job, in two
+languages, with separate deployments, secrets and monitoring. Two systems doing one thing
+is how one of them silently drifts, and the Railway half is the one that is proven — a
+real job has round-tripped through it.
+
+For the second half, a webhook is an HTTP endpoint receiving a small JSON body, not heavy
+compute. `apps/web` already has 116 routes carrying authentication, the `{ data, meta? }` /
+`{ error, code }` envelope, `fromPostgrestError`, and Sentry. A Deno runtime would add a
+second deployment target and a second place for secrets to live, in exchange for nothing
+this workload needs.
+
+**Correction this ADR records:** ADR-023 states that tier-1 native webhooks are "already
+built". They are not, and were not — there is no webhook endpoint of any kind in this
+repository, Edge Function or otherwise. The 2026-10-06 Foundation Layer audit found this
+by looking rather than by reading.
+
+**Consequences:**
+- `supabase/functions/` stays empty. `ARCHITECTURE.md` and `EDGE_FUNCTIONS.md` are
+  amended rather than left to imply otherwise.
+- The four webhook routes become **tracked, scheduled work**, not a resolved gap. They are
+  blocked on credentials in any case — no Meta account, no payment gateway, and
+  `CLERK_WEBHOOK_SECRET` unset — so nothing is lost by sequencing them behind those.
+- Each route, when built, needs signature verification against the provider's secret,
+  idempotency on the provider's event id (a webhook is delivered at least once, not
+  exactly once), and a refusal that does not leak whether a record exists.
+- If a future workload genuinely needs compute close to the database — something
+  latency-bound inside Postgres rather than an HTTP handler — this decision is worth
+  revisiting on its own merits. It is not revisited merely because a document names Edge
+  Functions.
+
+---

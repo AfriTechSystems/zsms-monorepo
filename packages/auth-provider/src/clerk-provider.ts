@@ -23,7 +23,8 @@ interface ClerkAuthLike {
   orgId: string | null
   orgSlug: string | null
   orgRole: string | null
-  actor: { sub: string } | null
+  /** Present only during impersonation. Clerk omits it entirely otherwise. */
+  actor?: { sub: string } | null
   getToken(opts?: { template?: string }): Promise<string | null>
   sessionClaims: Record<string, unknown> | null
 }
@@ -56,7 +57,18 @@ export class ClerkAuthProvider implements AuthProvider {
       organisationId: auth.orgId,
       organisationSlug: auth.orgSlug,
       role,
-      isImpersonating: auth.actor !== null,
+      // `!= null`, not `!== null`. Clerk returns `undefined` for `actor` on an
+      // ordinary session, not `null` — the local interface above says `| null`
+      // and is wrong about it. Strict inequality therefore reported EVERY
+      // session as an impersonation, which surfaced the moment a shell first
+      // rendered the impersonation banner: a school user signing in normally was
+      // told "you are signed in as a user at Test Academy Lusaka. Everything you
+      // do is recorded against them."
+      //
+      // That is worse than a cosmetic bug. The banner's whole value is that it
+      // is rare and alarming; one that shows on every session is one people
+      // learn to read past, and it would still be there on the day it was true.
+      isImpersonating: auth.actor != null,
       actorUserId: auth.actor?.sub ?? null,
     }
   }
@@ -73,9 +85,32 @@ export class ClerkAuthProvider implements AuthProvider {
     return verifyToken(token, { secretKey })
   }
 
+  /**
+   * The token forwarded to PostgREST as the caller's identity.
+   *
+   * **This returns the plain Clerk session token, deliberately — not a JWT
+   * template.** The distinction is the whole integration:
+   *
+   * - The *old* path minted a bespoke token from a Clerk JWT template named
+   *   `supabase`, signed with Supabase's legacy JWT secret. Clerk deprecated it
+   *   in 2025 and Supabase is retiring the shared secret it depends on.
+   * - The *current* path registers Clerk as a **third-party auth provider** in
+   *   Supabase. Supabase then verifies the ordinary session token against
+   *   Clerk's JWKS, so no shared secret exists to leak or rotate.
+   *
+   * Calling `getToken({ template: 'supabase' })` against a project configured
+   * the new way does not degrade — it fails, because no such template exists.
+   * That is worth stating because the failure reads as an authorisation bug
+   * rather than a configuration one: every route 403s with a valid session.
+   *
+   * The claims the RLS helpers read (`o.id`, `o.slg`, `o.rol`, `act`) now come
+   * from the session token's own customisation rather than a template body, and
+   * Supabase additionally requires `role: "authenticated"` on it — added by
+   * activating the Supabase integration on the Clerk side. Without that claim
+   * PostgREST treats a perfectly valid token as anonymous.
+   */
   async getSupabaseToken(): Promise<string | null> {
     const auth = await this.clerkAuth()
-    // The 'supabase' JWT template shapes the o/act claims the RLS helpers read.
-    return auth.getToken({ template: 'supabase' })
+    return auth.getToken()
   }
 }

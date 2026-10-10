@@ -197,12 +197,28 @@ Privacy (P) is deferred to SOC 2 renewal — it requires a mature privacy progra
 | CC6.2 New user access | Staff invitation flow, school org creation | Audit logs |
 | CC6.3 Access removal | Staff removal revokes Clerk membership | Audit logs |
 | CC6.6 Encryption in transit | TLS 1.3 enforced by Vercel/Cloudflare | TLS configuration |
-| CC6.7 Encryption at rest | Supabase + R2 AES-256, field encryption | Database config |
+| CC6.7 Encryption at rest | Supabase + R2 AES-256 (disk). **No field-level encryption** — see below | Database config |
 | CC7.1 Monitoring | Sentry error tracking, PostHog, Railway alerts | Alert configs |
 | CC7.2 Anomaly detection | Suspicious activity detection in sessions | Audit logs |
 | CC8.1 Change management | Git branch protection, staging environment | GitHub settings |
 | A1.1 Availability commitments | Supabase Pro SLA, Railway standby | SLA agreements |
 | A1.2 Capacity planning | Supabase usage monitoring | PostHog + Sentry |
+
+**Correction, 2026-10-03.** This table previously claimed "field encryption" under
+CC6.7. Disk encryption is real and provided by Supabase and R2; **field-level encryption is
+not implemented** — `students.nrc_or_birth_cert` and `parents.national_id` are stored in
+plaintext columns. Claiming a control that does not exist is worse at audit than declaring
+its absence, so it is declared. Masking happens on the way INTO `audit_logs`
+(`mask_audit_values()`), which is a different control and does not substitute.
+
+**Data subject rights are implemented as of 2026-10-03** (`0187`). Access and erasure are
+AfriTech-only at `/admin/data-requests`; portability is self-service from the account menu
+in every portal. Erasure anonymises rather than deletes, using the markers this document
+specifies, because Zambian financial regulation requires seven years of payment records —
+verified: payment rows survive an erasure with amounts and dates intact. The export is
+JSON rather than the CSV named below: a person's record spans an account, a parent row,
+several children and possibly a staff record, and flattening that to CSV either loses the
+structure or produces several files.
 
 **Gaps to close before SOC 2 Type I audit:**
 

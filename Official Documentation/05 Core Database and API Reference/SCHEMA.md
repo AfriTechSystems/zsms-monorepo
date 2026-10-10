@@ -39,6 +39,19 @@ afritech schema       — AfriTech internal team tables
 
 ---
 
+### `school_branding`
+**What it is:** The school's visual identity — two brand colours and two logo variants. One row per school; `school_id` is both the primary key and the tenant column. An absent row, or a NULL column, means the ZSMS default, which is the normal state for a school that has not been through the branding step.
+
+**Key columns:** `school_id` (PK → `schools.id`), `anchor_color` (ink — body text, headings, navigation), `primary_color` (buttons, links, active states), `logo_url` (full wordmark, R2 public bucket), `icon_url` (square mark for favicon and collapsed nav), `updated_by`.
+
+**Constraints worth knowing:** both colours are `#RRGGBB`, and both are contrast-constrained against the **page ground `#F1F3FA`**, not white — `anchor_color` must reach **4.5:1** (it is the ink the interface is written in), `primary_color` must reach **3:1** (it is used unmodified as a button and chip fill). The page is the darker of the two light grounds and therefore the binding one; migration `0094` moved these off white. Enforced by CHECK constraints calling `wcag_contrast_ratio()`, not only by the application. The format constraints are separate and necessary: a CHECK that evaluates to NULL passes, and the contrast function returns NULL for a malformed colour. Logo URLs must be HTTPS. See ADR-043 and `DESIGN_SYSTEM.md`.
+
+**Read scope is wider than most configuration:** every member of the school can SELECT it, because parents, students, and teachers all render the theme. Writing is owner, principal, and admin only. `anon` holds no privilege on the table at all — the unauthenticated parent login screen reads through `school_branding_by_slug()` instead.
+
+**Relates to:** `schools` (one-to-one). Read by `school_branding_by_slug()` (login screens), `worker_school_branding()` (report cards, statements), and `worker_payment_context()` (receipts).
+
+---
+
 ### `school_academic_config`
 **What it is:** Stores each school's academic structure choices — curriculum type, grading system preferences, report card format, and class naming convention. Created during onboarding, editable in settings.
 
@@ -208,16 +221,37 @@ afritech schema       — AfriTech internal team tables
 
 **Key columns:** `school_id`, `clerk_user_id`, `first_name`, `last_name`, `phone_e164`, `email`, `department`, `employment_type`, `is_active`.
 
-**Relates to:** `schools`, `staff_assignments`.
+**Relates to:** `schools`, `teacher_assignments`.
 
 ---
 
-### `staff_assignments`
-**What it is:** Links teachers to their assigned classes and subjects. Drives RLS policies that scope teachers to their own classes. One row per class-subject combination per teacher.
+### `class_subjects`
+**What it is:** Which subjects are taught to which class in an academic year. The curriculum half of the teaching-assignment model (ADR-037).
 
-**Key columns:** `school_id`, `staff_user_id`, `class_id`, `subject_code`, `is_class_teacher`, `academic_year`, `term_number`.
+**Key columns:** `school_id`, `class_id`, `subject_id` (FK to `school_subjects`), `academic_year`, `is_active`.
 
-**Relates to:** `schools`, `staff_members`.
+**Relates to:** `schools`, `school_subjects`, `teacher_assignments`.
+
+---
+
+### `teacher_assignments`
+**What it is:** What a teacher teaches, at one of two scopes. Replaces the never-defined `class_enrolments` and supersedes `staff_assignments`. **This is a security table** — it determines which students a teacher may read.
+
+- `scope = 'class'` — the teacher owns the whole class (`class_id` set, `subject_id` NULL). The primary-school and form-teacher case.
+- `scope = 'subject'` — the teacher teaches one subject to one class (both set). The secondary-school case.
+
+A teacher may hold any number of rows of either scope, including both at once. Because both scopes carry `class_id`, RLS resolves teacher reach with one predicate — `teacher_reaches_class()` — and never branches on school type.
+
+**Key columns:** `school_id`, `teacher_user_id`, `scope`, `class_id`, `subject_id`, `academic_year`, `term_number`, `is_active`.
+
+**Relates to:** `schools`, `school_subjects`, `students` (via `class_id`), `staff_members`.
+
+**Note:** a `CHECK` constraint keeps `scope` and `subject_id` in agreement. Only the owner and principal may write this table — a teacher who could write it could grant themselves any class's students.
+
+---
+
+### `staff_assignments` (Removed)
+**Removed in migration `0069`.** Superseded by `teacher_assignments` (ADR-037): `is_class_teacher = TRUE` maps to `scope = 'class'`, and a class/subject pairing maps to `scope = 'subject'`. Listed here only so that references to it in older documents resolve to an explanation rather than a missing table.
 
 ---
 
@@ -536,12 +570,14 @@ afritech schema       — AfriTech internal team tables
 
 ---
 
-### `public.lesson_plans`
+### `public.teaching_resources` (was `lesson_plans`)
 **What it is:** Generated lesson plans created by the AI lesson planner for both school-linked teachers and standalone teacher account holders. `school_id` is NULL for standalone teachers — they own their content regardless of school affiliation.
 
 **Key columns:** `school_id` (nullable), `created_by` (Clerk user ID — org:teacher or platform:teacher), `title`, `grade_level`, `subject`, `topic`, `curriculum_type`, `duration_minutes`, `lesson_type`, `content` (JSONB — full structured lesson plan: objectives, outline, activities, assessment, homework, differentiation), `knowledge_sources` (which knowledge_base chunks were retrieved — for transparency), `is_shared` (teacher can share publicly), `teacher_notes`.
 
-**Relates to:** `public.schools` (nullable), `public.standalone_teacher_accounts`.
+**Relates to:** `public.schools` (nullable, **provenance only — not an access path**), `public.standalone_teacher_accounts`.
+
+**Implemented in `0130` as `teaching_resources`**, one table for all three Hub generators with a `resource_kind` discriminator. Owner-scoped on `get_user_id()`, not school-scoped: a school cannot read its teachers' resources. Carries `generator_name`/`generator_version` so a scaffold stays distinguishable from later model output, and `is_deleted` because there is no DELETE grant.
 
 ---
 
@@ -557,7 +593,9 @@ afritech schema       — AfriTech internal team tables
 ### `public.standalone_teacher_accounts`
 **What it is:** Platform-level B2C accounts for teachers using the lesson planner independently of any school. Has no access to school operational data. Free trial: 5 lesson plans. After trial, monthly subscription required. Can optionally be linked to a ZSMS school when the school registers — lesson plans carry over on linking.
 
-**Key columns:** `clerk_user_id`, `full_name`, `email`, `curriculum_types` (TEXT array), `subjects` (TEXT array), `subscription_status` (trial / active / cancelled / suspended), `trial_plans_used`, `trial_plans_limit` (default 5), `lesson_plans_count`, `linked_school_id` (nullable — set when teacher links to a registered school).
+**Key columns (as applied in `0130`):** `clerk_user_id`, `full_name`, `email`, `curriculum_types`, `subjects`, `grade_levels`, `plan_code` (FK to `afritech.teacher_hub_plans`), `subscription_status` (trial / active / cancelled / suspended), `trial_resources_used` (monotonic, **not writable by the account holder**), `trial_allowance_override`, `resources_created`, `subscription_started_at`, `subscription_ends_at`.
+
+**`linked_school_id` and `trial_plans_limit` do not exist.** The first contradicted the documented multi-school rule and is answered by `my_schools()`; the second became `afritech.teacher_hub_plans.included_resources`, because a trial cap is configuration.
 
 **Relates to:** `public.schools` (nullable via linked_school_id), `public.lesson_plans`.
 

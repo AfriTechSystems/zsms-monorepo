@@ -141,6 +141,21 @@ WhatsApp (`WHATSAPP.md`, `META_API.md`, `TEMPLATES.md`), SMS fallback (`SMS.md`)
 - Announcement read tracking records one row per user per announcement.
 - Parent opt-out is honoured across every channel.
 
+
+### AI-Assisted Capture (Phase 4/5 — planned, ADR-039)
+
+Teachers photograph paper mark sheets, registers, enrolment lists, and payment proofs; a queued vision-extraction job pre-fills a verification screen; only teacher-approved data is written, through the existing RLS-gated APIs. Full design in `18 AI Module/AI_CAPTURE.md`.
+
+Sequenced here rather than earlier because it depends on **BullMQ workers** (Phase 3) and on **marks and attendance being settled** (Phase 2), and it is not on the launch path.
+
+**E2E gate when built:**
+- A photographed mark sheet for a known class produces a draft with per-cell confidence, and **writes nothing** until approved.
+- A handwritten name that does not match the class roster is reported unmatched — never assigned to the nearest candidate, never resolved by widening the search to the whole school.
+- Approved data is written under the **approving teacher's** credentials and teaching scope, and is refused when they no longer reach the class.
+- Re-approving a re-photographed sheet upserts rather than duplicating.
+- A failed extraction consumes **no credit**.
+- Every trial limit, credit price, and per-capture rate is read from configuration, with none hardcoded.
+
 ---
 
 ## Phase 5 — Platform, Admin, and Integrations
@@ -157,6 +172,17 @@ Super admin panel (`SUPERADMIN.md`), dynamic pricing (`PRICING.md`, `DYNAMIC_CON
 - A per-school override grants a feature outside the school's tier, with a mandatory reason, and expires on schedule.
 - Impersonation session starts, is fully logged, and ends cleanly with the school able to see the access record.
 - A webhook fires with a valid HMAC signature and a failure does not block school operations.
+
+---
+
+## Tracked pre-launch decisions
+
+Two items recorded against the sequence rather than a phase, because they are decisions with a deadline rather than features.
+
+| Item | ADR | Deadline | Why |
+|---|---|---|---|
+| **Grading-scale versioning on `exam_results`** | ADR-041 | **Before Phase 6 pilot**, and certainly before any school completes a full academic year | A grade letter is stored without the scale that produced it. A mid-year revision makes historical grades unexplainable, and the column cannot be backfilled for rows already written. `score_config` already solves this for loans. |
+| **Multi-country config hardening** | ADR-040 | When a second country becomes real | `curriculum_type`, `grading_system`, `examination_type`, `level_type`, and `term_number` are hardcoded CHECKs; `reference_subjects_zm` names a country it need not. Deferred deliberately — the second market is what reveals the right abstraction. |
 
 ---
 

@@ -264,3 +264,16 @@ CREATE TABLE public.standalone_teacher_accounts (
 | 2026-04-26 | Four-system architecture defined | Distinguishes statistical analytics from true LLM features |
 | 2026-04-26 | Data quality gate confirmed | AI insights on bad data cause harm, not value |
 | 2026-04-26 | Standalone lesson planner B2C confirmed | Most strategically valuable standalone AI product |
+
+---
+
+## Planned — System 5: AI-Assisted Capture (Phase 4/5)
+
+**Not built.** Design in `AI_CAPTURE.md`, decision in ADR-039.
+
+Teachers photograph paper mark sheets, registers, enrolment lists, and payment proofs; vision extraction pre-fills a verification screen; the teacher approves before anything is written. Like System 2, it is **approval-gated** — it never writes directly.
+
+It differs from the other four in two ways worth noting here:
+
+- **It is the only metered system.** Each capture is a vision-API call, so it is credit-priced rather than bundled into a subscription tier.
+- **It feeds the completeness gate the other systems depend on.** Systems 1 and 2 unlock at ≥70% data completeness; capture exists to make reaching that threshold realistic for a school whose teachers work on paper.

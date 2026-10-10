@@ -6,6 +6,96 @@ This document records all significant changes to ZSMS by date. It serves as the 
 
 ---
 
+## 2026-10-06 — Foundation Layer Audit and Remediation
+
+### Documentation
+- Audited all 14 Foundation Layer documents against the live schema and the tree. Overall **73%, Good**. `CONVENTIONS` and `RLS` scored 95%; this file scored **25%**, having stopped on 2026-08-14 with 214 commits since.
+- Added generated `SCHEMA_INVENTORY.md` (`npm run db:inventory`). `DATABASE.md` documented 49 of 93 tables; hand-writing the other 52 would have been accurate for about a week, so the list is now read from the schema instead. `DATABASE.md` keeps the DDL and the reasoning, which is what is worth writing by hand.
+
+### Feature
+- **Custom staff roles (ADR-012)** — `school_custom_roles`, assignments, tier ceiling (Starter 3 / Growth 10 / unlimited), and `/school/[code]/settings/roles`. Holders carry `org:staff` with zero default access.
+- **Marketing consent (ADR-015)** — `parents.marketing_opt_in`, defaulting FALSE and independent of `whatsapp_opted_in`. New `/parent/account` surface; the portal had none.
+- **Integrations framework (ADR-023)** — `school_integrations` and `integration_log`, with `/school/[code]/settings/integrations`.
+- **PostHog product analytics** — autocapture, input capture and session recording all OFF. Query strings stripped and dynamic path segments replaced before anything leaves the browser.
+- **Security headers at the origin** — the five `CLOUDFLARE_WAF.md` headers set in `next.config.mjs` as well as at the edge, so they survive the orange cloud being greyed.
+
+### Architecture
+- ADR-015 was found to need no new table: it describes an account that is not revoked, and no parent policy filters on `students.status`. Proven by exercise in `supabase/tests/adr015_graduation_access.sql` rather than by reading the policies.
+- ADR-023's claim that tier 1 was "already built" was **wrong** — no webhook table or dispatcher existed.
+
+### Security
+- Integration credentials cannot be stored at all: `FIELD_ENCRYPTION_KEY` is unset, so a CHECK refuses anything not already encrypted rather than letting a token sit in plaintext.
+- `integration_log` has no INSERT, UPDATE or DELETE policy for any user — it is worker-written, and an append-only record a user can edit is not a record.
+
+### Breaking Changes
+- None. Migrations `0228`–`0230` are additive.
+
+---
+
+## 2026-10-01 to 2026-10-05 — Phase 5: Mobile, AI Assistant, Loans, Audit
+
+### Feature
+- **Mobile app** — 27 screens across parent, teacher and school audiences; APK built for both ABIs after `armeabi-v7a`-only installs failed on older handsets.
+- **Role-based AI assistant** (`AI_ASSISTANT.md`) — right-side panel, "Ask AI" in every shell, conversation history, intent execution gated by role. Capped per role, then billed from AI credits.
+- **Loan module (ADR-018)** — `private.loan_applications`, consent log, behaviour score (300–850), lender integration, AfriTech toggle. Parent consent is three screens with a SHA-256 of the consent text recorded.
+- **Audit trail** — deep scan against the docs; `0223` covered five tables that had been missed, and the UI gained filters, an overview and role-scoped permissions.
+- **Timetable** — move and swap lessons with conflict detection. `0209` corrected `0208`, which wrongly assumed a two-row `UPDATE ... FROM` is constraint-checked once.
+- **Community Library**, **R2 download chain**, **curriculum extraction**, **parent payment claims**, **`schoolHasFeature()`** with an Upstash cache, and a unified toggle section in admin settings.
+
+### Bug Fix
+- Five of 312 payments were `pending_verification` while holding receipt numbers; `0211` separates `PAY-` on insert from `REC-` on verification.
+- `allocate_payment` manufactured consent timestamps (`0213`).
+- `teaching_resources` had an UPDATE policy with **no GRANT**, so Hub rename, edit and share had never worked (`0218`).
+- `0227` fixed a real hole: the behaviour score trusted a user id passed as an argument, so any signed-in user could read another parent's credit score.
+
+### Breaking Changes
+- None.
+
+---
+
+## 2026-09-26 to 2026-09-30 — Phase 4: Portals, Billing, CI
+
+### Feature
+- School Networks — aggregates for an owner of up to 100 schools.
+- Billing screens — admin run and record, school subscription, network consolidated.
+- Results: marks entry that records what a grade meant, via `grading_scale_version_id` (ADR-041).
+- School provisioning, self-registration, the onboarding task queue, the public schools directory, and per-student pricing.
+- Sidebar navigation for every portal; the platform incidents screen.
+
+### Infrastructure
+- **CI green for the first time** (`.github/workflows/ci.yml`). It immediately caught three defects, one of them a broken live route — all three from reasoning about a migration in isolation without re-running the suites covering the ground it touched.
+- `npm run lint` had been doing nothing: the script was `next lint` with no config, failing opaquely under turbo. Replaced with `eslint` and a flat config; nine dead imports removed.
+- Upstash Redis proven end to end — `EVAL`, `XADD` and `BZPOPMIN` all work on the free tier.
+- One real AI call made (`openai/gpt-4o`, 6.2s, $0.00129, schema-valid structured output).
+
+### Bug Fix
+- Clerk's `force_organization_selection` locked out three of five audiences — a standalone teacher, a parent and a school owner mid-registration all have no organisation by design. `npm run clerk:check` now mints a real token and decodes it.
+
+### Breaking Changes
+- None.
+
+---
+
+## 2026-08-15 to 2026-08-26 — Phase 3 Completion and the School Portal
+
+### Feature
+- Clerk mounted — middleware and `SessionProvider`, both provider-neutral names (ADR-032).
+- The AfriTech admin dashboard finished; the school portal through groups 0–3 — pupils, staff and invitations, teaching assignments, attendance, fees.
+- Organisation switcher and account menu in both shells.
+- Dynamic student ceilings (`0101`–`0103`) resolving through `school_student_limit()`.
+
+### Architecture
+- **ADR-042** — the worker boundary. A worker's connection bypasses RLS, so all its data access goes through `worker_*` functions; `.from(` anywhere in `apps/workers` is a defect.
+- `0095` created the three `afritech` tables that `PRICING.md` had specified and the database had never had — the documentation had been describing them as built for the whole of Phases 0–3.
+
+### Performance
+- School page render halved; auth screens branded.
+
+### Breaking Changes
+- None.
+
+---
+
 ## 2026-08-14 — Pre-Phase-1 Cleanup
 
 ### Security

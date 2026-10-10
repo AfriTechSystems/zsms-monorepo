@@ -488,6 +488,144 @@ async function PricingPage() {
 
 ---
 
+## Per-Student Pricing
+
+**Implemented — migrations `0124`–`0128`.**
+
+A per-student plan **is a tier**. It carries `pricing_model = 'per_student'` and a set
+of price bands; everything else about a tier is unchanged — its features still come
+from `tier_features`, its WhatsApp quota is still its own, and `school_has_feature()`
+is untouched.
+
+The separation is deliberate: **a tier says what you get, a pricing model says how you
+are charged.** Two per-student plans with different feature sets are simply two tiers,
+which needs no new mechanism.
+
+### Bands
+
+`afritech.tier_student_price_bands` holds, per tier and in both currencies:
+
+| min_students | max_students | price_per_student_zmw |
+|---|---|---|
+| 0 | 100 | 15.00 |
+| 101 | 300 | 12.00 |
+| 301 | *(null — and above)* | 9.00 |
+
+A volume discount expressed per pupil. `max_students IS NULL` is the catch-all band;
+**exactly one per tier should have it**, or a large school falls outside every band.
+
+**Overlapping bands are refused by a trigger.** Without that, two bands matching the
+same roll means the price depends on which row the planner reads first — a bill that
+changes between runs with no change to the data.
+
+### The count basis
+
+The roll **on the invoice date** — pupils with status `active` or `on_leave`. Chosen
+because it is what a school can check against its own records ("you had 312 pupils on
+1 October"), and because gaming it by withdrawing pupils before invoice day is not a
+realistic behaviour for a school. Peak and average were rejected: both need daily roll
+history stored, and neither is easier to dispute.
+
+### No enrolment ceiling on a per-student plan
+
+`school_student_limit()` returns unlimited with `source = 'per_student_pricing'`.
+Charging for growth and then blocking it would mean refusing a child a place over a
+plan the school already pays per pupil for.
+
+This sits **after** the per-school override in the resolution order, so a negotiated
+cap on a per-student plan remains possible without a migration.
+
+### A missing band never bills zero
+
+`school_subscription_charge()` returns a NULL amount and a stated reason when the
+charge cannot be resolved, and `generate_school_invoice()` refuses rather than
+issuing. The failure this prevents is specific: a roll outside every band summing to
+nothing, a K0 invoice, and a billing run that reports success while the revenue is
+silently lost.
+
+---
+
+## Invoicing
+
+**Implemented — migration `0126`.** Before it, ZSMS had a price list and no way to
+charge anybody.
+
+`afritech.invoices`, `invoice_lines` and `invoice_payments`. **These are school →
+AfriTech money and are deliberately nowhere near `public.payments`,** which is a parent
+paying a school for a child's fees. Conflating the two would put a school's revenue and
+AfriTech's revenue in one ledger.
+
+### An invoice carries its own basis
+
+The tier, the pricing model, the pupil count, the unit price and the tax rate are
+stored **on the invoice**. Bands get repriced and VAT moves; *"why was I charged
+K1,392 in October"* is a question a school asks in March. Nothing about a historical
+invoice is ever recomputed from current configuration — the same reasoning that puts a
+grading-scale version beside a grade (ADR-041).
+
+### Lifecycle
+
+`draft` → `issued` → `part_paid` → `paid`, with `void` available from any state but
+`paid`.
+
+- A **draft** is AfriTech's working state; the school cannot see it.
+- **Issuing** is the act of sending a bill. A payment cannot be recorded before it,
+  because nobody pays a bill they were not sent.
+- `amount_paid` and status are **derived by trigger** from confirmed payments, never
+  written by hand.
+- A **paid** invoice cannot be voided — that is a credit note, not a deletion.
+- Voiding **requires a reason**: a school will ask why a bill vanished.
+
+### Tax
+
+Prices are **net**; each invoice carries the `tax_rate` that applied and its own
+`tax_amount`. A VAT change or an exemption therefore never rewrites a historical
+invoice. Zambian VAT is 16% at the time of writing and is entered per billing run
+rather than hardcoded.
+
+### How a school pays
+
+**Manual recording, for now.** AfriTech records money that has already arrived by bank
+transfer or mobile money, with the statement reference so a reconciliation is possible.
+Unlike a parent's fee payment there is no verification step: AfriTech recording that it
+received money *is* the verification.
+
+A **gateway foundation** exists in `invoice_payments` — `gateway_name`,
+`gateway_reference`, `gateway_transaction_id`, `webhook_verified`, `gateway_payload` —
+with a unique index on `(gateway_name, gateway_reference)` as the idempotency key. A
+webhook retries; without that constraint a retry credits the school twice. The columns
+are present now because adding them later would mean migrating live payment rows.
+
+`gateway` is deliberately absent from the operator's payment-method list: a gateway
+payment is confirmed by a webhook, never typed in by a person.
+
+---
+
+## School Network Billing
+
+**Each school in a network is billed separately.** The network dashboard shows a
+consolidated total, and that total is a `SUM()` over school invoices — exactly as its
+other figures are sums over school aggregates.
+
+This is the decision that keeps the feature simple. There is **no network-level
+pricing, no pooled quota and no cross-school discount logic**, because a network is a
+reporting lens rather than a billing entity. `school_networks.billing_mode` records
+`per_school` (the default) or `consolidated` for the day one invoice per network is
+wanted; nothing reads it yet.
+
+Quotas and features stay per school, deliberately: a 900-pupil secondary and a
+40-pupil nursery in one network run differently, and pooling WhatsApp quota would let
+one school's habits starve another's.
+
+### Still open
+
+| Question | Status |
+|---|---|
+| Does a 100-school network get a volume discount beyond the per-pupil bands? | Commercial decision. The bands already express volume *within* a school; nothing expresses it *across* schools. |
+| One invoice for a whole network? | `billing_mode = 'consolidated'` records the intent. Nothing implements it, and nobody has asked for it yet. |
+
+---
+
 ## Change Log
 
 | Date | Change | Reason |

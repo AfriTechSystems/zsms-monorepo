@@ -1,5 +1,7 @@
 # ASSIGNMENTS.md — Class and Subject Assignments
 
+> **SUPERSEDED — `staff_assignments` was dropped in migration `0069`.** Teaching scope is now `public.teacher_assignments` with a `scope` of `'class'` or `'subject'` (ADR-037), resolved by `teacher_reaches_class()` and `teacher_teaches_subject()`. Content below that names `staff_assignments` describes a table that no longer exists.
+
 ## Related Documents
 
 - `docs/modules/staff/STAFF.md` — staff entity reference
@@ -8,14 +10,15 @@
 - `docs/modules/attendance/ATTENDANCE.md` — RLS uses assignments to scope teachers
 - `docs/modules/results/RESULTS.md` — RLS uses assignments to scope marks entry
 - `docs/infra/POWERSYNC.md` — sync rules use assignments to scope offline data
-- `docs/DATABASE.md` — staff_assignments table
+- `01 Foundation Layer/DATABASE.md` — `teacher_assignments` table
+- `01 Foundation Layer/DECISIONS.md` — ADR-037, the scope-based model
 - `docs/RLS.md` — teacher RLS policies based on assignments
 
 ---
 
 ## Purpose
 
-This document defines the staff assignment system — how teachers are assigned to classes and subjects, the assignment matrix UI, how assignments scope what teachers can see and do across attendance, results, and the mobile app. Every Claude Code session building any feature that reads `staff_assignments` must read this document.
+This document defines the staff assignment system — how teachers are assigned to classes and subjects, the assignment matrix UI, how assignments scope what teachers can see and do across attendance, results, and the mobile app. Every Claude Code session building any feature that reads `teacher_assignments` must read this document.
 
 ---
 
@@ -152,57 +155,50 @@ The system enforces a single class teacher per class per academic year. Attempti
 
 ## How Assignments Drive RLS Policies
 
-The `staff_assignments` table is the foundation for teacher-scoped RLS policies on attendance and results:
+`teacher_assignments` is the foundation for teacher-scoped RLS on attendance and results. The policies do not query it directly — they call two `SECURITY DEFINER` helpers, because a policy that reads a table whose own policy reads back into it makes PostgreSQL abort with *infinite recursion detected in policy*.
 
 ```sql
--- Teacher can only mark attendance for their assigned classes
+-- Attendance is a whole-class activity: any assignment reaching the class qualifies.
 CREATE POLICY "teacher_read_own_class_attendance"
 ON public.attendance_records FOR SELECT
 USING (
-  get_user_role() = 'org:teacher'
-  AND class_id IN (
-    SELECT class_id FROM public.staff_assignments
-    WHERE staff_user_id = get_user_id()
-      AND (class_id = attendance_records.class_id OR class_id = 'ALL')
-      AND academic_year = attendance_records.academic_year
-      AND is_active = TRUE
-  )
+  school_id = current_school_uuid()
+  AND get_user_role() = 'org:teacher'
+  AND teacher_reaches_class(class_id)
 );
 
--- Teacher can only enter marks for their assigned subjects
+-- Marks are per subject, so they use the narrower predicate. A scope='class'
+-- teacher owns every subject in their class; a scope='subject' teacher only theirs.
 CREATE POLICY "teacher_insert_results"
 ON public.exam_results FOR INSERT
 WITH CHECK (
-  get_user_role() = 'org:teacher'
+  school_id = current_school_uuid()
   AND (
-    subject_code IN (
-      SELECT subject_code FROM public.staff_assignments
-      WHERE staff_user_id = get_user_id()
-        AND (class_id = exam_results.class_id OR class_id = 'ALL')
-        AND (subject_code = exam_results.subject_code OR subject_code = 'ALL')
-        AND academic_year = exam_results.academic_year
-        AND is_active = TRUE
-    )
+    (get_user_role() = 'org:teacher' AND teacher_teaches_subject(class_id, subject_code))
+    OR get_user_role() IN ('org:owner', 'org:principal')
     OR has_permission_grant('results', 'write')
   )
+  AND results_published = FALSE
 );
 ```
 
----
+See `01 Foundation Layer/RLS.md` for the authoritative bodies of both helpers.
 
 ## How Assignments Drive PowerSync Sync Rules
 
 PowerSync uses the assignments table to determine what data syncs to each teacher's mobile device. Only the teacher's assigned students and their records sync:
 
+> **CORRECTED 2026-08-15.** This rule previously joined `class_enrolments` (never defined) and `staff_assignments` (dropped in `0069`). Both are superseded by `teacher_assignments` — see ADR-037.
+
 ```sql
--- Students sync rule: only students in assigned classes
+-- Students sync rule: only students in classes this teacher reaches
 SELECT s.* FROM students s
-JOIN class_enrolments ce ON ce.student_id = s.id
-JOIN staff_assignments sa ON sa.class_id = ce.class_id
-  OR sa.class_id = 'ALL'
-WHERE sa.staff_user_id = token_parameters.user_id
-  AND sa.academic_year = extract(year from current_date)::text
-  AND sa.is_active = TRUE
+JOIN teacher_assignments ta
+  ON (ta.class_id = s.class_id OR ta.class_id = 'ALL')
+ AND ta.school_id = s.school_id
+WHERE ta.teacher_user_id = token_parameters.user_id
+  AND ta.academic_year = extract(year from current_date)::text
+  AND ta.is_active = TRUE
   AND s.school_id = token_parameters.school_id;
 ```
 

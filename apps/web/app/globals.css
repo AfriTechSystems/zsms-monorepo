@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * The custom properties themselves are NOT written here.
+ *
+ * They are emitted server-side by `<ThemeStyle />` from the resolved school
+ * theme, so a school's colours arrive in the first HTML response. Writing
+ * defaults here as well would mean maintaining the palette in two places, and
+ * would produce a flash of ZSMS blue before a school's own blue applied.
+ *
+ * `@zsms/design-tokens` is the only definition. This file styles the primitives
+ * that consume it.
+ */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Anchors the rem scale to the token sizes rather than browser default. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* Contextual alternates and kerning — Inter's defaults are good, this just
+       makes them explicit so a future font swap does not silently change
+       metrics in dense tables. */
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'calt';
+  }
+
+  /*
+   * Focus. A single visible indicator on every interactive element, applied
+   * once here rather than per component.
+   *
+   * `:focus-visible` rather than `:focus` so a mouse click on a button does not
+   * leave a ring behind, while keyboard and assistive-technology navigation
+   * always shows one. Removing the outline without this distinction is the most
+   * common accessibility regression in a component library.
+   */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /*
+   * Every figure in this product is money, a mark, or a count. Proportional
+   * digits make a column of them ragged and materially slower to scan, so
+   * tabular figures are the default and prose opts out rather than in.
+   */
+  table,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Respect a stated preference for reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /*
+   * Skip link. Present on every page, visible only once focused.
+   *
+   * Without it, a keyboard user lands on a school portal and tabs through the
+   * entire navigation before reaching the fees table they came for — on every
+   * single page load.
+   */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50
+           focus:rounded-md focus:bg-primary focus:px-4 focus:py-2
+           focus:text-primary-foreground focus:shadow-lg;
+  }
+
+  /*
+   * Branded splash.
+   *
+   * The 180ms delay is the whole trick: a load that resolves before then
+   * unmounts the component while it is still fully transparent, so a fast
+   * navigation never flashes a full-screen takeover. No timer, no state, and it
+   * works inside a server-side suspense boundary where there is no client to run
+   * one.
+   */
+  .zsms-splash {
+    animation: zsms-splash-in 220ms ease-out 180ms both;
+  }
+
+  /*
+   * The indeterminate indicator. A segment sweeping a track — it makes exactly
+   * one claim, that work is ongoing, and no claim it could be wrong about.
+   */
+  .zsms-splash-bar {
+    animation: zsms-splash-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+    will-change: transform;
+  }
+
+  /*
+   * Reduced motion. The global rule above collapses animation DURATION, which
+   * for a looping sweep would leave the segment frozen at its start position —
+   * a bar that looks stuck rather than one that is deliberately still. So the
+   * sweep is replaced by a gentle opacity pulse on a full-width track: still an
+   * honest "something is happening", without translating anything across the
+   * screen.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .zsms-splash {
+      animation: none;
+    }
+
+    .zsms-splash-bar {
+      width: 100%;
+      animation: zsms-splash-pulse 2s ease-in-out infinite !important;
+      animation-duration: 2s !important;
+      animation-iteration-count: infinite !important;
+    }
+  }
+}
+
+@keyframes zsms-splash-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zsms-splash-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes zsms-splash-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/**
+ * Illustration motion.
+ *
+ * One animation, used by the flag on `SchoolBuilding` and anything else that wants a
+ * sign of life. Four pixels over four seconds: the drawing should look alive rather
+ * than animated, and on an empty screen anything faster becomes the busiest thing
+ * on the page — which is the opposite of what an empty state is for.
+ *
+ * Stopped outright under `prefers-reduced-motion`. Unlike the splash bar there is no
+ * honest still equivalent to substitute: a flag that does not move is simply a flag,
+ * and nothing is being communicated by the movement that the drawing does not already
+ * say.
+ */
+@keyframes zsms-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+.zsms-float {
+  animation: zsms-float 4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zsms-float {
+    animation: none;
+  }
+}

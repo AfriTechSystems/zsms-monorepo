@@ -238,9 +238,16 @@ For pilot schools during the September 2026 launch, AfriTech creates accounts ma
 3. AfriTech sets up a 2-hour guided onboarding session:
    - Screen share with school owner
    - Walk through every configuration step together
-   - Import student data together (AfriTech helps format the spreadsheet)
    - Set up at least one fee structure and generate fee records
    - Invite at least 2 teachers and confirm they can log in
+
+   **AMENDED 2026-09-30 — activate before importing pupils.** This step used to import student
+   data during the session, with activation at step 5 afterwards. Migration `0153` makes that
+   impossible, deliberately: `pending_verification` means AfriTech has not yet confirmed the school
+   is real, and accepting several hundred children's names and dates of birth from an unverified
+   party makes AfriTech their processor under the ZDPA before anybody has established there is a
+   school behind it. Activate at the point in the call where the details are confirmed, then import.
+   It reorders two steps and changes nothing about how long the call takes.
 
 4. Post-session follow-up:
    - Email with everything configured, what to do next
@@ -294,6 +301,55 @@ function calculateOnboardingCompletion(items: OnboardingChecklistItem[]): number
 
 ---
 
+## What Is Built
+
+*Added 2026-09-29.*
+
+**The checklist is real.** `afritech.onboarding_checklist_items` holds all fourteen items with the
+weights given in `calculateOnboardingCompletion()` above, exposed as
+`public.onboarding_checklist_catalogue`. `public.school_onboarding_completion(school_id)` returns
+the weighted percentage, and a critical-only percentage besides — a school at 45% with every
+critical item done is ready to use, and one at 45% that has only uploaded a logo cannot take a
+register.
+
+The items are **data, not a CHECK constraint**. `0010`'s constraint admitted ten keys while this
+document named fourteen, and they drifted for thirteen months without anything noticing — because
+nothing ever read the table. Adding a fifteenth item is now an INSERT plus
+`public.ensure_onboarding_checklist()` per school.
+
+Business rule 4 is satisfied: `0143` backfills every school. In practice that meant creating all
+fourteen items for every school, not just `whatsapp_configured`, since no school had any rows.
+
+**The task queue is built** — `public.onboarding_queue`, `/admin/onboarding`, and
+`school_onboarding_contacts`. Four differences from the description above, all deliberate:
+
+*The 24-hour rule is computed, not scheduled.* `outreach_overdue` and `outreach_escalated` are
+derived from the first recorded contact against registration time, so the panel is correct with no
+scheduler at all. Only the escalation *push* waits on Redis, which does not exist
+(`CREDENTIALS_CHECKLIST.md`); `platform_incidents` already exists for it to land in. This is the
+better decomposition rather than a workaround — a derived flag cannot drift from reality, and
+changing the window from 24 hours to 12 needs no backfill.
+
+*Four of the nine task states are computed and five are stored.* New, Converted, Expired and the
+percentage behind Complete are facts about the world. Assigned, In Progress, Not Interested and
+Complete are judgements a person makes, and business rule 2 says a task is never closed
+automatically — so a self-closing state machine would contradict it.
+
+*The window applies to self-registered schools only.* An AfriTech-created school was created by
+somebody who was already talking to it; a countdown on calling them back measures nothing, and a red
+row against it would train an operator to ignore red rows.
+
+*A recorded contact cannot be edited or deleted by anybody.* The escalation rules below hand
+consequences to a super admin on the strength of these rows. A mistaken entry is corrected by adding
+another. A note is required for every outcome except "no answer" and "wrong number", where there was
+nobody to quote.
+
+**Pilot onboarding is built; self-registration is not.** `POST /api/admin/schools/provision`
+creates the school, its Clerk organisation and its checklist, and invites the owner. Activation
+records a verification call — see `SCHOOL_SETUP.md`.
+
+---
+
 ## Business Rules
 
 1. Every self-registered school must receive a contact attempt within 24 hours of registration. The scheduled escalation job enforces this by alerting the super admin if no contact is recorded.
@@ -312,3 +368,6 @@ function calculateOnboardingCompletion(items: OnboardingChecklistItem[]): number
 | 2026-04-26 | Added whatsapp_configured checklist item | School-specific WhatsApp number confirmed |
 | 2026-04-26 | Added pilot school onboarding process | September 2026 pilot launch approach |
 | 2026-04-26 | Added 24h escalation via the queue | Enforcement of outreach requirement |
+| 2026-09-29 | Added *What Is Built* | Checklist implemented as data in `0143` with the documented weights; the four missing items added and backfilled per business rule 4. Task queue and 24-hour escalation still unbuilt, with the no-Redis design recorded. |
+| 2026-09-30 | Task queue implemented in `0152` | The 24-hour rule is derived in SQL rather than scheduled, since Redis does not exist. Four task states computed, five stored. Contact log append-only. |
+| 2026-09-30 | Pilot sequence amended: activate before importing pupils | Resolved the contradiction with SCHOOL_SETUP.md business rule 4 in favour of the stricter reading. An unverified school cannot create pupil records (`0153`); its configuration stays open. |

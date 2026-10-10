@@ -202,15 +202,35 @@ GET    /api/ai/analytics/fee-collection      org:accountant, org:admin — fee a
 
 ## Standalone Teacher Hub
 
+**Built 2026-09-27.** The paths differ from the plan below them: `/api/teacher/hub/…`, matching the `/teacher` URL space
+the screens use, rather than a second `teacher-hub` prefix.
+
 ```
-POST   /api/teacher-hub/signup               [Public] Register standalone teacher account
-GET    /api/teacher-hub/profile              platform:teacher — view own profile
-PATCH  /api/teacher-hub/profile              platform:teacher — update profile
-POST   /api/teacher-hub/link-school          platform:teacher — link to school via invite
-GET    /api/teacher-hub/subscription         platform:teacher — view subscription
-POST   /api/teacher-hub/subscription         platform:teacher — subscribe
-DELETE /api/teacher-hub/subscription         platform:teacher — cancel subscription
+GET    /api/teacher/hub                      own account, entitlement and the plan catalogue
+POST   /api/teacher/hub                      self-registration (the profile step)
+PATCH  /api/teacher/hub                      update own profile
+GET    /api/teacher/hub/resources            own library, filterable by kind/subject/grade
+POST   /api/teacher/hub/resources            generate a resource and save it
+GET    /api/teacher/hub/resources/[id]       one resource, full document
+PATCH  /api/teacher/hub/resources/[id]       rename, annotate, share, or remove (soft)
+DELETE /api/teacher/hub/subscription         cancel — takes effect at the end of the period
+GET    /api/admin/teacher-hub                afritech:* — every Hub account with usage
+POST   /api/admin/teacher-hub                afritech:* — record a payment, activate a plan
 ```
+
+**Three differences from the plan, each deliberate:**
+
+- **No `POST /api/teacher-hub/signup` as a public route.** Registration needs an authenticated session, because the row
+  is keyed to the Clerk user id and the INSERT policy compares it to `get_user_id()`. Sign-up is Clerk's; the profile
+  step is `POST /api/teacher/hub`.
+- **No `POST …/subscription`.** Payment is recorded by hand, so a teacher-callable activation would grant the paid
+  product for nothing. Activation is `POST /api/admin/teacher-hub`, and `teacher_hub_activate_subscription()` refuses
+  anybody who is not AfriTech.
+- **No `POST …/link-school`.** There is no invitation code to redeem: ZSMS invites staff server-side through the Clerk
+  Backend API, so linking happens when a school invites the teacher, and `my_schools()` reflects it immediately.
+
+`GET …/subscription` is folded into `GET /api/teacher/hub`, which returns the account, the resolved entitlement and the
+plan catalogue in one call — the shell needs all three on every page.
 
 ---
 

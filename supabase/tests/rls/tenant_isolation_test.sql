@@ -746,11 +746,24 @@ RESET ROLE;
 -- was live. Migration 0019 removes it; these assertions keep it removed.
 -- ===========================================================================
 
+-- One table is allowed, BY NAME rather than by raising the count.
+--
+-- `staff_custom_role_assignments` (0228) records that somebody currently holds a
+-- custom role. Removing them from it is a DELETE, and that is the right shape: it
+-- is a join row asserting a present fact, not a historical record. Prohibition 8
+-- names students, fee records, payments and exam results — none of which this is —
+-- and `audit_row_change()` is attached, so the removal is recorded even though the
+-- row is not.
+--
+-- Named rather than counted on purpose: a count of 1 would let the NEXT inherited
+-- DELETE through silently, which is the whole failure this section exists to catch.
+-- `0231` revoked nine such grants that had accumulated since `0019`.
 SELECT is(
   (SELECT count(*)::INT FROM information_schema.role_table_grants
    WHERE table_schema = 'public'
      AND grantee IN ('authenticated', 'anon')
-     AND privilege_type IN ('DELETE', 'TRUNCATE')),
+     AND privilege_type IN ('DELETE', 'TRUNCATE')
+     AND table_name <> 'staff_custom_role_assignments'),
   0,
   'no DELETE or TRUNCATE privilege exists anywhere in public for end-user roles'
 );

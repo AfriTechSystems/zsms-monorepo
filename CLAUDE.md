@@ -104,7 +104,7 @@ Docs are grouped by domain in numbered folders:
 
 **Cross-reference paths inside the docs are wrong.** Every file references siblings as `docs/ARCHITECTURE.md`, `docs/modules/fees/PAYMENTS.md`, etc. That layout does not exist. Resolve by filename against the folder map above.
 
-Start any substantive task by reading `01 Foundation Layer/CONVENTIONS.md` and `01 Foundation Layer/DECISIONS.md`. `DECISIONS.md` holds 44 ADRs — check it before proposing an architectural change, so settled decisions are not relitigated.
+Start any substantive task by reading `01 Foundation Layer/CONVENTIONS.md` and `01 Foundation Layer/DECISIONS.md`. `DECISIONS.md` holds 46 ADRs — check it before proposing an architectural change, so settled decisions are not relitigated.
 
 ---
 
@@ -216,7 +216,7 @@ From `01 Foundation Layer/CONVENTIONS.md` — that file is authoritative; this i
 
 ## Known documentation inconsistencies
 
-The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 44 ADRs.
+The 2026-04-26 / 2026-06-23 conflicts that used to be listed here — session lengths, schema counts, QStash vs BullMQ, the missing WAF, the missing ADRs — **have all been resolved.** `DECISIONS.md` now holds 46 ADRs.
 
 **A pattern worth knowing before you trust any doc — and before you trust *this* one:** repeatedly, a document has described something the schema could not do. The most recent instance was in this file: the line above about four `afritech` tables was true of the documentation and false of the database for the whole of Phases 0–3. Repeatedly, a document has described something the schema could not do. `class_enrolments` was referenced by four documents and defined by none. `GLOSSARY.md` promised a fee statement with a running balance that nothing could produce. `DATABASE.md`'s `payments` DDL omitted the verification columns `SCHEMA.md` specified. Each was found by *implementing against the doc*, not by reading it. **Verify against the applied schema before building on a documented claim.**
 

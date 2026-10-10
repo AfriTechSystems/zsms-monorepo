@@ -20,6 +20,21 @@ This document defines session durations for every user type, the security ration
 
 All end-user sessions are capped at **30 days maximum**. This is a deliberate security decision aligned with SOC 2 Type II Logical Access requirements and the ZDPA's mandate for appropriate technical measures to protect personal data.
 
+> **This table is the target policy, not the build — see ADR-045 (2026-10-11).**
+> Clerk configures session lifetime **per instance**, not per role, so fifteen different
+> durations are not expressible as configuration and none of them was implemented.
+> Implementing it in application code would mean a second session system running beside
+> Clerk's, whose failure mode is somebody signed out mid-payment because two clocks
+> disagreed.
+>
+> ZSMS sets **one lifetime, 7 days** — the duration this table gives the four roles that
+> use the product most, and shorter than the 30 days it gives everybody else. Erring short
+> is the right direction: the cost is an occasional extra email OTP.
+>
+> The AfriTech side is controlled more tightly than by session length anyway: `0237` grants
+> each role only its own capabilities, and `0238` caps an impersonation actor token at
+> **2 hours** regardless of session age.
+
 | Role | Session Duration | Re-auth Method | Rationale |
 |---|---|---|---|
 | `afritech:super_admin` | 8 hours | Email OTP | Highest privilege — mandatory daily re-auth |
@@ -81,6 +96,12 @@ Sessions are revoked immediately in these scenarios:
 
 ## Suspicious Activity Detection
 
+> **Not built.** None of the five patterns below is detected, and there is no alerting
+> path to AfriTech if one were. Two of them — `rapid_data_access` and
+> `payment_submission_multiple_accounts` — are the kind of thing `audit_logs` now has
+> enough in it to detect retrospectively, which is the sensible first step before
+> real-time alerting.
+
 ZSMS monitors for session anomalies and triggers alerts for:
 
 ```typescript
@@ -121,7 +142,7 @@ Session tokens are stored by Clerk in secure HTTP-only cookies (web) and secure 
 1. All end-user sessions (parent, student, teacher, alumni) are capped at 30 days. This is not configurable at the school level.
 2. AfriTech staff sessions are shorter (8-12 hours) than end-user sessions. Higher privilege requires more frequent re-authentication.
 3. The platform:alumni 30-day session replaces the previous indefinite session policy. Alumni re-authenticate via email OTP — the same flow as all other users.
-4. Payment submission security does not rely solely on session freshness. The `confirmation_checkbox_at` timestamp must be within 10 minutes of submission regardless of session age.
+4. Payment submission security does not rely solely on session freshness. The `confirmation_checkbox_at` timestamp must be within 10 minutes of submission regardless of session age. **Built and enforced** inside `allocate_payment()` — and it is the pattern to copy for anything genuinely time-sensitive: bind the freshness to the ACTION, not to the session.
 5. Session revocation for security incidents is immediate — Clerk invalidates all active tokens for the user within seconds.
 6. AfriTech developer production access is always time-limited regardless of their base session. The production grant (max 4 hours) is the binding constraint.
 
@@ -137,3 +158,6 @@ Session tokens are stored by Clerk in secure HTTP-only cookies (web) and secure 
 | 2026-06-23 | **REVISED: alumni indefinite → 30 days** | SOC 2 Logical Access control requirement |
 | 2026-06-23 | Added suspicious activity detection | Security monitoring requirement |
 | 2026-06-23 | Added session token storage requirements | SOC 2 control CC6.1 |
+| 2026-10-11 | **Marked the duration table as target policy, not build** | ADR-045: Clerk sets one lifetime per instance; ZSMS uses 7 days |
+| 2026-10-11 | Marked suspicious activity detection as not built | No detection and no alerting path exists |
+| 2026-10-11 | Confirmed business rule 4 is enforced in `allocate_payment()` | Verified against the live function |

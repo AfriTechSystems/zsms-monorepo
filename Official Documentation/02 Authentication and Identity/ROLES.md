@@ -51,7 +51,15 @@ Staging access by default. Production access via automated request → super adm
 Standalone teacher with no school affiliation. Access to Teacher Hub tools (lesson planner, quiz generator, homework creator). No access to any school operational data. Can coexist with `org:teacher` membership — a linked teacher has both.
 
 ### `platform:alumni`
-Graduated student or parent of graduated student. Permanent read-only access to their own historical records (report cards, receipts, attendance certificates). No access to current school operational data. Indefinite session duration.
+Graduated student or parent of graduated student. Permanent read-only access to their own historical records (report cards, receipts, attendance certificates). No access to current school operational data.
+
+**Session duration: 30 days, not indefinite.** This paragraph said "indefinite" and
+contradicted SESSIONS.md, which revised it on 2026-06-23 for SOC 2 CC6.1. The record
+ACCESS is permanent; the SESSION is not. Corrected 2026-10-11.
+
+**Built as part of the student portal, not separately** — ADR-046. Access is keyed on
+`students.clerk_user_id` and never on an organisation claim, which is what lets it
+survive the org membership being revoked at graduation.
 
 ---
 
@@ -167,3 +175,30 @@ Grants are checked after the base role but before RLS. A grant never elevates ab
 | 2026-04-26 | Added platform:teacher for standalone Teacher Hub | Teacher Hub B2C product |
 | 2026-04-26 | Added custom role tier limits (Starter 3, Growth 10) | Feature toggle billing confirmed |
 | 2026-08-13 | Corrected student session from 365 days to 30 days | Reconciled with the 2026-06-23 revision in SESSIONS.md |
+
+---
+
+## Implementation Status (2026-10-11)
+
+The six `afritech:*` roles were **a single boolean** until migration `0237`. Every limit
+described above — the finance officer who may not see loan PII, the developer who may not
+impersonate, the read-only support agent — was imaginary, because `is_afritech_admin()`
+returned true for anybody in the AfriTech organisation and nothing else was consulted.
+
+`0237` adds `afritech_role()` and `has_afritech_capability()`, which encode the matrix
+above, plus `afritech.staff_scope_assignments` for the regional scoping this document
+names. `is_afritech_admin()` is deliberately unchanged — **91 policies call it** — so it
+still means "is this AfriTech staff at all" and the differentiation sits above it.
+
+`/admin/team` shows the matrix, because a boundary nobody can see is one you discover by
+hiring somebody and watching them fail.
+
+**Scope is opt-in.** `afritech_school_in_scope()` returns TRUE for anybody with no scope
+rows, so the migration did not silently remove access from a live account. An unscoped
+regional manager still sees every school.
+
+**Still collapsed:** 32 of the 34 `admin_*` functions keep the plain
+`is_afritech_admin()` check. Only `admin_loan_applications()` and the impersonation
+functions are capability-gated so far — the two that guard somebody's personal
+information. Narrowing the rest is worth doing per release rather than in one unverifiable
+sweep.

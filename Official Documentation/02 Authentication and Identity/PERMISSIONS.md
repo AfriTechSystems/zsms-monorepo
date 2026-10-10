@@ -17,6 +17,33 @@ This document defines the complete permission grant system in ZSMS. It explains 
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built and reachable as of migration `0236`.** Before then the tables, the
+`has_permission_grant()` function and **15 live RLS policies** calling it all existed —
+and there was no API route, no screen and no grant rows, so the function always returned
+false and the whole system described below was unreachable.
+
+Two corrections `0236` made to the schema, both from this document:
+
+- `action` admitted only `read`/`write`/`delete`, so `export` and `publish` could not be
+  granted at all — and `results_publish` is one of this document's own worked examples.
+- `module` had **no CHECK**, so a typo stored cleanly and granted nothing. A permission
+  that silently grants nothing is the hardest kind to notice.
+
+**Writing goes through `grant_staff_permission()`, not the INSERT policy.** The rule
+below — that a grantor cannot grant what they do not hold — cannot live only in a route,
+because a direct PostgREST call skips the route entirely, and granting yourself a
+permission is exactly what somebody would try that for. The INSERT policy was dropped and
+the privilege revoked.
+
+Screen: `/school/[code]/settings/permissions`.
+
+**Not built:** the two-day expiry notification. There is no notification channel yet, so
+the screen surfaces grants lapsing within two days instead.
+
+---
+
 ## Overview
 
 ### The Core Philosophy
@@ -296,3 +323,11 @@ The last row — logging when a grant is actually used for a write operation —
 | 2026-04-26 | Initial complete draft | Stage 2 auth documentation |
 | 2026-04-26 | Added AfriTech internal grant scenarios | Confirmed support agent scoped write access model |
 | 2026-04-26 | Added loan officer scoped access scenario | Confirmed loan support access pattern |
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-10-11 | Marked built as of `0236`; recorded the `action` and `module` CHECK corrections and the move to a SECURITY DEFINER writer |

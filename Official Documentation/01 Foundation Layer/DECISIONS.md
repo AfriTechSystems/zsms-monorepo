@@ -662,3 +662,79 @@ by looking rather than by reading.
   Functions.
 
 ---
+
+---
+
+## ADR-045 — Session Duration Is One Clerk Setting, Not Fifteen
+
+**Status:** Confirmed (2026-10-11)
+**Decision:** ZSMS sets **one** session lifetime in the Clerk instance, at **7 days**,
+and does not attempt per-role durations in application code. SESSIONS.md's table is
+retained as the **target** policy and marked as such, not as a description of the build.
+
+**Reason:** SESSIONS.md specifies fifteen different durations, from 8 hours for
+`afritech:super_admin` to 30 days for a parent. Clerk configures session lifetime **per
+instance**, not per role or per organisation — so the table is not expressible as
+configuration, and none of it was implemented.
+
+Implementing it in application code would mean ZSMS deciding a session is too old and
+signing the user out itself, on every request, against a `sessions` table it also has to
+maintain. That is a second session system running beside Clerk's, and the failure mode is
+somebody being signed out mid-payment because two clocks disagreed.
+
+**7 days** is chosen because it is the duration SESSIONS.md gives the four roles that use
+ZSMS most — owner, principal, accountant, admin — and because it is shorter than the
+30 days it gives parents, pupils, teachers and alumni. Erring short is the right
+direction: the cost is an occasional extra email OTP, and the benefit is that the
+device-theft exposure window the document reasons about is smaller for everybody, not
+just for the roles it was strictest with.
+
+**What this does NOT weaken.** The AfriTech side has a tighter control than session
+length: `0237` gives each `afritech:*` role only the capabilities ROLES.md grants it, and
+`0238` caps an impersonation actor token at **2 hours** regardless of session age. The
+8-hour super-admin session was a proxy for limiting blast radius; capabilities and
+short-lived actor tokens limit it directly.
+
+Business rule 4 of SESSIONS.md — a payment confirmation must be within 10 minutes — is
+already enforced inside `allocate_payment()` and is unaffected. That is the right pattern
+for anything genuinely time-sensitive: bind the freshness to the **action**, not to the
+session.
+
+**Revisit when:** Clerk offers per-role session lifetimes, or a SOC 2 auditor asks for
+the differentiated table specifically. At that point the honest implementation is Clerk's
+feature, not a parallel session store.
+
+---
+
+## ADR-046 — Pupils and Alumni Share One Portal
+
+**Status:** Confirmed (2026-10-11)
+**Decision:** One portal at `/student` serves both a current pupil (`org:student`) and a
+former one (`platform:alumni`). There is no separate `/alumni` application. Access is
+keyed on `students.clerk_user_id` and **never on the organisation claim**.
+
+**Reason:** AUTH.md describes two login flows and two portals, and the data each needs is
+the same question — *my own records*. The only difference is that an alumnus has left.
+
+Keying on the Clerk id rather than on org membership is what makes one portal possible,
+and it is also what makes ADR-015 true: SESSIONS.md says a graduating pupil has their
+"school org session revoked", so any policy that required an org claim would revoke the
+permanent historical access ADR-015 promises, at exactly the moment it starts to matter.
+
+Two parallel portals and two parallel policy sets would have to be kept in step forever
+to express one idea, and the one that drifts is the one nobody uses daily — which is the
+alumni half, years after anyone remembers writing it.
+
+**Consequences:**
+- The portal reads `my_student_record().out_is_alumnus` and changes its **framing**, not
+  its permissions: a former pupil is told these are their records from while they were
+  there and that they stay available.
+- A live timetable is hidden for an alumnus, because there is not one. Results,
+  attendance and the pupil record remain.
+- `alumni_profiles`, which AUTH.md and DATABASE.md both name, is **not built and should
+  not be**. It would duplicate `students` for people who are already in it. See ADR-015,
+  which reached the same conclusion from the other direction.
+- Fees are not exposed to either. ROLES.md grants a pupil results, timetable and
+  announcements; money is between the school and whoever pays.
+
+---

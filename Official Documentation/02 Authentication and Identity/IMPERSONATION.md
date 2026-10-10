@@ -18,6 +18,37 @@ This document defines the complete impersonation system in ZSMS — how AfriTech
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built as of migration `0238`.** `is_impersonation_session()` and `get_actor_id()` have
+read the `act` claim since `0001` and `audit_logs.impersonated_user_id` recorded it — the
+detection half was always right. What was missing was minting the token and keeping a
+record of the session, and `POST /api/admin/impersonate` returned an honest 501.
+
+Now built:
+
+- `packages/auth-provider/src/impersonation.ts` mints and revokes Clerk actor tokens,
+  keeping ADR-032's boundary — nothing outside that package imports Clerk.
+- `public.impersonation_sessions` records each session: actor, target, reason, ticket
+  reference, start, end. **Separately from `audit_logs`**, which records the ACTIONS —
+  because a session that reads a parent's fee history and changes nothing leaves no trace
+  in `audit_logs` at all, and that is the session most worth finding later.
+- The banner lives in the ROOT layout, so it appears on every screen in every portal
+  including ones written before impersonation existed.
+- A **school owner can read sessions that entered their own school.** Being impersonated
+  is something a customer is entitled to know about, and a log only the operator can read
+  is not accountability.
+- Gated on the `impersonate` capability (`0237`), so a developer and a regional manager
+  are both refused — which this document states and nothing previously enforced.
+
+Actor tokens expire after **2 hours**, as recommended below, and the banner shows the
+minutes remaining.
+
+**Still needed:** `CLERK_SECRET_KEY` must be set for minting to work; the route says so
+by name rather than reporting a generic failure.
+
+---
+
 ## Overview
 
 Impersonation allows authorised AfriTech staff to view and operate the ZSMS platform exactly as a specific user would — seeing their school, their data, their dashboard — for the purpose of providing support, diagnosing issues, or making corrections on behalf of the user. It is implemented using Clerk's actor token mechanism.
@@ -304,3 +335,5 @@ This creates a clear record that AfriTech staff performed an action that school 
 | 2026-04-26 | Confirmed super admin full CRUD during impersonation | AfriTech support operational requirement |
 | 2026-04-26 | Added regional manager and support agent impersonation model | Confirmed internal team role structure |
 | 2026-04-26 | Added private schema impersonation behaviour | Clarified loan data access rules during impersonation |
+
+| 2026-10-11 | Marked built as of `0238`; recorded the session table, the root-layout banner, the customer's right to read sessions against their own school, and the capability gate |

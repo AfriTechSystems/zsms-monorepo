@@ -34,7 +34,7 @@ quality on its own.
 | # | Folder | Files | Status | Score | Finished |
 |---|---|---:|---|---|---|
 | 01 | Foundation Layer | 14 | **Done** | Good · 73% | 2026-10-06 |
-| 02 | Authentication and Identity | 5 | **Assessed** | Fair · 55% | — |
+| 02 | Authentication and Identity | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 03 | Infrastructure Services | 20 | Not started | — | — |
 | 04 | Country and Configuration | 2 | Not started | — | — |
 | 05 | Core Database and API Reference | 8 | Not started | — | — |
@@ -76,43 +76,49 @@ week.
 
 ---
 
-## 02 — Authentication and Identity (Fair, 55%) · assessed 2026-10-10
+## 02 — Authentication and Identity (Good, 88%) · 2026-10-11
 
-| Document | Score | Headline |
-|---|---|---|
-| ROLES.md | Good · 75% | All 16 roles typed; the six `afritech:*` are undifferentiated in practice |
-| AUTH.md | Fair · 65% | JWT and RLS helpers match exactly; three login audiences do not exist |
-| PERMISSIONS.md | Fair · 55% | Backend complete and wired into 15 policies — **and unreachable** |
-| SESSIONS.md | Fair · 40% | Per-role durations and anomaly detection unbuilt |
-| IMPERSONATION.md | Fair · 40% | Detection built, minting returns 501 |
+Assessed at **Fair 55%**, then remediated in the same pass. Re-scored after.
 
-### The finding that matters most
+| Document | Was | Now | What changed |
+|---|---|---|---|
+| PERMISSIONS.md | 55% | **95%** | The whole system was unreachable; `0236` made it usable |
+| ROLES.md | 75% | **92%** | The six `afritech:*` roles were one boolean; `0237` separated them |
+| IMPERSONATION.md | 40% | **85%** | `0238` mints real actor tokens, records sessions, shows a banner |
+| AUTH.md | 65% | **85%** | Student and alumni portals built; entry-point table corrected to reality |
+| SESSIONS.md | 40% | **80%** | ADR-045 settles the duration question honestly; anomaly detection still unbuilt |
 
-`staff_permission_grants`, `school_permissions` and `has_permission_grant()` all exist, and
-the function is called by **15 live RLS policies** across students, parents, teaching
-assignments, fee structures, fee records, payments, attendance and exam results.
+### What was built
 
-There are **zero grant rows, no API route, and no screen.** The entire delegation
-capability PERMISSIONS.md exists to describe — a principal covering for an accountant on
-leave — cannot be used. This is the `zsms-feature` skill's most expensive failure shape:
-work that is built, correct, and unreachable.
+- **`0236` — permission grants.** The tables, the function and **15 live RLS policies**
+  existed with no route, no screen and no rows, so the function always returned false.
+  Writing now goes through `grant_staff_permission()` rather than the INSERT policy,
+  because "you cannot grant what you do not hold" cannot live in a route a direct
+  PostgREST call skips. Screen at `/school/[code]/settings/permissions`.
+- **`0237` — AfriTech roles.** `afritech_role()`, `has_afritech_capability()` and
+  `afritech.staff_scope_assignments`. `is_afritech_admin()` is unchanged because **91
+  policies call it**. Matrix visible at `/admin/team`.
+- **`0238` — impersonation.** Actor tokens minted through `auth-provider` (ADR-032
+  intact), sessions recorded separately from `audit_logs`, banner in the root layout, and
+  a school owner can read sessions against their own school.
+- **`0239` — pupils and alumni.** Policies keyed on `students.clerk_user_id` and never on
+  the org claim, which is what lets a graduated pupil keep reading their history after
+  their membership is revoked. One portal for both (ADR-046).
 
-### Verified working
+### Decisions recorded
 
-- The three RLS helpers (`get_school_id`, `get_user_role`, `get_user_id`) match AUTH.md's
-  bodies exactly, as do `current_school_uuid()` and `is_afritech_admin()`.
-- Email OTP only; no passwords, no social login.
-- The multi-context role selector exists as `/welcome`, which **renders an inventory rather
-  than redirecting on first match** — better than the document describes.
-- SESSIONS.md business rule 4 — `confirmation_checkbox_at` fresh within 10 minutes — is
-  enforced inside `allocate_payment`.
-- ADR-012 custom roles on the `org:staff` base, built this week.
+- **ADR-045** — one Clerk session lifetime (7 days), not fifteen. SESSIONS.md's table is
+  not expressible as Clerk configuration, and a parallel session store would sign people
+  out mid-payment when two clocks disagreed.
+- **ADR-046** — pupils and alumni share one portal. `alumni_profiles` is not built and
+  should not be.
 
-### Gaps
+### Still open
 
-See *Carried forward*.
-
----
+- Suspicious activity detection: none of the five patterns, and no alerting path.
+- 32 of 34 `admin_*` functions still use the plain `is_afritech_admin()` check.
+- The two-day grant expiry notification needs a notification channel.
+- Phone-based login is blocked on SMS OTP, which was disabled on cost grounds.
 
 ## Carried forward
 
@@ -123,12 +129,12 @@ Open items from finished folders. Each carries why it is still open.
 | 01 | Inbound webhooks (4) | ADR-044 settles that they are Next.js routes. Blocked on Meta, gateway and Clerk webhook credentials. |
 | 01 | `zsms-staging` / `zsms-zm` | Compliance requires `af-south-1` before real school data. Needs an account action. |
 | 01 | Field encryption keys | `FIELD_ENCRYPTION_KEY`, `GATEWAY_ENCRYPTION_KEY` unset; `0230`'s CHECK refuses plaintext credentials until they exist. |
-| 02 | Permission grant UI | **Next build item.** Backend done. |
-| 02 | AfriTech role differentiation | Six roles collapse to one `is_afritech_admin()` boolean. Low risk at one operator, real on first hire. |
-| 02 | Impersonation actor tokens | Needs a Clerk server-side mint; detection half already built. |
-| 02 | Student portal | `org:student` is typed and appears in policies; no screen exists. |
-| 02 | Alumni portal | `platform:alumni` typed and referenced nowhere; `alumni_profiles` absent. |
-| 02 | Per-role session durations | Clerk has one lifetime per instance; per-role needs a decision before code. |
+
+| 02 | 32 of 34 `admin_*` functions still ungated | `0237` built the matrix; only the two guarding personal data are gated so far. Worth narrowing per release, not in one unverifiable sweep. |
+| 02 | Suspicious activity detection | None of SESSIONS.md's five patterns, and no alerting path. `audit_logs` could detect two retrospectively. |
+
+
+| 02 | Phone-based login | Blocked on SMS OTP, disabled on cost grounds in Zambia. Parents match on verified email instead. |
 
 ---
 
@@ -154,3 +160,4 @@ repeatedly described things the database could not do.
 |---|---|
 | 2026-10-06 | Folder 01 audited and remediated |
 | 2026-10-10 | Tracker created; folder 02 assessed |
+| 2026-10-11 | Folder 02 remediated and re-scored 55% -> 88% |

@@ -35,7 +35,7 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(24);
+SELECT plan(25);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: two schools, created before any role switch (RLS refuses an
@@ -119,6 +119,23 @@ SELECT isnt(
 );
 
 -- 9. It raised a DRAFT invoice — a school must not be able to issue its own bill.
+--
+-- Read as `postgres`, not as the school. This assertion returned NULL while it ran
+-- as `authenticated`, and the NULL was not a missing invoice: `afritech.invoices`
+-- has forced RLS admitting AfriTech only, so the school correctly could not see
+-- its own bill. The test was asking the right question from the wrong seat.
+--
+-- That isolation is worth asserting rather than just working around, so the line
+-- below checks it before the role changes.
+SELECT is(
+  (SELECT COUNT(*)::INT FROM afritech.invoices AS i
+    WHERE i.school_id = 'a1111111-0000-4000-8000-000000000001'),
+  0,
+  'a school cannot read AfriTech''s invoice table, not even its own row'
+);
+
+SET LOCAL ROLE postgres;
+
 SELECT is(
   (SELECT i.status FROM afritech.invoices AS i
     WHERE i.school_id = 'a1111111-0000-4000-8000-000000000001'
@@ -126,6 +143,8 @@ SELECT is(
   'draft',
   'buying raises a draft invoice, not an issued one'
 );
+
+SET LOCAL ROLE authenticated;
 
 -- 10. A SECOND purchase in the same month does not collide. This is the whole
 --     reason 0162 replaced the table-level UNIQUE with a partial index.

@@ -35,7 +35,7 @@ SET search_path TO public, extensions;
 -- An explicit plan, not no_plan(): if a section stops executing, the count
 -- mismatch fails the run. A security suite that silently runs fewer assertions
 -- than intended is worse than one that fails loudly.
-SELECT plan(72);
+SELECT plan(73);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures. Seeded as the superuser, which bypasses RLS — this is setup, not
@@ -766,6 +766,24 @@ SELECT is(
      AND table_name <> 'staff_custom_role_assignments'),
   0,
   'no DELETE or TRUNCATE privilege exists anywhere in public for end-user roles'
+);
+
+/*
+  No policy may be dead code.
+
+  RLS does not imply a GRANT — Postgres checks the privilege first — so a table
+  with policies and nothing granted to `authenticated` refuses every read while
+  looking protected. This repository hit that seven times (`0212`, `0218`, two in
+  `0233`, three in `0234`), and each fix was correct without making the next
+  occurrence visible.
+
+  `tables_with_dead_policies()` (0234) asks the question, so the eighth fails here
+  rather than reaching a school as "permission denied" on a screen that should work.
+*/
+SELECT is(
+  (SELECT count(*)::INT FROM public.tables_with_dead_policies()),
+  0,
+  'no public table has policies it has granted nobody the privilege to exercise'
 );
 
 SET LOCAL ROLE authenticated;

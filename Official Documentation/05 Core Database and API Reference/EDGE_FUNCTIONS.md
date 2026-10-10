@@ -9,7 +9,7 @@
 
 ---
 
-## Status — superseded, pending confirmation (2026-10-06)
+## Status — SUPERSEDED by ADR-044 (2026-10-10)
 
 > **`supabase/functions/` is empty and no Edge Function has ever been deployed.** A
 > Foundation Layer audit split the functions below into three groups and found them in
@@ -21,13 +21,13 @@
 > | WhatsApp dispatch | Edge Function | **Built as a Railway worker** |
 > | Webhooks — WhatsApp, payment, loan, Clerk | Edge Function | **Nothing, anywhere** |
 >
-> **The recommendation is that Edge Functions are superseded entirely.** The first two
+> **ADR-044 confirms Edge Functions are superseded entirely.** The first two
 > groups already work over BullMQ/Upstash with Railway workers; building them again in
 > Deno would mean two async systems doing one job, with separate deployments, secrets and
 > monitoring — and two systems doing one thing is how one of them silently drifts.
 >
-> **The webhooks are a genuine gap**, and the recommendation is that they are built as
-> **Next.js API routes** rather than Edge Functions. `apps/web` already has 116 routes
+> **The webhooks are a genuine gap**, and ADR-044 places them in
+> `apps/web/app/api/webhooks/` as **Next.js API routes** rather than Edge Functions. `apps/web` already has 116 routes
 > with authentication, the error envelope and Sentry wired in; a webhook is an HTTP
 > endpoint receiving a small JSON body, not heavy compute. A Deno runtime would add a
 > second deployment target and a second place for secrets to live, for no gain.
@@ -35,8 +35,14 @@
 > They are blocked on credentials in any case — there is no Meta account and no payment
 > gateway — so nothing is lost by scheduling them.
 >
-> **This section is a recommendation awaiting a decision, not a decision.** Until one is
-> made, the specifications below stand as written.
+> **The specifications below are retained as the requirements for those four webhook
+> routes** — the triggers, payloads and behaviours are unchanged by where the code lives.
+> Read "Edge Function" as "API route under `apps/web/app/api/webhooks/`".
+>
+> Each one needs, in addition to what is specified below: signature verification against
+> the provider's secret; **idempotency on the provider's event id**, because a webhook is
+> delivered at least once and not exactly once; and a refusal that does not reveal whether
+> a record exists.
 
 ---
 

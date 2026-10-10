@@ -616,3 +616,49 @@ Three questions had to be answered, and the interesting one is not the first.
 **Alternatives considered:** full white-labelling with configurable layout (rejected — see above; the cost is borne by support and by every user who moves between schools, and the benefit is not one parents perceive); a warn-only contrast check with an override for determined schools (rejected — the override would be used, and the person exercising it is never the person who pays for it); enforcing contrast only in the API (rejected — leaves the constraint absent from every other writer, and the second implementation is ~30 lines of SQL); a curated set of preset palettes instead of free colour choice (**not rejected on merit** — it is simpler, guarantees readability by construction, and should be reconsidered if support finds schools struggling with the refusal message; free choice was taken because a school's colour is usually already fixed by an existing crest and offering it a near-match is worse than offering it a check).
 
 **Consequences:** `public.school_branding` (0092) is the store, with RLS and the AA constraints. `school_branding_by_slug()` is the only `anon`-reachable path and exposes exactly five keys, pinned by test. `packages/design-tokens` is the single source of tokens for web, PDF, and email. `DESIGN_SYSTEM.md` is the authoritative document. `supabase/tests/rls/school_branding_test.sql` holds 36 assertions covering the guardrail, the SQL/TS agreement, tenancy, role scope, and the anon surface. Anything that renders a school's identity resolves it through `resolveTheme()` — a second resolution path would be a defect.
+
+---
+
+## ADR-044 — Supabase Edge Functions Superseded; Webhooks Are Next.js Routes
+
+**Status:** Confirmed (2026-10-10)
+**Decision:** ZSMS will not deploy Supabase Edge Functions. The work `EDGE_FUNCTIONS.md`
+assigns to them splits in two, and each half goes somewhere that already exists:
+
+1. **PDF generation and WhatsApp dispatch** — already built as Railway background workers
+   over BullMQ/Upstash (ADR-035, ADR-042). No further work; the document is amended to
+   record where they actually live.
+2. **Inbound webhooks** — WhatsApp, payment gateway, loan provider and Clerk — will be
+   built as **Next.js API routes** under `apps/web/app/api/webhooks/`.
+
+**Reason:** The first half would otherwise mean two async systems doing one job, in two
+languages, with separate deployments, secrets and monitoring. Two systems doing one thing
+is how one of them silently drifts, and the Railway half is the one that is proven — a
+real job has round-tripped through it.
+
+For the second half, a webhook is an HTTP endpoint receiving a small JSON body, not heavy
+compute. `apps/web` already has 116 routes carrying authentication, the `{ data, meta? }` /
+`{ error, code }` envelope, `fromPostgrestError`, and Sentry. A Deno runtime would add a
+second deployment target and a second place for secrets to live, in exchange for nothing
+this workload needs.
+
+**Correction this ADR records:** ADR-023 states that tier-1 native webhooks are "already
+built". They are not, and were not — there is no webhook endpoint of any kind in this
+repository, Edge Function or otherwise. The 2026-10-06 Foundation Layer audit found this
+by looking rather than by reading.
+
+**Consequences:**
+- `supabase/functions/` stays empty. `ARCHITECTURE.md` and `EDGE_FUNCTIONS.md` are
+  amended rather than left to imply otherwise.
+- The four webhook routes become **tracked, scheduled work**, not a resolved gap. They are
+  blocked on credentials in any case — no Meta account, no payment gateway, and
+  `CLERK_WEBHOOK_SECRET` unset — so nothing is lost by sequencing them behind those.
+- Each route, when built, needs signature verification against the provider's secret,
+  idempotency on the provider's event id (a webhook is delivered at least once, not
+  exactly once), and a refusal that does not leak whether a record exists.
+- If a future workload genuinely needs compute close to the database — something
+  latency-bound inside Postgres rather than an HTTP handler — this decision is worth
+  revisiting on its own merits. It is not revisited merely because a document names Edge
+  Functions.
+
+---

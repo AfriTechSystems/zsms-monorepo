@@ -31,6 +31,7 @@ import {
   Receipt,
   ScrollText,
   ShieldAlert,
+  ShieldCheck,
   Siren,
   SlidersHorizontal,
   Sparkles,
@@ -129,6 +130,14 @@ export function AdminShell({
         { path: '/data-requests', label: 'Data requests', icon: ShieldAlert },
         // The trail has been written since `0131` and nothing has ever read it.
         { path: '/audit', label: 'Audit trail', icon: ScrollText },
+        /*
+          The AfriTech team and what each platform role may do (ROLES.md).
+
+          Under Operations rather than its own group: it is read-mostly reference, and
+          only the scope form at the bottom is a super admin's to use — which the page
+          itself hides for everybody else.
+        */
+        { path: '/team', label: 'Team & roles', icon: ShieldCheck },
       ],
     },
     {

@@ -37,7 +37,7 @@ quality on its own.
 | 02 | Authentication and Identity | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 03 | Infrastructure Services | 20 | **Done** | Good · 78% | 2026-10-11 |
 | 04 | Country and Configuration | 2 | **Done** | Excellent · 90% | 2026-10-11 |
-| 05 | Core Database and API Reference | 8 | Not started | — | — |
+| 05 | Core Database and API Reference | 8 | **Done** | Good · 82% | 2026-10-11 |
 | 06 | School and Tenant | — | Not started | — | — |
 | 07 | Students and Parents | — | Not started | — | — |
 | 08 | Staff | — | Not started | — | — |
@@ -190,6 +190,49 @@ Also added `appName` and `whatsAppSenderId`, which ZM.md specified and the type 
 index Step 2 describes — keyed by code, selected by `NEXT_PUBLIC_COUNTRY_CODE`, with an
 error naming the runbook. Step 2 is satisfied.
 
+## 05 — Core Database and API Reference (Good, 82%) · 2026-10-11
+
+### Built
+
+- **Per-key rate limiting.** `rate_limit_rpm` was stored by `0241`, shown on the
+  management screen, and consulted by nothing — my own gap from the previous pass. A
+  limit a school can see and set, and that does not apply, is a promise rather than a
+  limit.
+- **Middleware policies aligned with RATE_LIMITS.md's seven categories** rather than the
+  three broad bands shipped the day before. Its distinctions are the useful ones: a
+  broadcast and a dashboard read are not the same risk.
+- **Webhooks, the first one ever.** `0243` builds idempotency keyed on the provider's own
+  event id — delivery is at-least-once, so without it a retried gateway callback credits
+  a fee twice. `lib/webhook-verify.ts` handles both signature styles in the document,
+  constant-time, Edge-compatible, with ten smoke checks including forgery, replay and
+  future-dating. `POST /api/webhooks/clerk` is live and needs only the signing secret.
+- **Three error codes added to the envelope** — `RATE_LIMITED`, `INSUFFICIENT_SCOPE`,
+  `API_KEY_INVALID` — because code here already returned them and a type that does not
+  admit what it sends disagrees with reality.
+- **`ENDPOINT_INVENTORY.md` generated.** `ENDPOINTS.md` catalogues 74 routes of 124.
+
+### What `npm run gaps` caught
+
+Two pieces of **my own** unreachable work from earlier passes —
+`admin_integration_health()` and `admin_marketing_consent_summary()`, both built with no
+route and no screen. Now called by `/api/admin/overview`. Three more are called from SQL
+rather than source and are ACCEPTED with reasons.
+
+An exception nearly went in wrong: `ACCEPTED_ROUTES` is keyed relative to the api
+directory, and a full path matches nothing silently — the entry would have looked
+recorded while the warning stayed.
+
+### Still open
+
+- **Nine of ten webhooks**, every one blocked on an account that does not exist —
+  seven gateways, Meta, a lending partner. The foundation is built, so each is a handler
+  rather than a project.
+- **Outgoing webhooks** (ZSMS → school systems). The `webhooks:receive` scope exists in
+  `0241`; registration and delivery do not.
+- Three pre-existing orphaned functions: `admin_publish_prompt_template`,
+  `ai_credit_topup`, `revise_grading_scale`.
+- Clerk-side OTP rate limits, which are instance settings rather than ZSMS code.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -204,6 +247,8 @@ Open items from finished folders. Each carries why it is still open.
 | 02 | Suspicious activity detection | None of SESSIONS.md's five patterns, and no alerting path. `audit_logs` could detect two retrospectively. |
 
 
+| 05 | Nine of ten inbound webhooks | Foundation built (`0243`); each is blocked on a gateway, Meta or lender account. |
+| 05 | Outgoing webhooks to school systems | Scope exists, registration and delivery do not. |
 | 04 | Multi-country constraint widening | ADR-040 defers it until a second country is real. `npm run country:check` keeps the inventory honest in the meantime. |
 | 03 | Uptime monitoring and alerting | `/api/health` exists and nothing polls it. Needs an external monitor, not code. |
 | 03 | API write endpoints (Tier 1/3) | Needs idempotency on a caller-supplied key, or a retried request double-records a payment. |
@@ -237,3 +282,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 02 remediated and re-scored 55% -> 88% |
 | 2026-10-11 | Folder 03 assessed and remediated, 52% -> 78% |
 | 2026-10-11 | Folder 04 assessed and remediated, 90% |
+| 2026-10-11 | Folder 05 assessed and remediated, 82% |

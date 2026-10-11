@@ -10,6 +10,23 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**This document catalogues 74 routes; 124 exist.**
+
+The gap is not an oversight to be typed away — hand-writing 50 more entries produces a
+document accurate for about a week, which is the same trap `DATABASE.md` fell into with
+its 49 tables of 93.
+
+So **`ENDPOINT_INVENTORY.md` is generated** (`npm run api:inventory`) and answers "what
+exists right now", including the HTTP methods each route exports and the rate limit
+policy it falls under. This document keeps the request and response shapes, the auth
+requirements and the reasoning — the parts worth writing and reading.
+
+Use the inventory for existence, this for behaviour.
+
+---
+
 ## Purpose
 
 This document lists every ZSMS API endpoint — the route, HTTP method, authentication required, and what it does. Every Claude Code session adding a new endpoint must add it here.

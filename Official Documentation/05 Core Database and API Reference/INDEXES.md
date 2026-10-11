@@ -9,6 +9,25 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**289 indexes exist in `public`; this document specifies 79.** The excess is mostly
+primary keys and unique constraints, which create indexes without being listed here, plus
+indexes added alongside migrations since this was written. 174 follow the `idx_` naming
+convention.
+
+**Five tables carry nothing beyond their primary key:** `ai_credit_caps`,
+`school_branding`, `school_credit_settings`, `school_network_roles` and
+`school_public_profiles`. Three of those are filtered by `school_id` in their RLS
+policies with no index on it.
+
+Left alone deliberately. Each holds roughly one row per school, so a sequential scan over
+single-digit rows is faster than an index lookup and will stay so into the thousands. Worth
+revisiting when any of them exceeds a few thousand rows — not before, because an index
+that is never used still has to be maintained on every write.
+
+---
+
 ## Purpose
 
 This document is the complete database index reference. It lists every index in the ZSMS database, the query pattern it serves, and the performance target it is designed to meet. Claude Code reads this before adding new queries to ensure an appropriate index exists, and before creating new indexes to avoid duplicating existing ones.

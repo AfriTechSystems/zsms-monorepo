@@ -13,6 +13,39 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**One of ten built, and the foundation every one of them needs.**
+
+`0243` adds `webhook_events`, keyed on the PROVIDER's own event id. Delivery is
+at-least-once — every sender below retries — so without this a handler does the work
+twice, and for a payment gateway that means crediting a fee twice from one transaction.
+A duplicate is answered 200, because a sender retrying something already processed wants
+to stop.
+
+`apps/web/lib/webhook-verify.ts` covers both signature styles in this document: Svix HMAC
+for Clerk, and plain hex HMAC for the gateways. Hand-written rather than via the Svix SDK
+so it runs on the Edge runtime and so one implementation serves all ten senders. The
+comparison is constant-time — a `===` on a signature leaks through timing how many bytes
+were right, and a public endpoint gives an attacker unlimited attempts.
+
+`npm run webhook:smoke` proves it: signed accepted, tampered refused, wrong secret
+refused, old refused, FUTURE-dated refused, rotation accepted.
+
+| Webhook | State |
+|---|---|
+| **Clerk** | **Built** — `POST /api/webhooks/clerk`. Needs `CLERK_WEBHOOK_SECRET`. |
+| Flutterwave, PawaPay, DPO, Pesapal, Airtel, MTN, Zanaco | Not built — no gateway account exists |
+| Meta WhatsApp | Not built — no Meta account |
+| Loan disbursement | Not built — no lending partner |
+| Outgoing (ZSMS → school) | Not built. The `webhooks:receive` scope exists in `0241`; registration and delivery do not. |
+
+The Clerk handler deliberately does not create records. `user.created` is somebody
+signing up, which is `/welcome`'s business — a webhook that enrolled people would be a
+second provisioning path competing with the one that holds the rules.
+
+---
+
 ## Purpose
 
 This document covers every webhook in ZSMS — both incoming webhooks (external services calling ZSMS) and outgoing webhooks (ZSMS calling school systems for API integration). Every webhook endpoint, its authentication method, payload structure, and processing logic is documented here. Claude Code reads this before implementing any webhook handler to ensure correct signature verification and payload handling.

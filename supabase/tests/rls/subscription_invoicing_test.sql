@@ -71,11 +71,11 @@ VALUES
  ('44444444-4444-4444-4444-444444444444','ZM-LSK-0004','org_d','Gap School','day','combined','LSK','active','ps_gap');
 
 INSERT INTO public.students (student_id, school_id, first_name, last_name, grade_id, class_id)
-SELECT 'STU-A-'||g,'11111111-1111-1111-1111-111111111111','P','One','grade_1','g1a'
+SELECT 'STU-ZM-LSK-0001-' || lpad(g::text, 5, '0'),'11111111-1111-1111-1111-111111111111','P','One','grade_1','g1a'
 FROM generate_series(1,80) g;
 
 INSERT INTO public.students (student_id, school_id, first_name, last_name, grade_id, class_id)
-SELECT 'STU-D-'||g,'44444444-4444-4444-4444-444444444444','P','Gap','grade_1','g1a'
+SELECT 'STU-ZM-LVS-0004-' || lpad(g::text, 5, '0'),'44444444-4444-4444-4444-444444444444','P','Gap','grade_1','g1a'
 FROM generate_series(1,80) g;
 
 SET LOCAL ROLE authenticated;

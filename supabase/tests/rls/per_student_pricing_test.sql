@@ -79,11 +79,11 @@ SELECT ok(TRUE, 'and a school can be put on it');
 
 -- 80 pupils lands in band 1; 150 in band 2. Two bands exercised, not one.
 INSERT INTO public.students (student_id, school_id, first_name, last_name, grade_id, class_id)
-SELECT 'STU-A-'||g,'11111111-1111-1111-1111-111111111111','P','One','grade_1','g1a'
+SELECT 'STU-ZM-LSK-0001-' || lpad(g::text, 5, '0'),'11111111-1111-1111-1111-111111111111','P','One','grade_1','g1a'
 FROM generate_series(1,80) g;
 
 INSERT INTO public.students (student_id, school_id, first_name, last_name, grade_id, class_id)
-SELECT 'STU-B-'||g,'22222222-2222-2222-2222-222222222222','P','Two','grade_1','g1a'
+SELECT 'STU-ZM-NDL-0002-' || lpad(g::text, 5, '0'),'22222222-2222-2222-2222-222222222222','P','Two','grade_1','g1a'
 FROM generate_series(1,150) g;
 
 SELECT is(

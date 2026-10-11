@@ -10,6 +10,31 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The gating this document specifies is built; the data it asks for is mostly not there
+yet, which is expected before launch.**
+
+`school_data_completeness()` computes the score and the three bands. `curriculum_coverage()`
+reports how much syllabus exists to ground against — currently none, since
+`curriculum_topics` is empty.
+
+**Predictive Intelligence remains correctly unbuilt.** This document sets the bar at 18+
+months of data across 50+ schools; there are 6 synthetic schools and no history. Building
+it now would mean training on fixtures, and a model that learnt from `dev_seed.sql` would
+make confident predictions about nothing.
+
+**The honest summary of this folder:** the plumbing is built and the fuel is not. Credits,
+quotas, metering, assignment, caps, the assistant, the generator pipeline and the
+completeness gate all work. What is missing is an ECZ syllabus in `curriculum_topics`,
+credit on the Anthropic key, a decision on the tier allowances (now settable from
+`/admin/pricing` rather than needing a migration), and `AI_GENERATOR=live`.
+
+Each of those is a short, deliberate action rather than an engineering project — which is
+the right place for this module to be sitting.
+
+---
+
 ## Purpose
 
 This document defines what data must exist and at what completeness level before each AI feature activates. It also defines the data completeness scoring system and how schools are guided to improve their data quality.

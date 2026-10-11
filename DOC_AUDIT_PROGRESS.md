@@ -50,7 +50,7 @@ quality on its own.
 | 15 | Super Admin and Platform | 5 | **Done** | Good · 84% | 2026-10-11 |
 | 16 | Testing and Launch | 7 | **Done** | Good · 78% | 2026-10-11 |
 | 17 | Integration and Pricing | 5 | **Done** | Good · 76% | 2026-10-11 |
-| 18 | AI Module | 5 | Not started | — | — |
+| 18 | AI Module | 6 | **Done** | Good · 79% | 2026-10-11 |
 
 ---
 
@@ -865,6 +865,138 @@ and there is no `is_deleted` on that table. The migration applied and would have
 first call, because plpgsql resolves names at run time — caught only because the
 assertion exercised it. `db:cols -- payments` answers both in one call.
 
+## 18 — AI Module (Good, 79%) · 2026-10-11
+
+Six documents. **The plumbing is built and the fuel is not**, which is a fair place for
+this module to sit before launch.
+
+All four systems exist at genuinely different stages, as AI_OVERVIEW.md intends: Smart
+Analytics is SQL with no model in it (correctly — a dashboard figure a model produced
+cannot be audited), the AI Assistant is built and reads through the caller's own RLS
+policies, the Lesson Planner's whole pipeline works but generates from templates, and
+Predictive Intelligence is correctly unbuilt pending 18 months of data.
+
+### `tier_ai_allowances` was empty with nothing able to write it
+
+Referenced by exactly two migrations, one of which only inserts inside a rolled-back
+assertion. So `ai_allowance_for_account()` resolved **every school on every tier to zero
+included credits**, and the only way to change that was a deployment.
+
+A school paying K2,000 a month for Professional got no AI at all. That is precisely what
+ADR-031 exists to prevent: **configuration with no editor is indistinguishable from a
+hardcoded zero**, and it is the same shape as the reminder schedule in folder 09 and the
+brand colours in folder 13.
+
+`0264` adds the read and write functions and surfaces them on `/admin/pricing`. **No
+amounts are seeded** — the table is still empty, because a seeded guess would make a
+commercial decision by accident. An undecided tier shows a warning rather than a bare
+zero, since "deliberately none" and "nobody has decided" are different facts and only the
+second explains why a teacher's generate button fails.
+
+### The two gaps that matter most, both short actions rather than projects
+
+- **`curriculum_topics` is empty**, so `curriculum_slice()` returns nothing and the prompt
+  cites nothing. That is the difference between **AI-written and syllabus-grounded**, and
+  a lesson plan invented against no syllabus is a plausible document a teacher may trust.
+  The import pipeline is built; no content is seeded deliberately, because inventing ECZ
+  topic codes would put fabricated references into the product. Start with one slice and
+  judge a generated plan against it.
+- **Failover to Anthropic has never executed.** OpenAI has answered a real call; the
+  Anthropic key has no credit, so the chain has only been observed *leaving* a provider,
+  never *arriving* at the second. A failover path that has never run is an untested branch
+  that will be exercised for the first time during an outage.
+
+### Worth defending as built
+
+`0169` asserts that **no `admin_ai_*` function returns a user identifier**, so AfriTech
+sees that a school spent 400 credits without seeing which teacher asked what. That
+assertion is the control — without it the privacy claim is a convention.
+
+And AI_CAPTURE.md is right that capture is the one feature needing reserve/settle:
+without it a teacher queues twenty photographed pages against a balance of two and finds
+out a day later. The ledger already admits `reserve` and `release`, so building it is not
+a migration against a financial table holding live rows.
+
+### My own slip
+
+Invented the `log_audit_event` argument order. The real signature is
+`(p_action, p_table_name, p_record_id UUID, p_metadata, p_school_id, ...)` — and
+`p_record_id` is a UUID where a tier is keyed by name, so the tier belongs in the metadata.
+Caught at apply time.
+
+---
+
+# The audit is complete — all 18 folders, 2026-10-11
+
+119 documents across 18 folders, every one read and marked with an
+**Implementation Status** block dated against the tree rather than against the
+documentation.
+
+## Scores
+
+| Band | Folders |
+|---|---|
+| **Excellent (90%+)** | — |
+| **Good (70–89%)** | 01 (73), 02, 03, 04, 05, 06, 07 (88), 08 (87), 09 (85), 10 (80), 11 (88), 13 (86), 14 (82), 15 (84), 16 (78), 17 (76), 18 (79) |
+| **Fair (50–69%)** | 12 (65) — four of six documents unverifiable without provider credentials |
+
+No folder scored Bad. **Folder 12 is the floor and the reason is honest:** no message has
+ever left this machine, so WhatsApp, SMS and the chatbot cannot be verified by anybody,
+and a passing score for unexecuted code would be the same mistake as reporting CI green
+from a stale doc line.
+
+## The pattern that held in eleven of eighteen folders
+
+**Work that was finished, correct, tested — and unreachable.** Not bugs. Chains with one
+link missing, usually in the middle where `npm run gaps` could not see it:
+
+- a reminder schedule hardcoded in a worker (`09`)
+- `parent_notified` existing since `0074` and never read, so marking a child absent told
+  nobody (`10`)
+- `revise_grading_scale()` with a 20-assertion suite and no caller (`11`)
+- two colour columns with WCAG contrast guarantees and no editor (`13`)
+- a repayment screen fetching the lender's account details and rendering none (`14`)
+- MRR, ARR and tier revenue computed nowhere though every input existed (`15`)
+- `tier_ai_allowances` empty with nothing able to write it (`18`)
+
+## Three claims in `CLAUDE.md` were false
+
+Found by building against them rather than by reading:
+
+1. **"No mobile screens exist"** — there are 27, including the register marking screen.
+2. **`admin/impersonate` "(501 — needs Clerk actor tokens)"** — fully built, mints real
+   actor tokens through `@clerk/backend`.
+3. **ADR-023 / INTEGRATIONS.md: tier-1 webhooks "already built"** — the table named does
+   not exist and never did.
+
+All three corrected, each with a note recording that it happened.
+
+## What launch now waits on, and almost none of it is code
+
+| Blocker | Consequence |
+|---|---|
+| **Paid Clerk plan** | Free tier caps an organisation at five members — a six-staff school cannot be onboarded |
+| **Twilio** | SMS reaches the parent with no smartphone. Today that parent is reached by **nothing** |
+| **Meta WhatsApp** | No message has ever been delivered; `delivered_at` and `read_at` can never populate without the inbound webhook |
+| **`zsms-staging` / `zsms-zm` in `af-south-1`** | Required by `COMPLIANCE.md`; also unblocks UAT, load testing and the Playwright specs |
+| **`FIELD_ENCRYPTION_KEY`** | Blocks per-school integration credentials AND outgoing webhook signing |
+| **ECZ syllabus content** | The difference between AI-written and syllabus-grounded |
+| **Credit on the Anthropic key** | Failover has never executed |
+| **Terms of Service and Privacy Policy text** | Consent is recorded and timestamped; the wording needs a lawyer |
+| **A business decision on AI allowances and credit prices** | Now settable from `/admin/pricing` without a deployment |
+
+## Standing artefacts
+
+Four commands now answer questions that used to need a person:
+
+- `npm run security:audit` — executes SECURITY_AUDIT.md (15 pass, 0 fail, 7 suite-covered,
+  7 blocked)
+- `npm run test:unit` — 13 unit tests, in `ci:checks` and CI
+- `npm run gaps` / `gaps:mobile` — the reachability chain
+- `npm run db:cols` — which I should have reached for more often than I did
+
+**Migrations `0228`–`0264` were written during this audit.** CI is green on both jobs.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -881,6 +1013,9 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 18 | ECZ syllabus content | `curriculum_topics` is empty, so lesson plans are AI-written rather than syllabus-grounded. Import pipeline built; content must not be invented. |
+| 18 | AI credit reserve/settle | Needed by capture, not by synchronous generation. Ledger shape already correct. |
+| 18 | Anthropic failover never executed | Key has no credit. An untested branch that will first run during an outage. |
 | 17 | Outgoing webhook dispatch | Needs a signing secret retrievable in plaintext; blocked on `FIELD_ENCRYPTION_KEY`. Registry exists, nothing sends. |
 | 17 | CRM connectors need a ZDPA basis | Pushing pupil/parent records to a third party is a transfer, not just an OAuth flow. Decide the lawful basis before building. |
 | 16 | Playwright E2E specs | The three named flows (payment, results publication, parent login) need a seeded environment a browser can drive — same prerequisite as UAT. |
@@ -946,3 +1081,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 15 assessed and remediated, 84%; MRR/ARR/tier revenue built, CLAUDE.md's impersonation "501" claim corrected |
 | 2026-10-11 | Folder 16 assessed, 78%; SECURITY_AUDIT.md made executable (1 real finding, fixed in 0262), first unit tests added |
 | 2026-10-11 | Folder 17 assessed and remediated, 76%; Sage 50 export built, ADR-023's "already built" webhook claim corrected |
+| 2026-10-11 | Folder 18 assessed and remediated, 79%; tier AI allowances made editable. **AUDIT COMPLETE — all 18 folders** |

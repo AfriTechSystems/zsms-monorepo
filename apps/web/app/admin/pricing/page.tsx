@@ -44,11 +44,13 @@ import { apiSend, useApi } from '../../../lib/use-api'
 import { PriceBands, usePriceBands } from './price-bands'
 import { Alert } from '../../../components/ui/alert'
 import { Badge } from '../../../components/ui/badge'
+import { Card } from '../../../components/ui/card'
 import { Button } from '../../../components/ui/button'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { Field, Input, PrefixedInput } from '../../../components/ui/field'
 import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../components/ui/form'
+import { useToast } from '../../../components/ui/toast'
 import { formatPrice } from '../health-shared'
 
 interface Tier {
@@ -73,9 +75,98 @@ interface Tier {
 interface PricingPayload {
   tiers: Tier[]
   billingPerTier: Record<string, number>
+  /**
+   * Included monthly AI credits per tier (`0264`).
+   *
+   * `isSet` distinguishes a decided zero from an undecided tier. The table was empty
+   * with nothing able to write it, so every school resolved to zero included credits
+   * and the only way to change that was a migration.
+   */
+  aiAllowances: Record<string, { credits: number; isSet: boolean }>
 }
 
 const num = (v: string | number | null): string => (v === null ? '' : String(Number(v)))
+
+/**
+ * Included monthly AI credits for one tier.
+ *
+ * Its own component and its own save, because an allowance is decided at a different
+ * time from a price: making somebody resubmit the whole tier to change it is how a
+ * ceiling gets clobbered.
+ */
+function AiAllowance({
+  tierName,
+  current,
+  isSet,
+  onSaved,
+}: {
+  tierName: string
+  current: number
+  isSet: boolean
+  onSaved: () => void
+}): JSX.Element {
+  const { toast } = useToast()
+  const [value, setValue] = useState(String(current))
+  const [saving, setSaving] = useState(false)
+
+  async function save(): Promise<void> {
+    const n = Number(value)
+    if (!Number.isInteger(n) || n < 0) {
+      toast('Enter a whole number of credits, or 0 for none.', 'danger')
+      return
+    }
+    setSaving(true)
+    try {
+      const result = await apiSend<{ message?: string }>('/api/admin/tiers', 'PUT', {
+        tierName,
+        monthlyCredits: n,
+      })
+      toast(result.data?.message ?? result.error ?? 'Saved.', result.data ? 'success' : 'danger')
+      if (result.data) onSaved()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="p-card">
+      <h3 className="text-sm font-medium">Included AI credits</h3>
+
+      {!isSet && (
+        <Alert variant="warning" className="mt-2">
+          {/*
+            Named explicitly, because the symptom a school reports is "the AI does not
+            work" and the cause is that nobody has decided what this tier includes.
+            A bare 0 would look like a deliberate choice.
+          */}
+          No allowance has been decided for this tier, so schools on it include{' '}
+          <strong>no</strong> AI credits and can only use credits they buy. Set a
+          number below &mdash; or set 0 to record that none are included.
+        </Alert>
+      )}
+
+      <div className="mt-stack flex flex-wrap items-end gap-2">
+        <label className="block">
+          <span className="text-xs font-medium">Credits per month</span>
+          <Input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            inputMode="numeric"
+            className="mt-1 w-28 text-center"
+          />
+        </label>
+        <Button type="button" variant="outline" onClick={() => void save()} disabled={saving}>
+          {saving ? 'Saving...' : 'Save allowance'}
+        </Button>
+      </div>
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        A lesson plan or quiz costs 1 credit, a photographed page 2. Teachers can also
+        buy their own packs, and a school can buy seats to assign.
+      </p>
+    </Card>
+  )
+}
 
 function TierEditor({
   tier,
@@ -344,6 +435,12 @@ export default function AdminPricingPage(): JSX.Element {
                   Beneath the tier rather than inside it: the flat price and the per-pupil bands
                   are alternatives, and nesting one in the other would suggest they combine.
                 */}
+                <AiAllowance
+                  tierName={tier.tier_name}
+                  current={data.aiAllowances?.[tier.tier_name]?.credits ?? 0}
+                  isSet={data.aiAllowances?.[tier.tier_name]?.isSet ?? false}
+                  onSaved={reload}
+                />
                 <PriceBands
                   tierName={tier.tier_name}
                   displayName={tier.display_name}

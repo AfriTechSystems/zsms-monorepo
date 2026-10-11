@@ -12,6 +12,36 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**All four systems exist in some form, and the four are at genuinely different stages —
+which is the point this document makes and worth confirming.**
+
+| System | State |
+|---|---|
+| 1 — Smart Analytics (SQL only, no LLM) | Built. `school_data_completeness()` gates it |
+| 2 — AI Assistant (Claude, RLS-enforced) | Built: `start_ai_conversation()`, `ai_assistant_begin()`, `ai_assistant_quota()`, `ai_conversations`, `ai_messages` |
+| 3 — Lesson Planner (RAG over a Zambian curriculum) | Built, **generating from templates**: `AI_GENERATOR=template`, and `curriculum_topics` is empty |
+| 4 — Predictive Intelligence | Not built, correctly — blocked until 18+ months of data across 50+ schools |
+
+**Fixed this pass: `afritech.tier_ai_allowances` was empty and nothing could write it.**
+Grepped on 2026-10-11 — referenced by exactly two migrations, one of which only inserts
+inside a rolled-back assertion. So `ai_allowance_for_account()` resolved **every school on
+every tier to zero included credits**, and the only way to change that was a deployment.
+
+A school paying K2,000 a month for Professional got no AI at all. That is the failure
+ADR-031 exists to prevent: configuration with no editor is indistinguishable from a
+hardcoded zero.
+
+`0264` adds `admin_tier_ai_allowances()` and `admin_set_tier_ai_allowance()`, surfaced on
+`/admin/pricing`. **No amounts are seeded** — the table is still empty, because a seeded
+guess would make a commercial decision by accident. The screen says so: an undecided tier
+carries a warning rather than a bare zero, since "deliberately none" and "nobody has
+decided" are different facts and only the second explains why a teacher's generate button
+fails.
+
+---
+
 ## Purpose
 
 This document defines the ZSMS AI module — the four-system architecture, what is genuinely AI vs smart analytics, the cost model, the phased build plan, and the data quality gate that governs when AI features activate. Every Claude Code session building any AI feature must read this document before starting.

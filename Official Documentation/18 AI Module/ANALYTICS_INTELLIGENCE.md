@@ -10,6 +10,30 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, and deliberately the only AI system with no model in it.**
+
+Smart Analytics is SQL — `school_data_completeness()`, `curriculum_coverage()`, the health
+score functions, `admin_ai_usage_breakdown()` and `admin_ai_usage_distribution()`. No LLM,
+no credits, no latency, and nothing to hallucinate.
+
+That is the right separation and worth defending: a figure on a dashboard that a model
+produced cannot be audited, and a head teacher acting on "attendance is down 12%" needs
+that to be arithmetic.
+
+**The completeness gate is implemented as specified** — ≥70% full, 50–69% limited,
+<50% locked — and it gates systems 1 and 2 rather than being advisory. A school that has
+entered three weeks of attendance and no marks genuinely cannot support analysis, and
+saying so is better than producing confident nonsense from a tenth of a term.
+
+**AfriTech sees aggregates only.** `0169` asserts that no `admin_ai_*` function returns a
+user identifier — so AfriTech can see that a school spent 400 credits without seeing
+which teacher asked what. That assertion is the control; without it the privacy claim is
+a convention.
+
+---
+
 ## Purpose
 
 This document defines the smart analytics and early warning system — the statistical intelligence layer that forms the foundation of all AI insights in ZSMS. These are SQL-based aggregations and rules, not LLM calls. Fast, cheap, and highly valuable. Every Claude Code session building any analytics or insights feature must read this document.

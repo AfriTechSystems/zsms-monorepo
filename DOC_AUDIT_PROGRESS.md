@@ -44,7 +44,7 @@ quality on its own.
 | 09 | Fee and Financial Management | 6 | **Done** | Good · 85% | 2026-10-11 |
 | 10 | Attendance | 4 | **Done** | Good · 80% | 2026-10-11 |
 | 11 | Examinations and Results | 5 | **Done** | Good · 88% | 2026-10-11 |
-| 12 | Communication | — | Not started | — | — |
+| 12 | Communication System | 6 | **Done** | Fair · 65% | 2026-10-11 |
 | 13 | PDFs and Documents | — | Not started | — | — |
 | 14 | Loans | — | Not started | — | — |
 | 15 | Super Admin and Platform | 5 | Not started | — | — |
@@ -509,6 +509,53 @@ happened — the same failure that file warns about in its own text.
 Offline capture, deferred on the PowerSync licence. Everything else in this folder is
 built and reachable.
 
+## 12 — Communication System (Fair, 65%) · 2026-10-11
+
+Six documents, and the lowest score so far — not because the code is poor but because
+**four of the six cannot be exercised at all.** No Meta, Twilio or Resend credentials
+exist, so every channel runs through the mock provider and **no message has ever left
+this machine.**
+
+That is the honest ceiling for this folder. Announcements score near full marks; WhatsApp,
+SMS and the chatbot cannot be verified by anybody, and a passing score for unexecuted code
+would be the same mistake as reporting CI green from a doc line.
+
+### Built this pass
+
+**The message log had a table, a writer and no reader.** Full lifecycle, failure reasons,
+retry counts, fallback chain, quota consumption — all recorded since `0075`, visible
+nowhere. Screen now at Communication → Message log.
+
+**The banner on it is the point.** Rows say "sent"; nothing was sent. A log that implied
+delivery would be the most misleading thing this product could show a school chasing an
+unpaid fee, so the route reports `providerIsMock` from the environment and the screen says
+so plainly — and stops saying it the moment credentials exist, with no deployment.
+
+**The accountant could not read it** (`0257`), though MESSAGE_LOG.md always said they
+could, and every fee reminder in the log is theirs to answer for.
+
+### Two mistakes worth recording, both caught by the gate
+
+- **`settings:read` does not exist** in the permission matrix. `can()` returns false for
+  an unknown key, so the nav row would have silently vanished for everybody. Replaced with
+  `fees:read`, whose holders are exactly the four roles the policy admits after `0257`.
+  This is the failure `zsms-feature` names explicitly, and I made it anyway.
+- **A concatenated PostgREST `select` string** killed row inference and produced eleven
+  type errors. Also a named rule in the same skill.
+
+### Not built, with reasons
+
+- **The inbound WhatsApp webhook**, which blocks `delivered_at` and `read_at` from ever
+  being populated — they come from receipts with nowhere to arrive. ADR-044 settles that
+  it is a Next.js route; `webhook_events` (`0243`) already holds the idempotency table.
+- **The chatbot**, two blockers deep: it needs the webhook, which needs the Meta account.
+- **A screen for a school to write its own template text.** The override mechanism exists
+  and is SQL-only. Low priority while delivery is mocked — a school cannot tune wording
+  nobody receives.
+- **SMS has never run**, and this is the one that should worry us: in Zambia it is the
+  channel that reaches a parent with no smartphone and no data. Today that parent is
+  reached by nothing at all.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -525,6 +572,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 12 | SMS has never run | The channel that reaches a parent with no smartphone. Needs Twilio; a launch prerequisite rather than an enhancement. |
+| 12 | School-authored template text | The override mechanism is SQL-only; no screen. Low priority while delivery is mocked. |
 | 10 | Mobile OFFLINE capture | The 27 screens exist and mark a register online; ADR-004's offline-first waits on a PowerSync licence. Schema already shaped for it. |
 | 10 | NOTIFICATIONS.md Channels 2, 4, 5 | Push needs the mobile app; monthly summary and the chatbot command need a live Meta account. |
 | 09 | `payments.payment_method` has no `mobile_money` | The dominant Zambian rail is recorded as `online_gateway`. Needs a migration and a product decision. |
@@ -573,3 +622,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 09 assessed and remediated, 85%; the reminder schedule is now per-school configuration |
 | 2026-10-11 | Folder 10 assessed and remediated, 80%; absence alerts built as a worker, ADR-047 |
 | 2026-10-11 | Folder 11 assessed and remediated, 88%; grade override built, grading revision reachable, CLAUDE.md's "no mobile screens" claim corrected |
+| 2026-10-11 | Folder 12 assessed, 65%; message log built, accountant access fixed. Four of six docs unverifiable without provider credentials |

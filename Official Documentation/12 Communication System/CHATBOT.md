@@ -10,6 +10,23 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not built, and correctly last in this folder.**
+
+Every command described here arrives as an inbound WhatsApp message, so the chatbot cannot
+exist before the webhook, and the webhook cannot exist before a Meta account. Two blockers
+deep.
+
+`announcement_starters` exists and is reachable, which is a different feature despite the
+similar name — prompts for a human composing an announcement, not a bot answering a
+parent.
+
+When it is built, the `ATTENDANCE` command is the one to start with: it answers the
+question parents ask most, it is read-only, and it needs no state machine.
+
+---
+
 ## Purpose
 
 This document defines the WhatsApp chatbot — how inbound messages are received, how commands are processed, how responses are formatted, and how the chatbot handles multiple children and edge cases. Every Claude Code session building the chatbot must read this document.

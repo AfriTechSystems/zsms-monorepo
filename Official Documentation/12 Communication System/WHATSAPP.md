@@ -13,6 +13,30 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Code complete, never executed. Blocked on credentials, not on engineering.**
+
+`packages/notifications` holds the dispatch abstraction and the fallback chain, and every
+caller goes through `sendWithFallback()`. There is **no Meta account**, so the provider is
+a mock and no WhatsApp message has ever left this machine.
+
+**The inbound webhook does not exist either**, and ADR-044 settles where it goes: a
+Next.js route under `apps/web/app/api/webhooks/`, not an Edge Function. It needs signature
+verification, **idempotency on Meta's own event id** because delivery is at-least-once,
+and a refusal that does not reveal whether a record exists. `webhook_events` (`0243`)
+already provides the idempotency table.
+
+Until then, `message_log.delivered_at` and `.read_at` can never be populated — they are
+set from delivery receipts that have nowhere to arrive.
+
+**Per-school WhatsApp numbers are further blocked**: `school_integrations.credentials_enc`
+refuses anything not prefixed `enc:v1:`, and `FIELD_ENCRYPTION_KEY` is unset. That refusal
+is deliberate — storing a school's Meta token in plaintext to make a demo work is the kind
+of shortcut that survives into production.
+
+---
+
 ## Purpose
 
 This document defines the complete WhatsApp communication system from the school's perspective — the portal-first model, approved message types, school-specific number configuration, quota management, parent opt-out, and the fallback chain. Every Claude Code session building any WhatsApp feature must read this document alongside `docs/infra/META_API.md`.

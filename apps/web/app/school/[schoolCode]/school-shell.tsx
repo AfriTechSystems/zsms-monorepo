@@ -33,6 +33,7 @@ import {
   FileSpreadsheet,
   Globe,
   GraduationCap,
+  Inbox,
   KeyRound,
   LayoutDashboard,
   ListChecks,
@@ -141,6 +142,23 @@ export function SchoolShell({
       label: 'Communication',
       items: [
         { path: '/announcements', label: 'Announcements', icon: Megaphone },
+        /*
+          Message log (MESSAGE_LOG.md).
+
+          Beside Announcements because it answers the question an announcement raises:
+          did it arrive.
+
+          `fees:read` and not `settings:write`, because its holders are EXACTLY the four
+          roles `school_management_read_message_log` admits after `0257` — owner,
+          principal, administrator, accountant. A link gated on a different set than the
+          policy would either hide a readable page or show an empty one.
+
+          The first draft wrote `settings:read`, which does not exist in the matrix.
+          `can()` returns false for an unknown key, so the row would have silently
+          vanished for everybody — the exact failure `zsms-feature` warns about, caught
+          by grepping the keys rather than trusting the name.
+        */
+        { path: '/messages', label: 'Message log', icon: Inbox, needs: 'fees:read' },
       ],
     },
     {

@@ -10,6 +10,27 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The registry is built and resolution works.** `notification_templates` with
+`resolve_notification_template()`, platform defaults on `school_id IS NULL` and per-school
+overrides above them.
+
+**Templates added while auditing this folder set:** `fee_overdue_final` (`0253`) and
+`absence_alert / in_app` (`0255`). Both cases were the same shape — a document named a
+template, a school could choose the channel it belonged to, and nothing had seeded it, so
+that choice would have sent **nothing, silently**. `0253` asserts that every channel a
+school can pick has a template on both fee-reminder rungs.
+
+**Not built: a screen for a school to write its own template text.** The override
+mechanism exists and is reachable from SQL only. It is deliberately low priority while
+delivery is mocked — a school cannot usefully tune wording nobody receives — but it is a
+real gap, and `0253`'s note about never renaming a template key matters most here: a
+school that has overridden a key carries a row under the old name, and renaming would
+leave the override unfound while still appearing in their settings.
+
+---
+
 ## Purpose
 
 This document is the complete reference for all WhatsApp message templates used in ZSMS — what each template contains, its variable structure, character limits, approval status, and how new templates are added. Every Claude Code session dispatching a WhatsApp message must reference this document to ensure the correct template ID and variable order are used.

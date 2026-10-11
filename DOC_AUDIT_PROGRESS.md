@@ -39,7 +39,7 @@ quality on its own.
 | 04 | Country and Configuration | 2 | **Done** | Excellent · 90% | 2026-10-11 |
 | 05 | Core Database and API Reference | 8 | **Done** | Good · 82% | 2026-10-11 |
 | 06 | School and Tenant Management | 6 | **Done** | Good · 85% | 2026-10-11 |
-| 07 | Student and Parent Modules | 5 | **Part-done** | — | — |
+| 07 | Student and Parent Modules | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 08 | Staff | — | Not started | — | — |
 | 09 | Fees | — | Not started | — | — |
 | 10 | Attendance | — | Not started | — | — |
@@ -275,36 +275,48 @@ is a screen that lies.
 **The trial notification schedule** — all ten touchpoints, blocked on email. The worker
 logs each expired school by name so somebody can telephone.
 
-## 07 — Student and Parent Modules · ASSESSED, part-built · 2026-10-11
+## 07 — Student and Parent Modules (Good, 88%) · 2026-10-11
 
-**Not finished — stopped mid-task.** What was assessed and what remains:
+Five documents. Most of this folder was already built — the finding was one artefact
+nobody could produce, and one format nobody checked.
 
-**Already built and verified, better than first appearance:** `transfer_student()`,
-`import_students()`, `unlink_parent_from_student()`, `claim_parent_links()`,
-`request_parent_link_by_phone()`. The 30-day unlink grace period IS honoured —
-`is_linked_parent_of()` admits `is_active = FALSE AND grace_period_ends_at > NOW()`.
+### The transfer letter was never produced
 
-The external transfer UI **is** built, on the student detail page exactly where
-TRANSFER.md says it belongs. My first pass concluded it was missing because I searched
-for a file named `*transfer*` instead of checking the page — a reminder that absence of
-a filename is not absence of a feature.
+`transfer_letter` had been an allowed `doc_type` since `0087`, a type in
+`packages/documents`, and listed in `/api/documents`. **Nothing rendered one.** A school
+transferring a pupil had no letter for the family — the one physical artefact a transfer
+produces, and what the receiving school asks for.
 
-**The real gap: no transfer letter is ever produced.** `transfer_letter` is an allowed
-`doc_type`, a type in `packages/documents`, and listed in `/api/documents` — and nothing
-rendered one. A school transferring a pupil had no letter for the family, which is the
-one physical artefact a transfer produces and what the receiving school asks for.
+Now built end to end: `renderTransferLetter()`, `0246`'s context and reference functions,
+a queued worker that stores to R2 at the path TRANSFER.md specifies, and the checkbox
+ticked by default as recommended.
 
-**Done:** `renderTransferLetter()` in `packages/documents`, to TRANSFER.md's specified
-contents — registration number, enrolment and transfer dates, final grade, empty
-signature and stamp blocks. Type-checks.
+Queued rather than rendered inline so a transfer still completes when R2 is briefly
+unavailable — the pupil's status must not fail; the letter is retryable.
 
-**NOT done, and this is the next step:** nothing calls it. The route
-(`/api/school/students/year-end`, `action: 'transfer'`) must render, store to R2 under
-`{school}/documents/transfers/{ref}.pdf`, record in `generated_documents`, and the leave
-form needs TRANSFER.md's "Generate transfer letter" checkbox. Until then the renderer is
-unreachable work — the exact failure this audit keeps finding.
+### The pupil identifier format was unenforced
 
-**Also not assessed:** STUDENTS.md, STUDENT_ID.md, BULK_IMPORT.md.
+`students.student_id` was NOT NULL and UNIQUE, and the format `STU-ZM-LSK-0001-00042` —
+specified in two documents — was enforced nowhere. `STU-ZM-LSK-1-42` would have stored
+cleanly and then failed every lookup built on the documented shape. A pupil who exists
+and cannot be found is worse than a refused insert at the moment of the typo. `0247`
+adds the CHECK; all 254 existing pupils already matched.
+
+### Already built, and better than first appearance
+
+The external transfer UI **is** on the pupil's page, where TRANSFER.md says. My first
+pass called it missing because I searched for a filename rather than checking the page.
+
+The 30-day unlink grace period **is** honoured — `is_linked_parent_of()` admits an
+inactive link whose `grace_period_ends_at` is still in the future. That is the kind of
+detail most likely to have been skipped, and it was not.
+
+### Still open
+
+- The marketing opt-in prompt at transfer: the column exists and defaults FALSE; the
+  screen does not.
+- `packages/validators` does not exist. The one regex lives beside the data instead,
+  because a package for a single expression is two places for it to drift.
 
 ## Carried forward
 
@@ -359,3 +371,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 04 assessed and remediated, 90% |
 | 2026-10-11 | Folder 05 assessed and remediated, 82% |
 | 2026-10-11 | Folder 06 assessed and remediated, 85% |
+| 2026-10-11 | Folder 07 assessed and remediated, 88% |

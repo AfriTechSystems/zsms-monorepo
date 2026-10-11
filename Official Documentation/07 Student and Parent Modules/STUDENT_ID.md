@@ -12,6 +12,26 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The format is now enforced. Until `0247` it was not.**
+
+`students.student_id` has always been NOT NULL and UNIQUE. The **format** was specified
+here and in `CONVENTIONS.md` and enforced nowhere, so `STU-ZM-LSK-1-42` would have stored
+cleanly — and then failed every lookup built on the documented shape. A pupil who exists
+and cannot be found is a worse failure than a refused insert at the moment of the typo.
+
+`0247` adds a CHECK matching the regex below, and `public.is_valid_student_id()` so a
+route, an import and a policy all ask the same question of the same expression.
+
+All 254 pupils on `zsms-dev` already matched — checked before writing, because a CHECK
+added to a table with one non-conforming row fails the migration outright.
+
+**`packages/validators/student.ts` does not exist**, and the validator lives beside the
+data instead. Creating a package for one regex would be two places for it to drift.
+
+---
+
 ## Purpose
 
 This document is the focused reference for the student ID system — its format, how it is generated, how it is used across every module that references it, and what happens to it when a student transfers schools. Every Claude Code session that generates, displays, or validates student IDs must read this document.

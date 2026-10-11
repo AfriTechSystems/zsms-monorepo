@@ -39,7 +39,7 @@ quality on its own.
 | 04 | Country and Configuration | 2 | **Done** | Excellent · 90% | 2026-10-11 |
 | 05 | Core Database and API Reference | 8 | **Done** | Good · 82% | 2026-10-11 |
 | 06 | School and Tenant Management | 6 | **Done** | Good · 85% | 2026-10-11 |
-| 07 | Students and Parents | — | Not started | — | — |
+| 07 | Student and Parent Modules | 5 | **Part-done** | — | — |
 | 08 | Staff | — | Not started | — | — |
 | 09 | Fees | — | Not started | — | — |
 | 10 | Attendance | — | Not started | — | — |
@@ -274,6 +274,37 @@ is a screen that lies.
 
 **The trial notification schedule** — all ten touchpoints, blocked on email. The worker
 logs each expired school by name so somebody can telephone.
+
+## 07 — Student and Parent Modules · ASSESSED, part-built · 2026-10-11
+
+**Not finished — stopped mid-task.** What was assessed and what remains:
+
+**Already built and verified, better than first appearance:** `transfer_student()`,
+`import_students()`, `unlink_parent_from_student()`, `claim_parent_links()`,
+`request_parent_link_by_phone()`. The 30-day unlink grace period IS honoured —
+`is_linked_parent_of()` admits `is_active = FALSE AND grace_period_ends_at > NOW()`.
+
+The external transfer UI **is** built, on the student detail page exactly where
+TRANSFER.md says it belongs. My first pass concluded it was missing because I searched
+for a file named `*transfer*` instead of checking the page — a reminder that absence of
+a filename is not absence of a feature.
+
+**The real gap: no transfer letter is ever produced.** `transfer_letter` is an allowed
+`doc_type`, a type in `packages/documents`, and listed in `/api/documents` — and nothing
+rendered one. A school transferring a pupil had no letter for the family, which is the
+one physical artefact a transfer produces and what the receiving school asks for.
+
+**Done:** `renderTransferLetter()` in `packages/documents`, to TRANSFER.md's specified
+contents — registration number, enrolment and transfer dates, final grade, empty
+signature and stamp blocks. Type-checks.
+
+**NOT done, and this is the next step:** nothing calls it. The route
+(`/api/school/students/year-end`, `action: 'transfer'`) must render, store to R2 under
+`{school}/documents/transfers/{ref}.pdf`, record in `generated_documents`, and the leave
+form needs TRANSFER.md's "Generate transfer letter" checkbox. Until then the renderer is
+unreachable work — the exact failure this audit keeps finding.
+
+**Also not assessed:** STUDENTS.md, STUDENT_ID.md, BULK_IMPORT.md.
 
 ## Carried forward
 

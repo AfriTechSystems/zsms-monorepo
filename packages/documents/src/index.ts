@@ -18,12 +18,21 @@ import {
   move,
   needsPage,
   newDocument,
+  // Wrapping body text, which only the transfer letter needs — the other
+  // documents are all label/value rows.
+  paragraph,
   newPage,
   rule,
   text,
   textRight,
 } from './pdf'
-import type { ReceiptData, RenderedDocument, ReportCardData, StatementData } from './types'
+import type {
+  ReceiptData,
+  RenderedDocument,
+  ReportCardData,
+  StatementData,
+  TransferLetterData,
+} from './types'
 
 const RIGHT = A4.width - MARGIN
 
@@ -216,6 +225,105 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
 
   footer(doc, `${data.school.name} · ${data.studentCode} · ${data.academicYear} Term ${data.termNumber}`)
   return finish(doc, `report-${data.studentCode}-${data.academicYear}-T${data.termNumber}.pdf`)
+}
+
+// ---------------------------------------------------------------------------
+// Transfer letter — the document a family carries to the next school
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a transfer letter to `TRANSFER.md`'s specified contents.
+ *
+ * ## Why this is formal rather than friendly
+ *
+ * The audience is not the parent. It is a registrar at the receiving school deciding
+ * whether to admit a child, and they are looking for specific facts: who, from where,
+ * when, what grade was completed, and who at the origin school stands behind it.
+ *
+ * So no greeting, no prose paragraph, and a signature block that is deliberately empty
+ * — a letter ZSMS signed itself would be worth nothing. The school signs and stamps it.
+ *
+ * ## Withdrawal is said plainly
+ *
+ * A withdrawal is not a transfer, and a letter that blurs them misleads the reader
+ * about whether a destination school exists. The heading and the body both say which.
+ */
+export async function renderTransferLetter(
+  data: TransferLetterData,
+): Promise<RenderedDocument> {
+  const doc = await newDocument()
+
+  const leaving = data.kind === 'withdrawn'
+  await header(doc, data.school, leaving ? 'WITHDRAWAL LETTER' : 'TRANSFER LETTER')
+
+  text(doc, data.transferReference, { size: 12, bold: true })
+  move(doc, 16)
+  text(doc, `Issued ${data.transferredOn}`, { size: 9, color: MUTED })
+  move(doc, 24)
+
+  /*
+    The registration number sits with the school, not the pupil. It is what tells a
+    registrar this letter comes from a recognised school rather than anybody with a
+    printer, so it is the first thing after the reference.
+  */
+  if (data.ministryRegistrationNumber) {
+    labelValue(doc, 'Ministry registration', data.ministryRegistrationNumber)
+  }
+  rule(doc)
+
+  labelValue(doc, 'Pupil', data.studentName)
+  labelValue(doc, 'Pupil number', data.studentCode)
+  labelValue(doc, 'Enrolled', data.enrolledOn)
+  labelValue(doc, leaving ? 'Withdrawn' : 'Transferred', data.transferredOn)
+  labelValue(doc, 'Final grade completed', data.finalGradeLevel)
+
+  if (!leaving) {
+    /*
+      "Not specified" rather than omitting the row. A registrar reading a letter with
+      no destination line cannot tell whether the school did not know or the letter is
+      incomplete, and the two have different consequences.
+    */
+    labelValue(doc, 'Destination', data.destination || 'Not specified')
+  }
+  rule(doc)
+
+  paragraph(
+    doc,
+    leaving
+      ? `This is to confirm that ${data.studentName} (${data.studentCode}) was enrolled at ` +
+          `${data.school.name} from ${data.enrolledOn} until ${data.transferredOn}, and has ` +
+          `been withdrawn from the school.`
+      : `This is to confirm that ${data.studentName} (${data.studentCode}) was enrolled at ` +
+          `${data.school.name} from ${data.enrolledOn} until ${data.transferredOn}, and has ` +
+          `been transferred with the school's knowledge.`,
+    { size: 10 },
+  )
+  move(doc, 8)
+
+  /*
+    Said explicitly because a registrar will wonder, and because TRANSFER.md is firm
+    that records are never deleted. A pupil's history is available from the origin
+    school on request — this letter is a summary, not the file.
+  */
+  paragraph(
+    doc,
+    "The pupil's academic and attendance records are retained by this school and may be " +
+      'requested through the school office, quoting the reference above.',
+    { size: 9, color: MUTED },
+  )
+  move(doc, 36)
+
+  // An empty signature block. ZSMS states facts; the school vouches for them.
+  text(doc, data.principalName ?? 'Principal', { size: 10, bold: true })
+  move(doc, 30)
+  rule(doc, 2)
+  text(doc, 'Signature and date', { size: 8.5, color: MUTED })
+  move(doc, 40)
+  rule(doc, 2)
+  text(doc, 'School stamp', { size: 8.5, color: MUTED })
+
+  footer(doc, `${data.school.name} · ${data.transferReference}`)
+  return finish(doc, `${data.transferReference}.pdf`)
 }
 
 export type { TeachingResourceDocument } from './teaching-resource'

@@ -36,7 +36,7 @@ quality on its own.
 | 01 | Foundation Layer | 14 | **Done** | Good · 73% | 2026-10-06 |
 | 02 | Authentication and Identity | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 03 | Infrastructure Services | 20 | **Done** | Good · 78% | 2026-10-11 |
-| 04 | Country and Configuration | 2 | Not started | — | — |
+| 04 | Country and Configuration | 2 | **Done** | Excellent · 90% | 2026-10-11 |
 | 05 | Core Database and API Reference | 8 | Not started | — | — |
 | 06 | School and Tenant | — | Not started | — | — |
 | 07 | Students and Parents | — | Not started | — | — |
@@ -160,6 +160,36 @@ have to re-derive which is which.
 - Outbound webhook registration (`webhooks:receive` scope exists, no endpoint).
 - Billing alerts, which want real spend data first.
 
+## 04 — Country and Configuration (Excellent, 90%) · 2026-10-11
+
+Two documents, and the smallest folder so far — but it held one real product gap.
+
+**`reference_subjects_zm` held 16 of the 62 subjects ZM.md lists, and none at A-level.**
+That table is what a school picks from during onboarding, so a secondary school found
+about a quarter of its curriculum and typed the rest by hand — at exactly the moment it
+is deciding whether ZSMS knows anything about Zambian schooling. A sixth form found
+nothing. `0242` seeds all 62, extracted from ZM.md's own tables by script rather than
+transcribed, because a mistyped code does not fail — it quietly never appears.
+
+**`npm run country:check`** is new: it prints every place in the live schema that assumes
+Zambia. `ADDING_COUNTRY.md` is an eight-step runbook that would have failed *gradually* —
+the first school in a new country refused by one CHECK, then another, each looking like a
+bug. ADR-040 rightly defers widening them; what was missing was that the list existed
+nowhere, so the runbook promised a path nobody had walked.
+
+The script found **ten** places where ADR-040 listed five, and corrected it twice:
+
+- **`term_number` is not coupled.** Every CHECK admits 1–4, so a four-term country
+  already works. One fewer thing to do.
+- **`school_subjects.curriculum_type` was missed**, and it is on a table schools write to
+  — so it would have been met sooner and read as a stranger bug.
+
+Also added `appName` and `whatsAppSenderId`, which ZM.md specified and the type omitted.
+
+**Already country-neutral, and worth not re-solving:** `packages/config` has the country
+index Step 2 describes — keyed by code, selected by `NEXT_PUBLIC_COUNTRY_CODE`, with an
+error naming the runbook. Step 2 is satisfied.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -174,6 +204,7 @@ Open items from finished folders. Each carries why it is still open.
 | 02 | Suspicious activity detection | None of SESSIONS.md's five patterns, and no alerting path. `audit_logs` could detect two retrospectively. |
 
 
+| 04 | Multi-country constraint widening | ADR-040 defers it until a second country is real. `npm run country:check` keeps the inventory honest in the meantime. |
 | 03 | Uptime monitoring and alerting | `/api/health` exists and nothing polls it. Needs an external monitor, not code. |
 | 03 | API write endpoints (Tier 1/3) | Needs idempotency on a caller-supplied key, or a retried request double-records a payment. |
 | 03 | PITR and the Railway standby | Paid plans. `zsms-dev` is free and synthetic, so there is nothing yet to verify against. |
@@ -205,3 +236,4 @@ repeatedly described things the database could not do.
 | 2026-10-10 | Tracker created; folder 02 assessed |
 | 2026-10-11 | Folder 02 remediated and re-scored 55% -> 88% |
 | 2026-10-11 | Folder 03 assessed and remediated, 52% -> 78% |
+| 2026-10-11 | Folder 04 assessed and remediated, 90% |

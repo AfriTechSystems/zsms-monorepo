@@ -529,6 +529,19 @@ Also: **`reference_subjects_zm` bakes the country into the table name** even tho
 
 ---
 
+**Corrected 2026-10-11, by asking the schema rather than re-reading this ADR.**
+
+- **`term_number` is NOT coupled** and should not have been listed. Every CHECK on it
+  admits 1 to 4, so a country with four terms already works.
+- **`school_subjects.curriculum_type` WAS coupled and was missed.** Same constraint as
+  `reference_subjects_zm`'s, on a table schools write to — so it would have been met
+  sooner and read as a stranger bug.
+
+The live count is **ten** places, not five. `npm run country:check` prints them from the
+schema, so the list cannot go stale the way this paragraph did. The deferral itself stands:
+widening a constraint for a country that does not exist removes a validation ZSMS performs
+for the one that does.
+
 ## ADR-041 — Grading Scale Versioning for Exam Results
 
 **Status:** **Resolved 2026-09-26** — migrations `0106` and `0107`, 20 pgTAP assertions in `grading_scale_versioning_test.sql`.

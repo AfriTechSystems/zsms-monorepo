@@ -21,6 +21,8 @@ export const ZM_CONFIG: CountryConfig = {
   paymentGateways: [
     'flutterwave', 'pawapay', 'airtel_money', 'mtn_momo', 'zanaco_zpay', 'dpo', 'pesapal',
   ],
+  appName: 'ZSMS',
+  whatsAppSenderId: 'ZSMS Zambia',
   domain: 'zsms.co.zm',
   dataRegion: 'af-south-1',
   complianceLaw: 'Zambia Data Protection Act 2021',

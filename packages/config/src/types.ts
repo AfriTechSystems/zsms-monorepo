@@ -5,6 +5,21 @@ export interface CountryConfig {
   phone: { countryCode: string; minLength: number; maxLength: number; stripLeadingZero: boolean }
   academicYear: { terms: number; termNames: string[]; startMonth: number; endMonth: number }
   paymentGateways: string[]
+  /**
+   * What the product is called in this country.
+   *
+   * Separate from `name` (the country) and from the domain, because a second country may
+   * ship under a different brand — `ZM.md` names it and nothing read it until now.
+   */
+  appName: string
+  /**
+   * The display name a WhatsApp message appears from.
+   *
+   * Not a credential: `META_WHATSAPP_PHONE_NUMBER_ID` is the credential and lives in the
+   * environment. This is the human-readable sender a parent sees, which is country-scoped
+   * because a Zambian parent should not receive messages headed with another country's name.
+   */
+  whatsAppSenderId: string
   domain: string
   dataRegion: string
   complianceLaw: string

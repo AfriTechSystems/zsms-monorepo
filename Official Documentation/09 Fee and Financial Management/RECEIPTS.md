@@ -13,6 +13,22 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built and verified end to end.** The number format below is exactly what the database
+produces — checked against live rows on 2026-10-11 (`REC-ZM-LSK-9001-000078`).
+
+Generation, storage and delivery all work as of the R2 configuration on 2026-10-10:
+`npm run docs:smoke` proves the whole chain — the worker stores the file,
+`generated_documents` records it, the route signs the recorded path, and the bytes served
+are byte-identical to the ones stored.
+
+**Worth knowing:** `generate-receipt` was enqueued from a route no screen had ever called,
+so for a long time no receipt had been produced for anybody. Found by `npm run gaps`, which
+is the check that exists for that class of failure.
+
+---
+
 ## Purpose
 
 This document defines receipt generation — when receipts are created, how receipt numbers are sequenced, what receipts contain, how they are stored and accessed, and how parents receive them. Every Claude Code session building any receipt-related feature must read this document.

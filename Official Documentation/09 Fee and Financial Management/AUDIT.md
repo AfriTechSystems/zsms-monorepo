@@ -13,6 +13,24 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built.** `audit_logs` with `audit_row_change()` attached across the catalogue, and a
+screen at Settings → Audit trail with filters.
+
+Two things worth knowing before extending it:
+
+**`afritech` tables have no row-change trigger.** Anything written there needs an explicit
+`log_audit_event()` call, or the act goes unrecorded.
+
+**`0131`'s trigger list is frozen at migration time**, so a table created afterwards is not
+audited and nothing reminds anybody — which is how `school_payment_details` went two days
+unaudited. New school-scoped tables attach both the audit trigger and `0149`'s status guard
+in their own migration; `school_fee_reminder_settings` (`0251`) does, because changing when
+parents are chased for money is worth a record of who did it.
+
+---
+
 ## Purpose
 
 This document defines the financial audit trail in ZSMS — what is logged for every financial event, how the audit log is accessed, how reports are generated, and the immutability guarantees that make the trail trustworthy. Every Claude Code session building any financial feature must ensure the appropriate audit log entry is written.

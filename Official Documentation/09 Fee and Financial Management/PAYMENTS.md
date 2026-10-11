@@ -15,6 +15,25 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, with one defect found and fixed this month worth recording.**
+
+`allocate_payment()` selected a column that does not exist (`s.allocate` where the function
+returns `suggested`), so **every payment recorded without explicit allocations had failed
+since `0213`** with a bare `42703`. Fixed in `0232` as a one-token edit of the live
+definition — rebuilding the function by hand would have destroyed the changed-column diff
+and the no-op suppression it had accumulated.
+
+It was found by CI running the pgTAP suites against a from-scratch database, not by reading
+the code. `db:test:plans` counts assertions without executing them, so a suite that errors
+on its first line still passes the plan check.
+
+**Open:** `payment_method` has no `mobile_money` value, so the dominant Zambian rail is
+recorded as `online_gateway`. See `GATEWAY.md`.
+
+---
+
 ## Purpose
 
 This document defines the complete payment lifecycle in ZSMS — how payments are submitted by parents, recorded by accountants, verified, rejected, queried, and reversed. It covers the updated security model (confirmation checkbox and proof of payment instead of OTP), the verification queue workflow, duplicate detection, and how payment status flows through the system. Every Claude Code session building any payment feature must read this document.

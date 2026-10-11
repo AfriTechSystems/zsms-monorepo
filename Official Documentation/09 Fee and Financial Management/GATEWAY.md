@@ -12,6 +12,33 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not built, and currently outside the product model rather than behind it.**
+
+The present design is that parents pay their school by whatever rail the school already
+uses — cash, bank deposit, mobile money — and use ZSMS to **upload proof of payment**, see
+the school's account details, and read receipts and fee updates. The school verifies and
+records. Nothing in that path needs a gateway.
+
+What this document describes would automate the recording step: a school connects its own
+account, funds flow parent → gateway → school, and ZSMS records the confirmed outcome via
+webhook. That remains the right design when it is built — ZSMS never holding funds, and
+AfriTech taking no transaction fee — and the foundation exists in `invoice_payments`
+(gateway columns plus a unique `(gateway_name, gateway_reference)` idempotency key).
+
+**Blocked on two things**, both real: no gateway account or credentials, and the inbound
+webhook route it depends on is one of the nine still unbuilt for the same reason
+(ADR-044 settles that they are Next.js routes under `app/api/webhooks/`, not Edge
+Functions).
+
+**`payments.payment_method` has no `mobile_money` value**, which matters here. Mobile money
+is the dominant rail in Zambia and has to be recorded as `online_gateway` today, losing the
+distinction on every receipt and reconciliation. Tracked in `CLAUDE.md`; it needs a
+migration and a product decision.
+
+---
+
 ## Purpose
 
 This document covers payment gateway configuration from the school's perspective — how schools connect their gateway accounts, how multiple gateways work simultaneously, how the parent payment page presents gateway options, and how gateway webhooks flow into the payment verification system. Every Claude Code session building gateway configuration or the parent payment page must read this document.

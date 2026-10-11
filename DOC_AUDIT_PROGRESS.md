@@ -41,7 +41,7 @@ quality on its own.
 | 06 | School and Tenant Management | 6 | **Done** | Good · 85% | 2026-10-11 |
 | 07 | Student and Parent Modules | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 08 | Staff Management | 5 | **Done** | Good · 87% | 2026-10-11 |
-| 09 | Fees | — | Not started | — | — |
+| 09 | Fee and Financial Management | 6 | **Done** | Good · 85% | 2026-10-11 |
 | 10 | Attendance | — | Not started | — | — |
 | 11 | Exams | — | Not started | — | — |
 | 12 | Communication | — | Not started | — | — |
@@ -361,6 +361,55 @@ The departure marketing prompt (`0248`) — asked once when a child leaves, neve
 pre-ticked, and clicking Continue without ticking counts as an answer rather than a
 deferral.
 
+## 09 — Fee and Financial Management (Good, 85%) · 2026-10-11
+
+Six documents. The fee path turned out to be almost entirely configuration-driven already
+— no hardcoded prices, no hardcoded tiers, receipt numbers matching the documented format
+exactly. One exception, and it was a consequential one.
+
+### The reminder schedule was two constants in a TypeScript file
+
+`?? 3` and `?? 7` in the fee-reminder handler decided when **every school in Zambia**
+chased a parent for money, and they did not match REMINDERS.md's 7/14/30. Nothing passed
+those options, so the defaults were the behaviour.
+
+`0251` makes it per-school: the rungs, the three channels separately (WhatsApp costs quota,
+the others do not), a cooldown, and an off switch that keeps the schedule. `0252` makes the
+worker read it. Screen at Settings → Fee reminders.
+
+**`0252` deviates from the documented rule deliberately.** Exact day matching, which the
+document specifies, means a missed cron run on day 7 sends **no** 7-day reminder ever. The
+duplicate it guards against is already handled by the cooldown. So it counts rungs passed
+against reminders received — same cadence, late instead of never, and arithmetically
+incapable of over-sending.
+
+### The final-notice template was named but never seeded
+
+Only `fee_reminder` existed, so a family thirty days in arrears got the same gentle nudge
+as one seven days in, three times. `fee_reminder` also had no in-app row, though a school
+can choose in-app as its only channel — which would have sent nothing, silently. `0253`
+seeds both and asserts every choosable channel has a template on both rungs.
+
+### I opened a tenant hole and closed it in the same session
+
+`0251` granted `school_reminder_settings(UUID)` — SECURITY DEFINER, no tenant clause — to
+`authenticated`, so any signed-in user could read any school's chasing schedule by changing
+a UUID. Caught while wiring the route, fixed in `0254` with a no-argument
+`my_reminder_settings()`. Commercially sensitive rather than catastrophic, and exactly the
+pattern the migration skill names first: never trust an id passed as an argument.
+
+### Deferred, with reasons
+
+- **GATEWAY.md** is outside the current product model, not behind it. Parents pay their
+  school by whatever rail the school uses and upload proof; nothing in that path needs a
+  gateway. When built it automates the recording step, and it is blocked on both credentials
+  and one of the nine unbuilt webhook routes.
+- **`payments.payment_method` has no `mobile_money`** — the dominant Zambian rail is
+  recorded as `online_gateway`, losing the distinction on every receipt. Needs a migration
+  and a product decision.
+- **Delivery remains unproven.** The schedule is correct; no Meta/Twilio/Resend credentials
+  exist, so no reminder has left this machine.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -377,6 +426,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 09 | `payments.payment_method` has no `mobile_money` | The dominant Zambian rail is recorded as `online_gateway`. Needs a migration and a product decision. |
+| 09 | Reminder DELIVERY is unproven | Schedule correct; no Meta/Twilio/Resend credentials, so nothing has left this machine. |
 | 08 | Bulk staff invitation | Blocked on a paid Clerk plan — the free tier caps an organisation at five members. |
 | 08 | Assignment subject/class validation | `class_id` is intentionally not a foreign key; the check belongs in the route. |
 | 05 | Nine of ten inbound webhooks | Foundation built (`0243`); each is blocked on a gateway, Meta or lender account. |
@@ -418,3 +469,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 06 assessed and remediated, 85% |
 | 2026-10-11 | Folder 07 assessed and remediated, 88% |
 | 2026-10-11 | Folder 08 assessed and remediated, 87%; folder 07's open item closed |
+| 2026-10-11 | Folder 09 assessed and remediated, 85%; the reminder schedule is now per-school configuration |

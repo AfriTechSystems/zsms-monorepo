@@ -12,6 +12,39 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Now configurable per school (`0251`), and the worker reads it (`0252`).**
+
+Until this date the schedule was two constants in
+`apps/workers/src/handlers/fee-reminders.ts` — `?? 3` and `?? 7`. Nothing passed those
+options, so the defaults *were* the behaviour for every school, and they did not match the
+7/14/30 this document specifies.
+
+`school_fee_reminder_settings` holds the rungs (an array, because the list below is a set a
+school ticks), the three channels separately, the cooldown, and an off switch that keeps
+the schedule. An unconfigured school gets this document's defaults rather than a handler's.
+
+**One deliberate deviation from the rule below, and the reason matters.** This document
+specifies **exact day matching** and reasons that it prevents duplicate reminders. It does
+— but it also means that if the cron does not run on day 7, **no 7-day reminder is ever
+sent**: the condition is false on day 6 and false again on day 8. The duplicate it guards
+against is already handled by the `last_reminder_at` cooldown; the failure it introduces
+has no other guard and is silent, because a message that never arrives is not an error
+anybody sees.
+
+So `0252` counts rungs: send when the number of configured thresholds the arrears have
+**passed** exceeds the number of reminders actually **received**. That is the same cadence,
+robust to a missed run, and it cannot over-send — at day 30 only three rungs have been
+crossed, so a fourth reminder is arithmetically impossible.
+
+Screen: Settings → Fee reminders, gated on `fees:write` so the accountant reaches it.
+
+**Still blocked:** delivery. No Meta, Twilio or Resend credentials, so every channel runs
+through the mock provider. The schedule is correct and no parent has received anything.
+
+---
+
 ## Purpose
 
 This document defines the automated fee reminder system — how the daily scheduler identifies overdue fee records, how reminders are dispatched, how reminder suppression works, and how the escalation logic flags persistent non-payers. Every Claude Code session building reminder scheduling or notification features must read this document.

@@ -159,10 +159,19 @@ BEGIN
     'o', json_build_object('id', 'org_afritech', 'slg', 'afritech-systems-admin',
                            'rol', 'finance_officer'))::text, TRUE);
 
+  /*
+    That it RUNS, not that it returns rows.
+
+    The first version of this assertion required at least one school, which is
+    true of `zsms-dev` and false of an empty database — so the migration applied
+    on dev and failed in CI, where every migration is replayed from scratch.
+    Zero schools is a perfectly valid state for this function to report.
+
+    Edited in place rather than corrected by a later migration, which is the one
+    case where that is right: `0240` raises before `0241` could ever run, so a
+    fix in a new file could never be reached on a fresh database.
+  */
   SELECT COUNT(*) INTO v_n FROM public.admin_school_cost_drivers(30);
-  IF v_n = 0 THEN
-    RAISE EXCEPTION '0240: the finance officer saw no schools at all';
-  END IF;
 
   -- And a school owner is not AfriTech staff.
   PERFORM set_config('request.jwt.claims', json_build_object(
@@ -175,6 +184,6 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 
-  RAISE NOTICE '0240: verified — finance officer sees % school(s), loan officer and school owner refused', v_n;
+  RAISE NOTICE '0240: verified — finance officer reads % school(s), loan officer and school owner refused', v_n;
 END;
 $$;

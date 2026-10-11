@@ -24,6 +24,7 @@ import {
   Banknote,
   BookMarked,
   Building2,
+  Coins,
   Gauge,
   HeartPulse,
   Network,
@@ -144,6 +145,15 @@ export function AdminShell({
       label: 'Revenue',
       items: [
         { path: '/billing', label: 'Invoices & billing', icon: Receipt },
+        /*
+          Unit economics (COST_MANAGEMENT.md).
+
+          Under Revenue beside billing, because it answers the question billing raises:
+          an invoice says what a school pays, and this says what serving them consumes.
+          Gated the same way in the database — `billing:read`, so a loan officer is
+          refused.
+        */
+        { path: '/costs', label: 'Unit economics', icon: Coins },
         { path: '/pricing', label: 'Plans & pricing', icon: Wallet },
         /*
           The loan queue and its partners, under Revenue because that is what they are

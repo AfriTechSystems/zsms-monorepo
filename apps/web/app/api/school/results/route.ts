@@ -106,7 +106,8 @@ export async function GET(request: NextRequest): Promise<Response> {
         .from('exam_results')
         .select(
           'id, student_id, marks_obtained, marks_total, grade_letter, grade_points, ' +
-            'comments, results_published, published_at, grading_scale_version_id',
+            'comments, results_published, published_at, grading_scale_version_id, ' +
+            'grade_override, grade_override_reason, unlocked_at',
         )
         .eq('class_id', q.classId)
         .eq('subject_code', q.subjectCode)
@@ -133,6 +134,9 @@ export async function GET(request: NextRequest): Promise<Response> {
       comments: string | null
       results_published: boolean
       grading_scale_version_id: string | null
+      grade_override: string | null
+      grade_override_reason: string | null
+      unlocked_at: string | null
     }
     const markRows = (marks.data ?? []) as unknown as MarkRow[]
     const byStudent = new Map(markRows.map((m) => [m.student_id, m] as const))
@@ -151,7 +155,19 @@ export async function GET(request: NextRequest): Promise<Response> {
         // null, never 0. A pupil nobody has marked is unmarked.
         marksObtained: existing?.marks_obtained ?? null,
         marksTotal: existing?.marks_total ?? null,
+        /*
+          The COMPUTED grade, always. `grade_override` travels separately rather
+          than replacing it, because a report card has to be able to show that a
+          grade was awarded rather than calculated — GRADING.md asks for a
+          footnote, and you cannot footnote a value you have overwritten.
+        */
         gradeLetter: existing?.grade_letter ?? null,
+        gradeOverride: existing?.grade_override ?? null,
+        gradeOverrideReason: existing?.grade_override_reason ?? null,
+        // Whether an override can be set right now: a published result needs
+        // unlocking first, which records the reason (0124).
+        canOverride: Boolean(existing?.id) &&
+          (!existing?.results_published || Boolean(existing?.unlocked_at)),
         gradePoints: existing?.grade_points ?? null,
         comments: existing?.comments ?? null,
         published: existing?.results_published ?? false,
@@ -239,6 +255,73 @@ export async function POST(request: NextRequest): Promise<Response> {
       // what happens when the subject has no grading scale. Silence there would
       // look like success and read as a missing feature later.
       graded: row?.graded_count ?? 0,
+    })
+  })
+}
+
+/**
+ * PATCH — award a grade rather than calculate it.
+ *
+ * Spec: `11 Examinations and Results/GRADING.md` → *Grade Override*
+ *
+ * Used where a final grade is not a percentage: coursework subjects, practicals, and
+ * exceptional circumstances the principal has approved.
+ *
+ * `set_grade_override()` (`0256`) does the enforcing — it requires a reason, validates
+ * the grade against the school's own scale version, refuses a published result, and
+ * takes the school from the session rather than from this request. None of that is
+ * re-checked here, because a second copy of a rule is the copy a direct PostgREST call
+ * bypasses.
+ */
+const overrideSchema = z.object({
+  resultId: z.string().uuid(),
+  /*
+    Optional, and an empty string is meaningful: it clears the override. Not
+    validated against a grade list here — the school's scale is the authority and
+    `0256` checks against the version that produced this very result.
+  */
+  grade: z.string().trim().max(10).optional(),
+  reason: z.string().trim().max(500).optional(),
+})
+
+export async function PATCH(request: NextRequest): Promise<Response> {
+  return guard(async () => {
+    const parsed = overrideSchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) {
+      return fail('VALIDATION_ERROR', parsed.error.issues[0]?.message ?? 'Invalid request.')
+    }
+
+    const client = await createUserClient()
+    if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    const { data, error } = await client
+      .rpc('set_grade_override', {
+        p_result_id: parsed.data.resultId,
+        // An empty grade CLEARS the override and restores the computed grade.
+        p_grade: parsed.data.grade ?? null,
+        p_reason: parsed.data.reason ?? null,
+      })
+      .maybeSingle()
+
+    if (error) {
+      if (error.code === '42501') return fail('FORBIDDEN', error.message)
+      if (error.code === '22023') return fail('VALIDATION_ERROR', error.message)
+      return fromPostgrestError(error)
+    }
+
+    const row = data as {
+      out_grade: string | null
+      out_computed: string | null
+      out_is_override: boolean
+    } | null
+
+    return ok({
+      grade: row?.out_grade ?? null,
+      computed: row?.out_computed ?? null,
+      isOverride: row?.out_is_override ?? false,
+      message: row?.out_is_override
+        ? 'Grade awarded. It appears on the report card with your reason as a footnote.'
+        : 'Override removed. The calculated grade applies again.',
     })
   })
 }

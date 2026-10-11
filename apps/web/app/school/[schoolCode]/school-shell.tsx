@@ -189,6 +189,16 @@ export function SchoolShell({
           the right way round: the gate is the policy, and this only keeps the nav
           roughly honest.
         */
+        /*
+          Grading scales (GRADING.md, ADR-041).
+
+          `revise_grading_scale()` existed since `0141` with the whole versioning
+          apparatus and a 20-assertion suite behind it, and nothing called it — a school
+          could not change its own grade boundaries through any surface.
+
+          `settings:write` gates the link; the function is narrower.
+        */
+        { path: '/settings/grading', label: 'Grading scales', icon: GraduationCap, needs: 'settings:write' },
         { path: '/settings/roles', label: 'Staff roles', icon: ShieldCheck, needs: 'settings:write' },
         /*
           Permission grants (PERMISSIONS.md).

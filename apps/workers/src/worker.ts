@@ -16,8 +16,10 @@
 
 import { createWorker } from '@zsms/queue'
 import { createWorkerDeps, workerDb } from './db'
+import { registerRecurringJobs } from './schedule'
 import { handlePaymentVerified } from './handlers/payment-verified'
 import { handleFeeReminders, type DueReminder } from './handlers/fee-reminders'
+import { handleExpireTrials, type ExpiredTrial } from './handlers/expire-trials'
 import {
   handleScheduledAnnouncements,
   type AnnouncementRecipient,
@@ -242,6 +244,40 @@ export async function startWorkers(): Promise<void> {
     { concurrency: 2 },
   )
 
+  /*
+    One narrow call, so the handler never holds a Supabase client.
+
+    ADR-042: a worker's connection bypasses RLS, so everything goes through a
+    `worker_*` function. The handler cannot reach for `.from()` even by accident
+    because its dependency type does not offer one.
+  */
+  function expireTrialsDeps() {
+    return {
+      async expireOverdueTrials(): Promise<ExpiredTrial[]> {
+        const { data, error } = await workerDb().rpc('worker_expire_overdue_trials', {})
+        if (error) {
+          throw new Error(`worker_expire_overdue_trials failed: ${error.message}`)
+        }
+        return ((data ?? []) as Array<Record<string, string>>).map((r) => ({
+          schoolId: r['out_school_id']!,
+          schoolCode: r['out_school_code']!,
+          name: r['out_name']!,
+          endedAt: r['out_ended_at']!,
+        }))
+      },
+    }
+  }
+
+  await createWorker<Record<string, never>, unknown>(
+    'expire-trials',
+    async () => handleExpireTrials(expireTrialsDeps()),
+    /*
+      Concurrency 1. The UPDATE is atomic and idempotent, so a second runner would be
+      harmless — and there is nothing to gain, because the whole job is one statement.
+    */
+    { concurrency: 1 },
+  )
+
   await createWorker<Record<string, never>, unknown>(
     'check-scheduled-announcements',
     async () => handleScheduledAnnouncements(announcementDeps()),
@@ -264,7 +300,16 @@ export async function startWorkers(): Promise<void> {
     { concurrency: 2 },
   )
 
-  console.log('ZSMS workers started: generate-receipt, send-fee-reminders, check-scheduled-announcements, generate-report-card')
+  /*
+    After the workers are listening, never before.
+
+    Registering a schedule first would queue jobs with nothing to take them — they
+    would wait rather than be lost, but the first run after a deploy would be a
+    backlog instead of a single job.
+  */
+  await registerRecurringJobs()
+
+  console.log('ZSMS workers started: generate-receipt, send-fee-reminders, check-scheduled-announcements, generate-report-card, expire-trials')
 }
 
 if (process.env['NODE_ENV'] !== 'test') {

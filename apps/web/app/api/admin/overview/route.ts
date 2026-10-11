@@ -26,7 +26,7 @@ export async function GET(): Promise<Response> {
 
     // Both functions are SECURITY INVOKER, so RLS scopes them to what this
     // operator may see. The 403 above is the courtesy; this is the boundary.
-    const [metrics, health, integrations, consent] = await Promise.all([
+    const [metrics, health, integrations, consent, trials] = await Promise.all([
       client.rpc('platform_metrics'),
       client.rpc('school_health_scores'),
       /*
@@ -41,6 +41,14 @@ export async function GET(): Promise<Response> {
       */
       client.rpc('admin_integration_health'),
       client.rpc('admin_marketing_consent_summary'),
+      /*
+        Trials, with days remaining computed in the database.
+
+        TRIAL.md's notification schedule turns on exact day counts — 25, 28, 30, 33,
+        37 — and a browser clock in another timezone would put a school on the wrong
+        rung. One answer for the overview and for the notifier when it exists.
+      */
+      client.rpc('admin_trial_status'),
     ])
 
     if (metrics.error) return fromPostgrestError(metrics.error)
@@ -73,6 +81,20 @@ export async function GET(): Promise<Response> {
       marketingConsent: consent.error
         ? null
         : ((consent.data as Array<Record<string, unknown>>)?.[0] ?? null),
+
+      trials: trials.error ? [] : ((trials.data ?? []) as Array<Record<string, unknown>>),
+      trialsLoaded: !trials.error,
+      /*
+        Surfaced separately because it is the one that needs acting on. A trial that
+        has run out and has NOT been expired means the job is not running — which was
+        the state of the world until `0244`, with one school past its date and nobody
+        aware.
+      */
+      trialsOverdue: trials.error
+        ? 0
+        : ((trials.data ?? []) as Array<Record<string, unknown>>).filter(
+            (t) => t['out_is_overdue'] === true,
+          ).length,
     })
   })
 }

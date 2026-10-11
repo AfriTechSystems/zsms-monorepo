@@ -18,6 +18,14 @@ export type JobType =
   | 'submit-to-lender'
   | 'dispatch-integration-event'
   | 'check-scheduled-announcements'
+  /*
+    Moves a school past `trial_ends_at` from `trial` to `trial_expired` (`0244`).
+
+    A trial expires because time passed, not because anybody acted, so there is no
+    write to hang a trigger on — it needs a job on a clock. Idempotent, so a cron
+    firing twice during a deploy is harmless.
+  */
+  | 'expire-trials'
   | 'calculate-platform-metrics'
   | 'calculate-school-health-scores'
   | 'calculate-churn-risk'

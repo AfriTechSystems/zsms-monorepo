@@ -39,6 +39,7 @@ import { ErrorState, PageHeader, TableSkeleton } from '../../components/ui/data-
 import { Field, Input } from '../../components/ui/field'
 import { useToast } from '../../components/ui/toast'
 import { apiSend, useApi } from '../../lib/use-api'
+import { StaffProfileSection } from '../../components/account/staff-profile'
 
 interface Erasure {
   pending: boolean
@@ -145,6 +146,15 @@ export default function AccountPage(): JSX.Element {
       />
 
       {/* ---------------- Who you are ---------------- */}
+      {/*
+        Staff details first, because they are the ones somebody comes here to CHANGE —
+        the sections below are rights (export, erasure) exercised rarely. Renders
+        nothing at all for an account that is not staff anywhere.
+      */}
+      <div className="mb-cards">
+        <StaffProfileSection />
+      </div>
+
       <Card className="mb-cards">
         <CardHeader>
           <CardTitle>Your details</CardTitle>

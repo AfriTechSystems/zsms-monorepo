@@ -13,6 +13,34 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, with the role differentiation this document asks for.**
+
+`/admin` carries the overview, schools, health, pricing, features, overrides, billing,
+networks, lenders, loans, incidents, curriculum, price bands and the Teacher Hub view.
+
+**`0237` separated the AfriTech roles** this document describes — `super_admin`,
+`regional_manager`, `support_agent`, `loan_officer`, `finance_officer`, `developer` — via
+`afritech_role()` and `has_afritech_capability()`, with `afritech.staff_scope_assignments`
+for regional scoping.
+
+**`is_afritech_admin()` was deliberately left unchanged**, because 91 policies call it.
+Differentiation sits *above* it: the broad function still answers "is this AfriTech at
+all", and capability checks narrow from there. Rewriting it would have re-scoped 91
+policies in one migration.
+
+**A missing role claim resolves to `developer`, the least privileged role, not the most.**
+A missing claim is a configuration fault, and the safe reading of a configuration fault is
+"can see, cannot act".
+
+**Still open:** 32 of 34 `admin_*` functions use the broad `is_afritech_admin()` rather
+than a capability. The two that do not are the revenue functions added in `0261`, which
+check `billing:read` — because a support engineer does not need MRR in order to do
+support.
+
+---
+
 ## Purpose
 
 This document defines the AfriTech admin panel — what each internal role can see and do, how the panel is structured, and what tools are available for managing the ZSMS platform across all schools. Every Claude Code session building any AfriTech admin panel feature must read this document.

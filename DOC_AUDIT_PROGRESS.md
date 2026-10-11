@@ -47,7 +47,7 @@ quality on its own.
 | 12 | Communication System | 6 | **Done** | Fair · 65% | 2026-10-11 |
 | 13 | Document and PDF System | 4 | **Done** | Good · 86% | 2026-10-11 |
 | 14 | Loan and Finance Module | 7 | **Done** | Good · 82% | 2026-10-11 |
-| 15 | Super Admin and Platform | 5 | Not started | — | — |
+| 15 | Super Admin and Platform | 5 | **Done** | Good · 84% | 2026-10-11 |
 | 16 | Testing and Launch | 6 | Not started | — | — |
 | 17 | Integration and Pricing | 5 | Not started | — | — |
 | 18 | AI Module | 5 | Not started | — | — |
@@ -674,6 +674,66 @@ what the migration skill says to do first and what I did third.
   is unset, and storing a lender's API key in plaintext to make a demo work is the kind of
   shortcut that survives into production.
 
+## 15 — Super Admin and Platform (Good, 84%) · 2026-10-11
+
+Five documents. Onboarding, health scores and impersonation are all genuinely complete.
+The gap was in the document this folder is largest for.
+
+### PLATFORM_METRICS.md is mostly about business metrics, and none were computed
+
+`platform_metrics()` returns schools, pupils, staff and fees collected. **Not one of MRR,
+ARR, revenue by tier, trial conversion or loan commission revenue existed anywhere** —
+though every input did, in `afritech.subscription_tiers`, `schools.subscription_tier` and
+`afritech.loan_commissions`.
+
+`0261` computes them, rendered at the top of `/admin`, above the operational figures:
+on AfriTech's own dashboard "is the business working" outranks "how many pupils are
+enrolled".
+
+Three decisions worth keeping:
+
+- **MRR comes from live subscription state, not invoices.** An invoice is what *was*
+  billed; recurring revenue is what *will* be. A school that joined yesterday has no
+  invoice and is unambiguously MRR; one that churned last week still has last month's.
+- **NRR is reported unavailable rather than computed.** It needs twelve months of history
+  and launch is January 2027, so any figure would come from an empty window and render as
+  0% or 100% — both of which read as facts. The dashboard says why.
+- **Trial conversion is NULL, not 0, when no trial has finished.** "None ended" and "none
+  converted" are different facts; 0% states the second. The card shows an em dash.
+
+Both functions check `billing:read` (`0237`) rather than "is AfriTech", so a support
+agent's overview omits revenue instead of failing.
+
+### `CLAUDE.md` was wrong again — second time this session
+
+Its API route list carried `admin/impersonate` *(501 — needs Clerk actor tokens)*. There
+is **no 501 in that route.** It mints a real Clerk actor token through `@clerk/backend`,
+records the session, and revokes the token if the database refuses — mint first, record
+second, undo on refusal, so a trail can never claim a session that did not happen.
+
+After the "no mobile screens" correction in folder 11, that is two stale claims in one
+session. A note is now beside the route list saying so.
+
+### What is already good and should not be touched
+
+- **`school_health_scores()` records its own deviations in comments**: two of three
+  operational sub-scores are measurable so they rescale from 80 to 100, and a school with
+  no fee records scores 50 rather than 0 — unbilled is unconfigured, not failing. It also
+  returns `inputs_available` / `inputs_total`, which is the honest shape for a composite
+  built on partial data.
+- **`afritech_role()` resolves a missing claim to `developer`**, the least privileged role.
+  A missing claim is a configuration fault, and the safe reading of one is "can see,
+  cannot act".
+- **`is_afritech_admin()` was deliberately not rewritten** by `0237` — 91 policies call
+  it, so differentiation sits above it rather than re-scoping 91 policies at once.
+
+### Remaining
+
+- **32 of 34 `admin_*` functions still use the broad `is_afritech_admin()`** rather than a
+  capability. The two that do not are `0261`'s revenue functions.
+- **Clerk's five-member organisation cap** blocks onboarding a school with six staff. A
+  paid plan is a launch prerequisite.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -690,6 +750,7 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 15 | NRR needs 12 months of history | Reported unavailable rather than computed from an empty window. Revisit after January 2028. |
 | 14 | Inbound lender webhook | Writes disbursement and repayment status. Blocked on a lender agreement, not engineering. |
 | 14 | No offerable lender on dev | The seeded lender was deactivated for having no collection details. Populate from a real agreement; never invent payment details. |
 | 13 | R2 lifecycle / retention | Nothing is ever expired. Needs a ZDPA decision about a departed pupil's documents, not a bucket rule. |
@@ -747,3 +808,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 12 assessed, 65%; message log built, accountant access fixed. Four of six docs unverifiable without provider credentials |
 | 2026-10-11 | Folder 13 assessed and remediated, 86%; document customisation built end to end and wired into the renderer |
 | 2026-10-11 | Folder 14 assessed and remediated, 82%; Phase 1 repayment display built, unrepayable lenders now refused |
+| 2026-10-11 | Folder 15 assessed and remediated, 84%; MRR/ARR/tier revenue built, CLAUDE.md's impersonation "501" claim corrected |

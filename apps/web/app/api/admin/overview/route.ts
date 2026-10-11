@@ -26,7 +26,8 @@ export async function GET(): Promise<Response> {
 
     // Both functions are SECURITY INVOKER, so RLS scopes them to what this
     // operator may see. The 403 above is the courtesy; this is the boundary.
-    const [metrics, health, integrations, consent, trials] = await Promise.all([
+    const [metrics, health, integrations, consent, trials, business, byTier] =
+      await Promise.all([
       client.rpc('platform_metrics'),
       client.rpc('school_health_scores'),
       /*
@@ -49,6 +50,20 @@ export async function GET(): Promise<Response> {
         rung. One answer for the overview and for the notifier when it exists.
       */
       client.rpc('admin_trial_status'),
+      /*
+        AfriTech's own business metrics (`0261`).
+
+        PLATFORM_METRICS.md is mostly about these -- MRR, ARR, revenue by tier,
+        trial conversion, loan commission revenue -- and none of them were computed
+        anywhere. `platform_metrics()` counts schools and pupils, which is a
+        different question.
+
+        Both are gated on the `billing:read` capability rather than on being an
+        AfriTech administrator, so a support agent's overview simply omits revenue
+        instead of failing. That is why their errors are tolerated below.
+      */
+      client.rpc('admin_business_metrics'),
+      client.rpc('admin_revenue_by_tier'),
     ])
 
     if (metrics.error) return fromPostgrestError(metrics.error)
@@ -57,6 +72,19 @@ export async function GET(): Promise<Response> {
     const rows = (health.data ?? []) as Array<Record<string, unknown>>
 
     return ok({
+      /*
+        Revenue is absent rather than fatal when the caller lacks `billing:read`.
+
+        A support agent has a legitimate overview; refusing the whole page because
+        they cannot see MRR would make the capability split (`0237`) a worse
+        experience than not having it. The screen renders what it was given.
+      */
+      business: business.error
+        ? null
+        : ((business.data as Array<Record<string, unknown>>)?.[0] ?? null),
+      revenueByTier: byTier.error
+        ? []
+        : ((byTier.data as Array<Record<string, unknown>>) ?? []),
       metrics: (metrics.data as Array<Record<string, unknown>>)?.[0] ?? null,
       health: rows,
       // Counted here rather than in the component so the number on the card and

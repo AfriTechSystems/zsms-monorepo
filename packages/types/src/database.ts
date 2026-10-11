@@ -6174,6 +6174,23 @@ export type Database = {
         Args: { p_clerk_org_id: string; p_school_id: string }
         Returns: boolean
       }
+      admin_business_metrics: {
+        Args: never
+        Returns: {
+          arr_zmw: number
+          collected_this_month: number
+          invoiced_unpaid: number
+          loan_commission_earned: number
+          loan_commission_unpaid: number
+          mrr_zmw: number
+          nrr_available: boolean
+          paying_schools: number
+          trial_conversion_pct: number
+          trials_active: number
+          trials_converted: number
+          trials_expired: number
+        }[]
+      }
       admin_create_override: {
         Args: {
           p_actor: string
@@ -6326,6 +6343,17 @@ export type Database = {
       admin_record_owner_invitation: {
         Args: { p_invitation_id: string; p_school_id: string }
         Returns: boolean
+      }
+      admin_revenue_by_tier: {
+        Args: never
+        Returns: {
+          display_name: string
+          mrr_share_pct: number
+          mrr_zmw: number
+          schools: number
+          students: number
+          tier_name: string
+        }[]
       }
       admin_revoke_override: {
         Args: { p_actor: string; p_id: string }
@@ -8127,6 +8155,10 @@ export type Database = {
           p_via_in_app: boolean
           p_via_whatsapp: boolean
         }
+        Returns: boolean
+      }
+      set_school_branding_colours: {
+        Args: { p_anchor_color: string; p_primary_color: string }
         Returns: boolean
       }
       set_school_public_profile: {

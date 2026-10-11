@@ -10,6 +10,23 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built.** `/schools` lists, `/schools/[code]` is the SEO'd profile, and
+`school_public_profiles` controls what each school chooses to publish. The seed covers
+three publishing states plus two schools with no profile row — the default, and the case
+a directory is likeliest to render wrongly.
+
+Rate-limited at 10 requests a minute under the `enumeration` policy, because a public
+directory is a scrape target and the school-code lookup is the same surface that makes an
+unknown code deliberately indistinguishable from a real one.
+
+**Not built:** the parent login flow *from* the directory described below. A parent signs
+in at `/sign-in` and `/welcome` dispatches them, which is the same destination by a
+different route — see the entry-point correction in `AUTH.md`.
+
+---
+
 ## Purpose
 
 This document defines the public school directory — what it shows, how it works, how the school ID is surfaced for parent login, and how the directory supports the parent login flow. This page is unauthenticated and accessible to anyone.

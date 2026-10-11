@@ -11,6 +11,34 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Trials now expire. Until `0244` they did not.**
+
+`schools.status` has admitted `trial_expired` since `0003` and `register_school()` has
+set `trial_ends_at` 30 days out since `0150`. No code ever made the transition — checked
+on 2026-10-11, one school on `zsms-dev` was past its end date with full access.
+
+`worker_expire_overdue_trials()` moves `trial` to `trial_expired` and does nothing else.
+`0149`'s status guard already blocks writes for a school that is not writable, so the
+enforcement exists. **Nothing is deleted**, because this document promises twice that
+data is recoverable on subscribing, and a school that lets a trial lapse over a holiday
+must find its pupils where it left them.
+
+Scheduled at 02:00 Lusaka by `apps/workers/src/schedule.ts` — overnight, because the
+status change blocks writes and a school meeting that mid-register is worse than finding
+it when they arrive.
+
+**Not built: the notification schedule.** All ten touchpoints — days 1, 3, 7, 14, 25, 28,
+30, expiry, 33, 37 — are unsent, because every delivery channel still runs through the
+mock provider. The worker logs each expired school by name and code so somebody can
+telephone; until email works, that log is the notification.
+
+Expiring a trial without warning anybody is the wrong half to ship alone, and the log is
+the acknowledgement of that rather than a substitute for it.
+
+---
+
 ## Purpose
 
 This document defines the complete 30-day free trial lifecycle — activation, what access is available during the trial, the notification schedule, what happens at expiry, and how the trial converts to a paid subscription. Every Claude Code session that touches trial status, expiry handling, or the subscription conversion flow must read this document.

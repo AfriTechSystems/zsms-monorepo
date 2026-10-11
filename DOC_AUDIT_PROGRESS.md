@@ -38,7 +38,7 @@ quality on its own.
 | 03 | Infrastructure Services | 20 | **Done** | Good · 78% | 2026-10-11 |
 | 04 | Country and Configuration | 2 | **Done** | Excellent · 90% | 2026-10-11 |
 | 05 | Core Database and API Reference | 8 | **Done** | Good · 82% | 2026-10-11 |
-| 06 | School and Tenant | — | Not started | — | — |
+| 06 | School and Tenant Management | 6 | **Done** | Good · 85% | 2026-10-11 |
 | 07 | Students and Parents | — | Not started | — | — |
 | 08 | Staff | — | Not started | — | — |
 | 09 | Fees | — | Not started | — | — |
@@ -233,6 +233,48 @@ recorded while the warning stayed.
   `ai_credit_topup`, `revise_grading_scale`.
 - Clerk-side OTP rate limits, which are instance settings rather than ZSMS code.
 
+## 06 — School and Tenant Management (Good, 85%) · 2026-10-11
+
+Six documents. Two commercial holes, both found by reading what the documents promise
+and asking whether anything enforced it.
+
+### Trials never expired
+
+`schools.status` admitted `trial_expired` since `0003`; `register_school()` set
+`trial_ends_at` since `0150`; **no code made the transition.** One school on `zsms-dev`
+was past its date with full access. `0244` fixes it, deleting nothing — TRIAL.md promises
+twice that data survives.
+
+### Which exposed something larger: no recurring job was scheduled at all
+
+`scheduleRecurring()` existed in `packages/queue` on both queue backends with a matching
+type entry, and **nothing had ever called it.** So `check-scheduled-announcements` had a
+worker, a handler, and a comment reading "cron every 15 minutes" — and no cron. An
+announcement a school scheduled for Monday would have sat in the table forever.
+`apps/workers/src/schedule.ts` registers both on startup.
+
+### The API was a paid add-on and was free
+
+SUBSCRIPTION.md prices API Read at K138 and API Write at K275. The flags existed; `0241`
+checked neither, so any school could use the API for nothing. `0245` gates it at issue
+AND at verify — the second is the one that matters, because without re-resolving each
+call a cancelled add-on leaves the key working forever.
+
+No key was revoked. A school already wired in is a commercial conversation, and
+`/admin/costs` now lists the mismatches so it starts from a list.
+
+### Deliberately not built
+
+**Per-school WhatsApp configuration.** `SCHOOL_CONFIG.md` describes a shared-number
+default and a bring-your-own-number path. Neither column exists, and `ARCHITECTURE.md`
+referred to both as though they did — a false claim now corrected. Not built because
+**neither option can send**: no Meta account, and `FIELD_ENCRYPTION_KEY` unset so a
+school's token could not be kept safely. A settings screen where both choices are inert
+is a screen that lies.
+
+**The trial notification schedule** — all ten touchpoints, blocked on email. The worker
+logs each expired school by name so somebody can telephone.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -247,6 +289,8 @@ Open items from finished folders. Each carries why it is still open.
 | 02 | Suspicious activity detection | None of SESSIONS.md's five patterns, and no alerting path. `audit_logs` could detect two retrospectively. |
 
 
+| 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
+| 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
 | 05 | Nine of ten inbound webhooks | Foundation built (`0243`); each is blocked on a gateway, Meta or lender account. |
 | 05 | Outgoing webhooks to school systems | Scope exists, registration and delivery do not. |
 | 04 | Multi-country constraint widening | ADR-040 defers it until a second country is real. `npm run country:check` keeps the inventory honest in the meantime. |
@@ -283,3 +327,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 03 assessed and remediated, 52% -> 78% |
 | 2026-10-11 | Folder 04 assessed and remediated, 90% |
 | 2026-10-11 | Folder 05 assessed and remediated, 82% |
+| 2026-10-11 | Folder 06 assessed and remediated, 85% |

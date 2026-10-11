@@ -9,6 +9,27 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Tiers, the feature matrix and all seven add-ons are built.** 20 feature flags, 36
+tier-feature rows, resolving through `school_has_feature()` in the fixed order: revoke
+override → grant override → tier override → tier matrix.
+
+**One add-on was priced and not enforced until `0245`.** API Read (K138) and API Write
+(K275) had flags from the start; the key system built in `0241` checked neither, so any
+school on any tier could use the API for nothing. Gated now at issue AND at verify — the
+second matters, because without re-resolving on every call a cancelled add-on leaves the
+key working forever, which makes a subscription a one-off purchase.
+
+No key was revoked when the gate landed. A school already wired in is a commercial
+conversation, and `/admin/costs` lists the mismatches so it can start from a list.
+
+**Worth checking when a new add-on is priced:** a flag in `afritech.feature_flags` and a
+price in this document are not the same as a gate in the code. `api_read` had both and
+was free for a day.
+
+---
+
 ## Purpose
 
 This document defines the ZSMS subscription model — base tiers, feature add-ons, billing cycles, the dynamic pricing system, and how feature access is resolved. Every Claude Code session building anything related to billing, feature gating, or subscription management must read this document.

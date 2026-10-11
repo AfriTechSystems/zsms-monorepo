@@ -126,9 +126,23 @@ jobs:
         # The CLI is a devDependency (never a global), so CI and a developer machine
         # run the same version. Only the database is needed — skipping the rest saves
         # several minutes of image pulls per run.
-        # No `-x` exclusions: the service names are version-specific and one wrong
-        # name fails `start` outright. A slower start is worth a run that works; trim
-        # it later against `supabase start --help` for the pinned CLI version.
+        # **Only Postgres.** This job applies migrations and runs pgTAP; it never
+        # touches Studio, the API gateway, auth, storage, realtime or the log
+        # pipeline. Starting them pulled THIRTEEN images per run and was the direct
+        # cause of four red builds on 2026-10-11 — "toomanyrequests: Rate exceeded"
+        # from Docker Hub, with the credentials correctly configured and the login
+        # step passing. The authenticated allowance was simply spent on images this
+        # job does not use.
+        #
+        # An earlier comment here said exclusions were avoided because "the service
+        # names are version-specific and one wrong name fails `start` outright", and
+        # suggested checking `supabase start --help` for the pinned version. That was
+        # the right instinct and the list below is the result of doing it: these are
+        # the names the pinned CLI (2.114.x) prints itself, not names guessed from
+        # another version's documentation.
+        #
+        # If a future CLI renames one, `start` fails loudly on the name rather than
+        # quietly skipping a service — which is the failure mode worth having.
         #
         # Retried three times with a growing wait, because Docker Hub's limit is a
         # WINDOW and not a wall: a pull refused now often succeeds a minute later. On
@@ -142,7 +156,7 @@ jobs:
         # arrives looking exactly like this one.
         run: |
           for attempt in 1 2 3; do
-            if npx supabase start; then
+            if npx supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor; then
               exit 0
             fi
             echo "::warning::supabase start failed on attempt $attempt (commonly a Docker Hub rate limit). Retrying."

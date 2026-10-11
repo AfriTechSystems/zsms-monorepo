@@ -12,6 +12,36 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, including two things that were missing until this date.**
+
+`grade_from_scale_version()`, the four grading systems, scale resolution and the
+aggregate all work, and ADR-041's versioning is real: `exam_results.grading_scale_version_id`
+records which scale produced each grade, and `reject_used_grading_scale_version_change()`
+refuses an edit to a version that has already graded a result.
+
+**Grade Override did not exist at all (now `0256`).** This document names
+`grade_override` and `grade_override_reason` and describes the flow; neither column had
+ever existed and nothing in `apps/` mentioned either name. A coursework subject whose
+final grade is not a percentage had no correct recording — a teacher could leave the
+computed grade wrong, or fake a mark to produce the right letter, which also corrupts the
+class average and position.
+
+The computed grade is **kept beside** the override rather than replaced: overwriting it
+would leave `grading_scale_version_id` pointing at a grade the scale never produced, make
+the asterisk this document asks for impossible to justify, and make removing an override
+unable to restore anything. The awarded grade is validated against the school's own scale
+version, because without that a typo becomes a grade.
+
+**Revising a scale had no caller.** `revise_grading_scale()` has existed since `0141`
+with a 20-assertion pgTAP suite behind it, and no school could change its own grade
+boundaries through any surface. Screen now at Settings → Grading scales, which states up
+front that a revision saves a new version and that already-graded results keep the scale
+that graded them.
+
+---
+
 ## Purpose
 
 This document defines how raw marks are converted to grade letters, grade points, and aggregates using the school's configured grading scale. It covers all supported systems — ECZ percentage, Cambridge O-Level, Cambridge A-Level, and custom scales — and the edge cases that arise when a school uses multiple systems simultaneously. Every Claude Code session implementing grade calculation must read this document.

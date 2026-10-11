@@ -15,6 +15,22 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built end to end.** `save_exam_marks()`, the mark entry screen, publication, and the
+parent view.
+
+**Marks are entered; grades are never typed.** The screen shows the grade the school's
+scale produces and has no field for it — a boundary implemented twice is two answers to
+"is 79.5 a B", and the copy on the screen says so. The one exception is a deliberate
+override (`0256`), which is marked with an asterisk and carries a reason.
+
+**An empty box is not a zero**, and the screen enforces the distinction: a zero is a
+pupil who sat the paper and scored nothing, an empty box is a pupil who was not examined,
+and the two mean opposite things on a report card.
+
+---
+
 ## Purpose
 
 This document defines the complete marks entry and results management system — how teachers enter marks, how grades are calculated in real time, how class positions are ranked, how the principal reviews results, and what rules govern editing and locking. Every Claude Code session building any results feature must read this document.

@@ -22,9 +22,17 @@ changed what all work through `attendance_records` and RLS; there is no RPC, by 
 
 **The parent view is built** — `/parent/attendance`.
 
-**The mobile app, which this document calls the *primary* interface, does not exist.**
-`apps/mobile` type-checks and has no screens. That is the largest single gap in the tree
-and a Phase 2 commitment.
+**The mobile app IS built** — and the first version of this status block said it was not,
+having trusted `CLAUDE.md`'s "no mobile screens" line instead of looking. There are 27
+screens: a teacher tab group with the class list and the register marking screen
+(`register/[classId].tsx`), and a parent tab group with its own attendance view.
+
+A teacher can mark a register on a phone, end to end, today.
+
+**Online only, and the screens say so.** `lib/api.ts` returns an `OFFLINE` code and the
+register answers it with "No connection, so nothing was saved. Your marks are still here —
+try again when you have signal." That wording is deliberate: implying the marks were
+stored is the one failure that loses a register.
 
 **Offline capture is deferred by decision, not oversight.** PowerSync is not licensed, so
 the build is online-only until it is — see `OFFLINE_SYNC.md`. The schema is already shaped

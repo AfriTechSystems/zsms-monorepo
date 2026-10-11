@@ -13,6 +13,21 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built.** `report_generation_jobs` tracks a batch, `worker_report_card_batch()` is the
+worker boundary, and the screen reports progress.
+
+Batching is per class and term rather than per pupil, which is what makes a whole-school
+run one job to watch instead of several hundred to reconcile.
+
+**Blocked on nothing.** R2 is live, both buckets accept and sign, and the delivery path is
+proven — unlike the messaging channels, which still have no provider credentials. A report
+card can be produced and downloaded today; what cannot happen yet is *WhatsApping* it to a
+parent.
+
+---
+
 ## Purpose
 
 This document defines the complete bulk report card PDF generation system — the pre-generation validation, the queued batch job architecture, how progress is tracked and broadcast in real time, what happens when individual batches fail, and how the completed run triggers parent distribution. Every Claude Code session building the bulk generation feature must read this document.

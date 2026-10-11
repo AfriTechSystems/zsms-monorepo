@@ -13,6 +13,26 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built**, including the correction path, which is the part most likely to be
+misunderstood.
+
+`publish_results()` is one-way: a result a parent has seen can be **corrected** but never
+withdrawn. Correcting one goes through `unlock_result_for_correction()` (`0124`/`0172`),
+which records the reason, and `relock_corrected_result()` closes it again.
+
+**The unlock is granular to a single result on purpose.** Unlocking a whole class
+mid-correction would silently withdraw every other mark from the parents already reading
+them, so the control is offered per pupil and never per class.
+
+Two defects were found here by walking the screen rather than by any automated check: the
+mark input stayed `disabled` after a correction was unlocked, so the correction could not
+be typed; and the Save button was hidden whenever any row was published, so the only
+control that could save a correction disappeared exactly when one became possible.
+
+---
+
 ## Purpose
 
 This document defines the complete results publication workflow — the pre-publication checklist, what happens at the moment of publication, how the marks lock works, how parents and students access published results, and how post-publication corrections are handled. Every Claude Code session building any results publication feature must read this document.

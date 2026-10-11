@@ -43,7 +43,7 @@ quality on its own.
 | 08 | Staff Management | 5 | **Done** | Good · 87% | 2026-10-11 |
 | 09 | Fee and Financial Management | 6 | **Done** | Good · 85% | 2026-10-11 |
 | 10 | Attendance | 4 | **Done** | Good · 80% | 2026-10-11 |
-| 11 | Exams | — | Not started | — | — |
+| 11 | Examinations and Results | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 12 | Communication | — | Not started | — | — |
 | 13 | PDFs and Documents | — | Not started | — | — |
 | 14 | Loans | — | Not started | — | — |
@@ -459,6 +459,56 @@ discovers it when the quota runs dry mid-term and a fee reminder cannot go out.
   summary and the `ATTENDANCE` chatbot command need a live Meta account.
 - **Delivery, for all of it.** No provider credentials; nothing has left this machine.
 
+## 11 — Examinations and Results (Good, 88%) · 2026-10-11
+
+Five documents, the most complete module in the tree after fees. Two gaps, both the
+"finished but unreachable" shape, and one stale claim corrected in `CLAUDE.md` itself.
+
+### Grade override was specified and did not exist
+
+GRADING.md names `exam_results.grade_override` and `.grade_override_reason` and describes
+the whole flow. **Neither column had ever existed** and nothing in `apps/` mentioned
+either name. So a coursework subject whose grade is not a percentage had no correct
+recording: leave the computed grade wrong, or fake a mark to produce the right letter —
+which also corrupts the class average and position.
+
+`0256` keeps the computed grade **beside** the override rather than replacing it.
+Overwriting would leave `grading_scale_version_id` pointing at a grade the scale never
+produced, make the asterisk GRADING.md asks for impossible to justify, and leave nothing
+to restore when an override is removed.
+
+**My first draft of the validation refused the result's own computed grade** — I assumed
+the band key was `grade`; it is `letter`. Found by running it, then checked with
+`jsonb_object_keys` rather than guessed a second time.
+
+### Revising a grading scale had no caller
+
+`revise_grading_scale()` has existed since `0141` with the versions table,
+`current_grading_scale_version()`, `reject_used_grading_scale_version_change()` and a
+20-assertion pgTAP suite behind it. **No school could change its own grade boundaries
+through any surface.** Screen now at Settings → Grading scales.
+
+### The mobile app was not missing — `CLAUDE.md` was wrong
+
+Asked to build mobile attendance screens, I went to build them and found **27 screens
+already there**, including the register marking screen, with a parent tab group and a
+teacher tab group. A teacher can mark a register on a phone end to end today.
+
+It is online only and the screens say so: `lib/api.ts` returns an `OFFLINE` code and the
+register answers it with "nothing was saved, your marks are still here" rather than
+implying they were stored. `lib/features.ts` separates "coming soon" from "needs your
+school", because a teacher can act on the second. `gaps:mobile` confirms all 22 endpoints
+the phone calls resolve.
+
+`CLAUDE.md` had said "no mobile screens exist" through several passes, and my own folder
+10 note repeated it without looking. Both corrected, with a note recording that it
+happened — the same failure that file warns about in its own text.
+
+### Remaining
+
+Offline capture, deferred on the PowerSync licence. Everything else in this folder is
+built and reachable.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -475,7 +525,7 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
-| 10 | Mobile attendance screens | ATTENDANCE.md calls mobile the primary interface; `apps/mobile` has no screens. Phase 2 commitment (ADR-004). |
+| 10 | Mobile OFFLINE capture | The 27 screens exist and mark a register online; ADR-004's offline-first waits on a PowerSync licence. Schema already shaped for it. |
 | 10 | NOTIFICATIONS.md Channels 2, 4, 5 | Push needs the mobile app; monthly summary and the chatbot command need a live Meta account. |
 | 09 | `payments.payment_method` has no `mobile_money` | The dominant Zambian rail is recorded as `online_gateway`. Needs a migration and a product decision. |
 | 09 | Reminder DELIVERY is unproven | Schedule correct; no Meta/Twilio/Resend credentials, so nothing has left this machine. |
@@ -522,3 +572,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 08 assessed and remediated, 87%; folder 07's open item closed |
 | 2026-10-11 | Folder 09 assessed and remediated, 85%; the reminder schedule is now per-school configuration |
 | 2026-10-11 | Folder 10 assessed and remediated, 80%; absence alerts built as a worker, ADR-047 |
+| 2026-10-11 | Folder 11 assessed and remediated, 88%; grade override built, grading revision reachable, CLAUDE.md's "no mobile screens" claim corrected |

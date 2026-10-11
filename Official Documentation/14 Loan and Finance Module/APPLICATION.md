@@ -12,6 +12,22 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built end to end.** `submit_loan_application()` writes to `private.loan_applications`,
+`lenders_for_application()` matches a parent against eligible lenders by amount and
+behaviour score, and `my_loan_applications()` / `school_loan_applications()` /
+`admin_loan_applications()` give each audience its own view.
+
+Every field this document specifies exists on the table, including `payslip_url`,
+`monthly_income`, `employer_name` and `behaviour_score_breakdown`.
+
+**Zero applications exist on dev**, which is correct rather than a gap: a synthetic loan
+application would mean synthetic income and employment data, and `TEST_DATA.md` is the
+place to decide whether that is wanted.
+
+---
+
 ## Purpose
 
 This document defines the complete loan application form — every field, validation rule, and what happens from the moment the parent clicks submit to when the lender receives the application. Every Claude Code session building the application form or submission Edge Function must read this document.

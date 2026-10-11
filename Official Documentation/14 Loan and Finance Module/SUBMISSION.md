@@ -12,6 +12,25 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The email route is built; the API route is not.**
+
+`lenders.integration_type` admits `email` and `api`, with a CHECK requiring
+`intake_email` for the first and `api_endpoint` for the second — so a lender cannot be
+onboarded without the channel it is going to be contacted through.
+
+**Submission itself has never been exercised**, because it goes out through the same
+notification dispatch as everything else and there are no provider credentials. A
+submitted application sits at its status with nothing sent.
+
+**`api_key_encrypted` and `webhook_secret` cannot be populated yet**, and that is
+deliberate rather than forgotten: `FIELD_ENCRYPTION_KEY` is unset, and storing a lender's
+API key in plaintext to make a demo work is the kind of shortcut that survives into
+production.
+
+---
+
 ## Purpose
 
 This document defines the complete security model for loan application submissions — why OTP was removed, what replaced it, how the three-layer model satisfies financial services compliance requirements, and what assurance the lender receives. Every Claude Code session building the loan submission flow must read this document.

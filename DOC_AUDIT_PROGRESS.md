@@ -46,7 +46,7 @@ quality on its own.
 | 11 | Examinations and Results | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 12 | Communication System | 6 | **Done** | Fair · 65% | 2026-10-11 |
 | 13 | Document and PDF System | 4 | **Done** | Good · 86% | 2026-10-11 |
-| 14 | Loans | — | Not started | — | — |
+| 14 | Loan and Finance Module | 7 | **Done** | Good · 82% | 2026-10-11 |
 | 15 | Super Admin and Platform | 5 | Not started | — | — |
 | 16 | Testing and Launch | 6 | Not started | — | — |
 | 17 | Integration and Pricing | 5 | Not started | — | — |
@@ -614,6 +614,66 @@ missing NOT NULL `updated_by`, and the category `documents` where the CHECK admi
   a storage-cost one, so it wants a deliberate answer, not a bucket rule.
 - **Visual regression testing.** Needs a rendered-image baseline harness.
 
+## 14 — Loan and Finance Module (Good, 82%) · 2026-10-11
+
+Seven documents, 2,345 lines — the largest folder in the set, and much better built than
+its size suggested. The application, consent, behaviour score, lender registry and
+commission halves are all complete and reachable, correctly in the `private` schema per
+ADR-018, and properly gated: `loan_module` is enforced in **both** the SQL function and
+the route, so a Starter school never sees it.
+
+### Phase 1 repayment was the one thing missing, and it mattered
+
+`REPAYMENT.md` defines Phase 1 as entirely *"surfacing the lender's collection details
+prominently, showing the repayment schedule clearly"* — ZSMS moves no money.
+
+The route had been returning `collectionAccount` and `repaymentSchedule` all along and
+**the screen rendered neither.** It showed `collection_instructions` and stopped. With the
+one seeded lender, whose instructions are the literal string "Airtel Money", a parent saw:
+
+> How to repay: Airtel Money
+
+A debt, a channel name, and no way to pay it. That is worse than an empty screen because
+it reads as an answer.
+
+Now rendered: the mobile number or bank account, the branch, the parent's own reference,
+and the instalment table — plus an explicit "ask your lender" state when a lender has
+given ZSMS nothing, because when it is about money, "this should be unreachable" is
+exactly the condition worth saying out loud.
+
+### `0260` makes the bad state impossible
+
+An **active** lender must now carry a `collection_account` with at least one route for
+money — mobile number, paybill or account number. A bank *name* alone is refused, because
+a row that looks populated is the one nobody checks.
+
+**The seeded lender was deactivated rather than given invented details.** Lupiya is a real
+company; writing a plausible Airtel number into their row would put fabricated payment
+details in front of a parent about to send money, which is the most harmful thing a seed
+could do anywhere in this product. The dev consequence — `lenders_for_application()`
+returns nothing — is the correct state: there is no lender ZSMS can honestly offer yet.
+
+### Four introspection misses in one probe
+
+`max_loan_amount`, then `interest_rate_display`, then two more NOT NULL columns, then a
+conditional CHECK requiring `intake_email` when `integration_type = 'email'`. Each was one
+failed push. `npm run db:cols -- lenders` answered all of it in a single call, which is
+what the migration skill says to do first and what I did third.
+
+### Not built, with reasons
+
+- **The inbound lender webhook.** It writes `lender_reference`, `disbursed_at`, and the
+  schedule's `status` and `paid_at`, so until it exists a disbursement and every repayment
+  are recorded by hand. Blocked on a lender agreement rather than engineering — there is
+  no endpoint to verify signatures against and no secret to verify with.
+- **Phase 2 and 3 repayment.** Phase 2 needs a payment gateway the platform has in no
+  form; `loan_repayment_log` belongs there.
+- **Submission has never been exercised** — it dispatches through the same notification
+  path as everything else, and there are no provider credentials.
+- **`api_key_encrypted` / `webhook_secret` cannot be populated**: `FIELD_ENCRYPTION_KEY`
+  is unset, and storing a lender's API key in plaintext to make a demo work is the kind of
+  shortcut that survives into production.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -630,6 +690,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 14 | Inbound lender webhook | Writes disbursement and repayment status. Blocked on a lender agreement, not engineering. |
+| 14 | No offerable lender on dev | The seeded lender was deactivated for having no collection details. Populate from a real agreement; never invent payment details. |
 | 13 | R2 lifecycle / retention | Nothing is ever expired. Needs a ZDPA decision about a departed pupil's documents, not a bucket rule. |
 | 13 | Template preview | A school sees changes on the next card generated. Needs a sample-data path. |
 | 12 | SMS has never run | The channel that reaches a parent with no smartphone. Needs Twilio; a launch prerequisite rather than an enhancement. |
@@ -684,3 +746,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 11 assessed and remediated, 88%; grade override built, grading revision reachable, CLAUDE.md's "no mobile screens" claim corrected |
 | 2026-10-11 | Folder 12 assessed, 65%; message log built, accountant access fixed. Four of six docs unverifiable without provider credentials |
 | 2026-10-11 | Folder 13 assessed and remediated, 86%; document customisation built end to end and wired into the renderer |
+| 2026-10-11 | Folder 14 assessed and remediated, 82%; Phase 1 repayment display built, unrepayable lenders now refused |

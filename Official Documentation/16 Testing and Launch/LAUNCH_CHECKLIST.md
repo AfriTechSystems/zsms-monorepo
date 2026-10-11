@@ -12,6 +12,32 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The engineering half is largely done; the purchases and environments are not.**
+
+Done and verified: R2 live (`r2:smoke`, 14 checks), PostHog live (`posthog:smoke`),
+Upstash and the queue transport proven (`queue:smoke`), 38 pgTAP suites green in CI,
+migrations applying cleanly to an empty database on every push, and the security audit
+executable and clean (`security:audit` — 15 pass, 0 fail).
+
+**Blocking, and none of it is code:**
+
+| Blocker | Why it blocks launch |
+|---|---|
+| **Paid Clerk plan** | The free tier caps an organisation at **five members**. A school with six staff cannot be fully onboarded |
+| **Meta / Twilio / Resend** | No message has ever left this machine. Every channel runs through the mock provider |
+| **`zsms-staging` and `zsms-zm` in `af-south-1`** | `COMPLIANCE.md` requires substantive personal data to stay in `af-south-1`. Only `eu-west-1` dev exists |
+| **Terms of Service and Privacy Policy** | Registration records consent and `0150` timestamps it; the pages state plainly that final text is unpublished. Needs a lawyer, not a developer |
+| **`FIELD_ENCRYPTION_KEY`** | Until set, no per-school integration credential can be stored at all |
+
+**SMS deserves separate mention.** In Zambia it is the channel that reaches a parent with
+no smartphone and no data. Today that parent is reached by nothing — the in-app badge needs
+the portal and the portal needs a smartphone. Twilio is a launch prerequisite rather than
+an enhancement.
+
+---
+
 ## Purpose
 
 This document is the go/no-go checklist for two launch milestones: the September 2026 pilot launch (10 pilot schools) and the January 2027 commercial launch (open self-registration). Every item must be checked by the responsible person before any school goes live on production.

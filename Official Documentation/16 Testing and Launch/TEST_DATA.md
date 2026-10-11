@@ -10,6 +10,34 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built as `supabase/seed/dev_seed.sql`**, run by `npm run db:seed`, which **refuses any
+project but `zsms-dev`** — the one guard that matters, since the region exception in
+`COMPLIANCE.md` depends entirely on dev holding synthetic data only.
+
+Seeded: 6 schools spanning the health bands, teaching assignments (so the directory's
+verified ratio has something to divide), 6 grading scales, 24 subjects, and 95 exam
+results graded through `grade_from_scale_version()` **with the scale version recorded** —
+the fixture exercises the real grading path rather than hardcoding letters.
+
+Three schools sit in three different publishing states and two have no profile row at all
+— the default, and the case a public directory is likeliest to render wrongly.
+
+**Deliberately not seeded:**
+
+- **Loan applications.** A synthetic one means synthetic employment and income, and this
+  document is the right place to decide whether that is wanted before inventing it.
+- **A lender's collection details.** `0260` deactivated the seeded lender rather than
+  giving it a plausible Airtel number: the lender is a real company, and fabricated
+  payment details in front of a parent about to send money is the most harmful thing a
+  seed could do.
+
+**Never load real school data into `zsms-dev`** — no production dumps, no anonymised
+extracts, no pilot records.
+
+---
+
 ## Purpose
 
 This document defines every test entity, seed script, and test scenario setup that Claude Code sessions need to build and test ZSMS features. All test data is clearly fictional — never real school names, real phone numbers, or real financial amounts. Every Claude Code session that needs test data reads this document first before inventing its own.

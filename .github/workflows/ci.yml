@@ -75,6 +75,12 @@ jobs:
         # already caught two in development.
         run: npm run db:test:plans
 
+      # Pure-logic tests, needing no database. Webhook signature verification is the
+      # first of them: nothing in SQL can test it, and a verifier that accepts anything
+      # looks identical to one that works until somebody posts a forged payload.
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Type check
         run: npm run type-check
 

@@ -13,6 +13,48 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**This document is now a command: `npm run security:audit`.**
+
+523 lines of pre-launch checks, most of which are questions the database answers in
+milliseconds. A check nobody can run is a check nobody runs, so the mechanically
+checkable half now executes against the live schema and reports four states:
+
+| State | Meaning |
+|---|---|
+| **PASS** | verified against the live schema just now |
+| **FAIL** | a finding; the command exits non-zero |
+| **SUITE** | covered by a named pgTAP suite, which CI runs against a from-scratch database |
+| **BLOCKED** | cannot be verified yet, with the blocker named |
+
+**A BLOCKED item is not a pass.** The failure this guards against is a sign-off that
+reads green because the unverifiable items were quietly omitted.
+
+**First run: 15 pass, 1 fail, 7 suite-covered, 7 blocked.**
+
+**The finding was real.** Check 1.4 — `authenticated` held `USAGE` on the `private`
+schema. Fixed in `0262`, which also revokes the default privileges so a table created
+there later does not arrive reachable.
+
+**The severity was initially overstated, and that is worth recording.** The script's first
+message said loan employer, income and payslip were exposed. They were not: `private` has
+no table grants to end users, so a SELECT fails on the table privilege before RLS is
+consulted. The real risk was narrower — with USAGE held, a future `GRANT` mistake becomes
+immediately exploitable instead of still being blocked. **Overstating a finding is its own
+defect**, because an audit that cries wolf is ignored on the day it is right.
+
+Revoking USAGE is safe because all five functions reading `private` are SECURITY DEFINER
+and run as owner. `0262` asserts each is still callable, because "the grant is gone" is not
+the property that matters — "the loan module still works" is.
+
+**The seven blocked checks** are the honest pre-launch list: three webhook verifications
+(no gateway or Meta account), field encryption (`FIELD_ENCRYPTION_KEY` unset), CORS,
+expired-session rejection, and `af-south-1` residency — dev is `eu-west-1` by documented
+exception and staging and production do not exist.
+
+---
+
 ## Purpose
 
 This document is the pre-launch security audit checklist. It covers every security control that must be verified before any school data is stored in production. This is not a penetration test — it is a verification that the security controls designed in the documentation are correctly implemented. Run this checklist before every major release, not just at launch.

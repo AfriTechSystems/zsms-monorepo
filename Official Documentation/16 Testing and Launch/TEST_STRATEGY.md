@@ -12,6 +12,41 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**One of the three layers below was strong, one was absent, and one is now started.**
+
+| Layer | State |
+|---|---|
+| **RLS integration (pgTAP)** | **38 suites, 892 assertions**, run by CI against a database built from nothing. Far beyond what this document asks for |
+| **Unit** | **Started today.** `npm run test:unit`, in `ci:checks` and in CI |
+| **E2E (Playwright)** | Not built. `apps/web/e2e/` does not exist |
+
+Building the RLS layer first was right: it guards tenant isolation, which is the one
+failure that cannot be walked back.
+
+**The first unit tests cover webhook signature verification**, chosen because it is the
+highest-value thing SQL cannot reach: pure, security-critical logic whose failure mode is
+silent — a verifier that accepts anything looks identical to one that works until somebody
+posts a forged payload. Thirteen tests, each a way this has actually failed for somebody:
+a tampered body, a wrong secret, a replay outside the window, a *future* timestamp, an
+unparseable timestamp, a rotation header carrying two signatures, an unknown version
+prefix, a truncated hex digest.
+
+**No new dependency.** `node:test` ships with Node, and `tsx` was already here. A test
+framework is a real decision and this did not need one.
+
+**Worth recording honestly: all five initial failures were my own test fixtures, not the
+code.** The Svix secret I invented contained an underscore, which standard base64 does not
+admit, so `atob()` threw and every "accepts" case failed with what looked exactly like a
+broken verifier. The verifier was correct throughout.
+
+**E2E remains genuinely unbuilt**, and the three flows this document names — payment,
+results publication, parent login — are the right three. They need a seeded environment a
+browser can drive, which is the same prerequisite as UAT.
+
+---
+
 ## Purpose
 
 This document defines the ZSMS testing philosophy, what is tested, what is not tested, and how tests are structured and run. Every Claude Code session adding a new feature must consider whether it falls into a tested category and add tests accordingly.

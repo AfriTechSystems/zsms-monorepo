@@ -12,6 +12,30 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not executed. No harness exists**, and running load tests against `zsms-dev` would be
+the wrong move — it is the only database in the project, and saturating it would stop
+development rather than measure anything useful.
+
+Scored as pending rather than failing.
+
+**What is known without a load test**, and is worth recording because it is where the
+first real limit will show:
+
+- **`/api/admin/schools/[id]` issues one RPC per feature** — 13 PostgREST round-trips
+  today, growing with the catalogue. Correct, but an N+1 over the network. It wants a
+  single set-returning `school_feature_resolution(school_id)` when the page feels slow.
+- **The rate limiter fails OPEN** by design, so a cache outage cannot take down a
+  school's register. That is the right trade and it means a load test measuring the
+  limiter must distinguish "limited" from "limiter unavailable".
+- **Report card batches are per class and term**, so a whole-school run is one job to
+  watch rather than several hundred to reconcile.
+
+Needs `zsms-staging` first, for the same reason as UAT.
+
+---
+
 ## Purpose
 
 This document defines how ZSMS verifies that it meets the load targets in `SCALING.md`. It specifies k6 as the primary load testing tool, Artillery as the secondary, the scenarios that model real school traffic, the thresholds that constitute a pass, and the rules that prevent a load test from becoming a self-inflicted outage. Every launch gate that claims the system handles N schools must point at a passing run of these scenarios.

@@ -48,7 +48,7 @@ quality on its own.
 | 13 | Document and PDF System | 4 | **Done** | Good · 86% | 2026-10-11 |
 | 14 | Loan and Finance Module | 7 | **Done** | Good · 82% | 2026-10-11 |
 | 15 | Super Admin and Platform | 5 | **Done** | Good · 84% | 2026-10-11 |
-| 16 | Testing and Launch | 6 | Not started | — | — |
+| 16 | Testing and Launch | 7 | **Done** | Good · 78% | 2026-10-11 |
 | 17 | Integration and Pricing | 5 | Not started | — | — |
 | 18 | AI Module | 5 | Not started | — | — |
 
@@ -734,6 +734,70 @@ session. A note is now beside the route list saying so.
 - **Clerk's five-member organisation cap** blocks onboarding a school with six staff. A
   paid plan is a launch prerequisite.
 
+## 16 — Testing and Launch (Good, 78%) · 2026-10-11
+
+Seven documents, 2,778 lines — the largest folder, and mostly checklists. Scored on
+whether the checklists are **accurate against the tree**, not marked down for being
+checklists. They are accurate; what they reveal is that the remaining work is purchases
+and environments rather than code.
+
+### SECURITY_AUDIT.md is now a command
+
+523 lines of pre-launch checks, most of them questions the database answers in
+milliseconds. A check nobody can run is a check nobody runs, so `npm run security:audit`
+executes the mechanically checkable half and reports PASS / FAIL / SUITE / BLOCKED.
+
+**A BLOCKED item is not a pass** — the failure this guards against is a sign-off that
+reads green because the unverifiable items were quietly omitted.
+
+First run: **15 pass, 1 fail, 7 suite-covered, 7 blocked.**
+
+**The finding was real:** `authenticated` held `USAGE` on the `private` schema. Fixed in
+`0262`, which also revokes default privileges so a table created there later does not
+arrive reachable.
+
+**And I overstated it, which is worth recording.** The first message claimed loan employer,
+income and payslip were exposed. They were not — `private` has no table grants to end
+users, so a SELECT fails on the table privilege before RLS is consulted. The real risk was
+narrower: a future `GRANT` mistake becomes immediately exploitable rather than still
+blocked. **Overstating a finding is its own defect**, because an audit that cries wolf is
+ignored on the day it is right.
+
+### The testing pyramid had one layer
+
+| Layer | Before | After |
+|---|---|---|
+| RLS integration (pgTAP) | 38 suites, 892 assertions | unchanged — already beyond what the doc asks |
+| Unit | **none** | 13 tests on webhook signature verification, in `ci:checks` and CI |
+| E2E (Playwright) | none | still none — needs a staging environment |
+
+Building RLS first was right: it guards tenant isolation, the one failure that cannot be
+walked back.
+
+Webhook verification was chosen as the first unit target because it is the highest-value
+thing SQL cannot reach — pure, security-critical logic whose failure mode is **silent**.
+A verifier that accepts anything looks identical to one that works until somebody posts a
+forged payload. No new dependency: `node:test` ships with Node.
+
+**All five initial failures were my own fixtures, not the code.** The Svix secret I
+invented contained an underscore, which standard base64 does not admit, so `atob()` threw
+and every "accepts" case failed with what looked exactly like a broken verifier. The
+verifier was correct throughout.
+
+### What the checklists correctly say is not done
+
+UAT, load testing and most of the performance checklist need `zsms-staging`, which does
+not exist. Running load tests against `zsms-dev` would stop development rather than
+measure anything. Scored as pending, not failing.
+
+**Launch blockers, none of which are code:** a paid Clerk plan (the free tier caps an
+organisation at five members, so a six-staff school cannot be onboarded), Meta/Twilio/
+Resend credentials, `zsms-staging` and `zsms-zm` in `af-south-1`, real Terms and Privacy
+text, and `FIELD_ENCRYPTION_KEY`.
+
+**SMS deserves separate mention.** In Zambia it reaches the parent with no smartphone and
+no data. Today that parent is reached by nothing at all.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -750,6 +814,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 16 | Playwright E2E specs | The three named flows (payment, results publication, parent login) need a seeded environment a browser can drive — same prerequisite as UAT. |
+| 16 | UAT, load testing, p95 latency | All need `zsms-staging` in `af-south-1`, which does not exist. Load testing against dev would stop development. |
 | 15 | NRR needs 12 months of history | Reported unavailable rather than computed from an empty window. Revisit after January 2028. |
 | 14 | Inbound lender webhook | Writes disbursement and repayment status. Blocked on a lender agreement, not engineering. |
 | 14 | No offerable lender on dev | The seeded lender was deactivated for having no collection details. Populate from a real agreement; never invent payment details. |
@@ -809,3 +875,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 13 assessed and remediated, 86%; document customisation built end to end and wired into the renderer |
 | 2026-10-11 | Folder 14 assessed and remediated, 82%; Phase 1 repayment display built, unrepayable lenders now refused |
 | 2026-10-11 | Folder 15 assessed and remediated, 84%; MRR/ARR/tier revenue built, CLAUDE.md's impersonation "501" claim corrected |
+| 2026-10-11 | Folder 16 assessed, 78%; SECURITY_AUDIT.md made executable (1 real finding, fixed in 0262), first unit tests added |

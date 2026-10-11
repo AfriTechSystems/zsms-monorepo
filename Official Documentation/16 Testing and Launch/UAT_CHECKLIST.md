@@ -11,6 +11,29 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not executed, and correctly not executable yet.**
+
+UAT needs real users on a real environment. `zsms-staging` is still a Phase 0 item, there
+are no pilot schools, and messaging credentials do not exist — so a tester following this
+document would reach "confirm the parent received the WhatsApp" and stop.
+
+Scored as pending rather than failing: this is a to-do list for work that is genuinely
+ahead, not a specification the build has drifted from.
+
+**What can be done before a staging environment exists**, and is worth doing in this
+order:
+
+1. Clear the launch blockers that are purchases rather than code — a paid Clerk plan (the
+   free tier caps an organisation at five members, so a six-staff school cannot be
+   onboarded) and messaging credentials.
+2. Stand up `zsms-staging` in `af-south-1`, which `COMPLIANCE.md` requires and which also
+   unblocks the Playwright E2E specs in `TEST_STRATEGY.md`.
+3. Then walk this checklist with one pilot school rather than reading it.
+
+---
+
 ## Purpose
 
 This document is the complete User Acceptance Testing checklist for the September 2026 pilot launch. AfriTech runs these scenarios with each of the 10 pilot schools before go-live. Each scenario has step-by-step actions, expected outcomes, and a pass/fail result. All 10 scenarios must pass before a school goes live.

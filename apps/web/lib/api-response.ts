@@ -12,6 +12,23 @@ import { reportRouteError, routeFromStack } from './report-error'
 import { ZodError } from 'zod'
 
 export type ErrorCode =
+  /*
+    `RATE_LIMITED`, `INSUFFICIENT_SCOPE`, `API_KEY_INVALID`
+
+    `ERROR_CODES.md` defines 36 codes; this union held six. The six are the HTTP-shaped
+    categories every route needs and they stay the default — but three of the others are
+    now actually returned by code in this repository, and a union that does not admit
+    them is a type that disagrees with the wire.
+
+    They earn their place by being ACTIONABLE in a way the six are not: FORBIDDEN tells an
+    integrator to ask their school for access, INSUFFICIENT_SCOPE tells them which scope
+    to ask for. The remaining domain codes (`DUPLICATE_STUDENT`, `FEE_ALREADY_PAID` and
+    the rest) belong in the message or in `details`, not here — a client branching on
+    thirty-six values is a client that breaks when a thirty-seventh arrives.
+  */
+  | 'RATE_LIMITED'
+  | 'INSUFFICIENT_SCOPE'
+  | 'API_KEY_INVALID'
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -26,6 +43,15 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   SERVER_ERROR: 500,
+  // 429, which is the whole point of the code.
+  RATE_LIMITED: 429,
+  /*
+    403, not 401. The key is valid and the caller IS authenticated — they are asking
+    for something this key was not granted. A 401 would tell an integrator to check
+    their credentials, which are fine.
+  */
+  INSUFFICIENT_SCOPE: 403,
+  API_KEY_INVALID: 401,
 }
 
 export interface Meta {

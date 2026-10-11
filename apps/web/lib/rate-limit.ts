@@ -53,48 +53,102 @@ interface Policy {
 /**
  * Policies, narrowest first — the first match wins.
  *
- * The numbers are deliberately generous. A school office with thirty staff behind one
- * NAT shares an IP, so a limit tight enough to stop a determined attacker would stop a
- * busy Monday morning first. These stop floods and scripted enumeration; they are not
- * meant to stop a patient attacker, which is what the database's own rules are for.
+ * The figures come from `RATE_LIMITS.md`'s own categories rather than being invented
+ * here: 10/min on enumeration, 5 on bulk, 10 on communication, 20 on financial, 200 for
+ * AfriTech, 120 for everything else. Where this file shipped with three broad bands
+ * yesterday, the document had seven, and its distinctions are the useful ones — a
+ * broadcast and a dashboard read are not the same risk.
+ *
+ * They remain generous on purpose. A school office with thirty staff behind one NAT
+ * address shares an IP, so a limit tight enough to stop a determined attacker would stop
+ * a busy Monday morning first. These stop floods and scripted enumeration; a patient
+ * attacker is what the database's own rules are for.
  */
 const POLICIES: { test: (path: string) => boolean; policy: Policy }[] = [
   {
     /*
-      Registration and join requests: the enumeration surface.
+      Enumeration, at RATE_LIMITS.md's strictest documented figure.
 
       `/api/teacher/school-link` takes a school CODE and deliberately answers the same
-      way for an unknown code as for a real one — which stops enumeration one guess at a
-      time and does nothing about ten thousand guesses a minute. This is the other half
-      of that defence.
+      way for an unknown code as for a real one — which defeats enumeration one guess at
+      a time and does nothing about ten thousand guesses a minute. This is the other half
+      of that defence, and the document's 10/min for student lookup is the right shape
+      for all of it.
     */
     test: (p) =>
       p.startsWith('/api/register') ||
       p.startsWith('/api/school/join-requests') ||
       p.startsWith('/api/teacher/school-link') ||
-      p.startsWith('/api/parent/claims'),
+      p.startsWith('/api/parent/claims') ||
+      p.includes('/lookup'),
     policy: { limit: 10, windowSeconds: 60, name: 'enumeration' },
   },
   {
+    // "Bulk operations (import, generate reports) — 5 per minute. Heavy operations,
+    // one at a time per school."
+    test: (p) =>
+      p.includes('/import') ||
+      p.includes('/export') ||
+      p.startsWith('/api/admin/curriculum/extract') ||
+      p.includes('/report-cards'),
+    policy: { limit: 5, windowSeconds: 60, name: 'bulk' },
+  },
+  {
+    // "Communication sends (broadcast messages) — 10 per minute. Prevents accidental
+    // mass messaging." The one where the cost of a mistake is measured in a school's
+    // message quota and a parent's patience.
+    test: (p) =>
+      p.startsWith('/api/announcements') ||
+      p.startsWith('/api/messages') ||
+      p.startsWith('/api/school/announcements'),
+    policy: { limit: 10, windowSeconds: 60, name: 'communication' },
+  },
+  {
     /*
-      Anything that costs money or CPU per call: a model, a PDF, an export.
+      "Financial writes — 20 per minute. Prevents accidental duplicate submissions."
 
-      These are not abuse-sensitive so much as expensive — twenty concurrent report-card
-      exports is a bill and a slow database for everybody else.
+      Path-based rather than method-based, because middleware would have to read the
+      method and a GET to `/api/payments` is as cheap as any other read. Erring strict
+      on the whole financial surface is the safer direction: 20 a minute is still far
+      more than an accountant can type.
     */
     test: (p) =>
+      p.startsWith('/api/payments') ||
+      p.startsWith('/api/fees') ||
+      p.startsWith('/api/school/fees'),
+    policy: { limit: 20, windowSeconds: 60, name: 'financial' },
+  },
+  {
+    // Anything that costs money or CPU per call: a model, a PDF, a document.
+    test: (p) =>
       p.startsWith('/api/assistant') ||
-      p.includes('/export') ||
       p.startsWith('/api/teacher/hub/resources') ||
-      p.startsWith('/api/admin/curriculum/extract'),
+      p.startsWith('/api/documents'),
     policy: { limit: 30, windowSeconds: 60, name: 'expensive' },
   },
   {
     /*
-      Writes. Generous, because a bulk import is a legitimate burst of them.
+      "AfriTech admin routes — 200 per minute. Internal team needs higher throughput."
+
+      Higher than a school's, which looks backwards until you consider what an admin
+      screen does: `/admin/schools` resolves a feature matrix per school, and a support
+      agent moving between twenty schools in a minute is working, not attacking.
+    */
+    test: (p) => p.startsWith('/api/admin/'),
+    policy: { limit: 200, windowSeconds: 60, name: 'admin' },
+  },
+  {
+    /*
+      "General dashboard reads — 120 per minute. Typical interactive use, comfortable
+      headroom."
+
+      Lower than the 300 this file shipped with yesterday, and closer to the document.
+      A school office with thirty staff behind one NAT address is the case that argues
+      for generosity — but a dashboard makes a handful of calls per screen, so 120 is
+      two screens a second from one address, which no human reaches.
     */
     test: (p) => p.startsWith('/api/'),
-    policy: { limit: 300, windowSeconds: 60, name: 'api' },
+    policy: { limit: 120, windowSeconds: 60, name: 'api' },
   },
 ]
 

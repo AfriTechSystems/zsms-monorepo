@@ -144,6 +144,72 @@ export async function authenticateApiKey(
 }
 
 /**
+ * Enforces the key's own requests-per-minute.
+ *
+ * `0241` stores `rate_limit_rpm` per key and `RATE_LIMITS.md` specifies 60 by default
+ * with 300 as the Tier 2 maximum. Until now the column was **decorative** — it was
+ * written, shown on the management screen, and consulted by nothing. A limit a school
+ * can see and set, and that does not apply, is worse than no limit: it is a promise.
+ *
+ * ## Why this is per KEY and not per IP
+ *
+ * `lib/rate-limit.ts` limits by IP in middleware, which is right for abuse from an
+ * unauthenticated source. An integration is the opposite case: one server, one IP, a
+ * legitimate key, and a loop that should not be allowed to pull a 2,000-pupil roll
+ * forty times a minute. The key is the identity that matters, and it carries its own
+ * ceiling because a school may reasonably grant one integration more than another.
+ *
+ * Both apply. The IP limit catches the flood; this catches the enthusiastic customer.
+ *
+ * ## Fails open, for the same reason as everything else on this path
+ *
+ * An unreachable Redis allows the request. See `lib/rate-limit.ts` for the full trade —
+ * the short version is that a cache outage must not stop a school's integration from
+ * reconciling its fees.
+ */
+export async function checkApiKeyRate(
+  ctx: ApiKeyContext,
+): Promise<{ allowed: boolean; limit: number }> {
+  const url = process.env['UPSTASH_REDIS_REST_URL']?.trim()
+  const token = process.env['UPSTASH_REDIS_REST_TOKEN']?.trim()
+
+  const limit = ctx.rateLimitRpm > 0 ? ctx.rateLimitRpm : 60
+  // Not configured is not a refusal — development runs without Redis.
+  if (!url || !token) return { allowed: true, limit }
+
+  /*
+    Keyed on the KEY id, not the school: two integrations at one school have separate
+    ceilings, which is the point of storing the limit per key.
+  */
+  const window = Math.floor(Date.now() / 60_000)
+  const redisKey = `zsms:ratelimit:apikey:${ctx.keyId}:${window}`
+
+  try {
+    const response = await fetch(`${url.replace(/\/$/, '')}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        ['INCR', redisKey],
+        ['EXPIRE', redisKey, '60'],
+      ]),
+      signal: AbortSignal.timeout(1000),
+    })
+
+    if (!response.ok) return { allowed: true, limit }
+
+    const body = (await response.json()) as { result?: number }[]
+    const count = body?.[0]?.result
+
+    return {
+      allowed: typeof count !== 'number' || count <= limit,
+      limit,
+    }
+  } catch {
+    return { allowed: true, limit }
+  }
+}
+
+/**
  * Records the call, including the refusals.
  *
  * A run of 403s is the clearest evidence a key has been stolen and is being probed, and

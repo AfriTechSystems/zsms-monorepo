@@ -36,6 +36,7 @@ import { NextResponse } from 'next/server'
 import {
   apiKeyQuery,
   authenticateApiKey,
+  checkApiKeyRate,
   recordApiKeyUsage,
   type ApiKeyContext,
 } from '../../../../lib/api-key-auth'
@@ -126,7 +127,34 @@ export async function GET(
     return problem(
       401,
       'Provide a valid API key as `Authorization: Bearer zsms_live_…`.',
-      'UNAUTHORIZED',
+      // ERROR_CODES.md's code for this, and it stays one answer for every cause.
+      'API_KEY_INVALID',
+    )
+  }
+
+  /*
+    The key's own ceiling, which `0241` stores and nothing enforced until now.
+
+    Checked AFTER authentication because the limit belongs to the key, and BEFORE the
+    resource lookup because a caller over their limit should be refused the cheapest
+    possible way — and because refusing with 429 before 404 stops the limit being used
+    to probe which resources exist.
+  */
+  const rate = await checkApiKeyRate(ctx)
+  if (!rate.allowed) {
+    await recordApiKeyUsage(ctx, request, 429)
+    return NextResponse.json(
+      {
+        error: `This key is limited to ${rate.limit} requests a minute. Wait and retry.`,
+        code: 'RATE_LIMITED',
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': '60',
+          'X-RateLimit-Limit': String(rate.limit),
+        },
+      },
     )
   }
 
@@ -143,10 +171,15 @@ export async function GET(
   if (!ctx.scopes.includes(spec.scope)) {
     // Recorded with the scope, so a school can see exactly what their key was refused.
     await recordApiKeyUsage(ctx, request, 403, spec.scope)
+    /*
+      `INSUFFICIENT_SCOPE`, not `FORBIDDEN`. ERROR_CODES.md defines it precisely for
+      this case, and the distinction is actionable: FORBIDDEN tells an integrator to
+      ask their school for access, INSUFFICIENT_SCOPE tells them which scope to ask for.
+    */
     return problem(
       403,
       `This key does not carry the \`${spec.scope}\` scope.`,
-      'FORBIDDEN',
+      'INSUFFICIENT_SCOPE',
     )
   }
 

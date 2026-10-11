@@ -210,6 +210,17 @@ export function SchoolShell({
           actually does it.
         */
         { path: '/settings/integrations', label: 'Connections', icon: Plug, needs: 'fees:write' },
+        /*
+          API keys (API_INTEGRATION.md).
+
+          Beside Connections because they are the two halves of integrating: a
+          connection is ZSMS pushing out, a key is another system reading in.
+
+          `settings:write` gates the link and the POLICY is narrower — `org:owner`
+          alone, not even the principal, because a key acts as the school with nobody's
+          name attached.
+        */
+        { path: '/settings/api-keys', label: 'API keys', icon: KeyRound, needs: 'settings:write' },
         // Outward-facing rather than internal configuration, and the only settings row a
         // parent ever sees the result of. Kept beside the others because that is where a head
         // teacher looks for it, not because it is the same kind of thing.

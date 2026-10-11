@@ -49,14 +49,16 @@ function feeReminderDeps() {
   return {
     async loadDueReminders(input: {
       schoolId?: string
-      minDaysOverdue: number
-      cooldownDays: number
       limit: number
     }): Promise<DueReminder[]> {
+      /*
+        No thresholds passed. `0252` resolves them per school from
+        `school_fee_reminder_settings`, so there is nowhere left for a constant
+        to hide — this used to send `?? 3` and `?? 7`, which decided when every
+        school in Zambia chased a parent for money.
+      */
       const { data, error } = await db.rpc('worker_due_fee_reminders', {
         p_school_id: input.schoolId ?? null,
-        p_min_days_overdue: input.minDaysOverdue,
-        p_cooldown_days: input.cooldownDays,
         p_limit: input.limit,
       })
       if (error) throw new Error(`Loading due reminders failed: ${error.message}`)
@@ -74,6 +76,12 @@ function feeReminderDeps() {
         currency: r['out_currency'] as string,
         arrearsAmount: r['out_arrears_amount'] as string,
         daysOverdue: r['out_days_overdue'] as number,
+        // Which rung, so the handler can pick the final-notice wording.
+        thresholdDays: r['out_threshold_days'] as number,
+        isFinal: Boolean(r['out_is_final']),
+        viaWhatsapp: Boolean(r['out_via_whatsapp']),
+        viaEmail: Boolean(r['out_via_email']),
+        viaInApp: Boolean(r['out_via_in_app']),
       }))
     },
 

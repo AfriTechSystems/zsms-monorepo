@@ -23,6 +23,7 @@
 
 import type { JSX, ReactNode } from 'react'
 import {
+  BellRing,
   CalendarCheck,
   CalendarDays,
   CalendarRange,
@@ -225,6 +226,15 @@ export function SchoolShell({
         // parent ever sees the result of. Kept beside the others because that is where a head
         // teacher looks for it, not because it is the same kind of thing.
         { path: '/settings/public-profile', label: 'Public listing', icon: Globe },
+        /*
+          Fee reminders (REMINDERS.md).
+
+          `fees:write` rather than `settings:write`, because the POLICY and
+          `set_reminder_settings()` admit the accountant alongside the owner and
+          principal — deciding when to chase a parent is the bursar's job, and gating
+          the link to leadership alone would hide it from the person who does it.
+        */
+        { path: '/settings/reminders', label: 'Fee reminders', icon: BellRing, needs: 'fees:write' },
         { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
         // `fees:read` to see, `fees:write` to buy — gated in the route, not here. Buying
         // credits spends the school's money, so it sits with the bursar's permissions

@@ -28,14 +28,19 @@ export interface DueReminder {
   currency: string
   arrearsAmount: string
   daysOverdue: number
+  /** The configured rung this message is for, and whether it is the last. */
+  thresholdDays: number
+  isFinal: boolean
+  /** The school's channel choices, resolved in SQL by 0252. */
+  viaWhatsapp: boolean
+  viaEmail: boolean
+  viaInApp: boolean
 }
 
 export interface FeeReminderDeps {
   /** Families due a reminder. Scoped per school when schoolId is supplied. */
   loadDueReminders(input: {
     schoolId?: string
-    minDaysOverdue: number
-    cooldownDays: number
     limit: number
   }): Promise<DueReminder[]>
   markReminderSent(feeRecordId: string): Promise<void>
@@ -52,8 +57,6 @@ export interface FeeReminderResult {
 export interface FeeReminderOptions {
   /** Restricts the run to one school. Omitted for the platform-wide cron. */
   schoolId?: string
-  minDaysOverdue?: number
-  cooldownDays?: number
   limit?: number
 }
 
@@ -66,8 +69,6 @@ export async function handleFeeReminders(
     // Defaults are conservative. A family one day late does not need a message
     // at 08:00; the values are overridable per run and belong in configuration
     // once the reminder schedule is school-editable.
-    minDaysOverdue: options.minDaysOverdue ?? 3,
-    cooldownDays: options.cooldownDays ?? 7,
     limit: options.limit ?? 500,
   })
 
@@ -82,11 +83,23 @@ export async function handleFeeReminders(
     const outcome = await sendWithFallback(
       {
         schoolId: r.schoolId,
-        templateKey: 'fee_reminder',
+        /*
+          REMINDERS.md specifies a different message for the last rung, and
+          `0253` seeds it. A family thirty days in arrears used to receive the
+          same gentle nudge as one seven days in, three times over.
+        */
+        templateKey: r.isFinal ? 'fee_overdue_final' : 'fee_reminder',
+        /*
+          The school's channel choices gate what we even offer the dispatcher.
+
+          Withholding the address is the enforcement — passing a phone number and
+          hoping the fallback chain skips WhatsApp would make the setting
+          decoration, and WhatsApp is the one that costs the school quota.
+        */
         recipient: {
-          phoneE164: r.parentPhone ?? undefined,
-          email: r.parentEmail ?? undefined,
-          userId: r.parentUserId ?? undefined,
+          phoneE164: r.viaWhatsapp ? (r.parentPhone ?? undefined) : undefined,
+          email: r.viaEmail ? (r.parentEmail ?? undefined) : undefined,
+          userId: r.viaInApp ? (r.parentUserId ?? undefined) : undefined,
         },
         studentId: r.studentId,
         variables: {

@@ -150,7 +150,7 @@ SELECT ok(
 -- crosses the tenant boundary that every other role in this file cannot — while
 -- making the result independent of whatever else lives in the database.
 SELECT is(
-  (SELECT count(*)::INT FROM public.worker_due_fee_reminders(NULL, 1, 7, 500) r
+  (SELECT count(*)::INT FROM public.worker_due_fee_reminders(NULL, 500) r
    WHERE r.out_school_id IN ('11111111-1111-1111-1111-111111111111',
                              '22222222-2222-2222-2222-222222222222')),
   2,
@@ -158,13 +158,13 @@ SELECT is(
 );
 
 SELECT is(
-  (SELECT count(*)::INT FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 1, 7, 500)),
+  (SELECT count(*)::INT FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 500)),
   1,
   'WORKER a school-scoped run sees only that school'
 );
 
 SELECT is(
-  (SELECT out_parent_phone FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 1, 7, 500)),
+  (SELECT out_parent_phone FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 500)),
   '+260977000001',
   'ATTACK a school-scoped run never returns another school''s parent'
 );
@@ -173,7 +173,7 @@ SELECT is(
 -- (ADR-038) rather than the invoice amount, or it dunns a parent for money
 -- they have already paid.
 SELECT is(
-  (SELECT out_arrears_amount FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 1, 7, 500)),
+  (SELECT out_arrears_amount FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 500)),
   '1000.00',
   'WORKER arrears quoted net of the verified payment, from student_fee_balance'
 );
@@ -185,7 +185,7 @@ SELECT lives_ok(
 
 -- The cooldown is the difference between a reminder and harassment.
 SELECT is(
-  (SELECT count(*)::INT FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 1, 7, 500)),
+  (SELECT count(*)::INT FROM public.worker_due_fee_reminders('11111111-1111-1111-1111-111111111111', 500)),
   0,
   'WORKER the cooldown suppresses a repeat reminder inside the window'
 );

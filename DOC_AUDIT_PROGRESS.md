@@ -40,7 +40,7 @@ quality on its own.
 | 05 | Core Database and API Reference | 8 | **Done** | Good · 82% | 2026-10-11 |
 | 06 | School and Tenant Management | 6 | **Done** | Good · 85% | 2026-10-11 |
 | 07 | Student and Parent Modules | 5 | **Done** | Good · 88% | 2026-10-11 |
-| 08 | Staff | — | Not started | — | — |
+| 08 | Staff Management | 5 | **Done** | Good · 87% | 2026-10-11 |
 | 09 | Fees | — | Not started | — | — |
 | 10 | Attendance | — | Not started | — | — |
 | 11 | Exams | — | Not started | — | — |
@@ -318,6 +318,49 @@ detail most likely to have been skipped, and it was not.
 - `packages/validators` does not exist. The one regex lives beside the data instead,
   because a package for a single expression is two places for it to drift.
 
+## 08 — Staff Management (Good, 87%) · 2026-10-11
+
+Five documents. Two real gaps, and one of them had live bad data.
+
+### Staff could not edit their own profile
+
+`staff_read_own_record` let them READ since `0014`; there was no UPDATE path, so a
+teacher whose phone number changed had to ask the office. `0249` adds it — on `/account`
+rather than in a school's settings, because a phone number belongs to a person and
+STAFF.md's multi-school case is real.
+
+**The first draft opened an escalation and its own assertion caught it.** `authenticated`
+already holds a table-level UPDATE on `staff_members`, and a column grant unions with a
+table grant rather than narrowing it — so a self-scoped policy would have let any member
+of staff write `school_id`, `is_active` or `staff_number` on their own row. It goes
+through a SECURITY DEFINER function instead, which cannot reach what it does not name.
+
+### Two teachers could be class teacher of one class
+
+ASSIGNMENTS.md says one. The unique index covered
+`(school_id, teacher_user_id, class_id, academic_year)`, which stops the same teacher
+twice and permits two different ones — and **three classes on `zsms-dev` had exactly
+that**. Since a `scope = 'class'` row is what RLS reads to decide who may mark a
+register, that is two people holding a responsibility the school believes one holds.
+
+Resolved the way the document's own replace flow does: stand the older down, keep the
+newest, delete nothing. The new index is partial on `is_active` so a handover still works.
+
+### Not built, with reasons
+
+- **Bulk invitation.** Clerk's free plan caps an organisation at five members, so a CSV
+  of 20–30 teachers would invite five and fail the rest — worse than not offering it.
+  Worth building immediately after a paid plan.
+- **"Subject must exist" / "class must exist" validation.** `class_id` is TEXT with no
+  foreign key, which is how grade structures stay school-configurable while Zambia runs
+  two systems at once. The validation belongs in the route and is a real gap there.
+
+### Folder 07's open item closed in the same pass
+
+The departure marketing prompt (`0248`) — asked once when a child leaves, never
+pre-ticked, and clicking Continue without ticking counts as an answer rather than a
+deferral.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -334,6 +377,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 08 | Bulk staff invitation | Blocked on a paid Clerk plan — the free tier caps an organisation at five members. |
+| 08 | Assignment subject/class validation | `class_id` is intentionally not a foreign key; the check belongs in the route. |
 | 05 | Nine of ten inbound webhooks | Foundation built (`0243`); each is blocked on a gateway, Meta or lender account. |
 | 05 | Outgoing webhooks to school systems | Scope exists, registration and delivery do not. |
 | 04 | Multi-country constraint widening | ADR-040 defers it until a second country is real. `npm run country:check` keeps the inventory honest in the meantime. |
@@ -372,3 +417,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 05 assessed and remediated, 82% |
 | 2026-10-11 | Folder 06 assessed and remediated, 85% |
 | 2026-10-11 | Folder 07 assessed and remediated, 88% |
+| 2026-10-11 | Folder 08 assessed and remediated, 87%; folder 07's open item closed |

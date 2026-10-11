@@ -10,6 +10,23 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built and reachable as of `0236`** — see `PERMISSIONS.md` for the full account.
+
+Before then the tables, `has_permission_grant()` and **15 live RLS policies** calling it
+all existed, with no route, no screen and no rows, so the function always returned false
+and everything this document describes was unreachable.
+
+Screen: `/school/[code]/settings/permissions`. Writing goes through
+`grant_staff_permission()` rather than an INSERT policy, because "you cannot grant what
+you do not hold" cannot live in a route a direct PostgREST call skips.
+
+**Not built:** the two-day expiry notification. There is no notification channel, so the
+screen warns about grants lapsing within two days instead.
+
+---
+
 ## Purpose
 
 This document is the school-facing practical guide to the permission override system. Where `docs/modules/auth/PERMISSIONS.md` covers the technical implementation, this document covers real school scenarios — when to use grants, how to create them, how they expire, and how to manage them. Every Claude Code session building the grants management UI must read both documents.

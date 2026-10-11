@@ -14,6 +14,32 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Self-management built (`0249`).** Staff could READ their own record since `0014` and
+there was no UPDATE path, so a teacher whose phone number changed had to ask the office.
+The seven fields this document lists are now editable on `/account`.
+
+**It goes through a function, not a policy, and the reason is worth knowing before
+anybody "simplifies" it.** `authenticated` already holds a **table-level UPDATE** on
+`staff_members`, granted so `management_write_staff` could work. A column grant does not
+narrow a table grant — it unions with it. So a self-scoped UPDATE policy would let every
+member of staff write any column on their own row: `school_id`, moving themselves into
+another school's roster; `is_active`, undoing their own removal; `staff_number`.
+
+`0249`'s own assertion caught that in its first draft.
+
+**Multi-school staff is handled**: the update applies to every row for that person,
+because a phone number belongs to a person rather than to an employment. The per-school
+facts — staff number, department, employment type, start date — are shown read-only with
+a line saying who to ask.
+
+**Not self-managed, by design:** `department`. This document does not list it, and
+`0246` reads it to find a school's principal for the transfer letter signature line. A
+field that decides who signs a document is not one somebody sets about themselves.
+
+---
+
 ## Purpose
 
 This document defines the complete staff entity — what a staff profile contains, how staff types differ, how staff work across multiple schools, how the `org:staff` base role works for custom role holders, and what staff can self-manage vs what requires admin action. Every Claude Code session building any staff management feature must read this document.

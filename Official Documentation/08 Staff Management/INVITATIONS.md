@@ -12,6 +12,26 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Path 1 (admin-initiated) is built** — invitations go out server-side through the Clerk
+Backend API from the Staff screen, so there is exactly one way to become a member of a
+school.
+
+**Path 2 is built as school join requests** (`0160`–`0161`). A teacher asks by **exact
+school code**, the school approves on the Staff screen choosing the role, and approval
+issues the same server-side invitation. Lookup is never by name, because that would let
+anyone with a free Hub account enumerate which schools are ZSMS customers — an unknown
+code is deliberately indistinguishable from a real one. `org:owner` cannot be granted
+this way.
+
+**Bulk invitation is NOT built**, and there is a reason beyond time: **Clerk's free plan
+caps an organisation at five members.** Verified on the live instance. A CSV of 20–30
+teachers would invite five and fail the rest, which is a worse experience than not
+offering it. Worth building immediately after a paid Clerk plan, not before.
+
+---
+
 ## Purpose
 
 This document defines every path by which a staff member joins a school on ZSMS — admin-initiated invitations, staff self-registration with approval, and bulk invitation during school onboarding. Every Claude Code session building staff onboarding features must read this document.

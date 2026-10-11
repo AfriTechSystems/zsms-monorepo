@@ -12,6 +12,21 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**`zsms-dev` is complete and exercised. Staging and production do not exist.**
+
+93 tables across `public`, `afritech` and `private`; RLS enabled AND forced on every one;
+0 tables without a policy. CI applies every migration to an empty database on each push
+and runs 38 pgTAP suites against the result.
+
+`zsms-dev` being in `eu-west-1` is a documented exception, not a mistake — it holds
+synthetic data only, so the ZDPA adequacy argument requiring `af-south-1` is not engaged.
+**Staging and production must be `af-south-1`**, and neither exists yet, which is a
+compliance blocker before any real school data.
+
+---
+
 ## Purpose
 
 This document covers everything needed to configure, operate, and maintain the Supabase projects that power ZSMS. It is the reference for every Claude Code session that writes migrations, deploys Edge Functions, configures Realtime, or troubleshoots database issues.

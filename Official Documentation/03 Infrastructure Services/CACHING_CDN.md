@@ -12,6 +12,26 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Layer 1 (Upstash) is real; the CDN layer is not configured.**
+
+Built: `apps/web/lib/features.ts` (`zsms:features:*`, 5-minute TTL) and
+`apps/web/lib/rate-limit.ts` (`zsms:ratelimit:*`, window TTL, fixed window, applied in
+middleware ahead of authentication).
+
+Both fail **open**. A caching layer that takes the product down when it fails is worse
+than no caching layer, and ZSMS is a school's attendance register on a Monday morning.
+The honest consequence for the rate limiter is that a Redis outage is also an open
+window — the right way round, because the alternative is certain downtime to avoid
+occasional exposure.
+
+Not configured: Cloudflare CDN, edge caching, and the zone itself. The security headers
+this document's sibling `CLOUDFLARE_WAF.md` specifies are set at the ORIGIN instead, so
+they survive the proxy being bypassed.
+
+---
+
 ## Purpose
 
 This document defines every cache in ZSMS — what is cached, where, for how long, under what key, and critically when it is invalidated. It covers the Upstash Redis application cache, the Cloudflare CDN edge cache, and Next.js ISR. Every Claude Code session that adds a hot-path lookup, changes a configuration table, or builds a public page must read this document before choosing a TTL.

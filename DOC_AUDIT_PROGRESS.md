@@ -35,7 +35,7 @@ quality on its own.
 |---|---|---:|---|---|---|
 | 01 | Foundation Layer | 14 | **Done** | Good · 73% | 2026-10-06 |
 | 02 | Authentication and Identity | 5 | **Done** | Good · 88% | 2026-10-11 |
-| 03 | Infrastructure Services | 20 | Not started | — | — |
+| 03 | Infrastructure Services | 20 | **Done** | Good · 78% | 2026-10-11 |
 | 04 | Country and Configuration | 2 | Not started | — | — |
 | 05 | Core Database and API Reference | 8 | Not started | — | — |
 | 06 | School and Tenant | — | Not started | — | — |
@@ -120,6 +120,46 @@ Assessed at **Fair 55%**, then remediated in the same pass. Re-scored after.
 - The two-day grant expiry notification needs a notification channel.
 - Phone-based login is blocked on SMS OTP, which was disabled on cost grounds.
 
+## 03 — Infrastructure Services (Good, 78%) · 2026-10-11
+
+Assessed at **Fair 52%**, then remediated. The pattern was sharp and worth remembering:
+**where ZSMS writes code it was done; where ZSMS needs an account it was not.**
+
+### Built this pass
+
+- **HTTP rate limiting** (`lib/rate-limit.ts`). There was none. `ai_assistant_quota()`
+  and `consume_message_quota()` are real but are BILLING limits — neither notices ten
+  thousand requests a minute. Middleware, ahead of authentication, failing open.
+- **API integration, Tier 2 end to end** (`0241`). `school_api_keys` was specified and
+  absent. Keys hashed and shown once, owner-only, `/api/v1/` read endpoints, usage log
+  including refusals, management screen. Tenant isolation tested, not reasoned about.
+- **Unit economics** (`0240`, `/admin/costs`). Consumption per school, no invented money.
+- **Cache convention** — the doc changed to match the code, per the decision that
+  `zsms:` namespacing is worth keeping in a shared Redis.
+
+### Scores after
+
+| Band | Documents |
+|---|---|
+| Excellent | R2 95, BULLMQ 90, SUPABASE 90 |
+| Good | CLERK 85, POSTHOG 85, API_INTEGRATION 80, CACHING_CDN 80, SENTRY 70, HOSTING_STRATEGY 70, COST_MANAGEMENT 70 |
+| Fair | META_API 55, TWILIO 55, QSTASH 55, VERCEL 50, CLOUDFLARE_WAF 50, RAILWAY 45, DEPLOYMENT_TOPOLOGY 40, SCALING 40, AVAILABILITY 35 |
+| Deferred | POWERSYNC — paid service, online-first by decision |
+
+Every one of the twenty now carries an **Implementation Status** block saying what is
+built, what is credential-blocked, and what is deferred — so the next reader does not
+have to re-derive which is which.
+
+### Still open
+
+- **AVAILABILITY is the weakest.** `/api/health` reports component status and **nothing
+  polls it.** No alerting, no PITR verification, no standby. Recovery objectives are
+  targets with nothing measuring them — worth knowing before quoting them to a customer.
+- API write endpoints (Tier 1/3): a write with no user behind it needs idempotency on a
+  caller-supplied key, or a retry double-records a payment.
+- Outbound webhook registration (`webhooks:receive` scope exists, no endpoint).
+- Billing alerts, which want real spend data first.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -134,6 +174,9 @@ Open items from finished folders. Each carries why it is still open.
 | 02 | Suspicious activity detection | None of SESSIONS.md's five patterns, and no alerting path. `audit_logs` could detect two retrospectively. |
 
 
+| 03 | Uptime monitoring and alerting | `/api/health` exists and nothing polls it. Needs an external monitor, not code. |
+| 03 | API write endpoints (Tier 1/3) | Needs idempotency on a caller-supplied key, or a retried request double-records a payment. |
+| 03 | PITR and the Railway standby | Paid plans. `zsms-dev` is free and synthetic, so there is nothing yet to verify against. |
 | 02 | Phone-based login | Blocked on SMS OTP, disabled on cost grounds in Zambia. Parents match on verified email instead. |
 
 ---
@@ -161,3 +204,4 @@ repeatedly described things the database could not do.
 | 2026-10-06 | Folder 01 audited and remediated |
 | 2026-10-10 | Tracker created; folder 02 assessed |
 | 2026-10-11 | Folder 02 remediated and re-scored 55% -> 88% |
+| 2026-10-11 | Folder 03 assessed and remediated, 52% -> 78% |

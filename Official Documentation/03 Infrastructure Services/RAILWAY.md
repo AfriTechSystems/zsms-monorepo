@@ -11,6 +11,20 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Workers yes, standby no.**
+
+Built: four BullMQ workers — receipts, fee reminders, scheduled announcements, report-card
+batches. The worker boundary is enforced by a pgTAP suite: a worker's connection bypasses
+RLS, so all its access goes through `worker_*` functions and `.from(` anywhere in
+`apps/workers` is a defect.
+
+Not built: the Postgres hot standby, the replication setup below, and lag monitoring. That
+is a paid Railway database and a one-time configuration, not code.
+
+---
+
 ## Purpose
 
 This document covers Railway's two roles in ZSMS: the PostgreSQL standby database (replication, failover, health monitoring) and the persistent BullMQ queue workers plus their Redis instance. The standby is passive infrastructure that is critical when needed; the workers are active infrastructure the platform depends on continuously.

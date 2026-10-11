@@ -10,6 +10,28 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Headers at the origin; the zone itself is not configured.**
+
+Built: all five security headers in `apps/web/next.config.mjs`, verified on a live
+response. They are set at the origin as well as being specified here as Transform Rules,
+because of prohibition 1 below — a header that exists only at the edge disappears the
+moment somebody greys the orange cloud to debug something, which is exactly when a site
+is most exposed.
+
+`X-XSS-Protection` is in this document and is deliberately NOT set: every current browser
+ignores it, and the versions that honoured it had auditor-introduced vulnerabilities. CSP
+is what prevents that class.
+
+Also built: application-level rate limiting in middleware (`lib/rate-limit.ts`), which is
+the ZSMS half of what this document's *Rate Limiting Rules* describes at the edge.
+
+Not configured: the zone, the WAF rulesets, edge rate limiting, and the origin IP lock.
+All dashboard work requiring the domain.
+
+---
+
 ## Purpose
 
 This document defines the Cloudflare WAF (Web Application Firewall) configuration for ZSMS — why it exists, what it protects against, how it is configured, and how it integrates with the rest of the infrastructure. Every Claude Code session touching network or security configuration must read this document.

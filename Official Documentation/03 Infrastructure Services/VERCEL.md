@@ -11,6 +11,17 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Dev only.** The application builds and deploys; `zsms-staging` and `zsms-zm` do not
+exist as Vercel projects any more than they do as Supabase projects.
+
+There is no `vercel.json` — configuration is dashboard-side. The one thing that IS in the
+repository is the security headers in `next.config.mjs`, which belong there rather than in
+platform configuration precisely so they survive a platform change.
+
+---
+
 ## Purpose
 
 This document covers the complete Vercel deployment configuration for ZSMS — how branches map to environments, how environment variables are managed per deployment, how the multi-country architecture is deployed, and how domain configuration works. Every Claude Code session that touches deployment configuration must reference this document.

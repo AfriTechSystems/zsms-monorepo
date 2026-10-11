@@ -8,6 +8,24 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Live, EU region, with autocapture OFF.**
+
+`apps/web/lib/analytics.ts`. Verified by `npm run posthog:smoke`.
+
+Autocapture, input capture and session recording are all disabled and **must stay
+disabled**. PostHog's default captures every click and input with the surrounding DOM
+text, and the DOM of a ZSMS screen is a class register with children's names, a fee ledger
+with amounts beside them, and a pupil record carrying an NRC and medical notes.
+
+Query strings are stripped before anything leaves the browser (`?childId=`, `?classId=`
+and `?feeRecordId=` each name a child), and page-view paths have their dynamic segments
+replaced, since `/school/ZM-LSK-0001/pupils/<uuid>` names a school and a pupil in the path
+itself. Nobody is identified: `identifyRole()` sends a role and a school code.
+
+---
+
 ## Purpose
 
 This document defines every PostHog event tracked in ZSMS — what is tracked, when it fires, what properties are included, and which dashboards use it. Every Claude Code session adding a new user-facing feature must add the corresponding PostHog event here and in the implementation.

@@ -9,6 +9,19 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Code complete; waiting on an account.**
+
+`packages/notifications/src/providers/twilio-sms.ts` is implemented and gated behind
+`useMock()` exactly as the WhatsApp provider is.
+
+Worth noting for `AUTH.md`: SMS OTP is disabled on cost grounds in Zambia, which is why
+parents are matched by verified email rather than by phone. Twilio here is for outbound
+notifications as a WhatsApp fallback, not for authentication.
+
+---
+
 ## Purpose
 
 This document covers Twilio's role in ZSMS. With the move to email OTP only and the portal-first communication model, Twilio's scope is deliberately narrow. This document defines exactly when Twilio is used, how it is configured, and what the fallback triggers are.

@@ -132,6 +132,12 @@ export default function StudentDetailPage({
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [leaveKind, setLeaveKind] = useState<'transferred' | 'withdrawn'>('transferred')
   const [leaveReason, setLeaveReason] = useState('')
+  /*
+    Ticked by default, as TRANSFER.md recommends. The letter is what the receiving
+    school asks for, and an unticked box is discovered when the family is already
+    standing at the next school's counter.
+  */
+  const [leaveLetter, setLeaveLetter] = useState(true)
   const [leaveTo, setLeaveTo] = useState('')
   const [leaving, setLeaving] = useState(false)
 
@@ -149,6 +155,7 @@ export default function StudentDetailPage({
             reason: leaveReason,
             destination: leaveTo || undefined,
             kind: leaveKind,
+            generateLetter: leaveLetter,
           },
         )
         if (result.error) {
@@ -162,7 +169,7 @@ export default function StudentDetailPage({
         setLeaving(false)
       }
     },
-    [id, leaveReason, leaveTo, leaveKind, toast, reload],
+    [id, leaveReason, leaveTo, leaveKind, leaveLetter, toast, reload],
   )
 
   const addGuardian = useCallback(
@@ -854,6 +861,29 @@ export default function StudentDetailPage({
                           
                         />
                       </div>
+
+                      {/*
+                        TRANSFER.md: "Generate transfer letter ☑ (recommended)".
+
+                        The letter is the one physical artefact a transfer produces and
+                        what the receiving school asks for, so it is ticked by default
+                        and the label says what it is for rather than merely what it is.
+                      */}
+                      <label className="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 accent-primary"
+                          checked={leaveLetter}
+                          onChange={(e) => setLeaveLetter(e.target.checked)}
+                        />
+                        <span>
+                          Generate a transfer letter
+                          <span className="block text-xs text-muted-foreground">
+                            A signed PDF the family can take to the next school. It is
+                            kept permanently, so you can issue the link again years later.
+                          </span>
+                        </span>
+                      </label>
 
                       <div className="flex flex-wrap items-center gap-2">
                         <Button type="submit" disabled={leaving || leaveReason.trim().length < 4}>

@@ -326,6 +326,9 @@ export async function renderTransferLetter(
   return finish(doc, `${data.transferReference}.pdf`)
 }
 
+// Exported so a worker can type the context it assembles for the renderer.
+export type { TransferLetterData } from './types'
+
 export type { TeachingResourceDocument } from './teaching-resource'
 export {
   renderTeachingResourcePdf,

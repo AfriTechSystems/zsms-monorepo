@@ -21,6 +21,10 @@ import { handlePaymentVerified } from './handlers/payment-verified'
 import { handleFeeReminders, type DueReminder } from './handlers/fee-reminders'
 import { handleExpireTrials, type ExpiredTrial } from './handlers/expire-trials'
 import {
+  handleTransferLetter,
+  type TransferLetterContext,
+} from './handlers/transfer-letter'
+import {
   handleScheduledAnnouncements,
   type AnnouncementRecipient,
   type ClaimedAnnouncement,
@@ -268,6 +272,80 @@ export async function startWorkers(): Promise<void> {
     }
   }
 
+  /*
+    The letter's whole context in one call, through a `worker_*` function.
+
+    The worker bypasses RLS, so every extra table it could reach is another place a
+    bug crosses a tenant boundary. One pupil id in, one row out.
+  */
+  function transferLetterDeps() {
+    const base = createWorkerDeps()
+    return {
+      async loadContext(studentId: string): Promise<TransferLetterContext | null> {
+        const { data, error } = await workerDb().rpc('worker_transfer_letter_context', {
+          p_student_id: studentId,
+        })
+        if (error) throw new Error(`worker_transfer_letter_context: ${error.message}`)
+
+        const row = (Array.isArray(data) ? data[0] : data) as
+          | Record<string, string | null>
+          | undefined
+        if (!row) return null
+
+        return {
+          school: {
+            name: row['out_school_name'] ?? 'School',
+            schoolCode: row['out_school_code'] ?? '',
+          },
+          ministryRegistrationNumber: row['out_ministry_reg'],
+          studentName: row['out_student_name'] ?? '',
+          studentCode: row['out_student_code'] ?? '',
+          enrolledOn: row['out_enrolled_on'] ?? '',
+          transferredOn: row['out_transferred_on'] ?? '',
+          finalGradeLevel: row['out_final_grade'] ?? '',
+          kind: row['out_kind'] === 'withdrawn' ? 'withdrawn' : 'transferred',
+          destination: null,
+          principalName: row['out_principal_name'],
+        }
+      },
+      /*
+        Its own `recordDocument`, because the shared one hardcodes
+        `payment_receipt` and demands a payment id, an academic year and a term —
+        none of which a transfer letter has.
+      */
+      async recordDocument(input: { schoolId: string; studentId: string }) {
+        const { data, error } = await workerDb().rpc('record_generated_document', {
+          p_school_id: input.schoolId,
+          p_doc_type: 'transfer_letter',
+          p_student_id: input.studentId,
+          p_payment_id: null,
+          p_academic_year: null,
+          p_term_number: null,
+          p_generated_by: null,
+        })
+        if (error) throw new Error(`Recording the transfer letter failed: ${error.message}`)
+        return data as string
+      },
+      storeDocument: base.storeDocument,
+      completeDocument: base.completeDocument,
+    }
+  }
+
+  await createWorker<
+    { studentId: string; schoolId: string; transferReference: string },
+    unknown
+  >(
+    'generate-transfer-letter',
+    async ({ payload }) => {
+      if (!payload?.studentId || !payload.schoolId || !payload.transferReference) {
+        throw new Error('generate-transfer-letter job is missing its identifiers')
+      }
+      return handleTransferLetter(payload, transferLetterDeps())
+    },
+    // One page per job, and a family may be waiting at the office counter.
+    { concurrency: 3 },
+  )
+
   await createWorker<Record<string, never>, unknown>(
     'expire-trials',
     async () => handleExpireTrials(expireTrialsDeps()),
@@ -309,7 +387,7 @@ export async function startWorkers(): Promise<void> {
   */
   await registerRecurringJobs()
 
-  console.log('ZSMS workers started: generate-receipt, send-fee-reminders, check-scheduled-announcements, generate-report-card, expire-trials')
+  console.log('ZSMS workers started: generate-receipt, send-fee-reminders, check-scheduled-announcements, generate-report-card, expire-trials, generate-transfer-letter')
 }
 
 if (process.env['NODE_ENV'] !== 'test') {

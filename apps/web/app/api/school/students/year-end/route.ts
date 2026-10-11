@@ -43,6 +43,13 @@ const bodySchema = z.discriminatedUnion('action', [
     // `graduated` is deliberately absent — graduating a cohort is decided against
     // examination results, not recorded as a pupil leaving.
     kind: z.enum(['transferred', 'withdrawn']).default('transferred'),
+    /*
+      TRANSFER.md marks this "(recommended)" and so does the form. Defaulted TRUE:
+      the letter is what the receiving school asks for, and a school that forgets to
+      tick it discovers the omission when a family is already standing at the next
+      school's counter.
+    */
+    generateLetter: z.boolean().default(true),
   }),
 ])
 
@@ -105,11 +112,63 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (!row.out_done) return fail('NOT_FOUND', row.out_message ?? 'That pupil is not here.')
 
+    /*
+      The letter, queued after the transfer has committed.
+
+      Order matters: the pupil's status is the thing that must not fail, and a letter
+      is retryable. Queuing first would risk a letter for a transfer that did not
+      happen.
+    */
+    let letterReference: string | null = null
+
+    if (input.generateLetter) {
+      try {
+        const school = await client.rpc('current_school_uuid')
+        const schoolId = (school.data as string | null) ?? null
+
+        if (schoolId) {
+          const ref = await client.rpc('next_transfer_reference', {
+            p_school_id: schoolId,
+          })
+          letterReference = (ref.data as string | null) ?? null
+
+          if (letterReference) {
+            const { getQueue } = await import('@zsms/queue')
+            await getQueue().enqueue(
+              'generate-transfer-letter',
+              { studentId: input.studentId, schoolId, transferReference: letterReference },
+              {
+                // Above a report-card batch: somebody may be waiting at the office
+                // counter for a letter they need to take with them today.
+                priority: 2,
+                attempts: 3,
+                backoff: { type: 'exponential', delay: 5000 },
+                // One letter per reference, so a double-submit does not render twice.
+                deduplicationId: `transfer-letter:${letterReference}`,
+              },
+            )
+          }
+        }
+      } catch {
+        /*
+          Swallowed, deliberately — and reported honestly below.
+
+          The transfer has already committed and must not be undone because a queue
+          was unreachable. `letterReference` stays null, the response says the letter
+          was not started, and the school can ask again rather than being told it
+          exists when it does not.
+        */
+        letterReference = null
+      }
+    }
+
     return ok({
       done: true,
       // Surfaced so the screen can say so: a family keeps access for 30 days, and a school
       // expecting the record to vanish would otherwise think it had failed.
       accessUntil: row.out_access_until ?? null,
+      letterReference,
+      letterRequested: input.generateLetter,
       message: row.out_message,
     })
   })

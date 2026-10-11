@@ -26,9 +26,21 @@ export async function GET(): Promise<Response> {
 
     // Both functions are SECURITY INVOKER, so RLS scopes them to what this
     // operator may see. The 403 above is the courtesy; this is the boundary.
-    const [metrics, health] = await Promise.all([
+    const [metrics, health, integrations, consent] = await Promise.all([
       client.rpc('platform_metrics'),
       client.rpc('school_health_scores'),
+      /*
+        Two aggregates that had no caller.
+
+        `admin_integration_health()` (`0230`) and `admin_marketing_consent_summary()`
+        (`0229`) were both built with no route and no screen — correct, tested, and
+        unreachable, which `npm run gaps` flagged and this fixes. They belong here
+        because the overview is where platform-wide numbers live, and because a
+        failing integration at one school is an operational fact somebody should meet
+        without going looking for it.
+      */
+      client.rpc('admin_integration_health'),
+      client.rpc('admin_marketing_consent_summary'),
     ])
 
     if (metrics.error) return fromPostgrestError(metrics.error)
@@ -42,6 +54,25 @@ export async function GET(): Promise<Response> {
       // Counted here rather than in the component so the number on the card and
       // the length of the list beneath it cannot disagree.
       atRisk: rows.filter((r) => r['band'] === 'at_risk' || r['band'] === 'critical').length,
+
+      /*
+        Both are capability-gated in the database — `admin_marketing_consent_summary()`
+        is AfriTech-only and `admin_integration_health()` likewise — so a caller
+        without the role gets an error rather than data. That is not a reason to fail
+        the whole page: the overview is useful without them, and a role that cannot
+        see one number should still see the rest.
+      */
+      integrations: integrations.error
+        ? []
+        : ((integrations.data ?? []) as Array<Record<string, unknown>>),
+      integrationsLoaded: !integrations.error,
+
+      // A COUNT, never a list. `0169` set that precedent and `0229` follows it: a
+      // function returning the opted-in parents would be a marketing list assembled
+      // from every school's roll.
+      marketingConsent: consent.error
+        ? null
+        : ((consent.data as Array<Record<string, unknown>>)?.[0] ?? null),
     })
   })
 }

@@ -19,11 +19,11 @@ To answer "what endpoints exist right now" without anybody keeping a list by han
 
 Generated on 2026-10-11.
 
-**124 routes** across 23 groups.
+**125 routes** across 24 groups.
 
 | Rate limit policy | Routes |
 |---|---:|
-| api (120/min) | 71 |
+| api (120/min) | 72 |
 | admin (200/min) | 25 |
 | financial (20/min) | 9 |
 | expensive (30/min) | 6 |
@@ -270,6 +270,12 @@ Generated on 2026-10-11.
 | Path | Methods | Rate limit |
 |---|---|---|
 | `/api/v1/[...resource]` | GET | api (120/min) |
+
+## `/api/webhooks`
+
+| Path | Methods | Rate limit |
+|---|---|---|
+| `/api/webhooks/clerk` | POST | api (120/min) |
 
 ## Business Rules
 

@@ -11,6 +11,35 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not built, and blocked on one specific, nameable thing.**
+
+`custom_webhook` is a valid `integration_type` and `school_integrations` already carries
+`events_subscribed` and `config`. Step 1 of the flow below — register a URL and pick
+events — is representable today.
+
+**Step 2 is the blocker.** "Copy Your Webhook Secret" needs a secret ZSMS can retrieve in
+**plaintext** to compute an HMAC over every outgoing payload. `credentials_enc` refuses
+anything not prefixed `enc:v1:`, and `FIELD_ENCRYPTION_KEY` is unset — so the secret
+cannot be stored without either the key, or a decision to keep a signing secret in the
+clear. The second would mean any read of that table hands over the ability to forge
+deliveries ZSMS's own signature vouches for, so this waits on the key.
+
+**The verification examples below are already proven in the opposite direction.** The
+Clerk webhook route implements exactly this scheme inbound — HMAC-SHA256 over
+`id.timestamp.body`, base64, constant-time comparison, a five-minute tolerance and
+space-separated signatures for rotation — and `apps/web/lib/webhook-verify.test.ts`
+covers it with 13 unit tests. When outgoing dispatch is built, the signing side mirrors a
+verifier that already works rather than inventing a scheme.
+
+**Also needed when it is:** a retry policy with backoff, and `integration_log` rows per
+attempt. Delivery to somebody else's endpoint fails routinely, and a webhook that gives up
+silently is worse than one that never existed — the school believes their system is in
+sync.
+
+---
+
 ## Purpose
 
 This document is the end-user guide for configuring custom outbound webhooks — how school IT admins and owners configure ZSMS to send event notifications to any external system. This complements `API_INTEGRATION.md` (the developer/technical reference) with the school-facing UI flow, event catalogue, payload formats, verification guide, and integration health monitoring. Every Claude Code session building the webhook configuration UI must read this document.

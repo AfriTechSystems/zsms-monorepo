@@ -202,6 +202,9 @@ This document records every significant architectural and product decision made 
 
 ---
 
+
+> **Correction (2026-10-11).** This ADR states that tier-1 native webhooks are "already built" using a `school_webhooks` table. Neither is true and neither ever was: there is no `school_webhooks` table and no outgoing webhook dispatch of any kind. What `0230` built is `school_integrations` — the registry, with `events_subscribed` and `integration_log`. The configuration exists; nothing sends. Dispatch is blocked on `FIELD_ENCRYPTION_KEY`, because a signed webhook needs a signing secret retrievable in plaintext to compute the HMAC. The DECISION stands; only the claim about prior state was wrong.
+
 ## ADR-024 — Dynamic Pricing and Super Admin Overrides
 
 **Status:** Confirmed

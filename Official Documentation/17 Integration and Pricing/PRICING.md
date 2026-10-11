@@ -11,6 +11,35 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Fully database-driven, and verified today: nothing in the pricing path carries a
+hardcoded price.**
+
+Four `afritech` tables hold it all — `subscription_tiers` (4 tiers),
+`feature_flags` (21), `tier_features` (36 rows), `school_feature_overrides` (5 live
+overrides) — plus `tier_student_price_bands` for per-student pricing. Everything is
+editable from `/admin/pricing` without a deployment, which is ADR-031's test: "would a
+business person reasonably want to change this without a deployment?"
+
+Live tiers: Starter K600 **per student**, Growth K1,100 flat, Professional K2,000 flat,
+Enterprise K3,000 flat.
+
+Feature access resolves through `public.school_has_feature()` in a fixed order — revoke
+override → grant override → tier override → tier matrix. The student ceiling resolves
+the same way through `school_student_limit()`.
+
+**Two corrections this document's own history records, both worth keeping:** three of the
+four tables did not exist until `0095` despite being documented from the start, and the
+documented resolution order has **five** steps where the implementation has four — there
+is no module-subscription table, so that step is omitted rather than faked.
+
+**Open:** AI credit prices and Teacher Hub plan allowances remain seeded guesses needing a
+business decision, and no tier has an AI allowance row yet, so schools currently include
+nothing.
+
+---
+
 ## Purpose
 
 This document defines the dynamic pricing system — how AfriTech super admins edit subscription tier prices, configure which features are included in each tier, create per-school access overrides, and extend subscriptions. Every Claude Code session building any feature access check, pricing display, or subscription management UI must read this document.

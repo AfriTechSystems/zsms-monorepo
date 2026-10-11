@@ -10,6 +10,42 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Connector 1 (Sage 50 CSV export) is built. Connectors 2–4 are credential-blocked.**
+
+| Connector | State |
+|---|---|
+| **Sage 50 — CSV export** | **Built** (`0263`). `sage50_export_rows()` + `/api/school/integrations/sage50`, downloadable from Settings → Connections |
+| Sage Business Cloud | Blocked — needs OAuth credentials |
+| QuickBooks | Blocked — needs a registered app |
+| Xero | Blocked — needs OAuth credentials |
+
+Sage 50 was built first because it is the one connector needing **no authentication at
+all**: a desktop application with no cloud API, so the integration is a file the
+accountant imports. This document notes Sage 50 Pastel is the most common accounting
+software in Zambian private schools, which makes it both the easiest and the most useful.
+
+**Three decisions in the export worth preserving:**
+
+- **Verified payments only.** A Sales Receipt asserts money arrived, and ZSMS records a
+  parent's *claim* separately from a bursar's *verification*. Exporting an unverified
+  claim would put the school's books out by whatever a parent mistyped. Reversals and
+  waivers are excluded for the same reason — both would overstate income.
+- **UTF-8 BOM and CRLF line endings.** Sage 50 is a Windows desktop application: without
+  the BOM it reads the file in the system codepage and mangles any diacritic, and without
+  CRLF some versions treat the whole file as a single line. Two one-character fixes for a
+  failure that presents as corrupt data.
+- **RFC 4180 quoting.** A pupil's name can carry an apostrophe and a fee label a comma;
+  either unescaped shifts every subsequent column, which Sage imports without complaint
+  and the accountant finds at reconciliation.
+
+Nominal codes come from `school_integrations.config` — a default plus per-fee-label
+overrides — because a school's chart of accounts is its own. The export works against
+the documented default of 4000 even for a school that has never opened the screen.
+
+---
+
 ## Purpose
 
 This document defines the four accounting system connectors — Sage 50 (CSV export), Sage Business Cloud (API), QuickBooks Online (API), and Google Sheets (API). Every Claude Code session building an accounting connector must read this document in full.

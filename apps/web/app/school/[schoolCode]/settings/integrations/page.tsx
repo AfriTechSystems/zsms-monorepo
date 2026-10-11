@@ -18,7 +18,7 @@
 
 import type { ChangeEvent, JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Plug, PauseCircle } from 'lucide-react'
+import { AlertTriangle, Download, Plug, PauseCircle } from 'lucide-react'
 
 import { Button } from '../../../../../components/ui/button'
 import { Card } from '../../../../../components/ui/card'
@@ -68,6 +68,63 @@ const EVENT_LABEL: Record<string, string> = {
 
 export default function IntegrationsPage(): JSX.Element {
   const { toast } = useToast()
+
+  /*
+    Defaults to the current month, which is what an accountant exporting mid-term
+    almost always wants. They can widen it; `sage50_export_rows()` caps the window at
+    one year so a mis-click cannot produce a file nobody can check.
+  */
+  const [sageFrom, setSageFrom] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+  })
+  const [sageTo, setSageTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [sageBusy, setSageBusy] = useState(false)
+
+  /**
+   * Downloads the CSV.
+   *
+   * Fetched rather than linked, so a refusal arrives as a readable message instead of
+   * the browser saving a file containing the error envelope — which is what a plain
+   * `<a download>` would do with a 403.
+   */
+  async function downloadSage(): Promise<void> {
+    setSageBusy(true)
+    try {
+      const response = await fetch(
+        `/api/school/integrations/sage50?from=${sageFrom}&to=${sageTo}`,
+      )
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        toast(body?.error ?? 'The export could not be produced.', 'danger')
+        return
+      }
+
+      const count = Number(response.headers.get('X-ZSMS-Row-Count') ?? '0')
+      if (count === 0) {
+        /*
+          An empty file is worse than a message: the accountant imports it, Sage
+          reports nothing, and they go looking for a Sage problem.
+        */
+        toast('No verified payments in that date range, so there is nothing to export.', 'danger')
+        return
+      }
+
+      const blob = await response.blob()
+      const href = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = href
+      link.download = `sage50-${sageFrom}-to-${sageTo}.csv`
+      link.click()
+      URL.revokeObjectURL(href)
+
+      toast(`${count} payment${count === 1 ? '' : 's'} exported for Sage 50.`, 'success')
+    } finally {
+      setSageBusy(false)
+    }
+  }
+
   const [payload, setPayload] = useState<Payload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -255,6 +312,71 @@ export default function IntegrationsPage(): JSX.Element {
           </p>
         </Card>
       ) : null}
+
+      {/*
+        The Sage 50 export.
+
+        Shown unconditionally, and ABOVE the dispatch warning's concern, because it is
+        the one connector in this folder that needs no credential at all: Sage 50 is a
+        desktop application with no cloud API, so the integration is a file the
+        accountant downloads. Everything else here waits on OAuth, an API key, or
+        `FIELD_ENCRYPTION_KEY`.
+
+        ACCOUNTING_CONNECTORS.md notes Sage 50 Pastel is the most common accounting
+        software in Zambian private schools, so this is also the connector most schools
+        would actually use.
+      */}
+      <Card className="mb-cards p-card">
+        <h2 className="flex items-center gap-2 font-medium">
+          <Download className="h-4 w-4" />
+          Sage 50 export
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A batch-import file for Sage 50 Pastel. Download it, then use Sage&rsquo;s batch
+          import to bring the term&rsquo;s verified payments in without re-typing them.
+        </p>
+
+        <div className="mt-stack flex flex-wrap items-end gap-stack">
+          <label className="block">
+            <span className="text-sm font-medium">From</span>
+            <Input
+              type="date"
+              value={sageFrom}
+              onChange={(e) => setSageFrom(e.target.value)}
+              className="mt-1"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">To</span>
+            <Input
+              type="date"
+              value={sageTo}
+              onChange={(e) => setSageTo(e.target.value)}
+              className="mt-1"
+            />
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!sageFrom || !sageTo || sageBusy}
+            onClick={() => void downloadSage()}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {sageBusy ? 'Preparing...' : 'Download CSV'}
+          </Button>
+        </div>
+
+        <p className="mt-stack text-xs text-muted-foreground">
+          {/*
+            Said plainly, because an accountant importing this into real books needs to
+            know what is NOT in it. A parent's unverified claim is not evidence money
+            arrived, and a Sales Receipt asserts it did.
+          */}
+          Only <strong>verified</strong> payments are included. Unverified claims,
+          reversals and waivers are left out, because each would overstate your income in
+          Sage.
+        </p>
+      </Card>
 
       {data.integrations.map((row) => (
         <Card key={row.id} className="p-card">

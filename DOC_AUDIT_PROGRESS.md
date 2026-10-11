@@ -49,7 +49,7 @@ quality on its own.
 | 14 | Loan and Finance Module | 7 | **Done** | Good · 82% | 2026-10-11 |
 | 15 | Super Admin and Platform | 5 | **Done** | Good · 84% | 2026-10-11 |
 | 16 | Testing and Launch | 7 | **Done** | Good · 78% | 2026-10-11 |
-| 17 | Integration and Pricing | 5 | Not started | — | — |
+| 17 | Integration and Pricing | 5 | **Done** | Good · 76% | 2026-10-11 |
 | 18 | AI Module | 5 | Not started | — | — |
 
 ---
@@ -798,6 +798,73 @@ text, and `FIELD_ENCRYPTION_KEY`.
 **SMS deserves separate mention.** In Zambia it reaches the parent with no smartphone and
 no data. Today that parent is reached by nothing at all.
 
+## 17 — Integration and Pricing (Good, 76%) · 2026-10-11
+
+Five documents, 2,133 lines. **Pricing is excellent; integrations are one built connector
+and four credential-blocked ones.** The split is clean and the score reflects it.
+
+### Pricing: no hardcoded values anywhere, verified
+
+Four `afritech` tables plus `tier_student_price_bands` hold every price, flag and
+override — 4 tiers, 21 feature flags, 36 tier-feature rows, 5 live school overrides —
+all editable from `/admin/pricing` without a deployment.
+
+I grepped the pricing path for hardcoded amounts. The only hits were two doc comments
+stating that the string "K600" appears nowhere in the codebase. It does not.
+
+### INTEGRATIONS.md claimed tier-1 webhooks were "already built". They are not.
+
+The document says native webhooks connect immediately "using the existing
+`school_webhooks` table". **There is no such table and there never was**, and no outgoing
+webhook dispatch exists in any form. ADR-023 carries the same claim and is now annotated;
+the DECISION stands, only the claim about prior state was wrong.
+
+What `0230` built is the **registry** — `school_integrations` with `events_subscribed`,
+`config` and `integration_log`. Configuration exists; nothing sends.
+
+### Sage 50 CSV export built, because it is the only connector that needs nothing
+
+Every other integration waits on a credential: Sage Business Cloud and Xero need OAuth,
+QuickBooks an app, HubSpot a key, and a custom webhook a signing secret. **Sage 50 needs
+none** — INTEGRATIONS.md's own schema comment says "NULL for `sage_50_export` (no auth
+needed)" — because it is a desktop application with no cloud API, so the integration is
+a file the accountant imports.
+
+ACCOUNTING_CONNECTORS.md also notes Sage 50 Pastel is the most common accounting software
+in Zambian private schools, making it both the easiest and the most useful.
+
+Three decisions in it worth keeping: **verified payments only** (a Sales Receipt asserts
+money arrived, and a parent's claim is not that), **UTF-8 BOM and CRLF** (Sage is a
+Windows desktop app — without them it mangles diacritics or reads the file as one line),
+and **RFC 4180 quoting** (an apostrophe in a pupil's name shifts every column, which Sage
+imports without complaint and the accountant finds at reconciliation).
+
+### The custom webhook blocker, named precisely
+
+Step 2 of CUSTOM_WEBHOOK.md is "copy your webhook secret" — and that secret must be
+retrievable in **plaintext** so ZSMS can compute the HMAC. `credentials_enc` refuses
+anything not `enc:v1:` prefixed and `FIELD_ENCRYPTION_KEY` is unset, so it cannot be
+stored without either the key or a decision to keep a signing secret in the clear. The
+second would let any read of that table forge deliveries ZSMS's own signature vouches for.
+
+The verification scheme itself is already proven inbound: the Clerk route implements it and
+`webhook-verify.test.ts` covers it with 13 unit tests, so the signing side mirrors a
+verifier that works.
+
+### One worth raising before any CRM work
+
+A CRM connector pushes **pupil and parent** records to a third party, which `COMPLIANCE.md`
+makes a ZDPA transfer needing a lawful basis and probably per-school consent — not just a
+working OAuth flow. The accounting connectors push financial records, a different and
+easier question. That is a second reason to have built the accounting side first.
+
+### My own slip
+
+Guessed `payments.verification_status` and `payments.is_deleted`; the column is `status`
+and there is no `is_deleted` on that table. The migration applied and would have failed on
+first call, because plpgsql resolves names at run time — caught only because the
+assertion exercised it. `db:cols -- payments` answers both in one call.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -814,6 +881,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 17 | Outgoing webhook dispatch | Needs a signing secret retrievable in plaintext; blocked on `FIELD_ENCRYPTION_KEY`. Registry exists, nothing sends. |
+| 17 | CRM connectors need a ZDPA basis | Pushing pupil/parent records to a third party is a transfer, not just an OAuth flow. Decide the lawful basis before building. |
 | 16 | Playwright E2E specs | The three named flows (payment, results publication, parent login) need a seeded environment a browser can drive — same prerequisite as UAT. |
 | 16 | UAT, load testing, p95 latency | All need `zsms-staging` in `af-south-1`, which does not exist. Load testing against dev would stop development. |
 | 15 | NRR needs 12 months of history | Reported unavailable rather than computed from an empty window. Revisit after January 2028. |
@@ -876,3 +945,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 14 assessed and remediated, 82%; Phase 1 repayment display built, unrepayable lenders now refused |
 | 2026-10-11 | Folder 15 assessed and remediated, 84%; MRR/ARR/tier revenue built, CLAUDE.md's impersonation "501" claim corrected |
 | 2026-10-11 | Folder 16 assessed, 78%; SECURITY_AUDIT.md made executable (1 real finding, fixed in 0262), first unit tests added |
+| 2026-10-11 | Folder 17 assessed and remediated, 76%; Sage 50 export built, ADR-023's "already built" webhook claim corrected |

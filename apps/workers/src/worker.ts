@@ -16,6 +16,7 @@
 
 import { createWorker } from '@zsms/queue'
 import { createWorkerDeps, workerDb } from './db'
+import { runAbsenceAlerts } from './handlers/absence-alerts'
 import { registerRecurringJobs } from './schedule'
 import { handlePaymentVerified } from './handlers/payment-verified'
 import { handleFeeReminders, type DueReminder } from './handlers/fee-reminders'
@@ -41,6 +42,53 @@ import type { SchoolBranding } from '@zsms/documents'
 //
 // Do not replace one of these with a direct table query.
 // ---------------------------------------------------------------------------
+
+function absenceAlertDeps() {
+  const db = workerDb()
+  const { dispatch } = createWorkerDeps()
+
+  return {
+    async loadDueAlerts(input: { schoolId?: string; limit: number }) {
+      /*
+        `.from(` is a defect in this package (ADR-042) — the service role bypasses
+        RLS, so every read goes through a `worker_*` function with its own tenant
+        handling.
+      */
+      const { data, error } = await db.rpc('worker_due_absence_alerts', {
+        p_school_id: input.schoolId ?? null,
+        p_limit: input.limit,
+      })
+      if (error) throw new Error(`Loading due absence alerts failed: ${error.message}`)
+
+      return (data ?? []).map((r: Record<string, unknown>) => ({
+        recordId: r['out_record_id'] as string,
+        schoolId: r['out_school_id'] as string,
+        schoolName: r['out_school_name'] as string,
+        studentId: r['out_student_id'] as string,
+        studentName: r['out_student_name'] as string,
+        classId: r['out_class_id'] as string,
+        attendanceDate: r['out_attendance_date'] as string,
+        status: r['out_status'] as string,
+        parentUserId: (r['out_parent_user_id'] as string) ?? null,
+        parentName: r['out_parent_name'] as string,
+        parentPhone: (r['out_parent_phone'] as string) ?? null,
+        parentEmail: (r['out_parent_email'] as string) ?? null,
+        viaWhatsapp: Boolean(r['out_via_whatsapp']),
+        viaEmail: Boolean(r['out_via_email']),
+        viaPush: Boolean(r['out_via_push']),
+      }))
+    },
+
+    async markAlerted(recordId: string): Promise<void> {
+      const { error } = await db.rpc('worker_mark_absence_alerted', {
+        p_record_id: recordId,
+      })
+      if (error) throw new Error(`Marking absence alerted failed: ${error.message}`)
+    },
+
+    dispatch,
+  }
+}
 
 function feeReminderDeps() {
   const db = workerDb()
@@ -246,6 +294,19 @@ export async function startWorkers(): Promise<void> {
       // than being rejected downstream.
       limiter: { max: 100, duration: 1000 },
     },
+  )
+
+  /*
+    Absence alerts (ADR-047).
+
+    BULK like fee reminders, and for the same reason: a run that touches every
+    school must never starve a receipt somebody is waiting on.
+  */
+  await createWorker<{ schoolId?: string }, unknown>(
+    'send-absence-alerts',
+    async ({ payload }) =>
+      runAbsenceAlerts(absenceAlertDeps(), payload?.schoolId ? { schoolId: payload.schoolId } : {}),
+    { concurrency: 2 },
   )
 
   await createWorker<{ schoolId?: string }, unknown>(

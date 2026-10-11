@@ -55,6 +55,25 @@ const SCHEDULE: Recurring[] = [
     why: 'send announcements a school scheduled for a future time',
   },
   {
+    jobType: 'send-absence-alerts',
+    /*
+      Hourly during the school day, Lusaka.
+
+      Not every 15 minutes: an absence alert is useful within the hour and
+      pointless at a resolution finer than that — a parent cannot act on "marked
+      absent six minutes ago" differently from "marked absent this morning". And
+      not daily, because an alert about today's absence that arrives tomorrow is
+      the thing NOTIFICATIONS.md's whole Channel 3 exists to avoid.
+
+      07:00 to 17:00 covers a Zambian school day with room either side for a
+      register marked late. Outside those hours nothing is sent, which also keeps
+      the product from messaging a family at two in the morning about a mark a
+      teacher corrected at midnight.
+    */
+    cron: '0 7-17 * * 1-5',
+    why: 'tell parents their child was marked absent (0255, ADR-047)',
+  },
+  {
     jobType: 'expire-trials',
     /*
       02:00 Lusaka, daily.

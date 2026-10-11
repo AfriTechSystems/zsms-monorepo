@@ -14,6 +14,24 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The web register is built** — `/school/[code]/attendance`, with the pgTAP suite
+`attendance_register_test` behind it. Marking, editing with a reason, and the audit of who
+changed what all work through `attendance_records` and RLS; there is no RPC, by design.
+
+**The parent view is built** — `/parent/attendance`.
+
+**The mobile app, which this document calls the *primary* interface, does not exist.**
+`apps/mobile` type-checks and has no screens. That is the largest single gap in the tree
+and a Phase 2 commitment.
+
+**Offline capture is deferred by decision, not oversight.** PowerSync is not licensed, so
+the build is online-only until it is — see `OFFLINE_SYNC.md`. The schema is already shaped
+for it: `sync_source` and `local_created_at` exist on every row.
+
+---
+
 ## Purpose
 
 This document defines the complete attendance system — how attendance is marked, by whom, through which interface, what statuses are available, how the school-wide view works, how historical records are accessed, and what rules govern editing past records. Every Claude Code session building any attendance feature must read this document.

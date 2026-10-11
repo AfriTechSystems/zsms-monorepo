@@ -235,6 +235,17 @@ export function SchoolShell({
           the link to leadership alone would hide it from the person who does it.
         */
         { path: '/settings/reminders', label: 'Fee reminders', icon: BellRing, needs: 'fees:write' },
+        /*
+          Attendance alerts (TRIGGERS.md, NOTIFICATIONS.md Channel 3).
+
+          Beside fee reminders because they are the same decision twice: which events
+          are worth spending the school's message quota on.
+
+          `settings:write` rather than `attendance:write` — a teacher marks a register,
+          but turning this on commits the school's quota for the term, and
+          `set_attendance_alerts()` admits only the owner and principal.
+        */
+        { path: '/settings/attendance-alerts', label: 'Attendance alerts', icon: CalendarCheck, needs: 'settings:write' },
         { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
         // `fees:read` to see, `fees:write` to buy — gated in the route, not here. Buying
         // credits spends the school's money, so it sits with the bursar's permissions

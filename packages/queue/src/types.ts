@@ -42,6 +42,7 @@ export type JobType =
   | 'check-trial-expiry'
   | 'check-override-expiry'
   | 'send-fee-reminders'
+  | 'send-absence-alerts'
   | 'send-attendance-summary'
   | 'generate-lesson-plan'
 

@@ -751,3 +751,74 @@ alumni half, years after anyone remembers writing it.
   announcements; money is between the school and whoever pays.
 
 ---
+
+## ADR-047
+
+**Absence notifications are polled by a worker, not pushed by a database trigger**
+
+- **Status:** Accepted
+- **Date:** 2026-10-11
+- **Supersedes:** the trigger design in `10 Attendance/TRIGGERS.md` → *Trigger 1 —
+  Absence Notification Queue*
+
+### Context
+
+`TRIGGERS.md` specifies a row trigger on `attendance_records` that fires on every absent
+mark and calls `net.http_post()` to a Supabase Edge Function, authenticated with a
+service-role key read from `current_setting('app.supabase_service_key')`. The Edge
+Function then enqueues the real notification job.
+
+`attendance_records.parent_notified` and `.notification_sent_at` have existed since
+`0074` and nothing had ever read or written either, so marking a child absent had never
+told their parent anything.
+
+### Decision
+
+Absences are **polled**, through `worker_due_absence_alerts()` (`0255`) on an hourly
+schedule during the school day, in the same shape as overdue fees
+(`worker_due_fee_reminders`) and scheduled announcements. No trigger, no HTTP call from
+the database, no Edge Function.
+
+`parent_notified` is the idempotency key, and it is set only on a **delivered** alert.
+
+### Rationale
+
+Three independent problems with the trigger design, any one sufficient:
+
+1. **It puts an HTTP call inside the register's transaction.** A teacher marks a class of
+   forty with eight absences, and the INSERT blocks on eight sequential round-trips. If
+   the endpoint is slow the register appears to hang. If it fails there are only two
+   outcomes, and both are wrong: roll back the teacher's attendance because a
+   notification could not be queued, or swallow the error and drop the alert silently.
+   Attendance is the record of record; a notification is a convenience. The convenience
+   must not be able to lose the record.
+
+2. **It requires an Edge Function, and ADR-044 settled that those are superseded.**
+   `supabase/functions/` stays empty deliberately — the Railway workers already do this
+   class of work over BullMQ/Upstash, and adding a second async system to serve one
+   trigger would mean two deployments, two sets of secrets and two things to monitor.
+
+3. **It stores a service-role key in database configuration.** That key bypasses RLS
+   entirely. `ALTER DATABASE ... SET` places it where every SECURITY DEFINER function can
+   read it, in exchange for saving a lookup.
+
+Polling also gives a property the trigger cannot: **a crashed worker retries.** With a
+trigger, the moment of the INSERT is the only chance to send. With a queue, the failure
+mode is a late alert rather than a missing one — and `max_age_days` (`0255`) bounds how
+late, so a week-long outage does not deliver a backlog of archaeology to a parent who
+already saw it all in the portal.
+
+### Consequences
+
+- An absence alert can lag by up to an hour rather than being near-instant. Judged
+  acceptable: a parent cannot act differently on "marked absent six minutes ago" than on
+  "marked absent this morning".
+- Nothing outside `packages/queue` touches BullMQ, and `.from(` remains a defect in
+  `apps/workers`, both unchanged.
+- `TRIGGERS.md`'s *Trigger 2* (`updated_at`) is unaffected and is built. *Trigger 3* was
+  already marked future.
+- The per-school toggle this needs (`school_attendance_alert_settings`) defaults to OFF,
+  because NOTIFICATIONS.md's own arithmetic puts a 400-pupil school at about 80% of the
+  Starter quota spent on absence alerts alone.
+
+---

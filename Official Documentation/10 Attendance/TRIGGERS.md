@@ -11,6 +11,37 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Trigger 1 was never built, and is now deliberately NOT going to be — see ADR-047.**
+
+Trigger 2 (`updated_at`) is built and attached. Trigger 3 was already marked future.
+
+The absence notification described below is now **built as a polled worker**
+(`worker_due_absence_alerts()`, `0255`) rather than a trigger. Three independent reasons,
+recorded in full in ADR-047:
+
+1. It puts an HTTP call inside the register's own transaction. A teacher marking forty
+   pupils with eight absences blocks the INSERT on eight sequential round-trips, and a
+   failure leaves only two outcomes, both wrong: roll back the teacher's attendance
+   because a notification could not be queued, or swallow the error and drop the alert.
+   **Attendance is the record of record; a notification is a convenience.**
+2. It needs a Supabase Edge Function, and **ADR-044 settled that those are superseded** —
+   the Railway workers already do this work over BullMQ.
+3. It stores a **service-role key in database configuration**, where every SECURITY
+   DEFINER function can read it, to save a lookup. That key bypasses RLS entirely.
+
+Polling also buys a property the trigger cannot have: a crashed worker **retries**. With
+a trigger, the moment of the INSERT is the only chance to send.
+
+**The *Per-Absence Alert Toggle* below is built** as
+`school_attendance_alert_settings` (`0255`), default OFF, at Settings → Attendance alerts.
+`attendance_records.parent_notified` and `.notification_sent_at` have existed since `0074`
+and **nothing had ever read or written either** — they are now the idempotency key they
+were shaped to be.
+
+---
+
 ## Purpose
 
 This document defines every database trigger related to attendance — what fires, when, what it does, and how failures are handled. Every Claude Code session writing attendance-related triggers or modifying the notification pipeline must read this document.

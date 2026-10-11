@@ -42,7 +42,7 @@ quality on its own.
 | 07 | Student and Parent Modules | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 08 | Staff Management | 5 | **Done** | Good · 87% | 2026-10-11 |
 | 09 | Fee and Financial Management | 6 | **Done** | Good · 85% | 2026-10-11 |
-| 10 | Attendance | — | Not started | — | — |
+| 10 | Attendance | 4 | **Done** | Good · 80% | 2026-10-11 |
 | 11 | Exams | — | Not started | — | — |
 | 12 | Communication | — | Not started | — | — |
 | 13 | PDFs and Documents | — | Not started | — | — |
@@ -410,6 +410,55 @@ pattern the migration skill names first: never trust an id passed as an argument
 - **Delivery remains unproven.** The schedule is correct; no Meta/Twilio/Resend credentials
   exist, so no reminder has left this machine.
 
+## 10 — Attendance (Good, 80%) · 2026-10-11
+
+Four documents, one of which (`OFFLINE_SYNC.md`) is deferred by a commercial decision
+rather than scored as a failure.
+
+### Marking a child absent had never told their parent anything
+
+`attendance_records.parent_notified` and `.notification_sent_at` have existed since
+`0074`. **Nothing had ever read or written either one.** The `absence_alert` template
+existed. The quota meter existed. Only the decision to send was missing — the exact
+"backend built, no chain" shape `npm run gaps` exists to catch, except that here the
+missing link was in the middle rather than at the end.
+
+Built in `0255`: a per-school toggle (default OFF), `worker_due_absence_alerts()`, the
+worker handler, an hourly weekday schedule, the route and the screen.
+
+### I did not build the trigger the document specifies, and wrote ADR-047 to say why
+
+TRIGGERS.md's Trigger 1 is a row trigger calling `net.http_post()` to an Edge Function
+with a service-role key read from database configuration. Three independent problems:
+
+1. **An HTTP call inside the register's transaction.** Forty pupils, eight absences,
+   eight sequential round-trips before the INSERT commits. On failure there are only two
+   outcomes and both are wrong: roll back the teacher's attendance, or silently drop the
+   alert. Attendance is the record of record; a notification is a convenience.
+2. **It needs an Edge Function, and ADR-044 superseded those.**
+3. **A service-role key in database configuration**, readable by every DEFINER function,
+   to save a lookup.
+
+Polling also buys retry, which a trigger structurally cannot: with a trigger the moment
+of the INSERT is the only chance to send.
+
+### The quota number is the feature, not the switch
+
+NOTIFICATIONS.md does the arithmetic — 400 pupils at 5% absence is ~400 messages a month,
+about 80% of the Starter tier's entire quota. The screen computes that from the school's
+**actual roll** and shows it before the toggle, because a school that enables this blind
+discovers it when the quota runs dry mid-term and a fee reminder cannot go out.
+
+### Not built, with reasons
+
+- **The mobile app, which ATTENDANCE.md calls the *primary* interface.** `apps/mobile`
+  type-checks and has no screens. Largest single gap in the tree.
+- **Offline capture** — PowerSync unlicensed; the schema is already shaped for it
+  (`sync_source`, `local_created_at`), so it needs no migration against live data.
+- **NOTIFICATIONS.md Channels 2, 4 and 5** — push needs the mobile app; the monthly
+  summary and the `ATTENDANCE` chatbot command need a live Meta account.
+- **Delivery, for all of it.** No provider credentials; nothing has left this machine.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -426,6 +475,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 10 | Mobile attendance screens | ATTENDANCE.md calls mobile the primary interface; `apps/mobile` has no screens. Phase 2 commitment (ADR-004). |
+| 10 | NOTIFICATIONS.md Channels 2, 4, 5 | Push needs the mobile app; monthly summary and the chatbot command need a live Meta account. |
 | 09 | `payments.payment_method` has no `mobile_money` | The dominant Zambian rail is recorded as `online_gateway`. Needs a migration and a product decision. |
 | 09 | Reminder DELIVERY is unproven | Schedule correct; no Meta/Twilio/Resend credentials, so nothing has left this machine. |
 | 08 | Bulk staff invitation | Blocked on a paid Clerk plan — the free tier caps an organisation at five members. |
@@ -470,3 +521,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 07 assessed and remediated, 88% |
 | 2026-10-11 | Folder 08 assessed and remediated, 87%; folder 07's open item closed |
 | 2026-10-11 | Folder 09 assessed and remediated, 85%; the reminder schedule is now per-school configuration |
+| 2026-10-11 | Folder 10 assessed and remediated, 80%; absence alerts built as a worker, ADR-047 |

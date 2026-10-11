@@ -885,6 +885,73 @@ export type Database = {
         }
         Relationships: []
       }
+      document_templates: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          doc_type: string
+          id: string
+          is_active: boolean
+          layout_variant: string | null
+          school_id: string
+          template_config: Json
+          template_level: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          doc_type: string
+          id?: string
+          is_active?: boolean
+          layout_variant?: string | null
+          school_id: string
+          template_config?: Json
+          template_level?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          doc_type?: string
+          id?: string
+          is_active?: boolean
+          layout_variant?: string | null
+          school_id?: string
+          template_config?: Json
+          template_level?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "document_templates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "document_templates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exam_results: {
         Row: {
           academic_year: string
@@ -895,6 +962,10 @@ export type Database = {
           created_at: string
           entered_by_user_id: string
           grade_letter: string | null
+          grade_override: string | null
+          grade_override_at: string | null
+          grade_override_by: string | null
+          grade_override_reason: string | null
           grade_points: number | null
           grading_scale_version_id: string | null
           id: string
@@ -923,6 +994,10 @@ export type Database = {
           created_at?: string
           entered_by_user_id: string
           grade_letter?: string | null
+          grade_override?: string | null
+          grade_override_at?: string | null
+          grade_override_by?: string | null
+          grade_override_reason?: string | null
           grade_points?: number | null
           grading_scale_version_id?: string | null
           id?: string
@@ -951,6 +1026,10 @@ export type Database = {
           created_at?: string
           entered_by_user_id?: string
           grade_letter?: string | null
+          grade_override?: string | null
+          grade_override_at?: string | null
+          grade_override_by?: string | null
+          grade_override_reason?: string | null
           grade_points?: number | null
           grading_scale_version_id?: string | null
           id?: string
@@ -2629,6 +2708,64 @@ export type Database = {
             foreignKeyName: "school_api_keys_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_attendance_alert_settings: {
+        Row: {
+          alert_on_statuses: string[]
+          max_age_days: number
+          per_absence_alert_enabled: boolean
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+          via_email: boolean
+          via_push: boolean
+          via_whatsapp: boolean
+        }
+        Insert: {
+          alert_on_statuses?: string[]
+          max_age_days?: number
+          per_absence_alert_enabled?: boolean
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+          via_email?: boolean
+          via_push?: boolean
+          via_whatsapp?: boolean
+        }
+        Update: {
+          alert_on_statuses?: string[]
+          max_age_days?: number
+          per_absence_alert_enabled?: boolean
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          via_email?: boolean
+          via_push?: boolean
+          via_whatsapp?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_attendance_alert_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_attendance_alert_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_attendance_alert_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
@@ -6952,6 +7089,18 @@ export type Database = {
         }[]
       }
       my_ai_credits: { Args: never; Returns: Json }
+      my_attendance_alerts: {
+        Args: never
+        Returns: {
+          out_configured: boolean
+          out_enabled: boolean
+          out_max_age_days: number
+          out_statuses: string[]
+          out_via_email: boolean
+          out_via_push: boolean
+          out_via_whatsapp: boolean
+        }[]
+      }
       my_children: {
         Args: never
         Returns: {
@@ -6973,6 +7122,16 @@ export type Database = {
           out_show: boolean
           out_status: string
           out_student_name: string
+        }[]
+      }
+      my_document_template: {
+        Args: { p_doc_type: string }
+        Returns: {
+          out_can_use_layouts: boolean
+          out_config: Json
+          out_configured: boolean
+          out_layout_variant: string
+          out_level: string
         }[]
       }
       my_erasure_status: {
@@ -7518,6 +7677,18 @@ export type Database = {
           out_unassigned_remaining: number
         }[]
       }
+      school_attendance_alerts: {
+        Args: { p_school_id: string }
+        Returns: {
+          out_configured: boolean
+          out_enabled: boolean
+          out_max_age_days: number
+          out_statuses: string[]
+          out_via_email: boolean
+          out_via_push: boolean
+          out_via_whatsapp: boolean
+        }[]
+      }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }
@@ -7626,6 +7797,15 @@ export type Database = {
         Returns: {
           out_decided: boolean
           out_linked: boolean
+        }[]
+      }
+      school_document_template: {
+        Args: { p_doc_type: string; p_school_id: string }
+        Returns: {
+          out_config: Json
+          out_configured: boolean
+          out_layout_variant: string
+          out_level: string
         }[]
       }
       school_feature_resolution: {
@@ -7891,6 +8071,29 @@ export type Database = {
           out_type: string
         }[]
       }
+      set_attendance_alerts: {
+        Args: {
+          p_enabled: boolean
+          p_max_age_days: number
+          p_statuses: string[]
+          p_via_email: boolean
+          p_via_push: boolean
+          p_via_whatsapp: boolean
+        }
+        Returns: boolean
+      }
+      set_document_template: {
+        Args: { p_config: Json; p_doc_type: string; p_layout_variant?: string }
+        Returns: boolean
+      }
+      set_grade_override: {
+        Args: { p_grade: string; p_reason: string; p_result_id: string }
+        Returns: {
+          out_computed: string
+          out_grade: string
+          out_is_override: boolean
+        }[]
+      }
       set_incident_status: {
         Args: { p_incident_id: string; p_note?: string; p_status: string }
         Returns: boolean
@@ -7906,6 +8109,14 @@ export type Database = {
           out_done: boolean
           out_message: string
         }[]
+      }
+      set_principal_comment: {
+        Args: {
+          p_academic_year: string
+          p_comment: string
+          p_term_number: number
+        }
+        Returns: boolean
       }
       set_reminder_settings: {
         Args: {
@@ -8258,6 +8469,26 @@ export type Database = {
         }
         Returns: undefined
       }
+      worker_due_absence_alerts: {
+        Args: { p_limit?: number; p_school_id?: string }
+        Returns: {
+          out_attendance_date: string
+          out_class_id: string
+          out_parent_email: string
+          out_parent_name: string
+          out_parent_phone: string
+          out_parent_user_id: string
+          out_record_id: string
+          out_school_id: string
+          out_school_name: string
+          out_status: string
+          out_student_id: string
+          out_student_name: string
+          out_via_email: boolean
+          out_via_push: boolean
+          out_via_whatsapp: boolean
+        }[]
+      }
       worker_due_fee_reminders: {
         Args: { p_limit?: number; p_school_id?: string }
         Returns: {
@@ -8288,6 +8519,10 @@ export type Database = {
           out_school_code: string
           out_school_id: string
         }[]
+      }
+      worker_mark_absence_alerted: {
+        Args: { p_record_id: string }
+        Returns: boolean
       }
       worker_mark_reminder_sent: {
         Args: { p_fee_record_id: string }

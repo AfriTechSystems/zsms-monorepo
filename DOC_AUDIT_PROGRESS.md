@@ -45,7 +45,7 @@ quality on its own.
 | 10 | Attendance | 4 | **Done** | Good · 80% | 2026-10-11 |
 | 11 | Examinations and Results | 5 | **Done** | Good · 88% | 2026-10-11 |
 | 12 | Communication System | 6 | **Done** | Fair · 65% | 2026-10-11 |
-| 13 | PDFs and Documents | — | Not started | — | — |
+| 13 | Document and PDF System | 4 | **Done** | Good · 86% | 2026-10-11 |
 | 14 | Loans | — | Not started | — | — |
 | 15 | Super Admin and Platform | 5 | Not started | — | — |
 | 16 | Testing and Launch | 6 | Not started | — | — |
@@ -556,6 +556,64 @@ could, and every fee reminder in the log is theirs to answer for.
   channel that reaches a parent with no smartphone and no data. Today that parent is
   reached by nothing at all.
 
+## 13 — Document and PDF System (Good, 86%) · 2026-10-11
+
+Four documents. The generation and storage halves were already proven; the
+**customisation** half was almost entirely unreachable.
+
+### Two colour columns with contrast guarantees and no way in
+
+`school_branding.anchor_color` and `.primary_color` have existed since `0092`, each
+carrying a `wcag_contrast_ratio()` CHECK — a school *physically cannot* set a brand
+colour too pale to read on a report card a parent has to hold. Excellent constraint, over
+a year old, and **nothing could set either column.** The settings screen edits the logo
+URL and stops.
+
+`0259` adds the setter and deliberately does **not** restate the threshold: two copies of
+"is this readable" is two answers, and the copy in a function drifts from the one the
+database enforces.
+
+### CUSTOMISATION steps 3–6 had no table at all
+
+`document_templates` is specified in TEMPLATE_SYSTEM.md and had never been created, so the
+layout variant, the content switches, the principal's comment and the acknowledgement slip
+were unrepresentable. Built in `0258`, with the tier gate on layout variants resolving on
+**read** as well as write — a school that downgrades falls back to the standard layout
+rather than losing report cards, which would turn a billing change into an outage.
+
+### And then the renderer had to actually read it
+
+Configuration nothing reads is the failure this audit keeps finding, so the chain is
+closed in the same pass: the worker resolves the template once per batch (not once per
+pupil), picks out the comment for the term being rendered, and the renderer honours
+position, average, attendance, comments and the slip.
+
+**Every switch defaults to shown when absent**, because absent means "this school has
+never opened that screen" — which is every school until it does. Defaulting to hidden
+would have silently stripped information from every report card in the system on deploy.
+
+### A bug caught by a migration's own assertion
+
+`set_principal_comment()` first merged with
+`jsonb_set(config, ARRAY['principal_comments', key], ..., TRUE)`. `create_missing` creates
+only the **last** path element, so while `principal_comments` did not exist the call
+returned the target unchanged and **every comment write silently did nothing.** A head
+would have typed a paragraph, seen no error, and found the cards blank. Now `||` at each
+level.
+
+Three other introspection misses in one statement — `feature_name` for `display_name`, a
+missing NOT NULL `updated_by`, and the category `documents` where the CHECK admits
+`document`. All three were guesses where `db:cols` would have answered.
+
+### Remaining
+
+- **Template preview.** A school sees its changes on the next card it generates. Needs a
+  sample-data path rather than a real pupil.
+- **R2 lifecycle policy.** Nothing is ever expired, which is the safe direction.
+  `COMPLIANCE.md` makes a departed pupil's documents a ZDPA retention question rather than
+  a storage-cost one, so it wants a deliberate answer, not a bucket rule.
+- **Visual regression testing.** Needs a rendered-image baseline harness.
+
 ## Carried forward
 
 Open items from finished folders. Each carries why it is still open.
@@ -572,6 +630,8 @@ Open items from finished folders. Each carries why it is still open.
 
 | 06 | Per-school WhatsApp configuration | Blocked twice over: no Meta account, and no encryption key for the token. |
 | 06 | Trial notification schedule | Ten touchpoints, all blocked on a delivery channel. |
+| 13 | R2 lifecycle / retention | Nothing is ever expired. Needs a ZDPA decision about a departed pupil's documents, not a bucket rule. |
+| 13 | Template preview | A school sees changes on the next card generated. Needs a sample-data path. |
 | 12 | SMS has never run | The channel that reaches a parent with no smartphone. Needs Twilio; a launch prerequisite rather than an enhancement. |
 | 12 | School-authored template text | The override mechanism is SQL-only; no screen. Low priority while delivery is mocked. |
 | 10 | Mobile OFFLINE capture | The 27 screens exist and mark a register online; ADR-004's offline-first waits on a PowerSync licence. Schema already shaped for it. |
@@ -623,3 +683,4 @@ repeatedly described things the database could not do.
 | 2026-10-11 | Folder 10 assessed and remediated, 80%; absence alerts built as a worker, ADR-047 |
 | 2026-10-11 | Folder 11 assessed and remediated, 88%; grade override built, grading revision reachable, CLAUDE.md's "no mobile screens" claim corrected |
 | 2026-10-11 | Folder 12 assessed, 65%; message log built, accountant access fixed. Four of six docs unverifiable without provider credentials |
+| 2026-10-11 | Folder 13 assessed and remediated, 86%; document customisation built end to end and wired into the renderer |

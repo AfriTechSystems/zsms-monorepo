@@ -224,6 +224,48 @@ function reportCardDeps() {
       }
     },
 
+    /*
+      What the school chose to show, and the principal's comments by term (`0258`).
+
+      `school_document_template()` is the id-taking form and is `service_role` only
+      — a route calls `my_document_template()` instead, which resolves the school
+      from the session. `0254` is why those are two functions.
+    */
+    async loadTemplate(schoolId: string): Promise<{
+      options: Record<string, boolean>
+      principalComments: Record<string, string>
+    }> {
+      const { data, error } = await db.rpc('school_document_template', {
+        p_school_id: schoolId,
+        p_doc_type: 'report_card',
+      })
+
+      /*
+        A failure here must not fail the batch. A school's report cards are more
+        important than its layout preferences, so an unreadable configuration falls
+        back to the renderer's defaults — which are the card every school got before
+        this existed — rather than stopping four hundred documents.
+      */
+      if (error) return { options: {}, principalComments: {} }
+
+      const row = (Array.isArray(data) ? data[0] : data) as {
+        out_config?: Record<string, unknown>
+      } | null
+
+      const config = row?.out_config ?? {}
+
+      return {
+        options: {
+          showPosition: config['show_position'] !== false,
+          showClassAverage: config['show_class_average'] !== false,
+          showAttendance: config['show_attendance'] !== false,
+          showComments: config['show_comments'] !== false,
+          acknowledgementRequired: config['acknowledgement_required'] === true,
+        },
+        principalComments: (config['principal_comments'] ?? {}) as Record<string, string>,
+      }
+    },
+
     async loadBatch(input: {
       schoolId: string
       academicYear: string

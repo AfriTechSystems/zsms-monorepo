@@ -12,6 +12,32 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built and proven end to end.** `npm run docs:smoke` runs the whole chain against the
+real service: the worker stores a file, `generated_documents` records it, the route signs
+the recorded path, and the bytes served are **byte-identical** to the ones stored.
+
+`packages/documents` renders report cards, receipts, transfer letters and teaching
+resources from one content model, synchronously in the worker.
+
+**Individual failure isolation works as this document specifies**: a pupil with no
+published marks is skipped rather than given an empty card, a render failure is recorded
+against that pupil and the batch continues, and the result reports `generated`, `failed`
+and `skippedNoMarks` separately. An empty report card would put a document in a parent's
+hands implying their child sat nothing.
+
+**As of `0258` the renderer honours the school's configuration** — position, class
+average, attendance, comments and the acknowledgement slip. Every switch defaults to
+**shown** when absent, because absent means "this school has never opened that screen",
+and defaulting to hidden would have silently stripped information from every report card
+in the system on deploy.
+
+**Not built:** visual regression testing. The approach this document describes needs a
+rendered-image baseline, and there is no harness for it.
+
+---
+
 ## Purpose
 
 This document is the technical reference for the PDF rendering engine — how `@react-pdf/renderer` is configured in the Deno Edge Function environment, how each document type is structured as a React component, how fonts and images are loaded efficiently across batch jobs, and how failures are isolated. Every Claude Code session building any PDF generation feature must read this document before writing any rendering code.

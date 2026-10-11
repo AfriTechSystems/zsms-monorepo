@@ -171,6 +171,18 @@ export async function renderFeeStatement(data: StatementData): Promise<RenderedD
 
 export async function renderReportCard(data: ReportCardData): Promise<RenderedDocument> {
   const doc = await newDocument()
+
+  /*
+    What this school chose to show (`0258`). Every switch defaults to TRUE when
+    absent, because absent means "this school has never opened that screen" — which
+    is every school until it does. Defaulting to hidden would silently strip
+    position, averages and comments from every report card in the system on deploy.
+  */
+  const o = data.options ?? {}
+  const showPosition = o.showPosition !== false
+  const showAttendance = o.showAttendance !== false
+  const showComments = o.showComments !== false
+
   await header(doc, data.school, `REPORT CARD — ${data.academicYear} TERM ${data.termNumber}`)
 
   text(doc, `${data.studentName} (${data.studentCode})`, { size: 11, bold: true })
@@ -183,7 +195,9 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
   text(doc, 'SUBJECT', { x: COL.subject, size: 8, bold: true, color: MUTED })
   textRight(doc, 'MARKS', COL.marks, { size: 8, bold: true, color: MUTED })
   textRight(doc, 'GRADE', COL.grade, { size: 8, bold: true, color: MUTED })
-  textRight(doc, 'POSITION', COL.position, { size: 8, bold: true, color: MUTED })
+  if (showPosition) {
+    textRight(doc, 'POSITION', COL.position, { size: 8, bold: true, color: MUTED })
+  }
   rule(doc, 6)
 
   for (const s of data.subjects) {
@@ -194,10 +208,14 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
     // a zero is a lie.
     textRight(doc, s.marksObtained === null ? '—' : `${s.marksObtained} / ${s.marksTotal}`, COL.marks, { size: 10 })
     textRight(doc, s.gradeLetter ?? '—', COL.grade, { size: 10, bold: true })
-    textRight(doc, s.classPosition === null ? '—' : String(s.classPosition), COL.position, { size: 10 })
+    // The column is omitted entirely rather than blanked: a school that turned
+    // ranking off does not want an empty POSITION column inviting the question.
+    if (showPosition) {
+      textRight(doc, s.classPosition === null ? '—' : String(s.classPosition), COL.position, { size: 10 })
+    }
     move(doc, 16)
 
-    if (s.comments) {
+    if (s.comments && showComments) {
       text(doc, s.comments, { x: COL.subject + 8, size: 8, color: MUTED, maxWidth: 380 })
       move(doc, 13)
     }
@@ -205,7 +223,7 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
 
   rule(doc)
 
-  if (data.attendanceTotal && data.attendanceTotal > 0) {
+  if (showAttendance && data.attendanceTotal && data.attendanceTotal > 0) {
     labelValue(
       doc,
       'Attendance',
@@ -221,6 +239,45 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
     // the scale version, the printed card is the only durable record of which
     // scale produced these letters.
     text(doc, `Grades awarded under: ${data.gradingScaleName}`, { size: 8, color: MUTED })
+  }
+
+  /*
+    The principal's words for this term (TEMPLATE_SYSTEM.md). Resolved by the
+    caller from the per-term map, so the renderer never has to know that comments
+    are stored by year and term — only that it was handed one or was not.
+  */
+  if (data.principalComment) {
+    move(doc, 14)
+    if (needsPage(doc, 60)) newPage(doc)
+    text(doc, "PRINCIPAL'S COMMENT", { size: 8, bold: true, color: MUTED })
+    move(doc, 13)
+    text(doc, data.principalComment, { size: 9, maxWidth: RIGHT - MARGIN })
+    move(doc, 16)
+  }
+
+  /*
+    The acknowledgement slip (CUSTOMISATION.md step 6) — a tear-off a parent signs
+    and returns. Off unless the school asked, because a school that does not collect
+    them does not want a blank signature box on every card.
+
+    Deliberately empty lines rather than pre-filled: the whole point is a physical
+    signature, and printing a name beside it would invite the question of who wrote it.
+  */
+  if (data.options?.acknowledgementRequired) {
+    if (needsPage(doc, 90)) newPage(doc)
+    move(doc, 10)
+    rule(doc, 8)
+    text(doc, 'PARENT ACKNOWLEDGEMENT — please sign and return to the school', {
+      size: 8,
+      bold: true,
+      color: MUTED,
+    })
+    move(doc, 24)
+    labelValue(doc, 'Signature', '')
+    move(doc, 20)
+    labelValue(doc, 'Name', '')
+    move(doc, 20)
+    labelValue(doc, 'Date', '')
   }
 
   footer(doc, `${data.school.name} · ${data.studentCode} · ${data.academicYear} Term ${data.termNumber}`)

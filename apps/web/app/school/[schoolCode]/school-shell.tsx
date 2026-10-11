@@ -32,6 +32,7 @@ import {
   Coins,
   FileSpreadsheet,
   Globe,
+  FileText,
   GraduationCap,
   Inbox,
   KeyRound,
@@ -217,6 +218,18 @@ export function SchoolShell({
           `settings:write` gates the link; the function is narrower.
         */
         { path: '/settings/grading', label: 'Grading scales', icon: GraduationCap, needs: 'settings:write' },
+        /*
+          Report cards and documents (CUSTOMISATION.md, TEMPLATE_SYSTEM.md).
+
+          Beside Grading scales because the two together decide what a report card
+          says: the scale decides the grade, this decides whether the card shows a
+          position, an average, or the principal's words.
+
+          `settings:write` gates the link; `set_document_template()` and
+          `set_school_branding_colours()` are narrower — owner and principal only,
+          because what a report card says about a child is the head's responsibility.
+        */
+        { path: '/settings/documents', label: 'Report cards & documents', icon: FileText, needs: 'settings:write' },
         { path: '/settings/roles', label: 'Staff roles', icon: ShieldCheck, needs: 'settings:write' },
         /*
           Permission grants (PERMISSIONS.md).

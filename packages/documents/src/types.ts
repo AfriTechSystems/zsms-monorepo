@@ -107,6 +107,29 @@ export interface ReportCardData {
   attendancePresent?: number
   attendanceTotal?: number
   classTeacherName?: string
+  /**
+   * The principal's words for THIS term, resolved by the caller from
+   * `document_templates.template_config -> principal_comments -> "YEAR-TERM"`.
+   *
+   * Resolved outside the renderer on purpose: the renderer should not know that
+   * comments are stored per term, only that it was given one or was not.
+   */
+  principalComment?: string | null
+  /**
+   * What this school chose to show (CUSTOMISATION.md step 4, `0258`).
+   *
+   * Every field defaults to SHOWN when absent, so a school with no configuration —
+   * which is every school until it opens that screen — gets exactly the card it got
+   * before this existed. A default of hidden would silently strip information from
+   * every report card in the system on deploy.
+   */
+  options?: {
+    showPosition?: boolean
+    showClassAverage?: boolean
+    showAttendance?: boolean
+    showComments?: boolean
+    acknowledgementRequired?: boolean
+  }
 }
 
 /**

@@ -55,19 +55,47 @@ async function main(): Promise<void> {
 
   const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
-  // Two schools, so isolation can be tested rather than assumed.
+  /*
+    Two schools, so isolation can be tested rather than assumed — and school A must
+    hold the `api_read` add-on.
+
+    `0245` gates the API on that add-on and re-resolves it on EVERY verify, so a key
+    for a school without it correctly returns nothing. Picking the first active school
+    made this test fail the moment the gate landed, which was the test being wrong
+    rather than the code.
+  */
   const { data: schools } = await db
     .from('schools')
     .select('id, name')
     .eq('status', 'active')
-    .limit(2)
+    .limit(20)
 
-  if (!schools || schools.length < 2) {
+  const all = (schools ?? []) as { id: string; name: string }[]
+  if (all.length < 2) {
     console.error('Need two active schools to test isolation. Run `npm run db:seed`.')
     process.exit(1)
   }
 
-  const [schoolA, schoolB] = schools as { id: string; name: string }[]
+  const entitled: { id: string; name: string }[] = []
+  for (const s of all) {
+    const { data: has } = await db.rpc('school_has_feature', {
+      p_school_id: s.id,
+      p_feature_key: 'api_read',
+    })
+    if (has === true) entitled.push(s)
+  }
+
+  if (entitled.length === 0) {
+    console.error(
+      'No active school holds the `api_read` add-on, so no key can verify. ' +
+        'Grant it to one in /admin, or this is testing nothing.',
+    )
+    process.exit(1)
+  }
+
+  const schoolA = entitled[0]!
+  // School B is any OTHER school — it does not need the add-on to prove isolation.
+  const schoolB = all.find((s) => s.id !== schoolA.id)!
 
   const plaintext = `zsms_live_smoke${Date.now()}`.slice(0, 42)
   const hash = await sha256Hex(plaintext)
@@ -77,7 +105,7 @@ async function main(): Promise<void> {
   const { data: inserted, error: insertError } = await db
     .from('school_api_keys')
     .insert({
-      school_id: schoolA!.id,
+      school_id: schoolA.id,
       name: `smoke ${Date.now()}`,
       key_hash: hash,
       key_prefix: plaintext.slice(0, 18),
@@ -100,7 +128,7 @@ async function main(): Promise<void> {
     const row = Array.isArray(verified) ? verified[0] : verified
     check(
       'a live key verifies and resolves its school',
-      row?.out_school_id === schoolA!.id,
+      row?.out_school_id === schoolA.id,
       `school=${String(row?.out_school_id).slice(0, 8)}…`,
     )
 
@@ -125,7 +153,7 @@ async function main(): Promise<void> {
     const { data: foreign } = await db
       .from('students')
       .select('id')
-      .eq('school_id', schoolB!.id)
+      .eq('school_id', schoolB.id)
       .eq('school_id', row?.out_school_id)
       .limit(1)
     check(
@@ -166,7 +194,60 @@ async function main(): Promise<void> {
       `rows=${(usage ?? []).length}`,
     )
 
-    // 7. Revoking stops it immediately.
+    /*
+      7. A school WITHOUT the add-on cannot use a key, even a valid one.
+
+      `0245` re-resolves `api_read` on every verify, so cancelling the add-on stops a
+      key that is otherwise perfectly good. Without this the add-on would be a one-off
+      purchase rather than a subscription.
+    */
+    const unentitled = all.find(async (s) => {
+      const { data } = await db.rpc('school_has_feature', {
+        p_school_id: s.id,
+        p_feature_key: 'api_read',
+      })
+      return data !== true
+    })
+
+    if (unentitled && unentitled.id !== schoolA.id) {
+      const otherHash = await sha256Hex(`zsms_live_other${Date.now()}`)
+      const { data: inserted2 } = await db
+        .from('school_api_keys')
+        .insert({
+          school_id: unentitled.id,
+          name: `smoke-gate ${Date.now()}`,
+          key_hash: otherHash,
+          key_prefix: 'zsms_live_gate',
+          scopes: ['students:read'],
+          created_by: 'apikey-smoke',
+        })
+        .select('id')
+        .single()
+
+      const { data: gated } = await db.rpc('verify_api_key', { p_key_hash: otherHash })
+      const entitledNow = await db.rpc('school_has_feature', {
+        p_school_id: unentitled.id,
+        p_feature_key: 'api_read',
+      })
+
+      // Only meaningful when that school genuinely lacks the add-on.
+      if (entitledNow.data !== true) {
+        check(
+          'a key for a school without the api_read add-on does NOT verify',
+          !gated || (Array.isArray(gated) && gated.length === 0),
+          JSON.stringify(gated),
+        )
+      }
+
+      if (inserted2) {
+        await db
+          .from('school_api_keys')
+          .delete()
+          .eq('id', (inserted2 as { id: string }).id)
+      }
+    }
+
+    // 8. Revoking stops it immediately.
     await db
       .from('school_api_keys')
       .update({ is_active: false, revoked_at: new Date().toISOString() })

@@ -29,9 +29,19 @@ export async function GET(request: Request): Promise<Response> {
     // Clamped rather than validated-and-refused: a silly number is a typo, not an attack.
     const days = Number.isFinite(raw) ? Math.min(365, Math.max(1, Math.trunc(raw))) : 30
 
-    const { data, error } = await client.rpc('admin_school_cost_drivers', {
-      p_since_days: days,
-    })
+    const [drivers, entitlement] = await Promise.all([
+      client.rpc('admin_school_cost_drivers', { p_since_days: days }),
+      /*
+        Who is using the API, and whether they pay for it.
+
+        `0245` gates the API on the `api_read` add-on and does NOT revoke existing
+        keys — a school already wired in is a commercial conversation, not a
+        Tuesday-morning outage. This is so that conversation starts from a list.
+      */
+      client.rpc('admin_api_key_entitlement'),
+    ])
+
+    const { data, error } = drivers
 
     if (error) {
       if (error.code === '42501') {
@@ -85,6 +95,17 @@ export async function GET(request: Request): Promise<Response> {
         messagesUsed: schools.reduce((n, s) => n + s.messagesUsed, 0),
         documents: schools.reduce((n, s) => n + s.documents, 0),
       },
+      /*
+        Only the mismatches. A school paying for what it uses is not news, and a list
+        that includes them buries the three that are not.
+      */
+      apiUnpaid: entitlement.error
+        ? []
+        : ((entitlement.data ?? []) as Array<Record<string, unknown>>).filter(
+            (r) => r['out_has_read'] !== true || (r['out_write_scoped'] === true && r['out_has_write'] !== true),
+          ),
+      apiEntitlementLoaded: !entitlement.error,
+
       /*
         The services ZSMS is billed for and cannot read, named so the screen can say
         what is missing rather than implying this page is the whole picture.

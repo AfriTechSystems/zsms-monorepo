@@ -18,9 +18,33 @@
  * rejects it. The array therefore has to be written out in place.
  */
 
-import { authMiddleware } from '@zsms/auth-provider/middleware'
+import type { NextFetchEvent, NextRequest } from 'next/server'
 
-export default authMiddleware
+import { authMiddleware } from '@zsms/auth-provider/middleware'
+import { rateLimitResponse } from './lib/rate-limit'
+
+/**
+ * Rate limiting runs BEFORE authentication.
+ *
+ * Two reasons. The abuse this protects against is unauthenticated by definition —
+ * somebody hammering registration has no account — so there is no user id to limit on
+ * and the IP is the only unit available. And verifying a session token for a request
+ * that is about to be refused is work worth not doing.
+ *
+ * `authMiddleware` is still the default behaviour for everything that passes. Composing
+ * here rather than inside `@zsms/auth-provider` keeps ADR-032 intact: `apps/web` imports
+ * no Clerk symbol, and rate limiting is not an authentication concern that belongs in
+ * the auth abstraction.
+ *
+ * The limiter fails OPEN. A Redis outage must not take a school's attendance register
+ * down on a Monday morning — see `lib/rate-limit.ts` for the full trade.
+ */
+export default async function middleware(request: NextRequest, event: NextFetchEvent) {
+  const limited = await rateLimitResponse(request)
+  if (limited) return limited
+
+  return authMiddleware(request, event)
+}
 
 export const config = {
   // Skips `_next` internals and static assets — they carry no session, and

@@ -42,6 +42,8 @@ import { Alert } from '../../../../components/ui/alert'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { DataTable } from '../../../../components/ui/data-table'
+import { RailPanel, RailStats, WithRail } from '../../../../components/ui/context-rail'
+import { SectionLink } from '../../../../components/ui/section-link'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../../components/ui/field'
@@ -111,6 +113,54 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
   */
   const canPromote = can(structure?.role as Role | undefined, 'results:publish')
   const ceiling = capacity?.is_unlimited ? null : (capacity?.student_limit ?? null)
+
+  /*
+    The rail's two datasets, shaped once rather than inside the JSX.
+
+    Sorted by year group as a NUMBER where possible: a plain string sort puts Year 10
+    between Year 1 and Year 2, which looks like a bug in the data rather than in the
+    sort. Zambian grade ids are numeric today; anything non-numeric falls back to
+    alphabetical rather than disappearing.
+  */
+  const distributionRows = useMemo(() => {
+    const dist = meta?.distribution
+    if (!dist) return []
+    const entries = Object.entries(dist)
+    const totalCounted = entries.reduce((sum, [, n]) => sum + n, 0)
+
+    return entries
+      .sort(([a], [b]) => {
+        const na = Number(a)
+        const nb = Number(b)
+        if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb
+        return a.localeCompare(b)
+      })
+      .map(([grade, n], i) => ({
+        label: grade === 'Unassigned' ? 'No year group' : `Year ${grade}`,
+        value: String(n),
+        percent: totalCounted > 0 ? (n / totalCounted) * 100 : 0,
+        // The validated series order, so the rail agrees with every chart.
+        colour: [
+          'bg-success-fill',
+          'bg-primary-fill',
+          'bg-warning-fill',
+          'bg-accent-fill',
+          'bg-danger-fill',
+        ][i % 5],
+      }))
+  }, [meta?.distribution])
+
+  const recentRows = useMemo(
+    () =>
+      ((meta?.recent ?? []) as Array<{
+        id: string
+        first_name: string
+        last_name: string
+        grade_id: string | null
+        photo_url: string | null
+      }>),
+    [meta?.recent],
+  )
 
   const total = meta?.total ?? 0
   const perPage = meta?.perPage ?? 25
@@ -259,7 +309,67 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
       {loading && !data && !error && <TableSkeleton rows={8} columns={5} />}
 
       {!error && data && (
-        <>
+        <WithRail
+          rail={
+            <>
+              {/*
+                The roll's shape, from `meta.distribution` — computed over the WHOLE
+                roll in the route, not from the rows on screen. A distribution derived
+                from ten visible pupils would read "Year 7: 4" meaning four on this
+                page, which nobody could distinguish from four in the school.
+              */}
+              <RailPanel
+                title="Year groups"
+                action={<SectionLink href={`${base}/settings`}>Structure</SectionLink>}
+              >
+                {meta?.distribution === null ? (
+                  <p className="text-sm text-muted-foreground">
+                    The breakdown could not be loaded. The list above is unaffected.
+                  </p>
+                ) : (
+                  <RailStats stats={distributionRows} />
+                )}
+              </RailPanel>
+
+              {/*
+                Recently enrolled. Useful on the day a school is onboarding a cohort,
+                and the fastest way back to a pupil somebody has just created.
+              */}
+              <RailPanel title="Recently enrolled">
+                {recentRows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nobody has been enrolled yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {recentRows.map((r) => (
+                      <li key={r.id}>
+                        <Link
+                          href={`${base}/students/${r.id}`}
+                          className="flex min-h-tap items-center gap-2.5 rounded-md text-sm transition-colors hover:bg-neutral-tint"
+                        >
+                          <Avatar
+                            name={`${r.first_name} ${r.last_name}`}
+                            src={r.photo_url}
+                            size="sm"
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium">
+                              {r.first_name} {r.last_name}
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {r.grade_id ? `Year ${r.grade_id}` : 'No year group'}
+                            </span>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </RailPanel>
+            </>
+          }
+        >
           <Card>
             <CardContent className="p-0">
               {/* One component, two layouts: a real table from `sm` up, a card
@@ -340,7 +450,7 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
             noun="pupils"
             onPageChange={(next) => setParam({ page: String(next) })}
           />
-        </>
+        </WithRail>
       )}
 
       {/* Once a year, and reserved to the people who run the school — the function

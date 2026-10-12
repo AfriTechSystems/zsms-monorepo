@@ -28,6 +28,17 @@ export interface ApiMeta {
   page?: number
   perPage?: number
   total?: number
+  /**
+   * Aggregates over the WHOLE collection, for a context rail beside a paginated
+   * table. `null` means the aggregate itself failed — which a rail must render
+   * differently from an empty one, since an empty distribution reads as a school
+   * with no pupils.
+   *
+   * Mirrors `Meta` in `lib/api-response.ts`; the two are separate because one
+   * describes what a route sends and the other what a hook received.
+   */
+  distribution?: Record<string, number> | null
+  recent?: unknown[]
   capacity?: {
     student_limit: number | null
     is_unlimited: boolean

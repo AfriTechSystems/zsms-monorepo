@@ -41,6 +41,8 @@ import { Button } from '../../../../../components/ui/button'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
 import { Avatar } from '../../../../../components/ui/avatar'
+import { RailPanel, WithRail } from '../../../../../components/ui/context-rail'
+import { SectionLink } from '../../../../../components/ui/section-link'
 import { CustomFieldsPanel } from './custom-fields-panel'
 import { useToast } from '../../../../../components/ui/toast'
 import { Field, Input, Select } from '../../../../../components/ui/field'
@@ -378,6 +380,81 @@ export default function StudentDetailPage({
             }
           />
 
+          <WithRail
+            rail={
+              <>
+                {/*
+                  The identity facts, read-only and always visible.
+
+                  They are editable in the form below, but a reader scrolling through
+                  the edit fields loses sight of who they are editing — which on a
+                  screen that can withdraw a pupil is the detail worth keeping on
+                  screen.
+                */}
+                <RailPanel title="Key information">
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Pupil number</dt>
+                      <dd data-numeric className="font-medium">{data.student_id}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Year group</dt>
+                      <dd className="font-medium">{data.grade_id}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Class</dt>
+                      <dd className="font-medium">{data.class_id}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Enrolled</dt>
+                      <dd data-numeric className="font-medium">
+                        {formatDate(data.enrolment_date)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Type</dt>
+                      <dd className="font-medium">
+                        {data.is_boarding ? 'Boarder' : 'Day scholar'}
+                      </dd>
+                    </div>
+                    {/*
+                      Absent rather than "Not recorded" guessed at: date of birth and
+                      gender are optional at enrolment, and an em dash says the school
+                      has not supplied it rather than implying a default.
+                    */}
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Date of birth</dt>
+                      <dd data-numeric className="font-medium">
+                        {data.date_of_birth ? formatDate(data.date_of_birth) : '\u2014'}
+                      </dd>
+                    </div>
+                  </dl>
+                </RailPanel>
+
+                {/*
+                  Only destinations that actually exist per pupil.
+
+                  The reference image offers Academic Record, Behaviour, Documents and
+                  Notes alongside Fees; none of those is a route in this application,
+                  and a link to a page that does not exist is worse than no link.
+                  Raised as a suggestion rather than invented here.
+                */}
+                <RailPanel title="Go to">
+                  <div className="flex flex-col items-start gap-1">
+                    <SectionLink href={`${base}/fees/${data.id}`} variant="ghost">
+                      Fees &amp; payments
+                    </SectionLink>
+                    <SectionLink href={`${base}/attendance`} variant="ghost">
+                      Class attendance
+                    </SectionLink>
+                    <SectionLink href={`${base}/results`} variant="ghost">
+                      Class results
+                    </SectionLink>
+                  </div>
+                </RailPanel>
+              </>
+            }
+          >
           <div className="space-y-cards">
             <Card>
               <CardContent className="pt-card">
@@ -958,6 +1035,7 @@ export default function StudentDetailPage({
               released. There is no way to delete a pupil, for anyone, including the school owner.
             </Alert>
           </div>
+          </WithRail>
         </>
       )}
     </>

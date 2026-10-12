@@ -27,6 +27,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import { CalendarRange, Lock, Plus } from 'lucide-react'
 
 import { Alert } from '../../../../components/ui/alert'
@@ -34,6 +35,7 @@ import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
+import { SettingsHub } from './settings-hub'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { SettingsHistory } from '../../../../components/ui/settings-history'
@@ -95,6 +97,15 @@ const shortDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function SchoolSettingsPage(): JSX.Element {
+  /*
+    The school's own path prefix, for the hub's tile links.
+
+    Read from the route rather than threaded through props: this screen is always
+    at `/school/<code>/settings`, and `useParams` is how every sibling resolves it.
+  */
+  const routeParams = useParams<{ schoolCode: string }>()
+  const base = `/school/${routeParams.schoolCode}`
+
   const { toast } = useToast()
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -193,6 +204,17 @@ export default function SchoolSettingsPage(): JSX.Element {
         description="Your school's details, academic structure and term calendar."
         note="Your subscription tier and school identifier are shown but cannot be changed here — AfriTech sets the first, and the second appears inside every pupil number and receipt ever issued."
       />
+
+      {/*
+        Every settings area as a tile (reference W4).
+
+        The image uses tiles as TABS across one page; ZSMS has fourteen settings areas
+        that are already separate routes with their own permissions and deep links, so
+        collapsing them into tabs would lose all three. As a hub the tiles solve the
+        problem the image is actually solving — finding a setting without reading a
+        sidebar of fourteen similar-sounding entries.
+      */}
+      <SettingsHub base={base} role={data.role} />
 
       {/* Three sections on one screen. Switched rather than scrolled past: term dates
           sat below two long forms, and nothing told anybody the screen had them. */}

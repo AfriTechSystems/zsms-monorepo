@@ -161,21 +161,22 @@ export async function DELETE(request: NextRequest): Promise<Response> {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
 
-    const { data, error } = await client
-      .from('saved_views')
-      .delete()
-      .eq('id', id)
-      .select('id')
-
-    if (error) return fromPostgrestError(error)
-
     /*
-      Zero rows means the policy refused OR it was already gone, and those are
-      deliberately one answer. Distinguishing them would confirm that somebody else's
-      view exists, which is the same rule the rest of this API follows.
+      A function, not a `.delete()`.
+
+      No end-user role holds DELETE anywhere in `public` — `tenant_isolation_test`
+      asserts it, and it caught the first version of this route, which used a DELETE
+      grant and a policy. `delete_saved_view()` makes the decision instead, and
+      answers "not yours" and "not there" identically so that an id from another
+      school reveals nothing.
     */
-    if (!data || data.length === 0) {
-      return fail('NOT_FOUND', 'That view is not available to remove.')
+    const { error } = await client.rpc('delete_saved_view', { p_view_id: id })
+
+    if (error) {
+      if (error.code === '42501') {
+        return fail('NOT_FOUND', 'That view is not available to remove.')
+      }
+      return fromPostgrestError(error)
     }
 
     return ok({ removed: id })

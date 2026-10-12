@@ -7003,6 +7003,7 @@ export type Database = {
           topic_name: string
         }[]
       }
+      delete_saved_view: { Args: { p_view_id: string }; Returns: boolean }
       delete_timetable_period: {
         Args: { p_period_id: string }
         Returns: {

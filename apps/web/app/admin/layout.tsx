@@ -18,7 +18,6 @@ import { getAuthProvider } from '@zsms/auth-provider'
 
 import { platformTheme, ThemeStyle } from '../../lib/theme'
 import { AccountMenu } from '../../components/ui/account-menu'
-import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { GlobalSearch } from '../../components/ui/global-search'
 import { AskAi } from '../../components/assistant/ask-ai'
 import { AdminShell } from './admin-shell'
@@ -73,7 +72,6 @@ export default async function AdminLayout({
               the same operational questions a head teacher does.
             */}
             <AskAi audience="school" />
-            <ThemeToggle />
             <AccountMenu />
           </>
         }

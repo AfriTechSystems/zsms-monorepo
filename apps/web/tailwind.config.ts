@@ -107,6 +107,23 @@ const config: Config = {
           fill: 'var(--zsms-neutral-fill)',
           text: 'var(--zsms-neutral-text)',
         },
+        /*
+          `surface` — a raised surface: a card, a header, a panel.
+
+          **This was missing, and `bg-surface` was used in 33 files and emitted
+          nothing.** Every one of them had no background colour at all. It went
+          unnoticed because almost all of them sit directly on `bg-background`, which
+          is the same colour in both themes — so the page looked right.
+
+          The Ask AI panel is where it finally showed: a panel that OVERLAYS the
+          dashboard and has no background is simply see-through, which is exactly what
+          it looked like.
+
+          Mapped to `--card`, which is what `bg-card` already resolves to and what
+          every Card on every screen has been painting with. One variable, two names,
+          and now both of them work.
+        */
+        surface: 'var(--card)',
         sunken: 'var(--zsms-surface-sunken)',
         subtle: 'var(--zsms-text-subtle)',
       },

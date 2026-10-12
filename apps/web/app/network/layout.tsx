@@ -14,7 +14,6 @@
 import type { JSX, ReactNode } from 'react'
 
 import { AccountMenu } from '../../components/ui/account-menu'
-import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { SchoolSwitcher } from '../../components/ui/school-switcher'
 import { NetworkShell } from './network-shell'
 
@@ -34,7 +33,6 @@ export default function NetworkLayout({ children }: { children: ReactNode }): JS
             {/* The drill-down into any one school. A context change rather than a destination,
                 which is why it belongs in the header and not in the sidebar. */}
             <SchoolSwitcher />
-            <ThemeToggle />
             <AccountMenu />
           </>
         }

@@ -303,7 +303,17 @@ export function AppShell({
       )}
 
       {/* ---------------- Content ---------------- */}
-      <div className={cn('transition-[padding]', collapsed ? 'lg:pl-16' : 'lg:pl-64')}>
+      {/*
+        `zsms-shell-pad` is what the assistant panel pushes against (globals.css).
+        The panel sets a `data-assistant` attribute on <html>; this wrapper reserves
+        the width on `lg` and up so the dashboard moves instead of being covered.
+      */}
+      <div
+        className={cn(
+          'zsms-shell-pad transition-[padding]',
+          collapsed ? 'lg:pl-16' : 'lg:pl-64',
+        )}
+      >
         <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
           <div className="flex items-center gap-3 px-gutter py-3">
             <button

@@ -189,6 +189,29 @@ export function AssistantPanel({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, historyOpen, onClose])
 
+  /*
+    Tell the shell to reserve room (globals.css, "The assistant panel reserves its own
+    space").
+
+    An attribute on <html> rather than context: the trigger is rendered into
+    `headerActions` and the layout wrapper lives in the shell, two subtrees with no
+    common owner below the layout. This needs no plumbing and covers every portal,
+    including ones added later.
+
+    Cleared on unmount as well as on close — a route change that unmounts the panel
+    while it is open would otherwise leave the dashboard permanently indented.
+  */
+  useEffect(() => {
+    const root = document.documentElement
+    if (!open) {
+      root.removeAttribute('data-assistant')
+      return undefined
+    }
+    root.setAttribute('data-assistant', expanded ? 'expanded' : 'open')
+    return () => root.removeAttribute('data-assistant')
+  }, [open, expanded])
+
+
   const loadConversation = useCallback(async (id: string) => {
     setConversationId(id)
     setHistoryOpen(false)

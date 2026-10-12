@@ -25,7 +25,6 @@ import { SignedIn, SignedOut } from '@zsms/auth-provider/react'
 
 import { NotificationBell } from '../../components/ui/notification-bell'
 import { AccountMenu } from '../../components/ui/account-menu'
-import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { GlobalSearch } from '../../components/ui/global-search'
 import { TeacherShell } from './teacher-shell'
 import { HubSignIn } from './hub-sign-in'
@@ -77,7 +76,6 @@ export default function TeacherHubLayout({ children }: { children: ReactNode }):
               security one.
             */}
             <GlobalSearch placeholder="Search pupils…" />
-              <ThemeToggle />
               <NotificationBell endpoint="/api/session/notices" />
             <AccountMenu />
             </>

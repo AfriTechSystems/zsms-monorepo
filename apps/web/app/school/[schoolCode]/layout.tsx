@@ -29,7 +29,6 @@ import { requireSchoolSession } from '../../../lib/school-session'
 import { ROLE_LABEL } from '../../../lib/roles'
 import { NotificationBell } from '../../../components/ui/notification-bell'
 import { AccountMenu } from '../../../components/ui/account-menu'
-import { ThemeToggle } from '../../../components/ui/theme-toggle'
 import { SchoolSwitcher } from '../../../components/ui/school-switcher'
 import { GlobalSearch } from '../../../components/ui/global-search'
 import { SchoolShell } from './school-shell'
@@ -106,7 +105,6 @@ export default async function SchoolLayout({
             {/* Renders nothing for the common case of one school, so a single-school head
                 teacher never sees a control implying there is somewhere else to be. */}
             <SchoolSwitcher />
-            <ThemeToggle />
             <NotificationBell endpoint="/api/session/notices" />
             <AccountMenu />
           </>

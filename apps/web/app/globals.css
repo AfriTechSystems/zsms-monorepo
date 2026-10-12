@@ -295,7 +295,19 @@
 .zsms-aura__scrim {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  /*
+    `--card`, not `--color-surface`.
+
+    `--color-surface` is defined ONLY inside the print block, so this `color-mix()`
+    referenced an undefined variable everywhere else — the whole declaration was
+    invalid and the scrim painted nothing. Combined with `bg-surface` emitting no
+    rule at all, the assistant panel had no background and no scrim: see-through, as
+    reported.
+
+    Two independent causes of one symptom, which is why reading the panel's markup
+    made it look correct.
+  */
+  background: color-mix(in srgb, var(--card) 88%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -440,4 +452,30 @@
 /* Visible on paper only. */
 .print-only {
   display: none;
+}
+
+/* ===========================================================================
+   The assistant panel reserves its own space
+   ---------------------------------------------------------------------------
+   On a wide screen the panel should MOVE the dashboard, not cover it: reading an
+   answer about the figure behind the panel is the whole point, and a 26rem panel
+   over a 1280px screen hides a third of it.
+
+   Done with an attribute on `<html>` rather than React context, because the trigger
+   lives in `headerActions` and the layout wrapper is in the shell — two subtrees with
+   no common owner below the layout. An attribute needs no plumbing and works for
+   every portal at once, including any added later.
+
+   Below `lg` the panel stays an overlay with a backdrop, which is correct: a phone
+   has no room to push anything aside.
+   =========================================================================== */
+
+@media (min-width: 1024px) {
+  :root[data-assistant='open'] .zsms-shell-pad {
+    padding-right: 26rem;
+  }
+
+  :root[data-assistant='expanded'] .zsms-shell-pad {
+    padding-right: 48rem;
+  }
 }

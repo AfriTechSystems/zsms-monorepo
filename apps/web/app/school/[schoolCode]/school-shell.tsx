@@ -60,6 +60,7 @@ import { can } from '../../../lib/roles'
 export function SchoolShell({
   base,
   schoolName,
+  logoUrl,
   roleLabel,
   role,
   children,
@@ -67,6 +68,8 @@ export function SchoolShell({
 }: {
   base: string
   schoolName: string
+  /** The school's logo, beside its name in the sidebar. Null renders nothing. */
+  logoUrl?: string | null
   roleLabel: string
   role: Role
   children: ReactNode
@@ -344,6 +347,7 @@ export function SchoolShell({
     <AppShell
       base={base}
       title={schoolName}
+      logoUrl={logoUrl}
       subtitle={roleLabel}
       groups={visible}
       headerActions={

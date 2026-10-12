@@ -63,6 +63,15 @@ export interface AppShellProps {
   /** Shown at the top of the sidebar. The product or the school. */
   title: string
   subtitle?: string
+  /**
+   * The organisation's logo, shown beside the name in the sidebar.
+   *
+   * Optional, and ABSENT rather than placeholdered when not supplied — the AfriTech
+   * and Teacher Hub shells have no logo to show and a dashed box in a sidebar they
+   * can never fill would be an instruction nobody can follow. The placeholder lives
+   * on the settings screen, where somebody can act on it.
+   */
+  logoUrl?: string | null
   groups: NavGroup[]
   /** Account menu, theme toggle, school switcher — whatever belongs to this portal. */
   headerActions?: ReactNode
@@ -75,6 +84,7 @@ export function AppShell({
   base,
   title,
   subtitle,
+  logoUrl,
   groups,
   headerActions,
   footer,
@@ -244,7 +254,17 @@ export function AppShell({
                 Z
               </span>
             ) : (
-              <span className="block truncate font-semibold text-text">{title}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                {logoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- an arbitrary R2 host
+                  <img
+                    src={logoUrl}
+                    alt=""
+                    className="size-6 shrink-0 rounded object-contain"
+                  />
+                )}
+                <span className="block truncate font-semibold text-text">{title}</span>
+              </span>
             )}
             {!collapsed && subtitle && (
               <span className="block truncate text-xs text-muted-text">{subtitle}</span>

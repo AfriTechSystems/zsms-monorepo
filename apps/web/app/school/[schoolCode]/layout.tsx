@@ -88,6 +88,7 @@ export default async function SchoolLayout({
       <SchoolShell
         base={base}
         schoolName={session.school.name}
+        logoUrl={session.school.logoUrl}
         roleLabel={`${session.school.schoolCode} · ${ROLE_LABEL[session.role] ?? session.role}`}
         role={session.role}
         headerActions={

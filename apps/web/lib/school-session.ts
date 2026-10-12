@@ -54,6 +54,8 @@ export interface SchoolRecord {
   level: string
   financeModuleEnabled: boolean
   whatsappEnabled: boolean
+  /** Beside the name in the sidebar. Null is the common case and renders nothing. */
+  logoUrl: string | null
 }
 
 export interface SchoolSession {
@@ -162,7 +164,7 @@ export const requireSchoolSession = cache(async function requireSchoolSession(
   const { data: schools } = await client
     .from('schools')
     .select(
-      'id, school_id, name, status, subscription_tier, type, level, finance_module_enabled, whatsapp_enabled',
+      'id, school_id, name, status, subscription_tier, type, level, finance_module_enabled, whatsapp_enabled, logo_url',
     )
     .limit(2)
 
@@ -192,6 +194,10 @@ export const requireSchoolSession = cache(async function requireSchoolSession(
       type: school.type as string,
       level: school.level as string,
       financeModuleEnabled: school.finance_module_enabled as boolean,
+      // Shown beside the name in the sidebar. Null is the common case and renders
+      // nothing there — the place to notice a missing logo is the settings screen,
+      // where there is something to do about it.
+      logoUrl: (school.logo_url as string | null) ?? null,
       whatsappEnabled: school.whatsapp_enabled as boolean,
     },
     capacity: toCapacity(capacityResult.data),

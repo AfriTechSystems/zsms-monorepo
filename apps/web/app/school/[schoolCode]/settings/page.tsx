@@ -36,6 +36,7 @@ import { Button } from '../../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
 import { SettingsHub } from './settings-hub'
+import { SchoolLogo } from '../../../../components/ui/school-logo'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { SettingsHistory } from '../../../../components/ui/settings-history'
@@ -340,15 +341,25 @@ export default function SchoolSettingsPage(): JSX.Element {
                   )}
                 </Field>
 
-                <Field id="logo" label="Logo URL" hint="Appears on PDFs and in the portal header.">
-                  {(props) => (
-                    <Input
-                      {...props}
-                      value={profile.logo_url ?? ''}
-                      onChange={(e) => setProfile({ ...profile, logo_url: e.target.value })}
-                    />
-                  )}
-                </Field>
+                {/*
+                  An upload with a preview, not a URL field.
+
+                  "Logo URL" asked a head teacher to host an image somewhere and paste
+                  an address — which is why no school had a logo. There was also no
+                  preview anywhere in the product, so an empty logo was indistinguishable
+                  from one that had been set and failed to load.
+
+                  Spans the grid because a control with a picture and two lines of
+                  explanation does not belong in a column sized for a text input.
+                */}
+                <div className="sm:col-span-2">
+                  <SchoolLogo
+                    name={profile.name ?? "This school"}
+                    src={profile.logo_url}
+                    size="lg"
+                    onChange={(url) => setProfile({ ...profile, logo_url: url })}
+                  />
+                </div>
               </div>
 
               {/*

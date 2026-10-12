@@ -33,6 +33,7 @@ import {
   Title,
   usePalette,
 } from '../../../components/ui'
+import { ThemeChoiceRow } from '../../../components/theme-choice'
 import { useSession } from '../../../lib/auth'
 import {
   enablePush,
@@ -113,6 +114,14 @@ export default function ParentAccount(): JSX.Element {
         </Card>
 
         {/* ---- Data rights ---- */}
+        {/*
+          Light / System / Dark, here rather than in a settings screen the app does
+          not have. The web portals put it in the account menu for the same reason:
+          it is a setting about the person, and this is the person's screen.
+        */}
+        <Card>
+          <ThemeChoiceRow />
+        </Card>
         <Card>
           <Row gap={SPACE.sm}>
             <ShieldCheck size={21} color={c.primaryMark} strokeWidth={2} />

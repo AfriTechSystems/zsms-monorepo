@@ -34,6 +34,7 @@ import {
   Title,
   usePalette,
 } from '../../../components/ui'
+import { ThemeChoiceRow } from '../../../components/theme-choice'
 import { NUMERIC, RADIUS, SPACE, TYPE } from '../../../theme'
 
 interface Hub {
@@ -128,6 +129,14 @@ export default function Account(): JSX.Element {
         )}
 
         {/* ---- Notifications ---- */}
+        {/*
+          Light / System / Dark, here rather than in a settings screen the app does
+          not have. The web portals put it in the account menu for the same reason:
+          it is a setting about the person, and this is the person's screen.
+        */}
+        <Card>
+          <ThemeChoiceRow />
+        </Card>
         <Card>
           <Row gap={SPACE.sm}>
             {push === 'on' ? (

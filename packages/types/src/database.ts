@@ -2579,6 +2579,58 @@ export type Database = {
           },
         ]
       }
+      saved_views: {
+        Row: {
+          created_at: string
+          created_by: string
+          filters: Json
+          id: string
+          name: string
+          school_id: string
+          surface: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          filters?: Json
+          id?: string
+          name: string
+          school_id: string
+          surface: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          filters?: Json
+          id?: string
+          name?: string
+          school_id?: string
+          surface?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_views_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "saved_views_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "saved_views_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_academic_config: {
         Row: {
           class_naming_convention: string | null
@@ -8447,6 +8499,12 @@ export type Database = {
           out_access_until: string
           out_done: boolean
           out_message: string
+        }[]
+      }
+      unguarded_school_tables: {
+        Args: never
+        Returns: {
+          out_table_name: string
         }[]
       }
       unlink_parent_from_student: {

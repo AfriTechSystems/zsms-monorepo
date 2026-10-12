@@ -29,6 +29,7 @@
  */
 
 import type { JSX, ReactNode } from 'react'
+import { Shortcuts } from '../ui/shortcuts'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -218,6 +219,17 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh bg-background">
+      {/*
+        Shortcuts (`?`), mounted ONCE here rather than per portal.
+
+        Every portal built on this shell gets them, and there is one list to keep
+        honest — a panel that advertises a key nobody wired is worse than no panel,
+        because the reader presses one, nothing happens, and they stop trusting the
+        rest of it. The parent portal does not use this shell and does not get them,
+        which is right: it is phone-first and has no keyboard.
+      */}
+      <Shortcuts />
+
       {/* ---------------- Desktop sidebar ---------------- */}
       <aside
         className={cn(

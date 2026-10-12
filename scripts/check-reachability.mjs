@@ -65,6 +65,13 @@ const CALLED_BY_POSTGRES = [
  * a place to hide things.
  * ------------------------------------------------------------------------- */
 const ACCEPTED = new Map([
+  [
+    'unguarded_school_tables',
+    'A catalogue check, called by school_status_enforcement_test rather than by any ' +
+      'source. It exists so that a school-scoped table created after 0149 cannot ' +
+      'silently miss its write guard — fourteen had, and the omission has no symptom ' +
+      'because the writes simply succeed (0270).',
+  ],
   /*
     Called by other SQL, not by application source.
 

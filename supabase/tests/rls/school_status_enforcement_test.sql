@@ -30,7 +30,7 @@ BEGIN;
 
 SET search_path TO public, extensions;
 
-SELECT plan(26);
+SELECT plan(28);
 
 -- ---------------------------------------------------------------------------
 -- Four schools, one per interesting status. All created writable, because a
@@ -330,6 +330,27 @@ SET LOCAL request.jwt.claims TO '{
 SELECT ok(
   public.school_can_write('33333333-3333-3333-3333-333333333333'),
   'AfriTech writes to a suspended school — acting on schools in every state is what the states are for'
+);
+
+-- ---------------------------------------------------------------------------
+-- The guard must cover EVERY school-scoped table, not the ones 0149 could see.
+--
+-- `0149` iterates the catalogue at migration time, so a table created afterwards has
+-- no guard — and the omission has no symptom, because the writes simply succeed.
+-- Fourteen tables had drifted out of coverage before `0270` looked. These two
+-- assertions are what stops the fifteenth doing the same quietly.
+-- ---------------------------------------------------------------------------
+
+SELECT is(
+  (SELECT count(*)::INT FROM public.unguarded_school_tables()),
+  0,
+  'every school-scoped table has a write guard, or a documented exemption'
+);
+
+SELECT is(
+  (SELECT string_agg(out_table_name, ', ') FROM public.unguarded_school_tables()),
+  NULL,
+  'and if one does not, this names it'
 );
 
 SELECT * FROM finish();

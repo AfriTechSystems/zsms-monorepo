@@ -43,6 +43,7 @@ import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { DataTable } from '../../../../components/ui/data-table'
 import { BulkBar } from '../../../../components/ui/bulk-bar'
+import { SavedViews } from '../../../../components/ui/saved-views'
 import { RailPanel, RailStats, WithRail } from '../../../../components/ui/context-rail'
 import { SectionLink } from '../../../../components/ui/section-link'
 import { EmptyState } from '../../../../components/ui/empty-state'
@@ -337,6 +338,25 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
           </div>
         </form>
       </FormSection>
+
+      {/*
+        Saved filter views (reference W2).
+
+        Above the error and the table on purpose: a view is how somebody gets BACK to
+        a list, so it has to be reachable when the list itself has failed to load.
+      */}
+      <SavedViews
+        surface="students"
+        current={{ status, gradeId, q: search }}
+        canSave={mayEnrol}
+        onApply={(f) =>
+          setParam({
+            status: f.status ?? 'all',
+            gradeId: f.gradeId ?? 'all',
+            q: f.q ?? '',
+          })
+        }
+      />
 
       {error && <ErrorState message={error} code={code} onRetry={reload} />}
       {loading && !data && !error && <TableSkeleton rows={8} columns={5} />}

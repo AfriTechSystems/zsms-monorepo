@@ -6,6 +6,30 @@ This document records all significant changes to ZSMS by date. It serves as the 
 
 ---
 
+## 2026-10-10 — CI Green, and `main` Merged for the First Time
+
+### Bug Fix
+- **`allocate_payment` had been broken on its main path since `0213`** — it selected `s.allocate` from `suggest_payment_allocation()`, which returns `suggested`. plpgsql resolves names at run time, so the migration applied cleanly and the function raised 42703 on every call. `POST /api/payments` and the parent payment claim both use that branch, so **every payment recorded without explicit allocations had failed**. Fixed in `0232`.
+- **Seven tables had policies and no GRANT** (`0233`, `0234`). Postgres checks the privilege before RLS, so the policies were dead code that read as protection and several screens returned "permission denied" to real users. `0234` adds `tables_with_dead_policies()` and `tenant_isolation_test` asserts it is empty, so the eighth occurrence fails a build.
+- **Nine inherited DELETE grants** (`0231`). Supabase grants ALL on a new table by default; nine of the ten were never deleted from by any code.
+- **`afritech.school_credit_plans` had no RLS at all** (`0231`).
+- **Provenance was editable** (`0233`) — `0218`'s table-level UPDATE grant implied column-level UPDATE on `content` and `generator_name`, so a teacher could rewrite what the model produced and whose model produced it. Now column-level.
+- **Four policies were broader than their screens** (`0235`), live only because the grants above had just been fixed. Scoped to the audiences in `lib/roles.ts`.
+- **The audit trail spoke two languages** (`0233`) — the trigger wrote `insert`, the explicit calls `create`. Now `create`; history deliberately not rewritten, and the UI reconciles both.
+
+### Infrastructure
+- **R2 live.** 14 checks across both buckets and the full document chain end to end. Report cards and receipts can be delivered.
+- **PostHog live**, EU region, autocapture off.
+- **CI green on both jobs**, 38 suites, 881 assertions — and **`main` merged up to date with `integration`** (PR #1, 222 commits), the first time since before the fees module.
+
+### Architecture
+- **ADR-044** — Edge Functions superseded; inbound webhooks are Next.js routes.
+
+### Breaking Changes
+- None. `0231`–`0235` are corrective.
+
+---
+
 ## 2026-10-06 — Foundation Layer Audit and Remediation
 
 ### Documentation

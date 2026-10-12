@@ -28,6 +28,59 @@ The entire process takes 4 to 8 days of part-time work for a country with straig
 
 ---
 
+## Before Step 1 — What the Schema Still Assumes
+
+> **Run `npm run country:check` first, and keep the output beside you.**
+
+This runbook describes eight steps. Followed today it would not fail at step one — it
+would fail gradually, after everything looked set up: the first school created in the new
+country refused by a CHECK admitting `ecz_grades`, then another admitting `ecz_percentage`,
+then a reference table with `_zm` in its name. One at a time, each looking like a bug
+rather than like the known consequence of a decision.
+
+**ADR-040 defers widening these until a second country is real, and that remains right.**
+A constraint widened for a country that does not exist is a validation ZSMS stops
+performing for the one that does. What was missing was not the hardening — it was that
+the list existed nowhere, so this document promised a path nobody had walked.
+
+As of 2026-10-11 the live schema has **ten** such places:
+
+| Kind | Object | What it assumes |
+|---|---|---|
+| CHECK | `school_academic_config.curriculum_type` | `ecz_grades`, `cambridge_forms`, `hybrid`, `custom` |
+| CHECK | `school_academic_config.grading_system` | `ecz_percentage`, `cambridge_o_level`, `cambridge_a_level`, `custom` |
+| CHECK | `school_grade_levels.examination_type` | `ecz`, `cambridge`, `internal`, `none` |
+| CHECK | `school_subjects.curriculum_type` | `ecz`, `cambridge`, `both` |
+| CHECK | `reference_subjects_zm.curriculum_type` | `ecz`, `cambridge`, `both` |
+| Table name | `reference_subjects_zm` | the country, in the identifier |
+| Default | `schools.country_code` | `'ZM'` |
+| Default | `curriculum_topics.country_code` | `'ZM'` |
+| Default | `reference_subjects_zm.country_code` | `'ZM'` |
+| Default | `standalone_teacher_accounts.country_code` | `'ZM'` |
+
+The script reads this from the live schema rather than from this table, so it stays
+correct as tables are added. **Use the script, not the table** — the table is here to
+show the shape of the problem.
+
+### Two corrections to ADR-040
+
+**`term_number` is not a blocker.** ADR-040 lists it; every CHECK on it admits **1 to 4**,
+so a country with four terms already works with no change. One fewer thing to do.
+
+**`school_subjects.curriculum_type` was not listed and should have been.** It is the same
+constraint as `reference_subjects_zm`'s and on a table schools actually write to — so it
+would have been met sooner and been more confusing. Found by asking the schema rather than
+by re-reading the ADR, which is the point of the script.
+
+### What is already country-neutral
+
+Worth knowing so it is not re-solved: `packages/config` has the country index this runbook's
+Step 2 describes — `COUNTRIES` keyed by code, selected by `NEXT_PUBLIC_COUNTRY_CODE`, with
+an error naming this document when a code is unknown. Step 2 is satisfied; the file in
+Step 1 is genuinely all that is needed on that side.
+
+---
+
 ## Pre-Expansion Checklist
 
 Before starting any technical work, confirm:

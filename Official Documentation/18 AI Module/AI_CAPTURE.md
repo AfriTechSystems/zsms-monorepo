@@ -15,6 +15,29 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not built, and this document is right about why it is the one that needs
+reserve/settle.**
+
+`ai_credit_ledger` admits `reserve` and `release` and carries `reservation_id`, but **only
+`ai_credit_consume()` exists.** Synchronous generation does not need reservations — it
+calls the model, then charges with the real token count, discarding the output if the
+charge fails.
+
+**A queued capture does.** Without reservation, a teacher queues twenty photographed pages
+against a balance of two and finds out a day later that eighteen failed. The table shape is
+already right, so building it is not a migration against a financial table holding live
+rows — write the three functions alongside capture.
+
+**The capture price cannot be fixed yet, and this document says so correctly.** It is
+seeded at 2 credits per photographed page, and the retry rate against real Zambian paper
+— exercise books, carbon copies, sun-faded registers — is unmeasured. Pricing a
+retry-heavy operation from a guess either loses money on every capture or overcharges for
+the clean ones.
+
+---
+
 ## Purpose
 
 Teachers in Zambian schools mark on paper. Registers, mark sheets, and enrolment lists are filled in by hand long before anyone opens a laptop, and the transcription into ZSMS is the slowest, most error-prone part of the day. AI-assisted capture removes the typing, not the teacher: a photograph of the paper produces a **pre-filled verification screen**, and the teacher confirms or corrects it before anything is written.

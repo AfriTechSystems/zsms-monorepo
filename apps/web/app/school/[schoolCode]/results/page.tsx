@@ -61,6 +61,9 @@ interface Row {
   marksObtained: number | null
   marksTotal: number | null
   gradeLetter: string | null
+  gradeOverride: string | null
+  gradeOverrideReason: string | null
+  canOverride: boolean
   gradePoints: number | null
   published: boolean
   hasScaleVersion: boolean
@@ -140,6 +143,11 @@ function MarkSheet(): JSX.Element {
    * two transposed marks in one class should not have to re-open the panel between them.
    */
   const [correcting, setCorrecting] = useState<string | null>(null)
+  // Which result's grade is being awarded, and the two fields of that form.
+  const [overriding, setOverriding] = useState<string | null>(null)
+  const [overrideGrade, setOverrideGrade] = useState('')
+  const [overrideReason, setOverrideReason] = useState('')
+  const [savingOverride, setSavingOverride] = useState(false)
   const [reason, setReason] = useState('')
   const [unlocking, setUnlocking] = useState(false)
 
@@ -270,6 +278,41 @@ function MarkSheet(): JSX.Element {
     toast(`${result.data?.published ?? 0} results published. Parents can see them now.`)
     reload()
   }, [academicYear, termNumber, classId, toast, reload])
+
+  
+  /**
+   * Award a grade, or clear an awarded one.
+   *
+   * `0256` enforces every rule — a reason, a grade the school's own scale defines, and
+   * refusal on a published result. This only reports what it said.
+   */
+  async function submitOverride(resultId: string, clear: boolean): Promise<void> {
+    setSavingOverride(true)
+    try {
+      const response = await fetch(`/api/school/results`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resultId,
+          // An empty grade is how the override is removed.
+          grade: clear ? '' : overrideGrade,
+          reason: clear ? '' : overrideReason,
+        }),
+      })
+      const body = await response.json()
+      toast(body.data?.message ?? body.error ?? 'Saved.', response.ok ? 'success' : 'danger')
+      if (response.ok) {
+        setOverriding(null)
+        setOverrideGrade('')
+        setOverrideReason('')
+        // Re-read, so the computed grade and the asterisk come from the server
+        // rather than from an optimistic guess about what it did.
+        reload()
+      }
+    } finally {
+      setSavingOverride(false)
+    }
+  }
 
   return (
     <>
@@ -491,15 +534,126 @@ function MarkSheet(): JSX.Element {
                           />
                         </div>
 
+                        {/*
+                          The grade cell. An awarded grade carries an asterisk and the
+                          calculated one is shown beneath it, because GRADING.md asks for
+                          the override to be visible rather than silently replacing the
+                          calculation — a teacher looking at a B should be able to see
+                          that the marks said C.
+                        */}
                         <div className="w-20 text-center">
-                          {r.gradeLetter ? (
-                            <Badge variant={r.hasScaleVersion ? 'neutral' : 'warning'}>
-                              {r.gradeLetter}
-                            </Badge>
+                          {r.gradeOverride ? (
+                            <button
+                              type="button"
+                              onClick={() => setOverriding(r.resultId)}
+                              title={r.gradeOverrideReason ?? undefined}
+                              className="min-h-tap"
+                            >
+                              <Badge variant="warning">{r.gradeOverride}*</Badge>
+                              <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                                was {r.gradeLetter ?? '—'}
+                              </span>
+                            </button>
+                          ) : r.gradeLetter ? (
+                            <button
+                              type="button"
+                              onClick={() => r.canOverride && setOverriding(r.resultId)}
+                              disabled={!r.canOverride}
+                              title={
+                                r.canOverride
+                                  ? 'Award a different grade'
+                                  : 'Unlock this result for correction first'
+                              }
+                              className="min-h-tap"
+                            >
+                              <Badge variant={r.hasScaleVersion ? 'neutral' : 'warning'}>
+                                {r.gradeLetter}
+                              </Badge>
+                            </button>
                           ) : (
                             <span className="text-sm text-muted-foreground">—</span>
                           )}
                         </div>
+
+                        {/*
+                          Awarding a grade, inline under the pupil it concerns.
+
+                          A modal would hide the marks the teacher is reasoning about —
+                          the whole point is that they can see the calculated grade while
+                          deciding to replace it.
+                        */}
+                        {overriding === r.resultId && (
+                          <div className="w-full basis-full border-t border-border pt-stack">
+                            <p className="text-sm font-medium">
+                              Award a grade for {r.firstName} {r.lastName}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              The marks give{' '}
+                              <strong>{r.gradeLetter ?? 'no grade'}</strong>. Use one of
+                              your school&rsquo;s own grades. The reason appears on the
+                              report card.
+                            </p>
+
+                            <div className="mt-stack flex flex-wrap items-end gap-2">
+                              <Field id={`ov-grade-${r.studentId}`} label="Grade" required>
+                                {(props) => (
+                                  <Input
+                                    {...props}
+                                    value={overrideGrade}
+                                    onChange={(e) => setOverrideGrade(e.target.value)}
+                                    placeholder={r.gradeLetter ?? 'A'}
+                                    className="w-20 text-center"
+                                  />
+                                )}
+                              </Field>
+                              <Field
+                                id={`ov-reason-${r.studentId}`}
+                                label="Reason"
+                                required
+                                className="min-w-[16rem] flex-1"
+                              >
+                                {(props) => (
+                                  <Input
+                                    {...props}
+                                    value={overrideReason}
+                                    onChange={(e) => setOverrideReason(e.target.value)}
+                                    placeholder="Practical assessment — distinction awarded"
+                                  />
+                                )}
+                              </Field>
+                            </div>
+
+                            <div className="mt-stack flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={savingOverride || !overrideGrade || !overrideReason}
+                                onClick={() => void submitOverride(r.resultId!, false)}
+                              >
+                                {savingOverride ? 'Saving…' : 'Award this grade'}
+                              </Button>
+                              {r.gradeOverride && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={savingOverride}
+                                  onClick={() => void submitOverride(r.resultId!, true)}
+                                >
+                                  Remove override
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setOverriding(null)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
 
                         {/*
                           Correcting one published mark.

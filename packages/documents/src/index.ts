@@ -18,12 +18,21 @@ import {
   move,
   needsPage,
   newDocument,
+  // Wrapping body text, which only the transfer letter needs — the other
+  // documents are all label/value rows.
+  paragraph,
   newPage,
   rule,
   text,
   textRight,
 } from './pdf'
-import type { ReceiptData, RenderedDocument, ReportCardData, StatementData } from './types'
+import type {
+  ReceiptData,
+  RenderedDocument,
+  ReportCardData,
+  StatementData,
+  TransferLetterData,
+} from './types'
 
 const RIGHT = A4.width - MARGIN
 
@@ -162,6 +171,18 @@ export async function renderFeeStatement(data: StatementData): Promise<RenderedD
 
 export async function renderReportCard(data: ReportCardData): Promise<RenderedDocument> {
   const doc = await newDocument()
+
+  /*
+    What this school chose to show (`0258`). Every switch defaults to TRUE when
+    absent, because absent means "this school has never opened that screen" — which
+    is every school until it does. Defaulting to hidden would silently strip
+    position, averages and comments from every report card in the system on deploy.
+  */
+  const o = data.options ?? {}
+  const showPosition = o.showPosition !== false
+  const showAttendance = o.showAttendance !== false
+  const showComments = o.showComments !== false
+
   await header(doc, data.school, `REPORT CARD — ${data.academicYear} TERM ${data.termNumber}`)
 
   text(doc, `${data.studentName} (${data.studentCode})`, { size: 11, bold: true })
@@ -174,7 +195,9 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
   text(doc, 'SUBJECT', { x: COL.subject, size: 8, bold: true, color: MUTED })
   textRight(doc, 'MARKS', COL.marks, { size: 8, bold: true, color: MUTED })
   textRight(doc, 'GRADE', COL.grade, { size: 8, bold: true, color: MUTED })
-  textRight(doc, 'POSITION', COL.position, { size: 8, bold: true, color: MUTED })
+  if (showPosition) {
+    textRight(doc, 'POSITION', COL.position, { size: 8, bold: true, color: MUTED })
+  }
   rule(doc, 6)
 
   for (const s of data.subjects) {
@@ -185,10 +208,14 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
     // a zero is a lie.
     textRight(doc, s.marksObtained === null ? '—' : `${s.marksObtained} / ${s.marksTotal}`, COL.marks, { size: 10 })
     textRight(doc, s.gradeLetter ?? '—', COL.grade, { size: 10, bold: true })
-    textRight(doc, s.classPosition === null ? '—' : String(s.classPosition), COL.position, { size: 10 })
+    // The column is omitted entirely rather than blanked: a school that turned
+    // ranking off does not want an empty POSITION column inviting the question.
+    if (showPosition) {
+      textRight(doc, s.classPosition === null ? '—' : String(s.classPosition), COL.position, { size: 10 })
+    }
     move(doc, 16)
 
-    if (s.comments) {
+    if (s.comments && showComments) {
       text(doc, s.comments, { x: COL.subject + 8, size: 8, color: MUTED, maxWidth: 380 })
       move(doc, 13)
     }
@@ -196,7 +223,7 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
 
   rule(doc)
 
-  if (data.attendanceTotal && data.attendanceTotal > 0) {
+  if (showAttendance && data.attendanceTotal && data.attendanceTotal > 0) {
     labelValue(
       doc,
       'Attendance',
@@ -214,9 +241,150 @@ export async function renderReportCard(data: ReportCardData): Promise<RenderedDo
     text(doc, `Grades awarded under: ${data.gradingScaleName}`, { size: 8, color: MUTED })
   }
 
+  /*
+    The principal's words for this term (TEMPLATE_SYSTEM.md). Resolved by the
+    caller from the per-term map, so the renderer never has to know that comments
+    are stored by year and term — only that it was handed one or was not.
+  */
+  if (data.principalComment) {
+    move(doc, 14)
+    if (needsPage(doc, 60)) newPage(doc)
+    text(doc, "PRINCIPAL'S COMMENT", { size: 8, bold: true, color: MUTED })
+    move(doc, 13)
+    text(doc, data.principalComment, { size: 9, maxWidth: RIGHT - MARGIN })
+    move(doc, 16)
+  }
+
+  /*
+    The acknowledgement slip (CUSTOMISATION.md step 6) — a tear-off a parent signs
+    and returns. Off unless the school asked, because a school that does not collect
+    them does not want a blank signature box on every card.
+
+    Deliberately empty lines rather than pre-filled: the whole point is a physical
+    signature, and printing a name beside it would invite the question of who wrote it.
+  */
+  if (data.options?.acknowledgementRequired) {
+    if (needsPage(doc, 90)) newPage(doc)
+    move(doc, 10)
+    rule(doc, 8)
+    text(doc, 'PARENT ACKNOWLEDGEMENT — please sign and return to the school', {
+      size: 8,
+      bold: true,
+      color: MUTED,
+    })
+    move(doc, 24)
+    labelValue(doc, 'Signature', '')
+    move(doc, 20)
+    labelValue(doc, 'Name', '')
+    move(doc, 20)
+    labelValue(doc, 'Date', '')
+  }
+
   footer(doc, `${data.school.name} · ${data.studentCode} · ${data.academicYear} Term ${data.termNumber}`)
   return finish(doc, `report-${data.studentCode}-${data.academicYear}-T${data.termNumber}.pdf`)
 }
+
+// ---------------------------------------------------------------------------
+// Transfer letter — the document a family carries to the next school
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a transfer letter to `TRANSFER.md`'s specified contents.
+ *
+ * ## Why this is formal rather than friendly
+ *
+ * The audience is not the parent. It is a registrar at the receiving school deciding
+ * whether to admit a child, and they are looking for specific facts: who, from where,
+ * when, what grade was completed, and who at the origin school stands behind it.
+ *
+ * So no greeting, no prose paragraph, and a signature block that is deliberately empty
+ * — a letter ZSMS signed itself would be worth nothing. The school signs and stamps it.
+ *
+ * ## Withdrawal is said plainly
+ *
+ * A withdrawal is not a transfer, and a letter that blurs them misleads the reader
+ * about whether a destination school exists. The heading and the body both say which.
+ */
+export async function renderTransferLetter(
+  data: TransferLetterData,
+): Promise<RenderedDocument> {
+  const doc = await newDocument()
+
+  const leaving = data.kind === 'withdrawn'
+  await header(doc, data.school, leaving ? 'WITHDRAWAL LETTER' : 'TRANSFER LETTER')
+
+  text(doc, data.transferReference, { size: 12, bold: true })
+  move(doc, 16)
+  text(doc, `Issued ${data.transferredOn}`, { size: 9, color: MUTED })
+  move(doc, 24)
+
+  /*
+    The registration number sits with the school, not the pupil. It is what tells a
+    registrar this letter comes from a recognised school rather than anybody with a
+    printer, so it is the first thing after the reference.
+  */
+  if (data.ministryRegistrationNumber) {
+    labelValue(doc, 'Ministry registration', data.ministryRegistrationNumber)
+  }
+  rule(doc)
+
+  labelValue(doc, 'Pupil', data.studentName)
+  labelValue(doc, 'Pupil number', data.studentCode)
+  labelValue(doc, 'Enrolled', data.enrolledOn)
+  labelValue(doc, leaving ? 'Withdrawn' : 'Transferred', data.transferredOn)
+  labelValue(doc, 'Final grade completed', data.finalGradeLevel)
+
+  if (!leaving) {
+    /*
+      "Not specified" rather than omitting the row. A registrar reading a letter with
+      no destination line cannot tell whether the school did not know or the letter is
+      incomplete, and the two have different consequences.
+    */
+    labelValue(doc, 'Destination', data.destination || 'Not specified')
+  }
+  rule(doc)
+
+  paragraph(
+    doc,
+    leaving
+      ? `This is to confirm that ${data.studentName} (${data.studentCode}) was enrolled at ` +
+          `${data.school.name} from ${data.enrolledOn} until ${data.transferredOn}, and has ` +
+          `been withdrawn from the school.`
+      : `This is to confirm that ${data.studentName} (${data.studentCode}) was enrolled at ` +
+          `${data.school.name} from ${data.enrolledOn} until ${data.transferredOn}, and has ` +
+          `been transferred with the school's knowledge.`,
+    { size: 10 },
+  )
+  move(doc, 8)
+
+  /*
+    Said explicitly because a registrar will wonder, and because TRANSFER.md is firm
+    that records are never deleted. A pupil's history is available from the origin
+    school on request — this letter is a summary, not the file.
+  */
+  paragraph(
+    doc,
+    "The pupil's academic and attendance records are retained by this school and may be " +
+      'requested through the school office, quoting the reference above.',
+    { size: 9, color: MUTED },
+  )
+  move(doc, 36)
+
+  // An empty signature block. ZSMS states facts; the school vouches for them.
+  text(doc, data.principalName ?? 'Principal', { size: 10, bold: true })
+  move(doc, 30)
+  rule(doc, 2)
+  text(doc, 'Signature and date', { size: 8.5, color: MUTED })
+  move(doc, 40)
+  rule(doc, 2)
+  text(doc, 'School stamp', { size: 8.5, color: MUTED })
+
+  footer(doc, `${data.school.name} · ${data.transferReference}`)
+  return finish(doc, `${data.transferReference}.pdf`)
+}
+
+// Exported so a worker can type the context it assembles for the renderer.
+export type { TransferLetterData } from './types'
 
 export type { TeachingResourceDocument } from './teaching-resource'
 export {

@@ -10,6 +10,26 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not built, and blocked on credentials rather than on engineering.**
+
+`google_sheets` and `hubspot` are both valid `integration_type` values in
+`school_integrations`, so the registry admits them. Neither has a dispatch path, and both
+need OAuth or an API key that does not exist.
+
+Scored as pending, not failing.
+
+**Worth deciding before building either**, because it changes the shape: a CRM connector
+pushes pupil and parent records to a third party. `COMPLIANCE.md` makes that a ZDPA
+transfer, so it needs a lawful basis and probably a per-school consent — not just a
+working OAuth flow. The accounting connectors push *financial* records, which is a
+different and easier question.
+
+That is the real reason to build the accounting side first, beyond the credentials.
+
+---
+
 ## Purpose
 
 This document defines the CRM connectors — HubSpot for enrollment marketing teams and the custom webhook connector for any other CRM. Every Claude Code session building a CRM connector must read this document.

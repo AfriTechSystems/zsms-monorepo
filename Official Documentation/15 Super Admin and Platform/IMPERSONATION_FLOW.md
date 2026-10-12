@@ -10,6 +10,30 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Fully built — and `CLAUDE.md` said otherwise until today.**
+
+That file's API route list carried `admin/impersonate` *(501 — needs Clerk actor tokens)*.
+There is no 501 in the route. It mints a real Clerk actor token through `@clerk/backend`,
+records the session via `begin_impersonation_session()`, and **revokes the token if the
+database refuses** — so a trail can never claim a session that did not happen.
+
+The order is deliberate and worth preserving: mint first, record second, undo the mint on
+refusal. Recording first would leave the trail asserting a session that failed to start.
+
+`impersonation_sessions`, `end_impersonation_session()`, `my_impersonation_context()` and
+`is_impersonation_session()` all exist, and the token's two-hour lifetime is what this
+document recommends — which matters because if the operator closes the tab without ending
+the session, nothing else does.
+
+Authorisation lives in `begin_impersonation_session()`, which enforces the `impersonate`
+capability: a developer and a regional manager are both refused there per ROLES.md. The
+route does not re-check, because a second copy would drift and the route is the copy a
+direct call skips.
+
+---
+
 ## Purpose
 
 This document is the operational guide for AfriTech team members who use impersonation to support schools. Where `IMPERSONATION.md` covers the technical implementation, this document covers the practical workflow — when to impersonate, how to start and end a session, what you can and cannot do, what is logged, and what school owners can see about AfriTech access to their data.

@@ -11,6 +11,29 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built as `school_health_scores()`** — a function computing live rather than a stored
+table, so a score can never be stale.
+
+The documented weights are implemented: operational 40%, financial 30%, engagement, with a
+composite and a band. Screen at `/admin/health`.
+
+**Two deviations are recorded in the function's own comments**, which is where they belong:
+
+- Only two of the three operational sub-scores are measurable today, so they are
+  **rescaled from 80 to 100** rather than leaving every school short of the ceiling for a
+  reason that is ZSMS's fault rather than theirs.
+- A school with no fee records **scores 50 rather than 0** on the financial dimension —
+  an unbilled school is unconfigured, not failing, and a zero would put it in the at-risk
+  list for having just been onboarded.
+
+`inputs_available` and `inputs_total` are returned alongside the score, so a dashboard can
+say how much of it is actually measured. That is the honest shape for a composite built on
+partial data.
+
+---
+
 ## Purpose
 
 This document defines the school health scoring system — the composite score calculated nightly for every active school that powers AfriTech's proactive customer success operations. Every Claude Code session building the health score calculation or admin health dashboard must read this document.

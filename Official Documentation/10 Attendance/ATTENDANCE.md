@@ -14,6 +14,32 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The web register is built** — `/school/[code]/attendance`, with the pgTAP suite
+`attendance_register_test` behind it. Marking, editing with a reason, and the audit of who
+changed what all work through `attendance_records` and RLS; there is no RPC, by design.
+
+**The parent view is built** — `/parent/attendance`.
+
+**The mobile app IS built** — and the first version of this status block said it was not,
+having trusted `CLAUDE.md`'s "no mobile screens" line instead of looking. There are 27
+screens: a teacher tab group with the class list and the register marking screen
+(`register/[classId].tsx`), and a parent tab group with its own attendance view.
+
+A teacher can mark a register on a phone, end to end, today.
+
+**Online only, and the screens say so.** `lib/api.ts` returns an `OFFLINE` code and the
+register answers it with "No connection, so nothing was saved. Your marks are still here —
+try again when you have signal." That wording is deliberate: implying the marks were
+stored is the one failure that loses a register.
+
+**Offline capture is deferred by decision, not oversight.** PowerSync is not licensed, so
+the build is online-only until it is — see `OFFLINE_SYNC.md`. The schema is already shaped
+for it: `sync_source` and `local_created_at` exist on every row.
+
+---
+
 ## Purpose
 
 This document defines the complete attendance system — how attendance is marked, by whom, through which interface, what statuses are available, how the school-wide view works, how historical records are accessed, and what rules govern editing past records. Every Claude Code session building any attendance feature must read this document.

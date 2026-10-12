@@ -11,6 +11,30 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built:** the settings shell, school profile, academic structure, pupil fields, terms,
+branding, public profile, AI credits, staff roles, permission grants, connections and API
+keys — each with its own screen under `/school/[code]/settings`.
+
+**Not built: per-school WhatsApp configuration.** The *WhatsApp Configuration* section
+below describes a shared-number default and a bring-your-own-number path taking Meta
+credentials. Neither `schools.whatsapp_phone_number_id` nor
+`schools.whatsapp_access_token_enc` exists, although `ARCHITECTURE.md` refers to both as
+though they do — a documented claim that is false, recorded here rather than left to be
+discovered.
+
+Deliberately not built yet, for a reason worth stating: **neither option can send.** There
+is no Meta Business account, so the shared number does not work either, and
+`FIELD_ENCRYPTION_KEY` is unset so a school's access token could not be stored safely if
+one were offered. A settings screen where both choices are inert is a screen that lies,
+and the same reasoning kept write endpoints out of the API.
+
+The columns and the screen are a small piece of work once a Meta account exists. Doing
+them before would mean shipping a form that collects credentials it cannot keep.
+
+---
+
 ## Purpose
 
 This document defines every school configuration option in ZSMS — what each setting does, where it lives in the UI, which database fields it maps to, and which subscription tier is required. Every Claude Code session building any settings or configuration feature must read this document.

@@ -14,6 +14,23 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built and deliverable as of 2026-10-10.** The chain is complete: the screen at
+`/school/[code]/results` → `/api/school/report-cards` → `worker_report_card_batch()` →
+the PDF renderer in `packages/documents` → R2 → `generated_documents` → a signed URL.
+
+`npm run docs:smoke` proves the whole path: the worker stores a file, the row records it,
+the route signs the recorded path, and the bytes served are byte-identical to the ones
+stored.
+
+**Worth knowing how close this came to never working.** `generated_documents`, the
+report-card worker and the PDF renderer were three correct pieces that met nowhere, so no
+school could produce a report card at all. Found by `npm run gaps`, which exists for
+exactly that failure.
+
+---
+
 ## Purpose
 
 This document defines what a report card contains, how the template system controls its layout, how customisation works at each tier, and how report cards are accessed by different users. Every Claude Code session building report card generation or the template configuration UI must read this document.

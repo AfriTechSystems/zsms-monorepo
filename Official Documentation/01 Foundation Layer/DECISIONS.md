@@ -202,6 +202,9 @@ This document records every significant architectural and product decision made 
 
 ---
 
+
+> **Correction (2026-10-11).** This ADR states that tier-1 native webhooks are "already built" using a `school_webhooks` table. Neither is true and neither ever was: there is no `school_webhooks` table and no outgoing webhook dispatch of any kind. What `0230` built is `school_integrations` — the registry, with `events_subscribed` and `integration_log`. The configuration exists; nothing sends. Dispatch is blocked on `FIELD_ENCRYPTION_KEY`, because a signed webhook needs a signing secret retrievable in plaintext to compute the HMAC. The DECISION stands; only the claim about prior state was wrong.
+
 ## ADR-024 — Dynamic Pricing and Super Admin Overrides
 
 **Status:** Confirmed
@@ -529,6 +532,19 @@ Also: **`reference_subjects_zm` bakes the country into the table name** even tho
 
 ---
 
+**Corrected 2026-10-11, by asking the schema rather than re-reading this ADR.**
+
+- **`term_number` is NOT coupled** and should not have been listed. Every CHECK on it
+  admits 1 to 4, so a country with four terms already works.
+- **`school_subjects.curriculum_type` WAS coupled and was missed.** Same constraint as
+  `reference_subjects_zm`'s, on a table schools write to — so it would have been met
+  sooner and read as a stranger bug.
+
+The live count is **ten** places, not five. `npm run country:check` prints them from the
+schema, so the list cannot go stale the way this paragraph did. The deferral itself stands:
+widening a constraint for a country that does not exist removes a validation ZSMS performs
+for the one that does.
+
 ## ADR-041 — Grading Scale Versioning for Exam Results
 
 **Status:** **Resolved 2026-09-26** — migrations `0106` and `0107`, 20 pgTAP assertions in `grading_scale_versioning_test.sql`.
@@ -660,5 +676,152 @@ by looking rather than by reading.
   latency-bound inside Postgres rather than an HTTP handler — this decision is worth
   revisiting on its own merits. It is not revisited merely because a document names Edge
   Functions.
+
+---
+
+---
+
+## ADR-045 — Session Duration Is One Clerk Setting, Not Fifteen
+
+**Status:** Confirmed (2026-10-11)
+**Decision:** ZSMS sets **one** session lifetime in the Clerk instance, at **7 days**,
+and does not attempt per-role durations in application code. SESSIONS.md's table is
+retained as the **target** policy and marked as such, not as a description of the build.
+
+**Reason:** SESSIONS.md specifies fifteen different durations, from 8 hours for
+`afritech:super_admin` to 30 days for a parent. Clerk configures session lifetime **per
+instance**, not per role or per organisation — so the table is not expressible as
+configuration, and none of it was implemented.
+
+Implementing it in application code would mean ZSMS deciding a session is too old and
+signing the user out itself, on every request, against a `sessions` table it also has to
+maintain. That is a second session system running beside Clerk's, and the failure mode is
+somebody being signed out mid-payment because two clocks disagreed.
+
+**7 days** is chosen because it is the duration SESSIONS.md gives the four roles that use
+ZSMS most — owner, principal, accountant, admin — and because it is shorter than the
+30 days it gives parents, pupils, teachers and alumni. Erring short is the right
+direction: the cost is an occasional extra email OTP, and the benefit is that the
+device-theft exposure window the document reasons about is smaller for everybody, not
+just for the roles it was strictest with.
+
+**What this does NOT weaken.** The AfriTech side has a tighter control than session
+length: `0237` gives each `afritech:*` role only the capabilities ROLES.md grants it, and
+`0238` caps an impersonation actor token at **2 hours** regardless of session age. The
+8-hour super-admin session was a proxy for limiting blast radius; capabilities and
+short-lived actor tokens limit it directly.
+
+Business rule 4 of SESSIONS.md — a payment confirmation must be within 10 minutes — is
+already enforced inside `allocate_payment()` and is unaffected. That is the right pattern
+for anything genuinely time-sensitive: bind the freshness to the **action**, not to the
+session.
+
+**Revisit when:** Clerk offers per-role session lifetimes, or a SOC 2 auditor asks for
+the differentiated table specifically. At that point the honest implementation is Clerk's
+feature, not a parallel session store.
+
+---
+
+## ADR-046 — Pupils and Alumni Share One Portal
+
+**Status:** Confirmed (2026-10-11)
+**Decision:** One portal at `/student` serves both a current pupil (`org:student`) and a
+former one (`platform:alumni`). There is no separate `/alumni` application. Access is
+keyed on `students.clerk_user_id` and **never on the organisation claim**.
+
+**Reason:** AUTH.md describes two login flows and two portals, and the data each needs is
+the same question — *my own records*. The only difference is that an alumnus has left.
+
+Keying on the Clerk id rather than on org membership is what makes one portal possible,
+and it is also what makes ADR-015 true: SESSIONS.md says a graduating pupil has their
+"school org session revoked", so any policy that required an org claim would revoke the
+permanent historical access ADR-015 promises, at exactly the moment it starts to matter.
+
+Two parallel portals and two parallel policy sets would have to be kept in step forever
+to express one idea, and the one that drifts is the one nobody uses daily — which is the
+alumni half, years after anyone remembers writing it.
+
+**Consequences:**
+- The portal reads `my_student_record().out_is_alumnus` and changes its **framing**, not
+  its permissions: a former pupil is told these are their records from while they were
+  there and that they stay available.
+- A live timetable is hidden for an alumnus, because there is not one. Results,
+  attendance and the pupil record remain.
+- `alumni_profiles`, which AUTH.md and DATABASE.md both name, is **not built and should
+  not be**. It would duplicate `students` for people who are already in it. See ADR-015,
+  which reached the same conclusion from the other direction.
+- Fees are not exposed to either. ROLES.md grants a pupil results, timetable and
+  announcements; money is between the school and whoever pays.
+
+---
+
+## ADR-047
+
+**Absence notifications are polled by a worker, not pushed by a database trigger**
+
+- **Status:** Accepted
+- **Date:** 2026-10-11
+- **Supersedes:** the trigger design in `10 Attendance/TRIGGERS.md` → *Trigger 1 —
+  Absence Notification Queue*
+
+### Context
+
+`TRIGGERS.md` specifies a row trigger on `attendance_records` that fires on every absent
+mark and calls `net.http_post()` to a Supabase Edge Function, authenticated with a
+service-role key read from `current_setting('app.supabase_service_key')`. The Edge
+Function then enqueues the real notification job.
+
+`attendance_records.parent_notified` and `.notification_sent_at` have existed since
+`0074` and nothing had ever read or written either, so marking a child absent had never
+told their parent anything.
+
+### Decision
+
+Absences are **polled**, through `worker_due_absence_alerts()` (`0255`) on an hourly
+schedule during the school day, in the same shape as overdue fees
+(`worker_due_fee_reminders`) and scheduled announcements. No trigger, no HTTP call from
+the database, no Edge Function.
+
+`parent_notified` is the idempotency key, and it is set only on a **delivered** alert.
+
+### Rationale
+
+Three independent problems with the trigger design, any one sufficient:
+
+1. **It puts an HTTP call inside the register's transaction.** A teacher marks a class of
+   forty with eight absences, and the INSERT blocks on eight sequential round-trips. If
+   the endpoint is slow the register appears to hang. If it fails there are only two
+   outcomes, and both are wrong: roll back the teacher's attendance because a
+   notification could not be queued, or swallow the error and drop the alert silently.
+   Attendance is the record of record; a notification is a convenience. The convenience
+   must not be able to lose the record.
+
+2. **It requires an Edge Function, and ADR-044 settled that those are superseded.**
+   `supabase/functions/` stays empty deliberately — the Railway workers already do this
+   class of work over BullMQ/Upstash, and adding a second async system to serve one
+   trigger would mean two deployments, two sets of secrets and two things to monitor.
+
+3. **It stores a service-role key in database configuration.** That key bypasses RLS
+   entirely. `ALTER DATABASE ... SET` places it where every SECURITY DEFINER function can
+   read it, in exchange for saving a lookup.
+
+Polling also gives a property the trigger cannot: **a crashed worker retries.** With a
+trigger, the moment of the INSERT is the only chance to send. With a queue, the failure
+mode is a late alert rather than a missing one — and `max_age_days` (`0255`) bounds how
+late, so a week-long outage does not deliver a backlog of archaeology to a parent who
+already saw it all in the portal.
+
+### Consequences
+
+- An absence alert can lag by up to an hour rather than being near-instant. Judged
+  acceptable: a parent cannot act differently on "marked absent six minutes ago" than on
+  "marked absent this morning".
+- Nothing outside `packages/queue` touches BullMQ, and `.from(` remains a defect in
+  `apps/workers`, both unchanged.
+- `TRIGGERS.md`'s *Trigger 2* (`updated_at`) is unaffected and is built. *Trigger 3* was
+  already marked future.
+- The per-school toggle this needs (`school_attendance_alert_settings`) defaults to OFF,
+  because NOTIFICATIONS.md's own arithmetic puts a 400-pupil school at about 80% of the
+  Starter quota spent on absence alerts alone.
 
 ---

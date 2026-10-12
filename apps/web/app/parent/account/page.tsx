@@ -21,6 +21,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { BellRing, Mail, MessageSquare, Phone } from 'lucide-react'
 
 import { Card } from '../../../components/ui/card'
+import {
+  DeparturePromptCard,
+  type DeparturePrompt,
+} from '../../../components/parent/departure-prompt'
 import { useToast } from '../../../components/ui/toast'
 
 interface Prefs {
@@ -32,6 +36,11 @@ interface Prefs {
   serviceMessages?: boolean
   marketing?: boolean
   message?: string
+  /*
+    Present only in the window after a child leaves and before the parent has
+    answered — see `my_departure_prompt()` (0248).
+  */
+  departurePrompt?: DeparturePrompt | null
 }
 
 export default function ParentAccountPage(): JSX.Element {
@@ -97,6 +106,18 @@ export default function ParentAccountPage(): JSX.Element {
 
   return (
     <div className="space-y-stack pb-24">
+      {/*
+        Above everything, because it is a moment rather than a setting — and
+        because a parent who came here to change a phone number should still be
+        asked once, in the place they already are.
+      */}
+      {prefs.departurePrompt ? (
+        <DeparturePromptCard
+          prompt={prefs.departurePrompt}
+          onAnswered={() => setPrefs((p) => (p ? { ...p, departurePrompt: null } : p))}
+        />
+      ) : null}
+
       <header>
         <h1 className="text-xl font-semibold">Your account</h1>
         <p className="mt-1 text-sm text-muted-foreground">

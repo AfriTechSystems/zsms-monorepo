@@ -13,6 +13,18 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built in full, including the editor.** Every field this document names has existed since
+`0070`, with GET and POST from the same migration — only the editing screen was missing,
+which made the whole module read as unbuilt in an earlier audit.
+
+Day/boarding fee lines, mandatory versus optional, per-term and per-grade amounts, and
+generation of `fee_records` at term start all work. Nothing in the path carries a hardcoded
+amount: the structure is the only source of what a pupil owes.
+
+---
+
 ## Purpose
 
 This document defines how schools configure their fee structures — the template that determines what each student owes each term. It covers fee line configuration, day vs boarding fees, mandatory vs optional fees, and how fee records are generated from the structure at term start. Every Claude Code session building the fee configuration UI or fee record generation must read this document.

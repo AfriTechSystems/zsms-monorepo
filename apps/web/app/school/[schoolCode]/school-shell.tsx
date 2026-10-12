@@ -23,6 +23,7 @@
 
 import type { JSX, ReactNode } from 'react'
 import {
+  BellRing,
   CalendarCheck,
   CalendarDays,
   CalendarRange,
@@ -31,7 +32,10 @@ import {
   Coins,
   FileSpreadsheet,
   Globe,
+  FileText,
   GraduationCap,
+  Inbox,
+  KeyRound,
   LayoutDashboard,
   ListChecks,
   Megaphone,
@@ -139,6 +143,23 @@ export function SchoolShell({
       label: 'Communication',
       items: [
         { path: '/announcements', label: 'Announcements', icon: Megaphone },
+        /*
+          Message log (MESSAGE_LOG.md).
+
+          Beside Announcements because it answers the question an announcement raises:
+          did it arrive.
+
+          `fees:read` and not `settings:write`, because its holders are EXACTLY the four
+          roles `school_management_read_message_log` admits after `0257` — owner,
+          principal, administrator, accountant. A link gated on a different set than the
+          policy would either hide a readable page or show an empty one.
+
+          The first draft wrote `settings:read`, which does not exist in the matrix.
+          `can()` returns false for an unknown key, so the row would have silently
+          vanished for everybody — the exact failure `zsms-feature` warns about, caught
+          by grepping the keys rather than trusting the name.
+        */
+        { path: '/messages', label: 'Message log', icon: Inbox, needs: 'fees:read' },
       ],
     },
     {
@@ -187,7 +208,41 @@ export function SchoolShell({
           the right way round: the gate is the policy, and this only keeps the nav
           roughly honest.
         */
+        /*
+          Grading scales (GRADING.md, ADR-041).
+
+          `revise_grading_scale()` existed since `0141` with the whole versioning
+          apparatus and a 20-assertion suite behind it, and nothing called it — a school
+          could not change its own grade boundaries through any surface.
+
+          `settings:write` gates the link; the function is narrower.
+        */
+        { path: '/settings/grading', label: 'Grading scales', icon: GraduationCap, needs: 'settings:write' },
+        /*
+          Report cards and documents (CUSTOMISATION.md, TEMPLATE_SYSTEM.md).
+
+          Beside Grading scales because the two together decide what a report card
+          says: the scale decides the grade, this decides whether the card shows a
+          position, an average, or the principal's words.
+
+          `settings:write` gates the link; `set_document_template()` and
+          `set_school_branding_colours()` are narrower — owner and principal only,
+          because what a report card says about a child is the head's responsibility.
+        */
+        { path: '/settings/documents', label: 'Report cards & documents', icon: FileText, needs: 'settings:write' },
         { path: '/settings/roles', label: 'Staff roles', icon: ShieldCheck, needs: 'settings:write' },
+        /*
+          Permission grants (PERMISSIONS.md).
+
+          Beside Staff roles because they answer two halves of one question: a role is
+          what somebody does permanently, a grant is what they may do for three weeks
+          while a colleague is on leave.
+
+          `settings:write` gates the link; the POLICY and `grant_staff_permission()`
+          are narrower still — owner and principal only, and a principal cannot grant
+          financial write because they do not hold it themselves.
+        */
+        { path: '/settings/permissions', label: 'Permission grants', icon: KeyRound, needs: 'settings:write' },
         /*
           Accounting and CRM connections (ADR-023).
 
@@ -197,10 +252,41 @@ export function SchoolShell({
           actually does it.
         */
         { path: '/settings/integrations', label: 'Connections', icon: Plug, needs: 'fees:write' },
+        /*
+          API keys (API_INTEGRATION.md).
+
+          Beside Connections because they are the two halves of integrating: a
+          connection is ZSMS pushing out, a key is another system reading in.
+
+          `settings:write` gates the link and the POLICY is narrower — `org:owner`
+          alone, not even the principal, because a key acts as the school with nobody's
+          name attached.
+        */
+        { path: '/settings/api-keys', label: 'API keys', icon: KeyRound, needs: 'settings:write' },
         // Outward-facing rather than internal configuration, and the only settings row a
         // parent ever sees the result of. Kept beside the others because that is where a head
         // teacher looks for it, not because it is the same kind of thing.
         { path: '/settings/public-profile', label: 'Public listing', icon: Globe },
+        /*
+          Fee reminders (REMINDERS.md).
+
+          `fees:write` rather than `settings:write`, because the POLICY and
+          `set_reminder_settings()` admit the accountant alongside the owner and
+          principal — deciding when to chase a parent is the bursar's job, and gating
+          the link to leadership alone would hide it from the person who does it.
+        */
+        { path: '/settings/reminders', label: 'Fee reminders', icon: BellRing, needs: 'fees:write' },
+        /*
+          Attendance alerts (TRIGGERS.md, NOTIFICATIONS.md Channel 3).
+
+          Beside fee reminders because they are the same decision twice: which events
+          are worth spending the school's message quota on.
+
+          `settings:write` rather than `attendance:write` — a teacher marks a register,
+          but turning this on commits the school's quota for the term, and
+          `set_attendance_alerts()` admits only the owner and principal.
+        */
+        { path: '/settings/attendance-alerts', label: 'Attendance alerts', icon: CalendarCheck, needs: 'settings:write' },
         { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
         // `fees:read` to see, `fees:write` to buy — gated in the route, not here. Buying
         // credits spends the school's money, so it sits with the bursar's permissions

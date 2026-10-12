@@ -66,6 +66,30 @@ const CALLED_BY_POSTGRES = [
  * ------------------------------------------------------------------------- */
 const ACCEPTED = new Map([
   /*
+    Called by other SQL, not by application source.
+
+    `afritech_role()` is consulted by `has_afritech_capability()` and by every
+    `admin_*` function gated on a capability; `afritech_school_in_scope()` is for
+    policies and for the scoping work `ROLES.md` describes. A source grep sees neither,
+    and making the route call them directly would duplicate a decision the database
+    already makes.
+  */
+  ['afritech_role', 'called by has_afritech_capability() and the admin_* gates (0237)'],
+  ['afritech_school_in_scope', 'policy and scope helper, called from SQL (0237)'],
+  /*
+    A BEFORE trigger on `parents`, stamping `marketing_opt_in_at` when consent moves.
+    The catalogue knows about the trigger; a grep cannot.
+  */
+  ['stamp_marketing_consent', 'trigger function on parents (0229)'],
+  /*
+    A diagnostic called by `tenant_isolation_test`, not by application source.
+
+    It exists to assert that no table has policies nobody was granted the privilege to
+    exercise — the defect this repository shipped seven times (`0234`). A source grep
+    cannot see a pgTAP suite.
+  */
+  ['tables_with_dead_policies', 'asserted by tenant_isolation_test (0234)'],
+  /*
     A trigger function. Called by `a_assign_payment_references_on_insert_on_payments`
     and the matching update trigger (`0211`) — the catalogue knows about those and a
     source grep cannot.
@@ -118,6 +142,18 @@ const ACCEPTED = new Map([
 ])
 
 const ACCEPTED_ROUTES = new Map([
+  /*
+    A webhook has no screen BY DEFINITION — Clerk calls it, not a person. It is
+    reachable in the only sense that matters: Clerk is configured to POST to it, and
+    `webhook_events` records every delivery so "did it arrive" is answerable.
+
+    Listed rather than left as a warning, because the next webhook will be too and a
+    standing warning is one nobody reads.
+  */
+  // Keyed relative to `apps/web/app/api`, without the `/api` prefix — see how
+  // `routes` is built below. A full path here matches nothing and the entry is
+  // silently ignored, which is how an exception becomes a standing warning.
+  ['webhooks/clerk', 'inbound webhook — called by Clerk, never by a screen (ADR-044)'],
   // A SECOND implementation of marking a notice read. The parent portal uses
   // `POST /api/parent/notices`, which inserts the same `announcement_reads` row —
   // verified on 2026-10-02 after this script's own listing led to the wrong

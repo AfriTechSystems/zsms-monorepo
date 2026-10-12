@@ -19,6 +19,7 @@ import { Suspense } from 'react'
 
 import { SessionProvider } from '@zsms/auth-provider/react'
 import { PageViews } from '../components/analytics/page-views'
+import { ImpersonationBanner } from '../components/impersonation-banner'
 
 import { platformTheme, ThemeStyle } from '../lib/theme'
 import { ToastProvider } from '../components/ui/toast'
@@ -87,6 +88,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {/* Mounted at the root so any screen can confirm an action without
               each one rendering its own strip — and so the strip is in the same
               place on every page, which is the point of a toast. */}
+          {/*
+            The impersonation banner, above everything.
+
+            In the ROOT layout rather than per shell, because an operator inside a
+            customer's session can be on any screen in any portal — including ones
+            written before impersonation existed. A page that looks ordinary while
+            somebody is acting as somebody else is the whole risk.
+
+            It renders nothing for an ordinary session.
+          */}
+          <ImpersonationBanner />
+
           {/*
             Page views, once for the whole application.
 

@@ -11,6 +11,38 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built.** `apps/web/lib/rate-limit.ts`, applied in middleware ahead of authentication,
+with the categories below rather than a single band.
+
+| Policy | Limit | Covers |
+|---|---|---|
+| enumeration | 10/min | registration, join requests, school-link, lookups |
+| bulk | 5/min | import, export, report cards, curriculum extraction |
+| communication | 10/min | announcements and messages |
+| financial | 20/min | payments and fees |
+| expensive | 30/min | the assistant, Hub resources, documents |
+| admin | 200/min | `/api/admin/*` |
+| api | 120/min | everything else |
+
+`/api/health` is exempt — rate-limiting the health check means the monitor reports an
+outage caused by the monitor.
+
+**Per-key limits are enforced too.** `school_api_keys.rate_limit_rpm` (`0241`) was stored
+and consulted by nothing until 2026-10-11; `checkApiKeyRate()` now applies it. Both
+limits run: the IP policy catches a flood, the key limit catches one integration looping.
+
+**Fails open.** An unreachable Redis allows the request, because a limiter that fails
+closed turns a cache outage into a school unable to take a register. The honest cost is
+that a Redis outage is also an open window.
+
+**Not built:** the Clerk-side OTP limits in the *Authentication* table. Those are Clerk
+instance settings, not ZSMS code, and belong with the other undocumented instance
+configuration in `CLERK.md`.
+
+---
+
 ## Purpose
 
 This document defines all rate limiting rules across the ZSMS API layer. Rate limiting operates at multiple levels — per IP for public routes, per user session for authenticated routes, per API key for external integrations, and per school for WhatsApp messaging. Claude Code reads this before implementing any new endpoint to apply the correct rate limiting tier.

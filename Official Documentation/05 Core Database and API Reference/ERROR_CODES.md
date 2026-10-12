@@ -9,6 +9,33 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**This document defines 36 codes; the API envelope admits nine.**
+
+That is deliberate, and the split is worth stating. The envelope's `code` is the
+*category* a client branches on, and a client branching on thirty-six values breaks when
+a thirty-seventh arrives. The six HTTP-shaped ones —
+`VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `SERVER_ERROR`
+— cover nearly everything.
+
+Three more were added on 2026-10-11 because code in this repository was already returning
+them on the wire, and a type that does not admit what it sends is a type disagreeing with
+reality:
+
+- `RATE_LIMITED` (429) — returned by the middleware limiter and by the per-key limiter.
+- `INSUFFICIENT_SCOPE` (403) — returned by `/api/v1/`. Actionable where `FORBIDDEN` is
+  not: it tells an integrator *which scope* to ask for rather than to ask their school
+  for access they may already have.
+- `API_KEY_INVALID` (401) — one answer for a missing, malformed, revoked or expired key,
+  so a prober learns nothing about which keys are real.
+
+**The remaining 27 are domain codes and belong in the message or in `details`**, not in
+the envelope's `code`. `DUPLICATE_STUDENT` and `FEE_ALREADY_PAID` tell a human what went
+wrong; `CONFLICT` tells a client what to do about it, and both can travel together.
+
+---
+
 ## Purpose
 
 This document defines every error code used across the ZSMS API layer. All errors follow a consistent shape. Claude Code reads this before implementing any error handling to ensure consistent codes, messages, and HTTP status codes across all endpoints and Edge Functions.

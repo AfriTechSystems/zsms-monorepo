@@ -10,6 +10,21 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Code complete, never executed.** SMS is the fallback below WhatsApp in
+`sendWithFallback()`, and there are **no Twilio credentials**, so it has never run.
+
+Worth stating plainly because this document positions SMS as the reliable floor: in
+Zambia it is the channel that reaches a parent with no smartphone and no data. Today that
+parent is reached by **nothing at all** — the in-app badge needs the portal, and the
+portal needs a smartphone.
+
+That makes Twilio credentials a launch prerequisite rather than an enhancement, in the
+same way a paid Clerk plan is.
+
+---
+
 ## Purpose
 
 This document defines SMS's narrow role in ZSMS as a last-resort fallback channel. It is intentionally brief — SMS is deliberately minimal in Phase 1 to control costs. Every Claude Code session that touches SMS must read this document to ensure SMS is never used as a primary channel.

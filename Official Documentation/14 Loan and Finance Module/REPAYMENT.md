@@ -11,6 +11,38 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Phase 1 is now actually built. It was the one thing in this folder that was not.**
+
+Phase 1, as this document defines it, is entirely *"surfacing the lender's collection
+details prominently, showing the repayment schedule clearly"*. ZSMS moves no money.
+
+The route had been returning `collectionAccount` and `repaymentSchedule` all along and
+**the screen rendered neither** — it showed `collection_instructions` and stopped. With
+the one seeded lender, that produced "How to repay: Airtel Money" and nothing else: a
+parent with a debt, a channel name, and no way to pay it. Worse than an empty screen,
+because it reads as an answer.
+
+Now rendered: the mobile money number or bank account, the branch, the parent's own
+reference (every lender's instructions say to quote it, and an unidentified repayment is
+the one that goes missing), and the instalment table.
+
+**`0260` makes the underlying state impossible.** An active lender must now have a
+`collection_account` carrying at least one route for money — a mobile number, a paybill or
+an account number. A bank *name* alone is refused, because a row that looks populated is
+the one nobody checks. The seeded lender was deactivated rather than given invented
+details: writing a plausible Airtel number against a real company would put fabricated
+payment details in front of a parent about to send money, which is the most harmful thing
+a seed could do in this module.
+
+**Phase 2 and 3 are correctly not built.** Phase 2 needs a payment gateway, which the
+platform does not have in any form. `loan_repayment_log` belongs there, and the schedule's
+`status` and `paid_at` fields are written by the lender webhook — which needs a lender
+agreement before it needs code.
+
+---
+
 ## Purpose
 
 This document defines how loan repayments are tracked, how the repayment UX works in the parent portal, how parents can initiate repayments through ZSMS, and how the repayment collection model evolves across the three phases. Every Claude Code session building any repayment feature must read this document.

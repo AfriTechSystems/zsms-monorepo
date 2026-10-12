@@ -10,6 +10,39 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**All six steps are now reachable. Two were not until today.**
+
+| Step | State |
+|---|---|
+| 1 — logo | Built, on the school profile screen. `worker_school_branding()` reads `COALESCE(branding.logo_url, schools.logo_url)`, so that one field already reaches every PDF |
+| 2 — colours | **Columns existed since `0092` with WCAG contrast CHECKs and nothing could set them.** Now `set_school_branding_colours()` (`0259`) |
+| 3 — layout variant | Built (`0258`), tier-gated on `custom_document_layouts` |
+| 4 — report card content | Built (`0258`) |
+| 5 — principal's comment | Built (`0258`), keyed per term |
+| 6 — parent acknowledgement | Built (`0258`), rendered as a tear-off slip |
+
+Screen at Settings → Report cards & documents.
+
+**Step 2 is the one worth dwelling on.** Both colour columns carry a
+`wcag_contrast_ratio()` CHECK, so a school *physically cannot* set a brand colour too
+pale to read on a report card a parent has to hold. That is a genuinely good constraint
+that existed for over a year with no way in. `0259` deliberately does not restate the
+threshold — two copies of "is this readable" is two answers, and the copy in a function
+is the one that drifts from the one the database enforces.
+
+**The tier gate resolves on read as well as on write.** A school that downgrades keeps
+its row and the variant resolves to NULL, so the renderer falls back. Blocking the render
+instead would turn a billing change into "no report cards", which is far worse than a
+plainer layout.
+
+**The logo is deliberately NOT on this screen**, though this document groups it here. It
+is edited on the school profile, and a second editor for the same picture would be two
+copies of one decision — the unused one drifts.
+
+---
+
 ## Purpose
 
 This document is the school-facing practical guide to customising report cards, receipts, and other ZSMS documents. Written for school owners and principals — not developers. No technical knowledge required. Every Claude Code session building the template configuration UI must use this document to ensure the UI matches the guidance given here.

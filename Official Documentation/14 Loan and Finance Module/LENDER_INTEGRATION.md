@@ -12,6 +12,31 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The lender registry is built and AfriTech can onboard one** — `/admin/lenders`, with
+`afritech_manages_lenders` as the only write policy and `anyone_reads_active_lenders`
+exposing just the active rows.
+
+Every field this document specifies exists, including `commission_rate`,
+`commission_terms` and `afritech.loan_commissions` for what AfriTech earns.
+
+**`0260` adds a constraint this document implies but never states**: an **active** lender
+must have a `collection_account` with at least one route for money. Phase 1 of
+`REPAYMENT.md` is entirely "show the collection details", so an active lender without them
+hands a parent a debt and no way to pay it. The seeded lender was in exactly that state.
+
+**Not built: the inbound lender webhook.** It is what writes `lender_reference`,
+`disbursed_at`, and the schedule's `status` and `paid_at` — so until it exists, a
+disbursement and every repayment have to be recorded by hand. ADR-044 settles that it is a
+Next.js route under `app/api/webhooks/`, and `webhook_events` (`0243`) already holds the
+idempotency table keyed on the provider's own event id.
+
+It is blocked on a lender agreement rather than on engineering: there is no endpoint to
+verify signatures against and no secret to verify with.
+
+---
+
 ## Purpose
 
 This document defines how lenders are onboarded onto the ZSMS platform and how integration works across the three phases of the loan module — email intake, API integration, and in-house ZSMS lending. Every Claude Code session building lender management or application dispatch features must read this document.

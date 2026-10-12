@@ -11,6 +11,22 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built as `calculate_behaviour_score()`**, and the score is stored on the application
+alongside `behaviour_score_breakdown` — the breakdown, not just the number.
+
+That matters and is worth keeping: this document gives a parent the right to understand
+their score, and `/parent/loans` shows every category and its weight rather than a bare
+figure. A credit-shaped number a parent cannot interrogate is the thing this section
+exists to prevent.
+
+The score is recorded **at the time of application** rather than recomputed on read, so a
+declined application still explains itself months later against the score the lender
+actually saw.
+
+---
+
 ## Purpose
 
 This document defines the complete payment behaviour score — its factors, weighting, calculation algorithm, score bands, how it is presented to parents and lenders, and the ethical constraints governing its use. Every Claude Code session implementing or modifying the score algorithm must read this document in full.

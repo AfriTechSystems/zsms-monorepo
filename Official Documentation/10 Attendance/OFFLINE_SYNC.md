@@ -11,6 +11,23 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Deferred by decision.** PowerSync is not licensed, so attendance is online-only. This is
+a commercial decision rather than a technical obstacle, and ADR-004's offline-first
+commitment stands for when it is.
+
+**The schema is already shaped for it**, which is why this can be added without a
+migration against live attendance data: `attendance_records.sync_source` (defaulting to
+`'web'`) and `.local_created_at` both exist, and last-write-wins with server authority is
+the documented conflict rule.
+
+**What will need building when PowerSync is licensed:** the mobile screens (none exist),
+the sync rules, and the conflict surface a teacher sees when their offline mark loses to a
+server one. Nothing here is blocked on a decision that has not been made.
+
+---
+
 ## Purpose
 
 This document is the deep reference for offline attendance sync — how PowerSync enables marking attendance without internet, what data lives on the teacher's device, how sync works when connectivity returns, how conflicts are resolved, and the edge cases that arise from offline-first design. Every Claude Code session building the mobile attendance feature must read this document alongside `docs/infra/POWERSYNC.md`.

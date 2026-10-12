@@ -12,6 +12,29 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Partially verifiable today; the rest needs a staging environment.**
+
+What holds now:
+
+- **Indexes exist** for the access paths that matter — `idx_teacher_assignments_*`,
+  `idx_document_templates_school`, the partial `idx_one_class_teacher_per_class` (`0250`),
+  and `INDEXES.md`'s set applied from `0001` onward.
+- **`npm run build` passes** and the bundle is produced on every CI run.
+- **PostHog is configured with autocapture, input capture and session recording all OFF**,
+  which is both a compliance requirement and a performance one: the DOM of a ZSMS screen
+  is a class register with children's names on it.
+
+**Known and unaddressed**, carried from `LOAD_TESTING.md`: the per-feature RPC fan-out on
+the school detail screen.
+
+**Not measurable without staging:** cold-start latency, p95 response times, and anything
+about real Zambian network conditions — which is the number that actually matters for a
+school on a 3G connection, and which no amount of local benchmarking will produce.
+
+---
+
 ## Purpose
 
 This document defines the performance targets for every critical ZSMS operation and the steps to verify they are met before launch. Every target here is tied to a real user experience — a slow operation causes a specific user to wait or abandon. Every Claude Code session that introduces a new database query should consider whether it hits an indexed path and whether it meets the target for its category.

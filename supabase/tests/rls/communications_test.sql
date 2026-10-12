@@ -28,7 +28,7 @@ BEGIN;
 -- `extensions` is appended only so the assertion functions are found.
 SET search_path TO public, extensions;
 
-SELECT plan(47);
+SELECT plan(50);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
@@ -67,6 +67,8 @@ CREATE OR REPLACE FUNCTION pg_temp.owner_b() RETURNS JSONB LANGUAGE SQL AS $$
   SELECT '{"sub":"user_owner_b","o":{"id":"org_school_b","slg":"beta-school","rol":"org:owner"}}'::JSONB; $$;
 CREATE OR REPLACE FUNCTION pg_temp.teacher_a() RETURNS JSONB LANGUAGE SQL AS $$
   SELECT '{"sub":"user_teacher_a","o":{"id":"org_school_a","slg":"alpha-academy","rol":"org:teacher"}}'::JSONB; $$;
+CREATE OR REPLACE FUNCTION pg_temp.accountant_a() RETURNS JSONB LANGUAGE SQL AS $$
+  SELECT '{"sub":"user_accountant_a","o":{"id":"org_school_a","slg":"alpha-academy","rol":"org:accountant"}}'::JSONB; $$;
 CREATE OR REPLACE FUNCTION pg_temp.parent_a() RETURNS JSONB LANGUAGE SQL AS $$
   SELECT '{"sub":"user_parent_a","o":{"id":"org_school_a","slg":"alpha-academy","rol":"org:parent"}}'::JSONB; $$;
 CREATE OR REPLACE FUNCTION pg_temp.parent_b() RETURNS JSONB LANGUAGE SQL AS $$
@@ -290,6 +292,44 @@ SELECT pg_temp.act_as(pg_temp.teacher_a());
 -- A teacher can mark attendance; message history is management's view.
 SELECT is((SELECT count(*)::INT FROM public.message_log), 0,
   'ATTACK a teacher cannot read the school message log');
+
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.act_as(pg_temp.accountant_a());
+
+/*
+  `0257` widened `school_management_read_message_log` to admit the accountant.
+
+  MESSAGE_LOG.md always said they could read it, and they are the person who most
+  needs to: every fee reminder in this log is theirs to answer for, so a parent
+  claiming they were never told is their question, not the principal's.
+
+  The migration could only assert that the policy TEXT admits the role — a
+  migration runs as a role RLS does not apply to, and two attempts to switch role
+  inside it left the role switched when the block ended, breaking the CLI's own
+  migration-history INSERT. Behaviour is asserted here, where the harness is built
+  to switch identity and CI runs it against a database built from nothing.
+*/
+SELECT is((SELECT count(*)::INT FROM public.message_log
+           WHERE school_id = '11111111-1111-1111-1111-111111111111'),
+  1,
+  'the accountant can read their own school''s message log (0257)');
+
+SELECT is((SELECT count(*)::INT FROM public.message_log
+           WHERE school_id = '22222222-2222-2222-2222-222222222222'),
+  0,
+  'ATTACK the accountant cannot read school B''s message log'
+);
+
+-- Widening a policy must not widen what it writes. Delivery records are the
+-- provider's word, not a user's.
+SELECT is(
+  (SELECT count(*)::INT FROM information_schema.role_table_grants
+   WHERE table_schema='public' AND table_name='message_log'
+     AND grantee='authenticated' AND privilege_type IN ('INSERT','UPDATE')),
+  0,
+  'the accountant still cannot forge or alter a delivery record'
+);
 
 RESET ROLE;
 SET LOCAL ROLE authenticated;

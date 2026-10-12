@@ -13,6 +13,31 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Live as of 2026-10-10 and verified.** `npm run r2:smoke` runs 14 checks against the
+real service: both buckets accept, serve, sign and delete.
+
+The two-bucket split is real and enforced in `packages/storage`: the private bucket is
+**only ever** served through a signed URL, and the client's own comment records that
+public-object settings are ignored for it by design.
+
+**This was the largest configuration blocker in the tree.** Before R2 credentials existed,
+report cards and receipts generated correctly and could not be delivered — the renderer
+worked, the worker worked, and the bytes had nowhere to go.
+
+**Not built:** the R2 lifecycle policy. Objects are never expired, so a school's documents
+accumulate indefinitely. That is the safe direction, and this document's retention schedule
+needs a decision about what a departed pupil's report cards are — `COMPLIANCE.md` makes
+them a ZDPA retention question rather than a storage-cost one, so it wants a deliberate
+answer rather than a bucket rule.
+
+**Alumni access to historical documents** is supported in principle by `0239`, which keys
+a pupil's access on `students.clerk_user_id` rather than on an organisation claim — which
+is exactly what lets a graduated pupil keep reading their own records.
+
+---
+
 ## Purpose
 
 This document is the complete storage reference for every file ZSMS generates, receives, or stores — where it lives, how it is named, who can access it, how long signed URLs last, and what happens to files over time. Every Claude Code session building any feature that reads or writes files must read this document before choosing a storage path or URL expiry.

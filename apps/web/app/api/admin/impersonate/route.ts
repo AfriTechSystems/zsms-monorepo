@@ -46,7 +46,8 @@ import { z } from 'zod'
 
 import { createUserClient } from '../../../../lib/supabase'
 import { resolveAdminContext } from '../../../../lib/admin-context'
-import { fail, guard, validationFailed } from '../../../../lib/api-response'
+import { createActorToken, revokeActorToken } from '@zsms/auth-provider/impersonation'
+import { fail, guard, ok, validationFailed } from '../../../../lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,11 +82,64 @@ export async function POST(request: NextRequest): Promise<Response> {
     const parsed = schema.safeParse(body)
     if (!parsed.success) return validationFailed(parsed.error)
 
-    return fail(
-      'SERVER_ERROR',
-      'Impersonation is not available yet: it requires Clerk actor tokens, which ' +
-        'packages/auth-provider does not yet mint and this environment has no ' +
-        'credentials for. Nothing was started and nothing was recorded.',
-    )
+    /*
+      Mint FIRST, record SECOND, and undo the mint if recording is refused.
+
+      The order matters. If the row were written first and the mint then failed, the
+      trail would claim a session that never happened. This way the only failure mode
+      is a token that exists for a moment and is revoked before anyone can redeem it.
+    */
+    let token
+    try {
+      token = await createActorToken({
+        targetUserId: parsed.data.targetUserId,
+        actorUserId: admin.userId,
+      })
+    } catch (error) {
+      /*
+        The common cause is `CLERK_SECRET_KEY` being unset, and saying so is more
+        useful than "something went wrong" — this is the one failure an operator can
+        actually fix.
+      */
+      return fail(
+        'SERVER_ERROR',
+        error instanceof Error && error.message.includes('CLERK_SECRET_KEY')
+          ? error.message
+          : 'Clerk refused to mint an impersonation token. Nothing was started.',
+      )
+    }
+
+    /*
+      `begin_impersonation_session()` enforces the `impersonate` capability — a
+      developer and a regional manager are both refused there, per ROLES.md. It is not
+      re-checked here: a second copy would drift, and this is the copy a direct call
+      skips.
+    */
+    const { data, error } = await client.rpc('begin_impersonation_session', {
+      p_target_user_id: parsed.data.targetUserId,
+      p_reason: parsed.data.reason,
+      p_ticket_ref: parsed.data.ticketRef ?? null,
+      p_actor_token_id: token.id,
+      p_expires_at: token.expiresAt.toISOString(),
+      p_target_school_id: null,
+    })
+
+    if (error) {
+      // Leave no usable ticket behind for a session the database refused.
+      await revokeActorToken(token.id).catch(() => undefined)
+
+      if (error.code === '42501') return fail('FORBIDDEN', error.message)
+      if (error.code === '22023') return fail('VALIDATION_ERROR', error.message)
+      return fail('SERVER_ERROR', 'The session could not be recorded, so it was not started.')
+    }
+
+    return ok({
+      sessionId: data as string,
+      url: token.url,
+      expiresAt: token.expiresAt.toISOString(),
+      message:
+        'Open the link in a new tab. Everything you do there is recorded against your ' +
+        'own name, not theirs.',
+    })
   })
 }

@@ -107,6 +107,61 @@ export interface ReportCardData {
   attendancePresent?: number
   attendanceTotal?: number
   classTeacherName?: string
+  /**
+   * The principal's words for THIS term, resolved by the caller from
+   * `document_templates.template_config -> principal_comments -> "YEAR-TERM"`.
+   *
+   * Resolved outside the renderer on purpose: the renderer should not know that
+   * comments are stored per term, only that it was given one or was not.
+   */
+  principalComment?: string | null
+  /**
+   * What this school chose to show (CUSTOMISATION.md step 4, `0258`).
+   *
+   * Every field defaults to SHOWN when absent, so a school with no configuration —
+   * which is every school until it opens that screen — gets exactly the card it got
+   * before this existed. A default of hidden would silently strip information from
+   * every report card in the system on deploy.
+   */
+  options?: {
+    showPosition?: boolean
+    showClassAverage?: boolean
+    showAttendance?: boolean
+    showComments?: boolean
+    acknowledgementRequired?: boolean
+  }
+}
+
+/**
+ * A transfer letter — the one physical artefact a transfer produces.
+ *
+ * `TRANSFER.md` → *Transfer Letter Contents*. The receiving school commonly asks for
+ * it, so the fields below are not decoration: a letter missing the enrolment date or
+ * the final grade is a letter the family has to come back for.
+ */
+export interface TransferLetterData {
+  school: SchoolBranding
+  /** The Ministry of Education registration number, which gives the letter standing. */
+  ministryRegistrationNumber?: string | null
+
+  studentName: string
+  studentCode: string
+
+  enrolledOn: string
+  transferredOn: string
+  /** The last grade the pupil completed here, not the one they were heading into. */
+  finalGradeLevel: string
+
+  /** `transferred` or `withdrawn` — the letter says which, because they differ. */
+  kind: 'transferred' | 'withdrawn'
+  /** Where they have gone, when the school knows. */
+  destination?: string | null
+
+  /** For the signature line. */
+  principalName?: string | null
+
+  /** The reference somebody can quote when querying the letter later. */
+  transferReference: string
 }
 
 export interface RenderedDocument {

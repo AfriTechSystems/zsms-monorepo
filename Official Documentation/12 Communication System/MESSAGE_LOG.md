@@ -12,6 +12,36 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The table and the writer were built; the screen was not. Now it is.**
+
+`message_log` holds the full lifecycle this document specifies — queued → sent →
+delivered → read → failed, with `failure_reason`, `retry_count`, `is_fallback` /
+`fallback_of_id`, and `consumed_quota`. `record_message_dispatch()` writes it. Nothing
+could read it.
+
+Screen at Communication → Message log.
+
+**The accountant was missing from the policy (`0257`).** This document has always said
+"school admins, **accountants**, and principals can view their school's message history",
+and `school_management_read_message_log` admitted only the first and last two. They are
+the person who most needs it: every fee reminder in the log is theirs to answer for, so a
+parent claiming they were never told is their question rather than the principal's.
+
+**The banner is the most important thing on that screen.** Every channel runs through the
+mock provider — no Meta, Twilio or Resend credentials exist — so **nothing has left the
+machine**. A log listing rows as "sent" without saying so would read as proof of delivery,
+which is the most misleading thing this product could show a school chasing an unpaid fee.
+The route reports it from the environment, so the banner disappears when credentials are
+configured rather than a deployment later.
+
+**Read-only, structurally.** `authenticated` holds SELECT and nothing else, and the pgTAP
+suite asserts no end-user role can INSERT or UPDATE: a delivery record is the provider's
+word about what happened, not a user's.
+
+---
+
 ## Purpose
 
 This document defines the message log — the append-only record of every outbound message sent from ZSMS. Covers what is stored, how delivery status updates work, how the log is queried by school admins, and retention policy. Every Claude Code session writing any message dispatch code must ensure a message_log row is created.

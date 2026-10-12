@@ -16,8 +16,15 @@
 
 import { createWorker } from '@zsms/queue'
 import { createWorkerDeps, workerDb } from './db'
+import { runAbsenceAlerts } from './handlers/absence-alerts'
+import { registerRecurringJobs } from './schedule'
 import { handlePaymentVerified } from './handlers/payment-verified'
 import { handleFeeReminders, type DueReminder } from './handlers/fee-reminders'
+import { handleExpireTrials, type ExpiredTrial } from './handlers/expire-trials'
+import {
+  handleTransferLetter,
+  type TransferLetterContext,
+} from './handlers/transfer-letter'
 import {
   handleScheduledAnnouncements,
   type AnnouncementRecipient,
@@ -36,6 +43,53 @@ import type { SchoolBranding } from '@zsms/documents'
 // Do not replace one of these with a direct table query.
 // ---------------------------------------------------------------------------
 
+function absenceAlertDeps() {
+  const db = workerDb()
+  const { dispatch } = createWorkerDeps()
+
+  return {
+    async loadDueAlerts(input: { schoolId?: string; limit: number }) {
+      /*
+        `.from(` is a defect in this package (ADR-042) — the service role bypasses
+        RLS, so every read goes through a `worker_*` function with its own tenant
+        handling.
+      */
+      const { data, error } = await db.rpc('worker_due_absence_alerts', {
+        p_school_id: input.schoolId ?? null,
+        p_limit: input.limit,
+      })
+      if (error) throw new Error(`Loading due absence alerts failed: ${error.message}`)
+
+      return (data ?? []).map((r: Record<string, unknown>) => ({
+        recordId: r['out_record_id'] as string,
+        schoolId: r['out_school_id'] as string,
+        schoolName: r['out_school_name'] as string,
+        studentId: r['out_student_id'] as string,
+        studentName: r['out_student_name'] as string,
+        classId: r['out_class_id'] as string,
+        attendanceDate: r['out_attendance_date'] as string,
+        status: r['out_status'] as string,
+        parentUserId: (r['out_parent_user_id'] as string) ?? null,
+        parentName: r['out_parent_name'] as string,
+        parentPhone: (r['out_parent_phone'] as string) ?? null,
+        parentEmail: (r['out_parent_email'] as string) ?? null,
+        viaWhatsapp: Boolean(r['out_via_whatsapp']),
+        viaEmail: Boolean(r['out_via_email']),
+        viaPush: Boolean(r['out_via_push']),
+      }))
+    },
+
+    async markAlerted(recordId: string): Promise<void> {
+      const { error } = await db.rpc('worker_mark_absence_alerted', {
+        p_record_id: recordId,
+      })
+      if (error) throw new Error(`Marking absence alerted failed: ${error.message}`)
+    },
+
+    dispatch,
+  }
+}
+
 function feeReminderDeps() {
   const db = workerDb()
   const { dispatch } = createWorkerDeps()
@@ -43,14 +97,16 @@ function feeReminderDeps() {
   return {
     async loadDueReminders(input: {
       schoolId?: string
-      minDaysOverdue: number
-      cooldownDays: number
       limit: number
     }): Promise<DueReminder[]> {
+      /*
+        No thresholds passed. `0252` resolves them per school from
+        `school_fee_reminder_settings`, so there is nowhere left for a constant
+        to hide — this used to send `?? 3` and `?? 7`, which decided when every
+        school in Zambia chased a parent for money.
+      */
       const { data, error } = await db.rpc('worker_due_fee_reminders', {
         p_school_id: input.schoolId ?? null,
-        p_min_days_overdue: input.minDaysOverdue,
-        p_cooldown_days: input.cooldownDays,
         p_limit: input.limit,
       })
       if (error) throw new Error(`Loading due reminders failed: ${error.message}`)
@@ -68,6 +124,12 @@ function feeReminderDeps() {
         currency: r['out_currency'] as string,
         arrearsAmount: r['out_arrears_amount'] as string,
         daysOverdue: r['out_days_overdue'] as number,
+        // Which rung, so the handler can pick the final-notice wording.
+        thresholdDays: r['out_threshold_days'] as number,
+        isFinal: Boolean(r['out_is_final']),
+        viaWhatsapp: Boolean(r['out_via_whatsapp']),
+        viaEmail: Boolean(r['out_via_email']),
+        viaInApp: Boolean(r['out_via_in_app']),
       }))
     },
 
@@ -162,6 +224,48 @@ function reportCardDeps() {
       }
     },
 
+    /*
+      What the school chose to show, and the principal's comments by term (`0258`).
+
+      `school_document_template()` is the id-taking form and is `service_role` only
+      — a route calls `my_document_template()` instead, which resolves the school
+      from the session. `0254` is why those are two functions.
+    */
+    async loadTemplate(schoolId: string): Promise<{
+      options: Record<string, boolean>
+      principalComments: Record<string, string>
+    }> {
+      const { data, error } = await db.rpc('school_document_template', {
+        p_school_id: schoolId,
+        p_doc_type: 'report_card',
+      })
+
+      /*
+        A failure here must not fail the batch. A school's report cards are more
+        important than its layout preferences, so an unreadable configuration falls
+        back to the renderer's defaults — which are the card every school got before
+        this existed — rather than stopping four hundred documents.
+      */
+      if (error) return { options: {}, principalComments: {} }
+
+      const row = (Array.isArray(data) ? data[0] : data) as {
+        out_config?: Record<string, unknown>
+      } | null
+
+      const config = row?.out_config ?? {}
+
+      return {
+        options: {
+          showPosition: config['show_position'] !== false,
+          showClassAverage: config['show_class_average'] !== false,
+          showAttendance: config['show_attendance'] !== false,
+          showComments: config['show_comments'] !== false,
+          acknowledgementRequired: config['acknowledgement_required'] === true,
+        },
+        principalComments: (config['principal_comments'] ?? {}) as Record<string, string>,
+      }
+    },
+
     async loadBatch(input: {
       schoolId: string
       academicYear: string
@@ -234,12 +338,133 @@ export async function startWorkers(): Promise<void> {
     },
   )
 
+  /*
+    Absence alerts (ADR-047).
+
+    BULK like fee reminders, and for the same reason: a run that touches every
+    school must never starve a receipt somebody is waiting on.
+  */
+  await createWorker<{ schoolId?: string }, unknown>(
+    'send-absence-alerts',
+    async ({ payload }) =>
+      runAbsenceAlerts(absenceAlertDeps(), payload?.schoolId ? { schoolId: payload.schoolId } : {}),
+    { concurrency: 2 },
+  )
+
   await createWorker<{ schoolId?: string }, unknown>(
     'send-fee-reminders',
     async ({ payload }) =>
       handleFeeReminders(feeReminderDeps(), payload?.schoolId ? { schoolId: payload.schoolId } : {}),
     // BULK. A reminder run touching every school must never starve a receipt.
     { concurrency: 2 },
+  )
+
+  /*
+    One narrow call, so the handler never holds a Supabase client.
+
+    ADR-042: a worker's connection bypasses RLS, so everything goes through a
+    `worker_*` function. The handler cannot reach for `.from()` even by accident
+    because its dependency type does not offer one.
+  */
+  function expireTrialsDeps() {
+    return {
+      async expireOverdueTrials(): Promise<ExpiredTrial[]> {
+        const { data, error } = await workerDb().rpc('worker_expire_overdue_trials', {})
+        if (error) {
+          throw new Error(`worker_expire_overdue_trials failed: ${error.message}`)
+        }
+        return ((data ?? []) as Array<Record<string, string>>).map((r) => ({
+          schoolId: r['out_school_id']!,
+          schoolCode: r['out_school_code']!,
+          name: r['out_name']!,
+          endedAt: r['out_ended_at']!,
+        }))
+      },
+    }
+  }
+
+  /*
+    The letter's whole context in one call, through a `worker_*` function.
+
+    The worker bypasses RLS, so every extra table it could reach is another place a
+    bug crosses a tenant boundary. One pupil id in, one row out.
+  */
+  function transferLetterDeps() {
+    const base = createWorkerDeps()
+    return {
+      async loadContext(studentId: string): Promise<TransferLetterContext | null> {
+        const { data, error } = await workerDb().rpc('worker_transfer_letter_context', {
+          p_student_id: studentId,
+        })
+        if (error) throw new Error(`worker_transfer_letter_context: ${error.message}`)
+
+        const row = (Array.isArray(data) ? data[0] : data) as
+          | Record<string, string | null>
+          | undefined
+        if (!row) return null
+
+        return {
+          school: {
+            name: row['out_school_name'] ?? 'School',
+            schoolCode: row['out_school_code'] ?? '',
+          },
+          ministryRegistrationNumber: row['out_ministry_reg'],
+          studentName: row['out_student_name'] ?? '',
+          studentCode: row['out_student_code'] ?? '',
+          enrolledOn: row['out_enrolled_on'] ?? '',
+          transferredOn: row['out_transferred_on'] ?? '',
+          finalGradeLevel: row['out_final_grade'] ?? '',
+          kind: row['out_kind'] === 'withdrawn' ? 'withdrawn' : 'transferred',
+          destination: null,
+          principalName: row['out_principal_name'],
+        }
+      },
+      /*
+        Its own `recordDocument`, because the shared one hardcodes
+        `payment_receipt` and demands a payment id, an academic year and a term —
+        none of which a transfer letter has.
+      */
+      async recordDocument(input: { schoolId: string; studentId: string }) {
+        const { data, error } = await workerDb().rpc('record_generated_document', {
+          p_school_id: input.schoolId,
+          p_doc_type: 'transfer_letter',
+          p_student_id: input.studentId,
+          p_payment_id: null,
+          p_academic_year: null,
+          p_term_number: null,
+          p_generated_by: null,
+        })
+        if (error) throw new Error(`Recording the transfer letter failed: ${error.message}`)
+        return data as string
+      },
+      storeDocument: base.storeDocument,
+      completeDocument: base.completeDocument,
+    }
+  }
+
+  await createWorker<
+    { studentId: string; schoolId: string; transferReference: string },
+    unknown
+  >(
+    'generate-transfer-letter',
+    async ({ payload }) => {
+      if (!payload?.studentId || !payload.schoolId || !payload.transferReference) {
+        throw new Error('generate-transfer-letter job is missing its identifiers')
+      }
+      return handleTransferLetter(payload, transferLetterDeps())
+    },
+    // One page per job, and a family may be waiting at the office counter.
+    { concurrency: 3 },
+  )
+
+  await createWorker<Record<string, never>, unknown>(
+    'expire-trials',
+    async () => handleExpireTrials(expireTrialsDeps()),
+    /*
+      Concurrency 1. The UPDATE is atomic and idempotent, so a second runner would be
+      harmless — and there is nothing to gain, because the whole job is one statement.
+    */
+    { concurrency: 1 },
   )
 
   await createWorker<Record<string, never>, unknown>(
@@ -264,7 +489,16 @@ export async function startWorkers(): Promise<void> {
     { concurrency: 2 },
   )
 
-  console.log('ZSMS workers started: generate-receipt, send-fee-reminders, check-scheduled-announcements, generate-report-card')
+  /*
+    After the workers are listening, never before.
+
+    Registering a schedule first would queue jobs with nothing to take them — they
+    would wait rather than be lost, but the first run after a deploy would be a
+    backlog instead of a single job.
+  */
+  await registerRecurringJobs()
+
+  console.log('ZSMS workers started: generate-receipt, send-fee-reminders, check-scheduled-announcements, generate-report-card, expire-trials, generate-transfer-letter')
 }
 
 if (process.env['NODE_ENV'] !== 'test') {

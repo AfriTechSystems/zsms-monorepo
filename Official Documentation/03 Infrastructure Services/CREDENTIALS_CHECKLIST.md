@@ -9,6 +9,32 @@
 
 ---
 
+## Where This Stands (2026-10-11)
+
+**Done since this list was written:** Cloudflare R2 (both buckets) and PostHog. R2 was
+the largest single blocker in the tree — report cards and receipts generated correctly
+for weeks and could not be delivered.
+
+**The four that still block finished work, in the order they unlock most:**
+
+1. **AI API credit.** Both OpenAI and Anthropic keys are out of credit, so no
+   model-backed feature can be demonstrated — the assistant, the lesson planner and
+   curriculum extraction are all code-complete and unprovable.
+2. **The `zsms.co.zm` domain.** Gates Resend, and a verified Meta Business account needs
+   it too. One purchase unblocks two channels.
+3. **A paid Clerk plan.** The free tier caps an organisation at FIVE members, verified on
+   the live instance. A school with six staff cannot be fully onboarded — a launch
+   prerequisite, not an optimisation.
+4. **`FIELD_ENCRYPTION_KEY` / `GATEWAY_ENCRYPTION_KEY`.** Integration and gateway
+   credentials cannot be stored at all until these exist; `0230`'s CHECK refuses anything
+   not already encrypted, deliberately, so the failure is loud rather than a plaintext
+   token sitting in every backup.
+
+**Deferred by decision, not missing:** PowerSync (paid, online-first for now), QStash
+(BullMQ is the default per ADR-035), the Railway hot standby, and the Cloudflare zone.
+
+---
+
 ## Purpose
 
 A single list of every account, key and credential a human must obtain, in the order that unblocks
@@ -36,13 +62,13 @@ example, and grepping alone would wrongly conclude it is unused.
 | **Meta WhatsApp** | **Missing** | All parent messaging |
 | **Resend** | **Missing** | Email fallback, receipts by email |
 | **Twilio** | **Missing** | SMS fallback |
-| **Cloudflare R2** | **Missing** | Logo upload, stored receipts and report cards |
+| **Cloudflare R2** | **DONE 2026-10-11** | Logo upload, stored receipts and report cards. Verified by `npm run r2:smoke` (14 checks, both buckets) and `npm run docs:smoke` (the whole chain, byte-identical). |
 | **Sentry** | **Missing, not installed** | Any visibility of unhandled errors |
 | Supabase — `zsms-staging` | Missing | Prohibition 10 (nothing reaches production unverified) |
 | Supabase — `zsms-zm` (production) | Missing | Launch |
 | Vercel | Missing | Deploying the web app anywhere but a laptop |
 | Railway | Missing | Running workers anywhere but a laptop |
-| PostHog | Missing | Product analytics |
+| PostHog | **DONE 2026-10-11** | Product analytics, EU region. Verified by `npm run posthog:smoke`. Autocapture OFF — see POSTHOG.md for why that must not change. |
 | QStash | Not needed | Fallback queue only; BullMQ is the default (ADR-035) |
 
 ---
@@ -253,7 +279,7 @@ nowhere else. `apps/web` has no code path that reads it, deliberately — see `l
 | `QSTASH_TOKEN` | Fallback queue. BullMQ is the default (ADR-035); only needed if Redis is dropped. |
 | `FIELD_ENCRYPTION_KEY` | Nothing encrypts a field yet. |
 | `GOOGLE_OAUTH_*`, `XERO_*`, `QUICKBOOKS_*` | Integration connectors — Phase 5, none built. |
-| `POSTHOG_*` | Product analytics; not installed. |
+| `POSTHOG_*` | Done. `NEXT_PUBLIC_POSTHOG_KEY` and `_HOST` are set; autocapture is off by design. |
 
 ---
 

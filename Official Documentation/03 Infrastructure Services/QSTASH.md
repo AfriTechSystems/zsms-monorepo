@@ -24,6 +24,17 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Deliberately idle, and correct.** ADR-035 makes BullMQ over Upstash Redis the default,
+and it is proven — `npm run queue:smoke` round-trips a real job, and the commands BullMQ
+needs (`EVAL`, `XADD`, `BZPOPMIN`) all work on the Upstash free tier.
+
+`packages/queue` abstracts both sides, so QStash remains the fallback it was specified as.
+Nothing here is missing; it is unused on purpose.
+
+---
+
 ## Purpose
 
 This document covers how QStash is configured and used when selected as the queue provider via `JOB_QUEUE_PROVIDER=qstash`. Every Claude Code session that writes code triggering a background job must use the queue abstraction in `BULLMQ.md` rather than the QStash client directly — this document exists to explain provider behaviour, not to be called from application code.

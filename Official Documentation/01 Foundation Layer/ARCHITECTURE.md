@@ -343,7 +343,7 @@ All messages dispatched using AfriTech's Meta WABA credentials from environment 
 
 **Mode B — School-Specific Number**
 `schools.whatsapp_owns_number = TRUE`
-The Edge Function reads `schools.whatsapp_phone_number_id` and decrypts `schools.whatsapp_access_token_enc` to dispatch using the school's own Meta credentials. Messages appear from the school's own number. School manages their own Meta quota.
+**Neither column exists** (checked 2026-10-11; see `SCHOOL_CONFIG.md`), and ADR-044 superseded the Edge Function. When per-school WhatsApp is built it will read `schools.whatsapp_phone_number_id` and decrypt `schools.whatsapp_access_token_enc` to dispatch using the school's own Meta credentials. Messages appear from the school's own number. School manages their own Meta quota.
 
 Fallback chain: WhatsApp → Email (Resend) → SMS (Twilio, critical messages only).
 

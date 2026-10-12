@@ -18,12 +18,31 @@ export type JobType =
   | 'submit-to-lender'
   | 'dispatch-integration-event'
   | 'check-scheduled-announcements'
+  /*
+    Moves a school past `trial_ends_at` from `trial` to `trial_expired` (`0244`).
+
+    A trial expires because time passed, not because anybody acted, so there is no
+    write to hang a trigger on — it needs a job on a clock. Idempotent, so a cron
+    firing twice during a deploy is harmless.
+  */
+  | 'expire-trials'
+  /*
+    Renders the letter a family carries to the next school (`0246`, TRANSFER.md).
+
+    Queued rather than rendered in the request, because it must be stored
+    permanently in R2 and recorded in `generated_documents` — the same shape
+    receipts and report cards already have. It also means a transfer still
+    completes when R2 is briefly unavailable: the pupil's status is what must not
+    fail, and the letter can be retried.
+  */
+  | 'generate-transfer-letter'
   | 'calculate-platform-metrics'
   | 'calculate-school-health-scores'
   | 'calculate-churn-risk'
   | 'check-trial-expiry'
   | 'check-override-expiry'
   | 'send-fee-reminders'
+  | 'send-absence-alerts'
   | 'send-attendance-summary'
   | 'generate-lesson-plan'
 

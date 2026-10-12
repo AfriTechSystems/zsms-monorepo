@@ -13,6 +13,37 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built — Tier 2 (read) end to end.** `0241` adds `school_api_keys` to the DDL below,
+plus `api_key_usage`, and `issue_api_key()` / `revoke_api_key()` / `verify_api_key()`.
+
+- `apps/web/lib/api-key-auth.ts` — generation, hashing, authentication, and
+  `apiKeyQuery()`, which applies the school filter in shared code so a route cannot
+  forget it. That filter is the tenant boundary, since the service role bypasses RLS.
+- `GET /api/v1/{students,fees,payments,attendance,results}` — one catch-all over a
+  resource table, with explicit column lists so an internal column addition cannot
+  silently change what an integration receives.
+- `/school/[code]/settings/api-keys` — issue, see usage, revoke. Owner only.
+
+**Two additions to this document's design, both deliberate.** `api_key_usage` records
+every call including refusals, because a run of 403s is the clearest sign a key has been
+stolen and `audit_logs` records neither the refusals nor that a call arrived over the
+API. And the `scopes` column is CHECK-constrained to the list below — an unconstrained
+array means a typo stores cleanly and grants nothing, which is the hardest kind of
+permission bug to notice.
+
+**Not built: writes.** Tier 1 and Tier 3 include `fees:write`, `attendance:write`,
+`loans:write` and `communication:send`. The scopes exist so a key is ready and the
+screen says which have no endpoint; the endpoints do not, because a write with no user
+behind it needs idempotency on a caller-supplied key or a retried request
+double-records a payment. Tier 2 is read-only by this document's own definition.
+
+**Not built: webhook registration** (`webhooks:receive`). ADR-044 settles that inbound
+webhooks are Next.js routes; outbound registration is the other half and is unscheduled.
+
+---
+
 ## Purpose
 
 This document defines the ZSMS modular API integration system — how schools with existing management systems can access individual ZSMS services (loan module, communication, fee tracking) without migrating their entire operation to ZSMS. It also covers the API key authentication model, the three tiers of integration, and how new API routes are written to support both Clerk JWT and API key authentication simultaneously.

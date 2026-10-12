@@ -19,7 +19,7 @@ Hand-writing the other 52 would have produced a document that was accurate for a
 
 ## Overview
 
-Generated from `zsms-dev` on 2026-10-06.
+Generated from `zsms-dev` on 2026-10-10.
 
 | Schema | Tables | Reachable from a route |
 |---|---:|---|
@@ -45,7 +45,7 @@ AfriTech's own books — pricing, tiers, feature flags, invoices, commissions. *
 | `loan_commissions` | 13 | forced | 0 | What AfriTech earns per disbursed loan. In `afritech` because a school has no business reading what AfriTech earns on its parents' loans (0224). |
 | `onboarding_checklist_items` | 11 | forced | 2 | The onboarding checklist definition. Weights transcribed from ONBOARDING.md. Adding an item is an INSERT here plus a backfill into public.onboarding_checklists for existing schools. |
 | `platform_settings` | 5 | forced | 0 | — |
-| `school_credit_plans` | 10 | **none** | 0 | What a school may buy, per teacher seat. Prices are configuration editable without a deployment — PRICING.md prohibition: never hardcode a price, tier or feature inclusion. |
+| `school_credit_plans` | 10 | forced | 1 | What a school may buy, per teacher seat. Prices are configuration editable without a deployment — PRICING.md prohibition: never hardcode a price, tier or feature inclusion. |
 | `school_feature_overrides` | 13 | forced | 2 | Per-school exceptions. Every row carries a reason and an actor — this is the table a support decision is audited from. |
 | `subscription_tiers` | 14 | forced | 2 | Database-driven tier configuration. Prices and quotas are edited here by a super admin, never hardcoded (ADR-031). |
 | `teacher_hub_plans` | 12 | forced | 2 | Teacher Hub plans, including the free trial. Prices and the trial allowance are rows because a price is never hardcoded. included_resources NULL = unlimited. |

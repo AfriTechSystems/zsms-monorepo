@@ -64,7 +64,29 @@ interface Application {
   disbursedAmount: number | null
   disbursedAt: string | null
   collectionInstructions: string | null
-  collectionAccount: Record<string, unknown> | null
+  /*
+    The lender's collection details (`LENDER_INTEGRATION.md`). Typed rather than
+    `Record<string, unknown>` because every field here is shown to a parent who has
+    to send money somewhere, and an unchecked shape is how the wrong number ends up
+    printed beside the right instruction.
+  */
+  collectionAccount: {
+    mobile_money?: string
+    network?: string
+    bank_name?: string
+    account_number?: string
+    branch?: string
+    paybill?: string
+  } | null
+  /** `REPAYMENT.md` -> Repayment Schedule. Phase 1 displays it; nothing writes it yet. */
+  repaymentSchedule: Array<{
+    instalment_number: number
+    due_date: string
+    amount: number
+    status?: string
+    paid_at?: string
+    paid_amount?: number
+  }> | null
   createdAt: string
 }
 
@@ -312,6 +334,167 @@ export default function ParentLoansPage(): JSX.Element {
                         )}
                       </Alert>
                     )}
+
+                    {/*
+                      WHERE to send the money.
+
+                      `REPAYMENT.md` Phase 1 is precisely this: ZSMS does not move a
+                      repayment, so the only thing it can do is make the lender's details
+                      impossible to miss. The instruction above was previously shown on its
+                      own, which told a parent to "send Airtel Money" without the number --
+                      everything needed to feel informed and nothing needed to pay.
+
+                      The reference is included because every lender's instructions say to
+                      quote it, and an unidentified repayment is the one that goes missing.
+                    */}
+                    {/*
+                      No details at all.
+
+                      This is the state the seeded lender was in: `collection_account`
+                      NULL and `collection_instructions` set to the literal string
+                      "Airtel Money". The card showed "How to repay: Airtel Money" and
+                      stopped -- a debt, a channel name, and no way to pay it, which reads
+                      as an answer and is worse than an empty screen.
+
+                      `0260` now refuses to make such a lender active, so this should be
+                      unreachable. It is here because "should be unreachable" is exactly
+                      the condition worth saying out loud when it is about money.
+                    */}
+                    {a.status === 'disbursed' && !a.collectionAccount && (
+                      <Alert variant="warning" title="Ask your lender where to pay">
+                        {a.lenderName ?? 'Your lender'} has not given ZSMS their repayment
+                        details, so we cannot show you where to send the money. Contact them
+                        directly before your first instalment is due
+                        {a.lenderReference ? (
+                          <>
+                            {' '}and quote your reference{' '}
+                            <strong data-numeric>{a.lenderReference}</strong>
+                          </>
+                        ) : null}
+                        .
+                      </Alert>
+                    )}
+
+                    {a.status === 'disbursed' && a.collectionAccount && (
+                      <div className="rounded-md border border-border bg-surface p-card">
+                        <p className="text-sm font-medium">Where to send your repayment</p>
+
+                        <dl className="mt-2 space-y-1 text-sm">
+                          {a.collectionAccount.mobile_money && (
+                            <div className="flex flex-wrap gap-2">
+                              <dt className="text-muted-foreground">
+                                {a.collectionAccount.network ?? 'Mobile money'}
+                              </dt>
+                              <dd className="font-medium" data-numeric>
+                                {a.collectionAccount.mobile_money}
+                              </dd>
+                            </div>
+                          )}
+                          {a.collectionAccount.paybill && (
+                            <div className="flex flex-wrap gap-2">
+                              <dt className="text-muted-foreground">Paybill</dt>
+                              <dd className="font-medium" data-numeric>
+                                {a.collectionAccount.paybill}
+                              </dd>
+                            </div>
+                          )}
+                          {a.collectionAccount.bank_name && (
+                            <div className="flex flex-wrap gap-2">
+                              <dt className="text-muted-foreground">Bank</dt>
+                              <dd className="font-medium">
+                                {a.collectionAccount.bank_name}
+                                {a.collectionAccount.branch
+                                  ? ` -- ${a.collectionAccount.branch}`
+                                  : ''}
+                              </dd>
+                            </div>
+                          )}
+                          {a.collectionAccount.account_number && (
+                            <div className="flex flex-wrap gap-2">
+                              <dt className="text-muted-foreground">Account</dt>
+                              <dd className="font-medium" data-numeric>
+                                {a.collectionAccount.account_number}
+                              </dd>
+                            </div>
+                          )}
+                          {a.lenderReference && (
+                            <div className="flex flex-wrap gap-2">
+                              <dt className="text-muted-foreground">Your reference</dt>
+                              <dd className="font-medium" data-numeric>
+                                {a.lenderReference}
+                              </dd>
+                            </div>
+                          )}
+                        </dl>
+
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {/*
+                            Said plainly. A parent who believes ZSMS has taken the money is
+                            a parent who misses an instalment and blames the school.
+                          */}
+                          You repay <strong>{a.lenderName ?? 'the lender'}</strong> directly.
+                          ZSMS does not collect repayments and cannot see whether one has
+                          arrived -- contact the lender if you need a receipt.
+                        </p>
+                      </div>
+                    )}
+
+                    {/*
+                      The schedule.
+
+                      Shown whenever the lender has supplied one. Nothing writes it yet --
+                      that arrives with the lender webhook -- so an approved loan with no
+                      schedule says so rather than rendering an empty table, which would
+                      read as a loan with no instalments due.
+                    */}
+                    {a.status === 'disbursed' &&
+                      (a.repaymentSchedule && a.repaymentSchedule.length > 0 ? (
+                        <div className="rounded-md border border-border p-card">
+                          <p className="text-sm font-medium">Your instalments</p>
+                          <ul className="mt-2 divide-y divide-border">
+                            {a.repaymentSchedule.map((i) => (
+                              <li
+                                key={i.instalment_number}
+                                className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm"
+                              >
+                                <span>
+                                  <span className="text-muted-foreground">
+                                    #{i.instalment_number}
+                                  </span>{' '}
+                                  due{' '}
+                                  <span data-numeric>
+                                    {new Date(i.due_date).toLocaleDateString('en-GB', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </span>
+                                </span>
+                                <span className="flex items-center gap-2">
+                                  <span className="font-medium" data-numeric>
+                                    {kwacha(i.amount)}
+                                  </span>
+                                  {/*
+                                    `paid` is the only status worth a green badge. An
+                                    overdue instalment is the lender's to chase, and a red
+                                    badge here would imply ZSMS knows something it does not.
+                                  */}
+                                  {i.status === 'paid' ? (
+                                    <Badge variant="success">paid</Badge>
+                                  ) : (
+                                    <Badge variant="neutral">{i.status ?? 'due'}</Badge>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Your lender has not sent an instalment schedule to ZSMS. Ask them
+                          for your repayment dates.
+                        </p>
+                      ))}
 
                     {/*
                       The score, explained.

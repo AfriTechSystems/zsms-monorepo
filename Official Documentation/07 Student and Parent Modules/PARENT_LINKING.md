@@ -10,6 +10,30 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, including the part most likely to have been skipped.**
+
+The 30-day grace period after unlinking **is honoured** — `is_linked_parent_of()` admits
+`is_active = TRUE OR (is_active = FALSE AND grace_period_ends_at > NOW())`, so a parent
+keeps access for the window this document describes rather than losing it the moment a
+school unlinks them.
+
+`claim_parent_links()` matches a parent to their children by **verified email** from the
+Clerk token, across every school at once. It takes no arguments on purpose: a function
+accepting an email would let any signed-in user link to an address they do not own.
+
+`request_parent_link_by_phone()` handles the phone-only parent, raising a claim the
+school approves by hand — the OTP that would justify auto-linking needs a delivery
+channel that does not exist yet.
+
+**The two opt-in fields are genuinely separate**, as this document insists:
+`whatsapp_opted_in` defaults TRUE and governs service messages; `marketing_opt_in`
+defaults FALSE and is AfriTech's. `0229` asserts both defaults at migration time, so a
+later change to the legal basis cannot happen quietly.
+
+---
+
 ## Purpose
 
 This document defines the complete parent account model — how parents are linked to students, what the marketing_opt_in field controls, how parent accounts persist permanently after graduation, and the alumni promotional content opt-in. Every Claude Code session building any parent-related feature must read this document.

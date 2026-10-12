@@ -11,6 +11,43 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The operational half was built; the business half — which is most of this document —
+was not. It is now (`0261`).**
+
+`platform_metrics()` returns schools, pupils, staff and fees collected. Useful, and not
+one of **MRR, ARR, revenue by tier, trial conversion or loan commission revenue** was
+computed anywhere, though every input already existed in
+`afritech.subscription_tiers`, `schools.subscription_tier` and
+`afritech.loan_commissions`.
+
+`admin_business_metrics()` and `admin_revenue_by_tier()` now compute them, rendered at the
+top of `/admin` — above the operational figures, because on AfriTech's own dashboard "is
+the business working" outranks "how many pupils are enrolled".
+
+**MRR is computed from live subscription state, not from invoices.** A deliberate choice:
+an invoice is what *was* billed, recurring revenue is what *will* be. A school that joined
+yesterday has no invoice and is unambiguously part of MRR; a school that churned last week
+still has last month's. Collected revenue is reported separately rather than conflated.
+Per-student tiers are priced on the actual roll, which is what the pricing model means.
+
+**NRR is deliberately absent, and the screen says why.** It compares what schools paid
+twelve months ago with today, and there is no twelve-month history — commercial launch is
+January 2027. Any figure would come from an empty window and render as 0% or 100%, both of
+which read as facts. The function returns `nrr_available = FALSE` and the dashboard
+explains it, rather than showing a number nobody should act on. Same reasoning as the
+18-month gate on Predictive Intelligence.
+
+**Trial conversion is NULL, not 0, when no trial has finished.** "No trials have ended" and
+"no trial ever converted" are different facts, and 0% states the second. The card shows an
+em dash.
+
+Both functions are gated on the `billing:read` capability (`0237`) rather than on being an
+AfriTech administrator, so a support agent's overview omits revenue instead of failing.
+
+---
+
 ## Purpose
 
 This document defines every platform metric that AfriTech tracks internally — how each is calculated, which database tables it draws from, how it is cached for performance, and which dashboard it appears on. Every Claude Code session building the AfriTech metrics dashboard must read this document.

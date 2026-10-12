@@ -13,6 +13,20 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built.** `import_students()` (`0112`) with `POST /api/school/students/import` and the
+screen at `/school/[code]/students/import` — upload, map columns, preview, commit.
+
+Rate-limited under the `bulk` policy at 5 requests a minute: a re-submitted import is
+the most expensive accidental action in the product.
+
+**Known limitation, recorded in `CLAUDE.md` rather than here:** the form-draft system
+deliberately excludes the import mapping. The CSV is held in memory only, so a restored
+mapping would point at a file the user no longer has.
+
+---
+
 ## Purpose
 
 This document defines the complete bulk student import system — the flexible template format, column mapping, validation rules, batch processing, error reporting, and duplicate detection. Every Claude Code session building the import UI, the import Edge Function, or the column mapping system must read this document.

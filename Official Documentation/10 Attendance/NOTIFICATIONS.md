@@ -12,6 +12,32 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Channel 1 (in-app badge)** — built. The parent attendance screen reads the records
+directly through RLS, and it is always on because it costs nothing.
+
+**Channel 3 (per-absence alert)** — built as of `0255`, default OFF, configured at
+Settings → Attendance alerts. The screen shows this document's own quota arithmetic
+computed from the school's **actual roll** before the switch is thrown, because a school
+that enables this blind finds out when the quota runs dry mid-term and a fee reminder
+cannot go out.
+
+It is a polled worker rather than the trigger `TRIGGERS.md` specifies — ADR-047.
+
+The `absence_alert` template existed for WhatsApp and email but had **no in-app row**,
+though in-app is a channel a school can choose, so that choice would have sent nothing
+silently. Seeded in `0255`, which asserts the coverage.
+
+**Channels 2, 4 and 5 are not built.** Push needs the mobile app (no screens exist);
+the monthly summary and the WhatsApp `ATTENDANCE` chatbot command both need a live Meta
+account.
+
+**Delivery remains unproven for all of it.** No Meta, Twilio or Resend credentials, so
+every channel runs through the mock provider and no message has left this machine.
+
+---
+
 ## Purpose
 
 This document defines the complete parent notification flow for attendance — from the moment a student is marked absent to the parent receiving confirmation, and the monthly summary model that replaces per-absence alerts as the default. Every Claude Code session building any attendance notification feature must read this document.

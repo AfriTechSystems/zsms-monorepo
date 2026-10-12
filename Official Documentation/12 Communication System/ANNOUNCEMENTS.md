@@ -11,6 +11,25 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built end to end**, and the most complete part of this folder.
+
+Composer at `/school/[code]/announcements`, audience targeting through
+`set_announcement_target_type()` and `announcement_addressed_to_me()`, scheduling via
+`worker_claim_scheduled_announcements()` on a 15-minute cron, read tracking in
+`announcement_reads`, and the parent view. The quota is shown on the composer before
+sending, drawn from `school_message_quotas`.
+
+A 16-assertion pgTAP suite (`announcement_audience_test`) covers who may see what, which
+matters more here than anywhere else in the folder: an announcement addressed to one
+class must not reach the whole school.
+
+**What cannot happen is delivery.** The in-app copy appears for parents; the WhatsApp and
+email copies go to the mock provider.
+
+---
+
 ## Purpose
 
 This document defines the complete school announcement system — how announcements are created, targeted, delivered, and tracked. Covers both school-level announcements and AfriTech platform-level announcements to school owners. Every Claude Code session building any announcement feature must read this document.

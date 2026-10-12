@@ -7,7 +7,7 @@
 - `docs/modules/auth/PERMISSIONS.md` — permission grant system
 - `docs/modules/auth/IMPERSONATION.md` — AfriTech team impersonation
 - `docs/modules/school/TEACHER_PORTAL.md` — standalone teacher auth flow
-- `docs/DATABASE.md` — standalone_teacher_accounts, alumni_profiles
+- `docs/DATABASE.md` — standalone_teacher_accounts (`alumni_profiles` is **not built**; see ADR-046)
 
 ---
 
@@ -27,14 +27,26 @@ No passwords. No social login. Email-only OTP for all user types.
 
 ## User Types and Login Entry Points
 
-| User Type | Entry Point | Clerk Role | Account Location |
+**There is one entry point, not six.** Everybody signs in at `/sign-in`, and
+`/welcome` works out where they belong. The per-audience URLs below were the original
+design and are **not built**, deliberately:
+
+- A person can hold more than one of these at once — a teacher who is also a parent, a
+  pupil whose mother teaches at the school — so a door per audience asks them to classify
+  themselves before ZSMS knows the answer.
+- `/welcome` can resolve it properly, because by then there is a session to interrogate.
+  It RENDERS a choice rather than redirecting on the first match, so a person with two
+  contexts sees both.
+- Six doors is also six places to get the Clerk configuration wrong.
+
+| User Type | Clerk Role | Account Location | Where `/welcome` sends them |
 |---|---|---|---|
-| School owner/staff | zsms.co.zm/login | org:* | Clerk org member |
-| Parent | zsms.co.zm/portal/login | org:parent | Clerk org member |
-| Student | zsms.co.zm/portal/login | org:student | Clerk org member |
-| Standalone teacher | zsms.co.zm/teacher/login | platform:teacher | No org |
-| Alumni | zsms.co.zm/alumni/login | platform:alumni | No org (or former org) |
-| AfriTech staff | zsms.co.zm/admin/login | afritech:* | AfriTech Clerk org |
+| School owner/staff | `org:*` | Clerk org member | `/school/[code]` |
+| Parent | `org:parent` | Clerk org member | `/parent` |
+| Student | `org:student` | Clerk org member | `/student` |
+| Standalone teacher | `platform:teacher` | No org | `/teacher` |
+| Alumni | `platform:alumni` | **No org** — see ADR-046 | `/student`, framed as a record |
+| AfriTech staff | `afritech:*` | AfriTech Clerk org | `/admin` |
 
 ---
 
@@ -100,6 +112,16 @@ $$;
 
 ## Login Flow — Parent/Student Phone Discovery
 
+> **Not built, and blocked rather than deferred.** Clerk is configured for email OTP
+> only, so there is no phone to look an account up by. A parent with no email address
+> cannot sign in at all today; they are matched to their children by **verified email**
+> (`claim_parent_links()`, migration `0170`), and a phone-only parent raises a claim the
+> school approves by hand.
+>
+> Doing this properly needs SMS OTP, which needs Twilio credentials — and `ADR-?` level
+> reasoning about whether SMS OTP is affordable in Zambia at volume, which is why it was
+> disabled in the first place. The flow below is the target.
+
 Parents and students log in using their phone number (not email) because many parents registered via phone during student import:
 
 ```
@@ -137,6 +159,16 @@ The selected context determines which dashboard loads. The choice is remembered 
 
 ## Student Login Flow
 
+> **Built (2026-10-11), with two differences.** There is no `/portal/student` URL —
+> students sign in at `/sign-in` like everybody else and `/welcome` sends them to
+> `/student`. And they are identified by **email**, not by student ID: the pupil row
+> carries `clerk_user_id`, which the school links. A student ID is a public-ish
+> identifier printed on a card, so accepting it as a login handle would let anybody who
+> saw the card start an OTP flow against that pupil.
+>
+> Access matches what is described: own published results, own attendance summary, own
+> class timetable. Not fees — see ROLES.md.
+
 Students log in via the student portal using their student ID or email:
 
 ```
@@ -163,6 +195,20 @@ Students log in via the student portal using their student ID or email:
 ---
 
 ## Alumni Login Flow
+
+> **Built (2026-10-11) as the SAME portal — see ADR-046.** An alumnus signs in exactly as
+> they did as a pupil and lands on `/student`, which tells them plainly that these are
+> their records from while they were there.
+>
+> `alumni_profiles` is **not built and should not be.** Access is keyed on
+> `students.clerk_user_id` and never on the organisation claim, so a graduated pupil keeps
+> reading their own history after their org membership is revoked — which is precisely
+> what ADR-015 promises. A separate table would duplicate `students` for people already
+> in it, and a separate portal would be the half that drifts, years after anybody
+> remembers writing it.
+>
+> Parents of graduated students keep access through their existing link row, proven by
+> `supabase/tests/rls/alumni_access_test.sql`.
 
 Graduated students and parents of graduated students:
 
@@ -261,3 +307,6 @@ Developer production access requires a time-limited grant (max 4 hours) approved
 | 2026-08-13 | **Corrected all three RLS helper bodies to match RLS.md** | `get_school_id()` returned `uuid` from `user_metadata`; `get_user_role()` and `get_user_id()` read `request.jwt.claims` directly. RLS.md is authoritative and uses `auth.jwt()` with the compact `o`/`act` claims. Migration `0001` implements RLS.md's versions. |
 | 2026-08-13 | Corrected `ZsmsJwtClaims` to the compact `o`/`act` claim shape | Interface declared `org_id`/`org_role`/`metadata.school_id`, which the RLS helpers do not read |
 | 2026-08-13 | Corrected alumni login from indefinite session to 30 days | Missed by the earlier sweep because it said "indefinite" rather than "365"; permanent record access is unchanged |
+| 2026-10-11 | **Entry points corrected to the one that exists** | Six per-audience URLs were never built. `/sign-in` plus the `/welcome` dispatcher is what ships, and it handles a person holding two contexts, which six doors cannot |
+| 2026-10-11 | Marked phone discovery as blocked on SMS OTP | Clerk is email-OTP only; parents match on verified email instead |
+| 2026-10-11 | Student and alumni flows marked built, with their differences | One portal (ADR-046), email rather than student ID as the handle |

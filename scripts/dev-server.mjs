@@ -31,6 +31,7 @@
  * Usage:
  *   node scripts/dev-server.mjs              # free port 3000, start
  *   node scripts/dev-server.mjs --clean      # also delete apps/web/.next first
+ *   node scripts/dev-server.mjs --turbopack  # 2-3x faster cold compiles (not the build compiler)
  *   node scripts/dev-server.mjs --port 3005
  *   node scripts/dev-server.mjs --kill-only  # free the port and exit
  */
@@ -201,7 +202,38 @@ console.log('')
 const require = createRequire(join(WEB, 'package.json'))
 const NEXT_CLI = require.resolve('next/dist/bin/next')
 
-const child = spawn(process.execPath, [NEXT_CLI, 'dev', '-p', PORT, '-H', '0.0.0.0'], {
+/*
+  Turbopack, opt-in.
+
+  Measured on this machine, 2026-10-12, cold compile of each screen:
+
+  | | webpack | Turbopack |
+  |---|---|---|
+  | ready | 37.3s | 11.8s |
+  | `/` (homepage) | 50.9s | 21.5s |
+  | `/welcome` | 11.4s | 3.1s |
+  | `/school` | 6.0s | 3.2s |
+  | `/api/session/whoami` | 8.1s | 8.6s |
+
+  So roughly 2-3x faster to first paint on a cold server, which is the whole of
+  the "it takes forever to load" complaint. Warm requests are ~0.6s either way.
+
+  **Opt-in rather than default**, deliberately. `next build` uses webpack, and CI
+  builds with webpack, so making Turbopack the default here would mean the
+  compiler you develop against is not the one that produces the artefact you ship.
+  That divergence is small today and is exactly the kind of difference that
+  surfaces as "works on my machine".
+
+  Use `npm run dev:fast` when you are iterating on screens, and plain `npm run dev`
+  when you are about to trust what you see.
+*/
+const nextArgs = [NEXT_CLI, 'dev', '-p', PORT, '-H', '0.0.0.0']
+if (has('--turbopack')) {
+  nextArgs.push('--turbopack')
+  console.log('[dev] Turbopack enabled — faster cold compiles, but NOT the compiler `next build` uses')
+}
+
+const child = spawn(process.execPath, nextArgs, {
   cwd: WEB,
   stdio: 'inherit',
 })

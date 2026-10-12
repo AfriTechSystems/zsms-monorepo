@@ -24,6 +24,7 @@ import {
   Banknote,
   BookMarked,
   Building2,
+  Coins,
   Gauge,
   HeartPulse,
   Network,
@@ -31,6 +32,7 @@ import {
   Receipt,
   ScrollText,
   ShieldAlert,
+  ShieldCheck,
   Siren,
   SlidersHorizontal,
   Sparkles,
@@ -129,12 +131,29 @@ export function AdminShell({
         { path: '/data-requests', label: 'Data requests', icon: ShieldAlert },
         // The trail has been written since `0131` and nothing has ever read it.
         { path: '/audit', label: 'Audit trail', icon: ScrollText },
+        /*
+          The AfriTech team and what each platform role may do (ROLES.md).
+
+          Under Operations rather than its own group: it is read-mostly reference, and
+          only the scope form at the bottom is a super admin's to use — which the page
+          itself hides for everybody else.
+        */
+        { path: '/team', label: 'Team & roles', icon: ShieldCheck },
       ],
     },
     {
       label: 'Revenue',
       items: [
         { path: '/billing', label: 'Invoices & billing', icon: Receipt },
+        /*
+          Unit economics (COST_MANAGEMENT.md).
+
+          Under Revenue beside billing, because it answers the question billing raises:
+          an invoice says what a school pays, and this says what serving them consumes.
+          Gated the same way in the database — `billing:read`, so a loan officer is
+          refused.
+        */
+        { path: '/costs', label: 'Unit economics', icon: Coins },
         { path: '/pricing', label: 'Plans & pricing', icon: Wallet },
         /*
           The loan queue and its partners, under Revenue because that is what they are

@@ -11,6 +11,20 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Code complete; waiting on an account, not on engineering.**
+
+`packages/notifications/src/providers/meta-whatsapp.ts` is implemented against the
+Cloud API. `useMock()` defaults to the mock channel and flips to live the moment
+`META_WHATSAPP_*` credentials exist — no code change.
+
+**No message has ever left this machine.** Do not assume a parent has received anything.
+A verified Meta Business account needs the `zsms.co.zm` domain first, so this is blocked
+behind the domain rather than behind Meta.
+
+---
+
 ## Purpose
 
 This document defines the Meta Cloud API integration — how ZSMS dispatches WhatsApp messages, how delivery status webhooks are processed, and critically how the Edge Function selects between the AfriTech shared number and a school's own number. Every Claude Code session building any WhatsApp dispatch feature must read this document.

@@ -11,6 +11,39 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The whole pipeline is built and currently generates from templates, not a model.**
+
+`AI_GENERATOR=template` in the environment. Flipping it to `live` is a deliberate,
+separate step — and the reason to be deliberate is the next paragraph.
+
+**`curriculum_topics` is empty**, so `curriculum_slice()` returns nothing and the prompt is
+told to cite nothing. That is the difference between **AI-written and
+syllabus-grounded**, and it is the single most consequential gap in this folder: a lesson
+plan a model invents against no syllabus is a plausible document a teacher may trust.
+
+Everything needed to fill it exists — upload a PDF or `.docx` at `/admin/curriculum`,
+pick curriculum/subject/grade, the model proposes topics, you check the table, then import
+through `import_curriculum_topics()`. **No content is seeded deliberately**, because
+inventing ECZ topic codes would put fabricated references into the product.
+
+ECZ syllabuses are published by the Examinations Council of Zambia. The right next step is
+one slice — a single subject and grade — judged against a generated plan before
+transcribing more.
+
+**Two known limits worth keeping visible:**
+
+- **A scanned syllabus cannot be extracted.** Extraction reads the text layer with `unpdf`
+  or `mammoth`; a scan has none, and the route detects that and says so rather than
+  reporting zero topics. Anthropic reads PDFs natively and would handle it — a concrete
+  reason to put credit on that key.
+- **Exported diagrams are Mermaid source, not pictures**, stated on the page rather than
+  hidden. Rendering Mermaid needs a browser, so doing it properly belongs on the client
+  where Mermaid already runs.
+
+---
+
 ## Purpose
 
 This document defines the complete lesson planner — the RAG architecture, the curriculum knowledge base, the standalone B2C teacher product, the lesson plan output format, and the embedding pipeline. Every Claude Code session building any lesson planner feature must read this document first.

@@ -12,6 +12,26 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Layer 1 (Upstash) is real; the CDN layer is not configured.**
+
+Built: `apps/web/lib/features.ts` (`zsms:features:*`, 5-minute TTL) and
+`apps/web/lib/rate-limit.ts` (`zsms:ratelimit:*`, window TTL, fixed window, applied in
+middleware ahead of authentication).
+
+Both fail **open**. A caching layer that takes the product down when it fails is worse
+than no caching layer, and ZSMS is a school's attendance register on a Monday morning.
+The honest consequence for the rate limiter is that a Redis outage is also an open
+window — the right way round, because the alternative is certain downtime to avoid
+occasional exposure.
+
+Not configured: Cloudflare CDN, edge caching, and the zone itself. The security headers
+this document's sibling `CLOUDFLARE_WAF.md` specifies are set at the ORIGIN instead, so
+they survive the proxy being bypassed.
+
+---
+
 ## Purpose
 
 This document defines every cache in ZSMS — what is cached, where, for how long, under what key, and critically when it is invalidated. It covers the Upstash Redis application cache, the Cloudflare CDN edge cache, and Next.js ISR. Every Claude Code session that adds a hot-path lookup, changes a configuration table, or builds a public page must read this document before choosing a TTL.
@@ -50,21 +70,42 @@ The governing tension is specific to this product. ZSMS pricing and feature acce
 ### Key naming convention
 
 ```
-{namespace}:{scope}:{identifier}:{key}
+zsms:{namespace}:{identifier}[:{qualifier}]
 ```
+
+**Every key begins `zsms:`.** This was added on 2026-10-11 to match what the code had
+always done, rather than renaming working keys to match a document nobody had
+implemented. The prefix earns its place: an Upstash database is a shared resource, and a
+product that namespaces everything it writes can share one with something else — or be
+cleared without touching a neighbour — which a bare `school:{id}` cannot.
 
 | Namespace | Purpose | Example |
 |---|---|---|
-| `config` | Dynamic configuration values | `config:platform:global:trial_length_days` |
-| `tier_features` | Tier feature matrix | `tier_features:growth` |
-| `school_overrides` | Per-school feature overrides | `school_overrides:{school_id}` |
-| `module_subs` | Active module subscriptions | `module_subs:{school_id}` |
-| `school` | School record | `school:{school_id}` |
-| `ratelimit` | Rate limit counters | `ratelimit:session:{user_id}:{window}` |
-| `session` | Session metadata cache | `session:{clerk_session_id}` |
-| `metrics` | Precomputed dashboard metrics | `metrics:platform:daily:{date}` |
+| `features` | Resolved feature access for a school | `zsms:features:{school_id}` |
+| `config` | Dynamic configuration values | `zsms:config:trial_length_days` |
+| `tier_features` | Tier feature matrix | `zsms:tier_features:growth` |
+| `school` | School record | `zsms:school:{school_id}` |
+| `ratelimit` | Rate limit counters | `zsms:ratelimit:{policy}:{ip}:{window}` |
+| `metrics` | Precomputed dashboard metrics | `zsms:metrics:daily:{date}` |
 
-Keys are always lowercase, colon-delimited, and namespaced by scope so a school-scoped value can never collide with another school's. **Never construct a key from user input without validation** — a key containing a school-supplied string is a cache-poisoning vector.
+Keys are lowercase, colon-delimited, and namespaced so a school-scoped value can never
+collide with another school's. **Never construct a key from user input without
+validation** — a key containing a school-supplied string is a cache-poisoning vector.
+
+Two namespaces the earlier draft listed are gone rather than renamed.
+`module_subs` has no table behind it — per-module billing does not exist, and
+`CLAUDE.md` tracks that as open. `session` is Clerk's job; caching session metadata
+beside Clerk's own would be a second source of truth about who somebody is.
+
+#### What is implemented
+
+`apps/web/lib/features.ts` (`zsms:features:*`, 5-minute TTL) and
+`apps/web/lib/rate-limit.ts` (`zsms:ratelimit:*`, window-length TTL). The other
+namespaces are reserved, not built.
+
+Both fail **open** — a cache miss on an unreachable Redis reads through to the database,
+and an unreachable Redis in the rate limiter allows the request. A caching layer that
+takes the product down when it fails is worse than no caching layer.
 
 ### TTL bands
 
@@ -268,3 +309,4 @@ Rate limit counters share the Redis instance. A Redis outage therefore disables 
 | 2026-08-13 | Key naming convention and TTL bands defined | Cache keys were specified ad hoc across PRICING.md and RATE_LIMITS.md |
 | 2026-08-13 | Invalidation matrix documented | Database-driven pricing is only honest if invalidation is reliable |
 | 2026-08-13 | CDN rules on authenticated responses and signed URLs made absolute | Both failure modes are cross-tenant security incidents |
+| 2026-10-11 | **Key convention changed to match the code, not the reverse** | `zsms:` prefixes every key; the code had always done this and the prefix is worth keeping — a shared Upstash database needs it. Dropped `module_subs` (no table) and `session` (Clerk's job). |

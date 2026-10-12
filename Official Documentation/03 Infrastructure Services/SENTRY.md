@@ -10,6 +10,23 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Server reporting live; the browser half is dark by a second, deliberate decision.**
+
+`SENTRY_DSN` is set on dev and the server reports. `NEXT_PUBLIC_SENTRY_DSN` is unset, so
+browser errors go nowhere — and that is a decision rather than an oversight: a DSN inlined
+into a browser bundle is public, readable by anyone who views source and usable by anyone
+who wants to spend the quota.
+
+It is worth accepting that trade, because most of what a school reports as "ZSMS is broken
+today" is a browser exception nobody else can see.
+
+Session replay is **off and should stay off**: it records the DOM, and the DOM of a ZSMS
+screen is a class register with children's names on it.
+
+---
+
 ## Purpose
 
 This document covers Sentry configuration for ZSMS — how errors are captured across the web app, mobile app, and Edge Functions, what alert rules are configured, and how to investigate a Sentry error back to the relevant audit log entry or queued job. Every Claude Code session adding error handling must reference this document to ensure consistent Sentry integration.

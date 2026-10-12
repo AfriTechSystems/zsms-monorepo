@@ -13,6 +13,27 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, and the most complete module in this folder.** `timetables`,
+`timetable_periods`, `timetable_slots`, with `create_timetable()`, `set_timetable_slot()`,
+`move_timetable_slot()`, `clear_timetable_slot()`, `publish_timetable()`,
+`timetable_move_conflicts()` and `timetable_slot_options()`.
+
+Conflict detection is real: `timetable_move_conflicts()` is what makes this document's
+claim true that "assignments define possibility; the timetable defines actuality"
+(`ASSIGNMENTS.md`).
+
+`0239` gives pupils read access to their own class's **published** timetable — a draft is
+a work in progress, and a pupil turning up to a room that moved before the school
+announced it is the failure.
+
+**One correction to how publication is described:** `timetables.published` is a BOOLEAN
+with `published_at`, not a `status` column. Checked with `db:cols` while writing `0239`,
+where assuming otherwise would have failed at run time.
+
+---
+
 ## Purpose
 
 This document defines the complete timetable system — how timetables are structured, how the drag-and-drop builder works, how conflict detection prevents scheduling errors, how timetables are viewed by different user roles, and how the timetable connects to attendance and results modules. Every Claude Code session building any timetable feature must read this document.

@@ -28,6 +28,16 @@ export interface BatchStudent {
 
 export interface ReportCardBatchDeps {
   loadBranding(schoolId: string): Promise<SchoolBranding>
+  /**
+   * What this school chose to show, and the principal's words for this term.
+   *
+   * Optional so existing callers and tests keep working: when absent the renderer
+   * applies its own defaults, which are "show everything" — the card every school
+   * got before `0258` existed.
+   */
+  loadTemplate?(
+    schoolId: string,
+  ): Promise<{ options: Record<string, boolean>; principalComments: Record<string, string> }>
   loadBatch(input: {
     schoolId: string
     academicYear: string
@@ -69,6 +79,22 @@ export async function handleReportCardBatch(
   const branding = await deps.loadBranding(input.schoolId)
   const gradingScaleName = await deps.gradingScaleName?.(input.schoolId)
 
+  /*
+    Resolved once for the whole batch, like the branding above — a four-hundred
+    pupil run must not ask the database the same configuration question four
+    hundred times.
+  */
+  const template = await deps.loadTemplate?.(input.schoolId)
+
+  /*
+    The principal's comment for THIS term, picked out here rather than in the
+    renderer. The renderer is handed a comment or nothing, and never has to know
+    that comments are stored per term — which is also what stops last term's words
+    appearing on this term's cards.
+  */
+  const principalComment =
+    template?.principalComments?.[`${input.academicYear}-${input.termNumber}`] ?? null
+
   const students = await deps.loadBatch(input)
 
   const result: ReportCardBatchResult = {
@@ -103,6 +129,8 @@ export async function handleReportCardBatch(
     try {
       const pdf = await renderReportCard({
         school: branding,
+        options: template?.options,
+        principalComment,
         studentName: s.studentName,
         studentCode: s.studentCode,
         className: s.classId,

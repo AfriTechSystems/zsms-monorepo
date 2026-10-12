@@ -54,10 +54,10 @@ VALUES
 
 INSERT INTO public.students (id, student_id, school_id, first_name, last_name, grade_id, class_id)
 VALUES
- ('aaaa0000-0000-0000-0000-000000000001','STU-A-1','11111111-1111-1111-1111-111111111111','Alice','Mwale','grade_7','grade_7a'),
- ('bbbb0000-0000-0000-0000-000000000001','STU-B-1','22222222-2222-2222-2222-222222222222','Ben','Mwale','grade_4','grade_4a'),
+ ('aaaa0000-0000-0000-0000-000000000001','STU-ZM-LSK-0001-00001','11111111-1111-1111-1111-111111111111','Alice','Mwale','grade_7','grade_7a'),
+ ('bbbb0000-0000-0000-0000-000000000001','STU-ZM-NDL-0002-00001','22222222-2222-2222-2222-222222222222','Ben','Mwale','grade_4','grade_4a'),
  -- Another family at Alpha, so "only my own children" has something to fail on.
- ('dddd0000-0000-0000-0000-000000000001','STU-A-2','11111111-1111-1111-1111-111111111111','Other','Family','grade_7','grade_7a');
+ ('dddd0000-0000-0000-0000-000000000001','STU-ZM-LSK-0001-00002','11111111-1111-1111-1111-111111111111','Other','Family','grade_7','grade_7a');
 
 INSERT INTO public.parents (id, clerk_user_id, phone_e164, full_name, preferred_contact)
 VALUES

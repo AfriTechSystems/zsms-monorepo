@@ -11,6 +11,19 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Not built, by decision, and not a gap.** PowerSync is a paid service and has not been
+purchased. ZSMS is built online-first; ADR-004's offline-first attendance is deferred
+until the service exists.
+
+There are zero PowerSync references in the tree. Nothing half-built is waiting — the
+mobile app reads and writes over the network like the web app, and a teacher with no
+signal cannot mark a register. That is the accepted consequence and it should be stated
+to a school before they rely on it in a rural setting.
+
+---
+
 ## Purpose
 
 This document covers how PowerSync is configured to enable offline capability in the ZSMS React Native mobile app. It defines the sync rules, conflict resolution strategy, first-time sync experience, and how the PowerSync token lifecycle relates to Clerk sessions. Every Claude Code session building mobile offline features must read this document.

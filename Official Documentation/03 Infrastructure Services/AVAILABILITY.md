@@ -13,6 +13,28 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Health reporting built; monitoring, alerting and recovery are not.**
+
+Built: `GET /api/health` returns component-level status rather than a bare 200, so an
+alert can name what is down. It is exempt from rate limiting — limiting the health check
+means the monitor reports an outage caused by the monitor.
+
+Not built, and each needs an account or a paid plan rather than code:
+
+- **Uptime monitoring.** Nothing polls `/api/health`. The endpoint exists and nobody is
+  listening.
+- **Alert routing.** No pager, no escalation path.
+- **Point-in-time recovery verification.** Supabase offers PITR on paid plans; `zsms-dev`
+  is free and holds synthetic data, so there is nothing yet to verify against.
+- **The Railway hot standby** (`RAILWAY.md`) and replication lag monitoring.
+
+The recovery objectives below are therefore targets with nothing measuring them, which is
+worth knowing before quoting them to a customer.
+
+---
+
 ## Purpose
 
 This document defines ZSMS's availability commitments, how uptime is monitored, how backups are taken and — more importantly — verified, and the consolidated runbooks for recovering from each failure mode. It is the operational counterpart to `SECURITY_POLICIES.md` and supplies the evidence the SOC 2 Availability criterion requires.

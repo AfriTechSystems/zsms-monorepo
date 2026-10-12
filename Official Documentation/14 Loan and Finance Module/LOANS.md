@@ -14,6 +14,24 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, and gated.** `loan_module` has been a feature flag since `0095`, enforced in
+**both** places that matter: `submit_loan_application()` refuses without it, and
+`/api/school/loans` checks `schoolHasFeature()` before rendering. A school on Starter does
+not see the module at all.
+
+Screens: `/admin/loans` and `/admin/lenders` for AfriTech, `/school/[code]/fees/loans` for
+the school, `/parent/loans` for the parent.
+
+**The data lives in `private`**, not `public` — `private.loan_applications`,
+`private.loan_consent_log`, `private.consent_templates`. That is ADR-018 and it is the
+right call: a loan application holds an employer, a monthly income and a payslip, which is
+materially more sensitive than anything else in the tree, and `private` is never reachable
+from client-side code (prohibition 9).
+
+---
+
 ## Purpose
 
 This document defines the complete loan module — what it is, how it works across three phases of evolution, the three-party relationship between ZSMS, parents, and lenders, and how the module connects to the rest of the ZSMS system. Every Claude Code session building any loan feature must read this document before starting.

@@ -11,6 +11,21 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, and immutable by construction.** `private.loan_consent_log` records each consent
+with its template version, and `private.refuse_consent_mutation()` is attached to stop any
+UPDATE or DELETE reaching it.
+
+That trigger is the whole point: a consent record that can be edited is not evidence. The
+application also carries `consent_version` and `consented_at`, so the version a parent
+agreed to is attached to the thing they agreed about rather than only to a log entry.
+
+`private.consent_templates` holds the versioned wording, which is what makes "they
+consented to v2" a statement anybody can check.
+
+---
+
 ## Purpose
 
 This document defines the explicit consent flow that every parent must complete before any loan application data is collected. It covers the consent screens, the consent text, scroll verification, the consent log record, and why this design satisfies Zambian financial services and data protection requirements. Every Claude Code session building the consent flow must read this document in full.

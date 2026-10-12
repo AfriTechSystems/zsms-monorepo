@@ -500,6 +500,68 @@ export type Database = {
           },
         ]
       }
+      api_key_usage: {
+        Row: {
+          api_key_id: string
+          created_at: string
+          id: string
+          method: string
+          path: string
+          required_scope: string | null
+          school_id: string
+          status_code: number
+        }
+        Insert: {
+          api_key_id: string
+          created_at?: string
+          id?: string
+          method: string
+          path: string
+          required_scope?: string | null
+          school_id: string
+          status_code: number
+        }
+        Update: {
+          api_key_id?: string
+          created_at?: string
+          id?: string
+          method?: string
+          path?: string
+          required_scope?: string | null
+          school_id?: string
+          status_code?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_key_usage_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "school_api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_key_usage_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "api_key_usage_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "api_key_usage_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           academic_year: string
@@ -823,6 +885,73 @@ export type Database = {
         }
         Relationships: []
       }
+      document_templates: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          doc_type: string
+          id: string
+          is_active: boolean
+          layout_variant: string | null
+          school_id: string
+          template_config: Json
+          template_level: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          doc_type: string
+          id?: string
+          is_active?: boolean
+          layout_variant?: string | null
+          school_id: string
+          template_config?: Json
+          template_level?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          doc_type?: string
+          id?: string
+          is_active?: boolean
+          layout_variant?: string | null
+          school_id?: string
+          template_config?: Json
+          template_level?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "document_templates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "document_templates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exam_results: {
         Row: {
           academic_year: string
@@ -833,6 +962,10 @@ export type Database = {
           created_at: string
           entered_by_user_id: string
           grade_letter: string | null
+          grade_override: string | null
+          grade_override_at: string | null
+          grade_override_by: string | null
+          grade_override_reason: string | null
           grade_points: number | null
           grading_scale_version_id: string | null
           id: string
@@ -861,6 +994,10 @@ export type Database = {
           created_at?: string
           entered_by_user_id: string
           grade_letter?: string | null
+          grade_override?: string | null
+          grade_override_at?: string | null
+          grade_override_by?: string | null
+          grade_override_reason?: string | null
           grade_points?: number | null
           grading_scale_version_id?: string | null
           id?: string
@@ -889,6 +1026,10 @@ export type Database = {
           created_at?: string
           entered_by_user_id?: string
           grade_letter?: string | null
+          grade_override?: string | null
+          grade_override_at?: string | null
+          grade_override_by?: string | null
+          grade_override_reason?: string | null
           grade_points?: number | null
           grading_scale_version_id?: string | null
           id?: string
@@ -1273,6 +1414,73 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      impersonation_sessions: {
+        Row: {
+          actor_role: string
+          actor_token_id: string | null
+          actor_user_id: string
+          ended_at: string | null
+          ended_reason: string | null
+          expires_at: string
+          id: string
+          reason: string
+          started_at: string
+          target_school_id: string | null
+          target_user_id: string
+          ticket_ref: string | null
+        }
+        Insert: {
+          actor_role: string
+          actor_token_id?: string | null
+          actor_user_id: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          expires_at: string
+          id?: string
+          reason: string
+          started_at?: string
+          target_school_id?: string | null
+          target_user_id: string
+          ticket_ref?: string | null
+        }
+        Update: {
+          actor_role?: string
+          actor_token_id?: string | null
+          actor_user_id?: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          expires_at?: string
+          id?: string
+          reason?: string
+          started_at?: string
+          target_school_id?: string | null
+          target_user_id?: string
+          ticket_ref?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impersonation_sessions_target_school_id_fkey"
+            columns: ["target_school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "impersonation_sessions_target_school_id_fkey"
+            columns: ["target_school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "impersonation_sessions_target_school_id_fkey"
+            columns: ["target_school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -1898,6 +2106,7 @@ export type Database = {
           last_login_at: string | null
           marketing_opt_in: boolean
           marketing_opt_in_at: string | null
+          marketing_prompted_at: string | null
           national_id: string | null
           phone_e164: string | null
           preferred_contact: string
@@ -1913,6 +2122,7 @@ export type Database = {
           last_login_at?: string | null
           marketing_opt_in?: boolean
           marketing_opt_in_at?: string | null
+          marketing_prompted_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
           preferred_contact?: string
@@ -1928,6 +2138,7 @@ export type Database = {
           last_login_at?: string | null
           marketing_opt_in?: boolean
           marketing_opt_in_at?: string | null
+          marketing_prompted_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
           preferred_contact?: string
@@ -2429,6 +2640,137 @@ export type Database = {
           },
         ]
       }
+      school_api_keys: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          rate_limit_rpm: number
+          revoked_at: string | null
+          revoked_by: string | null
+          school_id: string
+          scopes: string[]
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          rate_limit_rpm?: number
+          revoked_at?: string | null
+          revoked_by?: string | null
+          school_id: string
+          scopes?: string[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          rate_limit_rpm?: number
+          revoked_at?: string | null
+          revoked_by?: string | null
+          school_id?: string
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_api_keys_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_api_keys_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_api_keys_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_attendance_alert_settings: {
+        Row: {
+          alert_on_statuses: string[]
+          max_age_days: number
+          per_absence_alert_enabled: boolean
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+          via_email: boolean
+          via_push: boolean
+          via_whatsapp: boolean
+        }
+        Insert: {
+          alert_on_statuses?: string[]
+          max_age_days?: number
+          per_absence_alert_enabled?: boolean
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+          via_email?: boolean
+          via_push?: boolean
+          via_whatsapp?: boolean
+        }
+        Update: {
+          alert_on_statuses?: string[]
+          max_age_days?: number
+          per_absence_alert_enabled?: boolean
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          via_email?: boolean
+          via_push?: boolean
+          via_whatsapp?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_attendance_alert_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_attendance_alert_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_attendance_alert_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_branding: {
         Row: {
           anchor_color: string | null
@@ -2833,6 +3175,64 @@ export type Database = {
             foreignKeyName: "school_custom_roles_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_fee_reminder_settings: {
+        Row: {
+          cooldown_days: number
+          is_enabled: boolean
+          reminder_days: number[]
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+          via_email: boolean
+          via_in_app: boolean
+          via_whatsapp: boolean
+        }
+        Insert: {
+          cooldown_days?: number
+          is_enabled?: boolean
+          reminder_days?: number[]
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+          via_email?: boolean
+          via_in_app?: boolean
+          via_whatsapp?: boolean
+        }
+        Update: {
+          cooldown_days?: number
+          is_enabled?: boolean
+          reminder_days?: number[]
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          via_email?: boolean
+          via_in_app?: boolean
+          via_whatsapp?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_fee_reminder_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_fee_reminder_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_fee_reminder_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
@@ -5109,6 +5509,67 @@ export type Database = {
           },
         ]
       }
+      webhook_events: {
+        Row: {
+          error_message: string | null
+          event_id: string
+          event_type: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          provider: string
+          received_at: string
+          school_id: string | null
+          status: string
+        }
+        Insert: {
+          error_message?: string | null
+          event_id: string
+          event_type?: string | null
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          provider: string
+          received_at?: string
+          school_id?: string | null
+          status?: string
+        }
+        Update: {
+          error_message?: string | null
+          event_id?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          provider?: string
+          received_at?: string
+          school_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "webhook_events_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "webhook_events_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       feature_catalogue: {
@@ -5698,9 +6159,37 @@ export type Database = {
           out_retained: string
         }[]
       }
+      admin_api_key_entitlement: {
+        Args: never
+        Returns: {
+          out_active_keys: number
+          out_has_read: boolean
+          out_has_write: boolean
+          out_school_id: string
+          out_school_name: string
+          out_write_scoped: boolean
+        }[]
+      }
       admin_attach_clerk_org: {
         Args: { p_clerk_org_id: string; p_school_id: string }
         Returns: boolean
+      }
+      admin_business_metrics: {
+        Args: never
+        Returns: {
+          arr_zmw: number
+          collected_this_month: number
+          invoiced_unpaid: number
+          loan_commission_earned: number
+          loan_commission_unpaid: number
+          mrr_zmw: number
+          nrr_available: boolean
+          paying_schools: number
+          trial_conversion_pct: number
+          trials_active: number
+          trials_converted: number
+          trials_expired: number
+        }[]
       }
       admin_create_override: {
         Args: {
@@ -5855,6 +6344,17 @@ export type Database = {
         Args: { p_invitation_id: string; p_school_id: string }
         Returns: boolean
       }
+      admin_revenue_by_tier: {
+        Args: never
+        Returns: {
+          display_name: string
+          mrr_share_pct: number
+          mrr_zmw: number
+          schools: number
+          students: number
+          tier_name: string
+        }[]
+      }
       admin_revoke_override: {
         Args: { p_actor: string; p_id: string }
         Returns: boolean
@@ -5887,6 +6387,23 @@ export type Database = {
           out_teachers_assigned: number
         }[]
       }
+      admin_school_cost_drivers: {
+        Args: { p_since_days?: number }
+        Returns: {
+          out_active_pupils: number
+          out_ai_credits_spent: number
+          out_api_calls: number
+          out_documents: number
+          out_message_quota: number
+          out_messages_used: number
+          out_school_code: string
+          out_school_id: string
+          out_school_name: string
+          out_staff: number
+          out_status: string
+          out_tier: string
+        }[]
+      }
       admin_set_onboarding_task: {
         Args: {
           p_assigned_to?: string
@@ -5900,6 +6417,15 @@ export type Database = {
       }
       admin_set_platform_setting: {
         Args: { p_key: string; p_reason: string; p_value: string }
+        Returns: string
+      }
+      admin_set_staff_scope: {
+        Args: {
+          p_country_code?: string
+          p_school_id?: string
+          p_scope_kind: string
+          p_staff_user_id: string
+        }
         Returns: string
       }
       admin_set_tier_feature: {
@@ -5933,6 +6459,18 @@ export type Database = {
           out_price: number
           out_sort_order: number
           out_subscribers: number
+        }[]
+      }
+      admin_trial_status: {
+        Args: never
+        Returns: {
+          out_days_left: number
+          out_is_overdue: boolean
+          out_name: string
+          out_school_code: string
+          out_school_id: string
+          out_status: string
+          out_trial_ends_at: string
         }[]
       }
       admin_update_loan_application: {
@@ -6012,6 +6550,11 @@ export type Database = {
       admin_void_invoice: {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: Json
+      }
+      afritech_role: { Args: never; Returns: string }
+      afritech_school_in_scope: {
+        Args: { p_school_id: string }
+        Returns: boolean
       }
       ai_allowance_for_account: {
         Args: { p_account_id: string }
@@ -6121,6 +6664,7 @@ export type Database = {
             }
             Returns: boolean
           }
+      answer_departure_prompt: { Args: { p_opt_in: boolean }; Returns: boolean }
       archive_old_ai_conversations: { Args: never; Returns: number }
       attach_own_registered_school: {
         Args: { p_clerk_org_id: string; p_school_id: string }
@@ -6147,6 +6691,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      begin_impersonation_session: {
+        Args: {
+          p_actor_token_id: string
+          p_expires_at: string
+          p_reason: string
+          p_target_school_id?: string
+          p_target_user_id: string
+          p_ticket_ref: string
+        }
+        Returns: string
       }
       calculate_behaviour_score: {
         Args: { p_monthly_income?: number; p_parent_user_id: string }
@@ -6175,6 +6730,18 @@ export type Database = {
           out_already_linked: number
           out_email: string
           out_linked: number
+        }[]
+      }
+      claim_webhook_event: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_payload: Json
+          p_provider: string
+        }
+        Returns: {
+          out_id: string
+          out_is_duplicate: boolean
         }[]
       }
       clear_student_custom_values: {
@@ -6245,6 +6812,15 @@ export type Database = {
       }
       complete_job_run: {
         Args: { p_error?: string; p_job_run_id: string; p_status: string }
+        Returns: undefined
+      }
+      complete_webhook_event: {
+        Args: {
+          p_error?: string
+          p_id: string
+          p_school_id?: string
+          p_status: string
+        }
         Returns: undefined
       }
       consume_message_quota: {
@@ -6358,6 +6934,10 @@ export type Database = {
         Args: { p_school_id: string }
         Returns: boolean
       }
+      end_impersonation_session: {
+        Args: { p_reason?: string }
+        Returns: boolean
+      }
       ensure_my_staff_record: {
         Args: {
           p_email?: string
@@ -6419,6 +6999,24 @@ export type Database = {
           grade_points: number
         }[]
       }
+      grant_staff_permission: {
+        Args: {
+          p_action: string
+          p_expires_at?: string
+          p_grantee_user_id: string
+          p_module: string
+          p_reason: string
+          p_scope_detail?: string
+        }
+        Returns: {
+          out_expires_at: string
+          out_grant_id: string
+        }[]
+      }
+      has_afritech_capability: {
+        Args: { p_capability: string }
+        Returns: boolean
+      }
       has_permission_grant: {
         Args: { p_action: string; p_module: string }
         Returns: boolean
@@ -6444,6 +7042,18 @@ export type Database = {
       is_own_student_record: {
         Args: { p_student_id: string }
         Returns: boolean
+      }
+      is_valid_student_id: { Args: { p_student_id: string }; Returns: boolean }
+      issue_api_key: {
+        Args: {
+          p_expires_at?: string
+          p_key_hash: string
+          p_key_prefix: string
+          p_name: string
+          p_rate_limit?: number
+          p_scopes: string[]
+        }
+        Returns: string
       }
       lenders_for_application: {
         Args: { p_score?: number }
@@ -6498,7 +7108,27 @@ export type Database = {
           out_swapped_with: string
         }[]
       }
+      my_afritech_capabilities: {
+        Args: never
+        Returns: {
+          out_capabilities: string[]
+          out_role: string
+          out_scoped: boolean
+        }[]
+      }
       my_ai_credits: { Args: never; Returns: Json }
+      my_attendance_alerts: {
+        Args: never
+        Returns: {
+          out_configured: boolean
+          out_enabled: boolean
+          out_max_age_days: number
+          out_statuses: string[]
+          out_via_email: boolean
+          out_via_push: boolean
+          out_via_whatsapp: boolean
+        }[]
+      }
       my_children: {
         Args: never
         Returns: {
@@ -6513,6 +7143,25 @@ export type Database = {
         }[]
       }
       my_custom_permissions: { Args: never; Returns: Json }
+      my_departure_prompt: {
+        Args: never
+        Returns: {
+          out_school_name: string
+          out_show: boolean
+          out_status: string
+          out_student_name: string
+        }[]
+      }
+      my_document_template: {
+        Args: { p_doc_type: string }
+        Returns: {
+          out_can_use_layouts: boolean
+          out_config: Json
+          out_configured: boolean
+          out_layout_variant: string
+          out_level: string
+        }[]
+      }
       my_erasure_status: {
         Args: never
         Returns: {
@@ -6522,6 +7171,17 @@ export type Database = {
           out_pending: boolean
           out_requested_at: string
           out_retain_years: number
+        }[]
+      }
+      my_impersonation_context: {
+        Args: never
+        Returns: {
+          out_actor_user_id: string
+          out_expires_at: string
+          out_is_impersonating: boolean
+          out_reason: string
+          out_started_at: string
+          out_target_user_id: string
         }[]
       }
       my_loan_applications: {
@@ -6590,6 +7250,18 @@ export type Database = {
           out_sort_order: number
         }[]
       }
+      my_reminder_settings: {
+        Args: never
+        Returns: {
+          out_configured: boolean
+          out_cooldown_days: number
+          out_is_enabled: boolean
+          out_reminder_days: number[]
+          out_via_email: boolean
+          out_via_in_app: boolean
+          out_via_whatsapp: boolean
+        }[]
+      }
       my_school_invoices: {
         Args: never
         Returns: {
@@ -6619,6 +7291,21 @@ export type Database = {
           out_school_code: string
           out_school_name: string
           out_school_uuid: string
+        }[]
+      }
+      my_student_record: {
+        Args: never
+        Returns: {
+          out_class_id: string
+          out_display_id: string
+          out_first_name: string
+          out_grade_id: string
+          out_is_alumnus: boolean
+          out_last_name: string
+          out_school_id: string
+          out_school_name: string
+          out_status: string
+          out_student_id: string
         }[]
       }
       my_teacher_hub: {
@@ -6697,6 +7384,10 @@ export type Database = {
         }[]
       }
       next_student_sequence: { Args: { p_school_id: string }; Returns: number }
+      next_transfer_reference: {
+        Args: { p_school_id: string }
+        Returns: string
+      }
       parent_can_access_fee_record: {
         Args: { p_fee_record_id: string }
         Returns: boolean
@@ -6764,6 +7455,16 @@ export type Database = {
       rate_teaching_resource: {
         Args: { p_id: string; p_rating: number }
         Returns: number
+      }
+      record_api_key_usage: {
+        Args: {
+          p_key_id: string
+          p_method: string
+          p_path: string
+          p_scope?: string
+          p_status: number
+        }
+        Returns: undefined
       }
       record_generated_document: {
         Args: {
@@ -6890,6 +7591,7 @@ export type Database = {
           out_trial_ends_at: string
         }[]
       }
+      reminder_days_are_sane: { Args: { p_days: number[] }; Returns: boolean }
       request_my_erasure: {
         Args: { p_reason?: string }
         Returns: {
@@ -6976,6 +7678,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      revoke_api_key: { Args: { p_key_id: string }; Returns: boolean }
+      revoke_staff_permission: {
+        Args: { p_grant_id: string }
+        Returns: boolean
+      }
       save_exam_marks: {
         Args: {
           p_academic_year: string
@@ -6996,6 +7703,18 @@ export type Database = {
         Returns: {
           out_assigned: number
           out_unassigned_remaining: number
+        }[]
+      }
+      school_attendance_alerts: {
+        Args: { p_school_id: string }
+        Returns: {
+          out_configured: boolean
+          out_enabled: boolean
+          out_max_age_days: number
+          out_statuses: string[]
+          out_via_email: boolean
+          out_via_push: boolean
+          out_via_whatsapp: boolean
         }[]
       }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
@@ -7108,6 +7827,15 @@ export type Database = {
           out_linked: boolean
         }[]
       }
+      school_document_template: {
+        Args: { p_doc_type: string; p_school_id: string }
+        Returns: {
+          out_config: Json
+          out_configured: boolean
+          out_layout_variant: string
+          out_level: string
+        }[]
+      }
       school_feature_resolution: {
         Args: { p_school_id: string }
         Returns: {
@@ -7173,6 +7901,24 @@ export type Database = {
           total_weight: number
         }[]
       }
+      school_permission_grants: {
+        Args: never
+        Returns: {
+          out_action: string
+          out_expires_at: string
+          out_expires_in_days: number
+          out_granted_at: string
+          out_grantee_id: string
+          out_grantee_name: string
+          out_grantor_name: string
+          out_id: string
+          out_is_active: boolean
+          out_module: string
+          out_reason: string
+          out_revoked_at: string
+          out_scope_detail: string
+        }[]
+      }
       school_public_profile: {
         Args: { p_school_code: string }
         Returns: {
@@ -7211,6 +7957,18 @@ export type Database = {
           out_purchase_id: string
           out_total_amount: number
           out_total_credits: number
+        }[]
+      }
+      school_reminder_settings: {
+        Args: { p_school_id: string }
+        Returns: {
+          out_configured: boolean
+          out_cooldown_days: number
+          out_is_enabled: boolean
+          out_reminder_days: number[]
+          out_via_email: boolean
+          out_via_in_app: boolean
+          out_via_whatsapp: boolean
         }[]
       }
       school_revoke_credit_assignment: {
@@ -7341,6 +8099,29 @@ export type Database = {
           out_type: string
         }[]
       }
+      set_attendance_alerts: {
+        Args: {
+          p_enabled: boolean
+          p_max_age_days: number
+          p_statuses: string[]
+          p_via_email: boolean
+          p_via_push: boolean
+          p_via_whatsapp: boolean
+        }
+        Returns: boolean
+      }
+      set_document_template: {
+        Args: { p_config: Json; p_doc_type: string; p_layout_variant?: string }
+        Returns: boolean
+      }
+      set_grade_override: {
+        Args: { p_grade: string; p_reason: string; p_result_id: string }
+        Returns: {
+          out_computed: string
+          out_grade: string
+          out_is_override: boolean
+        }[]
+      }
       set_incident_status: {
         Args: { p_incident_id: string; p_note?: string; p_status: string }
         Returns: boolean
@@ -7356,6 +8137,29 @@ export type Database = {
           out_done: boolean
           out_message: string
         }[]
+      }
+      set_principal_comment: {
+        Args: {
+          p_academic_year: string
+          p_comment: string
+          p_term_number: number
+        }
+        Returns: boolean
+      }
+      set_reminder_settings: {
+        Args: {
+          p_cooldown_days: number
+          p_is_enabled: boolean
+          p_reminder_days: number[]
+          p_via_email: boolean
+          p_via_in_app: boolean
+          p_via_whatsapp: boolean
+        }
+        Returns: boolean
+      }
+      set_school_branding_colours: {
+        Args: { p_anchor_color: string; p_primary_color: string }
+        Returns: boolean
       }
       set_school_public_profile: {
         Args: {
@@ -7479,6 +8283,13 @@ export type Database = {
           term_number: number
         }[]
       }
+      tables_with_dead_policies: {
+        Args: never
+        Returns: {
+          out_policy_count: number
+          out_table_name: string
+        }[]
+      }
       teacher_credit_balances: {
         Args: never
         Returns: {
@@ -7584,7 +8395,28 @@ export type Database = {
           out_unlocked: boolean
         }[]
       }
+      update_my_staff_profile: {
+        Args: {
+          p_email?: string
+          p_first_name?: string
+          p_last_name?: string
+          p_location?: string
+          p_phone_e164?: string
+          p_photo_url?: string
+          p_qualifications?: string
+        }
+        Returns: boolean
+      }
       use_community_resource: { Args: { p_id: string }; Returns: string }
+      verify_api_key: {
+        Args: { p_key_hash: string }
+        Returns: {
+          out_key_id: string
+          out_rate_limit: number
+          out_school_id: string
+          out_scopes: string[]
+        }[]
+      }
       verify_payment: {
         Args: { p_decision: string; p_payment_id: string; p_reason?: string }
         Returns: {
@@ -7669,18 +8501,34 @@ export type Database = {
         }
         Returns: undefined
       }
+      worker_due_absence_alerts: {
+        Args: { p_limit?: number; p_school_id?: string }
+        Returns: {
+          out_attendance_date: string
+          out_class_id: string
+          out_parent_email: string
+          out_parent_name: string
+          out_parent_phone: string
+          out_parent_user_id: string
+          out_record_id: string
+          out_school_id: string
+          out_school_name: string
+          out_status: string
+          out_student_id: string
+          out_student_name: string
+          out_via_email: boolean
+          out_via_push: boolean
+          out_via_whatsapp: boolean
+        }[]
+      }
       worker_due_fee_reminders: {
-        Args: {
-          p_cooldown_days?: number
-          p_limit?: number
-          p_min_days_overdue?: number
-          p_school_id?: string
-        }
+        Args: { p_limit?: number; p_school_id?: string }
         Returns: {
           out_arrears_amount: string
           out_currency: string
           out_days_overdue: number
           out_fee_record_id: string
+          out_is_final: boolean
           out_parent_email: string
           out_parent_name: string
           out_parent_phone: string
@@ -7689,7 +8537,24 @@ export type Database = {
           out_school_name: string
           out_student_id: string
           out_student_name: string
+          out_threshold_days: number
+          out_via_email: boolean
+          out_via_in_app: boolean
+          out_via_whatsapp: boolean
         }[]
+      }
+      worker_expire_overdue_trials: {
+        Args: never
+        Returns: {
+          out_ended_at: string
+          out_name: string
+          out_school_code: string
+          out_school_id: string
+        }[]
+      }
+      worker_mark_absence_alerted: {
+        Args: { p_record_id: string }
+        Returns: boolean
       }
       worker_mark_reminder_sent: {
         Args: { p_fee_record_id: string }
@@ -7724,6 +8589,22 @@ export type Database = {
         Returns: boolean
       }
       worker_school_branding: { Args: { p_school_id: string }; Returns: Json }
+      worker_transfer_letter_context: {
+        Args: { p_student_id: string }
+        Returns: {
+          out_enrolled_on: string
+          out_final_grade: string
+          out_kind: string
+          out_ministry_reg: string
+          out_principal_name: string
+          out_school_code: string
+          out_school_id: string
+          out_school_name: string
+          out_student_code: string
+          out_student_name: string
+          out_transferred_on: string
+        }[]
+      }
       worker_update_dispatch: {
         Args: {
           p_failure_reason?: string

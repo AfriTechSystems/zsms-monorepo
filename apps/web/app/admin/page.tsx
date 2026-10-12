@@ -19,7 +19,9 @@ import {
   Building2,
   CalendarClock,
   HeartPulse,
+  Hourglass,
   ReceiptText,
+  TrendingUp,
   TriangleAlert,
   Users,
   Wallet,
@@ -46,8 +48,43 @@ interface Metrics {
   payments_pending: number
 }
 
+/**
+ * AfriTech's own business metrics (`0261`, PLATFORM_METRICS.md).
+ *
+ * `null` when the caller lacks the `billing:read` capability — a support agent has a
+ * legitimate overview and simply does not see revenue, rather than being refused the
+ * whole page.
+ */
+interface Business {
+  mrr_zmw: string
+  arr_zmw: string
+  paying_schools: number
+  collected_this_month: string
+  invoiced_unpaid: string
+  trials_active: number
+  trials_converted: number
+  trials_expired: number
+  /** NULL when no trial has finished. "None ended" is not "none converted". */
+  trial_conversion_pct: string | null
+  loan_commission_earned: string
+  loan_commission_unpaid: string
+  /** FALSE until twelve months of subscription history exist. */
+  nrr_available: boolean
+}
+
+interface TierRevenue {
+  tier_name: string
+  display_name: string
+  schools: number
+  students: number
+  mrr_zmw: string
+  mrr_share_pct: string | null
+}
+
 interface Overview {
   metrics: Metrics | null
+  business: Business | null
+  revenueByTier: TierRevenue[]
   health: HealthRow[]
   atRisk: number
 }
@@ -81,6 +118,112 @@ export default function AdminOverviewPage(): JSX.Element {
 
       {!error && data && (
         <div className="space-y-section">
+          {/*
+            Revenue first, because this is AfriTech's own dashboard and "is the
+            business working" outranks "how many pupils are enrolled".
+
+            Rendered only when the caller holds `billing:read` (`0237`). A support
+            agent sees the operational figures below and nothing here.
+          */}
+          {data.business && (
+            <section aria-labelledby="revenue" className="mb-cards">
+              <h2 id="revenue" className="mb-stack font-medium">
+                Business
+              </h2>
+
+              <div className="grid grid-cols-2 gap-cards lg:grid-cols-3">
+                <StatCard
+                  label="Monthly recurring revenue"
+                  value={formatKwacha(data.business.mrr_zmw)}
+                  hint={`${data.business.paying_schools} paying school${
+                    data.business.paying_schools === 1 ? '' : 's'
+                  } · ${formatKwacha(data.business.arr_zmw)} a year`}
+                  tone="neutral"
+                  icon={<TrendingUp />}
+                />
+                <StatCard
+                  label="Collected this month"
+                  href="/admin/billing"
+                  hrefLabel="Billing"
+                  value={formatKwacha(data.business.collected_this_month)}
+                  hint={`${formatKwacha(data.business.invoiced_unpaid)} invoiced and unpaid`}
+                  tone={
+                    Number(data.business.invoiced_unpaid) > Number(data.business.mrr_zmw)
+                      ? 'warning'
+                      : 'neutral'
+                  }
+                  icon={<ReceiptText />}
+                />
+                <StatCard
+                  label="Trial conversion"
+                  /*
+                    An em dash, not 0%. `trial_conversion_pct` is NULL when no trial
+                    has finished yet, and "no trials have ended" is a different fact
+                    from "no trial ever converted" — which is what 0% would state.
+                  */
+                  value={
+                    data.business.trial_conversion_pct === null
+                      ? '—'
+                      : `${Number(data.business.trial_conversion_pct).toFixed(0)}%`
+                  }
+                  hint={
+                    data.business.trial_conversion_pct === null
+                      ? 'No trial has finished yet'
+                      : `${data.business.trials_converted} converted · ${data.business.trials_expired} lapsed · ${data.business.trials_active} running`
+                  }
+                  tone="neutral"
+                  icon={<Hourglass />}
+                />
+              </div>
+
+              {/*
+                Revenue by tier. PLATFORM_METRICS.md asks for the SHARE and says
+                why: if most revenue comes from few schools, that shapes sales
+                strategy — and a school count cannot show it.
+              */}
+              {data.revenueByTier.length > 0 && (
+                <ul className="mt-stack space-y-1">
+                  {data.revenueByTier.map((t) => (
+                    <li
+                      key={t.tier_name}
+                      className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                    >
+                      <span>
+                        {t.display_name}{' '}
+                        <span className="text-xs text-muted-foreground">
+                          <span data-numeric>{t.schools}</span> school
+                          {t.schools === 1 ? '' : 's'} ·{' '}
+                          <span data-numeric>{t.students}</span> pupils
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-medium" data-numeric>
+                          {formatKwacha(t.mrr_zmw)}
+                        </span>
+                        {t.mrr_share_pct !== null && (
+                          <span className="text-xs text-muted-foreground" data-numeric>
+                            {Number(t.mrr_share_pct).toFixed(0)}%
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/*
+                Said rather than omitted. An absent NRR figure looks like an
+                oversight; naming the reason makes it a known limit.
+              */}
+              {!data.business.nrr_available && (
+                <p className="mt-stack text-xs text-muted-foreground">
+                  Net revenue retention needs twelve months of subscription history to
+                  compare against. It will appear once there is a year to look back on.
+                </p>
+              )}
+            </section>
+          )}
+
           <section aria-labelledby="figures">
             <h2 id="figures" className="sr-only">
               Platform figures

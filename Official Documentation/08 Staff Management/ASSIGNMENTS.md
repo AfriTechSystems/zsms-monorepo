@@ -16,6 +16,33 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built as `teacher_assignments`, not `staff_assignments`.** The table below was
+superseded; the shape is the same idea with `scope` of `class` or `subject`, and a CHECK
+tying `subject_id` to the subject scope.
+
+**"Only one class teacher per class" was not enforced until `0250`, and three classes
+on `zsms-dev` had two.** The existing unique index covered
+`(school_id, teacher_user_id, class_id, academic_year)` — which stops the same teacher
+being assigned twice and happily permits two different teachers to hold one class.
+
+That is not cosmetic. A `scope = 'class'` assignment is what RLS reads to decide who may
+see a class's pupils, mark its register and enter its marks, so two class teachers is two
+people holding a responsibility the school believes one person holds.
+
+The duplicates were stood down rather than deleted, keeping the newest — which is exactly
+what this document's own replace flow does. The new index is partial on `is_active`, so a
+handover works by standing the previous teacher down rather than by deleting history.
+
+**Still unenforced, and deliberately:** "subject must exist" and "class must exist".
+`class_id` is TEXT with no foreign key to `school_grade_levels`, which is how grade
+structures stay school-configurable while Zambia runs two systems at once (see `ZM.md`).
+Adding a key would mean a school could not rename a grade without a migration. The
+validation belongs in the route, and is a real gap there.
+
+---
+
 ## Purpose
 
 This document defines the staff assignment system — how teachers are assigned to classes and subjects, the assignment matrix UI, how assignments scope what teachers can see and do across attendance, results, and the mobile app. Every Claude Code session building any feature that reads `teacher_assignments` must read this document.

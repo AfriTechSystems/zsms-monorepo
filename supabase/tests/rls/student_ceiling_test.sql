@@ -118,7 +118,10 @@ BEGIN
   INSERT INTO public.students
     (student_id, school_id, first_name, last_name, grade_id, class_id)
   VALUES
-    ('STU-ZM-LSK-0001-' || p_seq, '11111111-1111-1111-1111-111111111111',
+    -- Padded to five digits: `0247` enforces the documented format, and p_seq
+    -- is a bare counter.
+    ('STU-ZM-LSK-0001-' || lpad(p_seq::text, 5, '0'),
+     '11111111-1111-1111-1111-111111111111',
      'New', 'Pupil', 'grade_7', 'grade_7a');
 END;
 $$;

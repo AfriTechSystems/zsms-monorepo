@@ -12,6 +12,29 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**The most thoroughly built part of this folder.**
+
+`onboarding_queue`, `school_onboarding`, `onboarding_checklists` with a
+`onboarding_checklist_catalogue`, `school_onboarding_contacts`,
+`school_onboarding_completion`, plus `ensure_onboarding_checklist()`,
+`refresh_onboarding_checklist()`, `admin_set_onboarding_task()`,
+`set_onboarding_override()`, `admin_record_onboarding_contact()` and
+`my_onboarding_progress()` — so the school sees its own progress and AfriTech sees the
+queue.
+
+Provisioning is end to end: `/api/admin/schools/provision`, `/activate`, `/provisioning`,
+and self-registration through `/register` with `register_school()` (`0150`).
+
+**Two things worth knowing before onboarding a real school.** Clerk's free plan caps an
+organisation at **five members**, so a school with six staff cannot be fully onboarded —
+a paid plan is a launch prerequisite. And `school_onboarding_contacts` is deliberately
+exempt from `0149`'s write-blocking status guard, because AfriTech must be able to log a
+call to a suspended school.
+
+---
+
 ## Purpose
 
 This document defines the AfriTech-side onboarding workflow — how AfriTech manages the process of getting a new school from registration to a fully configured, actively using ZSMS account. Covers outreach requirements, the task queue, the onboarding call checklist, email automation, and escalation rules. Every Claude Code session building AfriTech admin onboarding features must read this document.

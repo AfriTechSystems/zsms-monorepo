@@ -12,6 +12,39 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Correction: Tier 1 is NOT "already built", and the table it names does not exist.**
+
+The text below says native webhooks connect immediately "using the existing
+`school_webhooks` table". Checked on 2026-10-11: **there is no `school_webhooks` table**,
+there never was, and no outgoing webhook dispatch exists in any form. ADR-023 carries the
+same claim and `CLAUDE.md` already flags it; this document is where somebody would read it
+first.
+
+What exists is `school_integrations` (`0230`, ADR-023) — the registry, with
+`events_subscribed`, `config`, `is_active`/`is_paused` and `integration_log`. The
+**configuration** is built. The **dispatch** is not.
+
+| Tier | Documented state | Actual state |
+|---|---|---|
+| 1 — Native webhooks | "Already built" | **Not built.** Registry only; nothing sends |
+| 2 — Pre-built connectors | Phase 2 | **Sage 50 CSV export built** (`0263`). The API ones are credential-blocked |
+| 3 — Zapier/Make | Phase 3 | Not built, correctly |
+
+**Sage 50 is built because it is the only connector that needs nothing.** This document's
+own schema comment says so: "NULL for `sage_50_export` (no auth needed)". Every other
+connector waits on OAuth, an API key, or `FIELD_ENCRYPTION_KEY`.
+
+**Outgoing dispatch is blocked on one specific thing**, and it is worth naming precisely:
+a signed webhook needs a signing secret ZSMS can retrieve in **plaintext** to compute the
+HMAC. `credentials_enc` refuses anything not prefixed `enc:v1:`, and
+`FIELD_ENCRYPTION_KEY` is unset — so the secret cannot be stored without either the key
+or a decision to keep it in the clear. The second is not acceptable, so this waits on the
+first.
+
+---
+
 ## Purpose
 
 This document defines the ZSMS integrations framework — the three-tier architecture, what connects to what, how integrations are configured, and how events flow from ZSMS to connected systems. Every Claude Code session building any integration connector must read this document before starting.

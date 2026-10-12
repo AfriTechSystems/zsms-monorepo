@@ -10,6 +10,36 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**`document_templates` is built as specified (`0258`)** — it had never been created, so a
+layout variant, the content switches, the principal's comment and the acknowledgement
+section were all unrepresentable.
+
+JSONB for `template_config` follows the shape below, and is right here for a reason worth
+stating since it would be wrong on a financial table: the switches differ per document
+type and will grow — a report card has a principal's comment and an acknowledgement slip,
+a receipt has neither — so modelling them as columns means a migration every time a
+document gains an option. **Nothing in this config is ever summed, compared or joined on.**
+
+**The principal's comment is keyed `"YEAR-TERM"`, which this document is specific about
+and which matters more than it looks.** A single field would mean last term's words
+silently printing on this term's cards. `set_principal_comment()` is also separate from
+`set_document_template()`: the switches are set once a year and the comment every term, so
+making the head resend the whole config to add a paragraph is how a switch gets clobbered.
+
+**A bug found by this migration's own assertion, worth recording.** The first version
+merged the comment with `jsonb_set(config, ARRAY['principal_comments', key], …, TRUE)`.
+`create_missing` creates only the **last** element of a path, so while
+`principal_comments` did not yet exist the call returned the target unchanged and **every
+comment write silently did nothing** — a head would have typed a paragraph, seen no error,
+and found the cards blank. It now merges with `||` at each level.
+
+**Not built:** the template preview system. A school sees its changes on the next card it
+generates. Worth building, and it needs a sample-data path rather than a real pupil.
+
+---
+
 ## Purpose
 
 This document is the technical reference for the document template configuration system — how template settings are stored, loaded at generation time, and applied to each PDF component. Every Claude Code session building template configuration UI or reading template config in a PDF renderer must read this document.

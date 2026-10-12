@@ -11,6 +11,31 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built, and the RLS enforcement this document insists on is real.**
+
+`start_ai_conversation()`, `ai_assistant_begin()`, `ai_conversations`, `ai_messages`, with
+`archive_old_ai_conversations()` for retention. The assistant reads through the caller's
+own policies rather than a service role, so it cannot surface a pupil the asker could not
+already see — which is the whole basis for letting a model near a class register.
+
+`ai_assistant_quota()` meters it, and `school_data_completeness()` implements the gate
+this document describes: ≥70% full, 50–69% limited, <50% locked.
+
+**Zero conversations exist on dev**, which is expected rather than a gap.
+
+**`ai_models` holds two providers**, OpenAI and Anthropic, ordered by priority. OpenAI has
+answered a real call (`npm run ai:smoke` — `gpt-4o`, 6.2s, schema-valid structured
+output). **Failover TO Anthropic has never executed**: the key has no credit, so the chain
+has only ever been observed leaving a provider, never arriving at the second one.
+
+That matters more than it sounds. A failover path that has never run is not a failover
+path — it is an untested branch that will be exercised for the first time during an
+outage.
+
+---
+
 ## Purpose
 
 This document defines the role-based AI assistant — how questions are interpreted, how structured queries are generated, how Claude narrates results, and how RLS boundaries are enforced. Every Claude Code session building the AI assistant must read this document before starting.

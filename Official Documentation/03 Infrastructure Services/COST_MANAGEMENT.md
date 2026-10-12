@@ -11,6 +11,26 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Unit economics built; cost tracking is not, and cannot be from inside ZSMS.**
+
+`/admin/costs` (`0240`) reports what each school CONSUMES — pupils, staff, AI credits
+spent, messages against quota, documents, audited writes. Gated on `billing:read`, so a
+loan officer is refused.
+
+It shows no money, deliberately. The nine services below are external accounts with
+their own credentials; ZSMS cannot read their invoices, and a figure invented here would
+eventually be used to price a tier. Consumption is the part that can be measured
+honestly, and it is the part that decides whether a tier is priced right — a 40-pupil
+school sending 2,000 messages is a different proposition from a 900-pupil school sending
+50, and no hosting invoice reveals that.
+
+**Not built:** billing alerts, and the expensive-patterns audit. Both want real spend
+data first.
+
+---
+
 ## Purpose
 
 This document defines how AfriTech monitors, attributes, and controls cloud spend across every ZSMS service. It sets billing alert thresholds, defines the cost-per-school unit economics that determine whether tier pricing is sustainable, and catalogues the expensive code patterns that cause surprise bills. Every Claude Code session introducing a new external service call, a scheduled job, or a bulk operation should check this document for the pattern it is about to create.

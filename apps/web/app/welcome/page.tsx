@@ -160,6 +160,35 @@ export default async function WelcomePage(): Promise<JSX.Element> {
   if (linkedAsParent) redirect('/parent')
 
   /**
+   * A pupil, or somebody who used to be one.
+   *
+   * Checked AFTER the parent claim and before giving up, because the two are not
+   * exclusive — a secondary pupil can also be a parent at the same school in a small
+   * town, and the parent portal is the more urgent of the two.
+   *
+   * `my_student_record()` keys on `students.clerk_user_id` and says nothing about the
+   * organisation claim (`0239`), so this is also how an ALUMNUS gets in: their org
+   * membership is gone, and their pupil row still carries their Clerk id. AUTH.md
+   * describes `/alumni` as a separate door; it is the same room, and the portal says
+   * plainly which of the two you are.
+   *
+   * Swallowed on failure for the same reason as the parent call above: a dispatcher
+   * that 500s is the lockout again in a new costume.
+   */
+  let isPupil = false
+  try {
+    const client = await createUserClient()
+    if (client) {
+      const { data } = await client.rpc('my_student_record').maybeSingle()
+      isPupil = Boolean((data as { out_student_id?: string } | null)?.out_student_id)
+    }
+  } catch {
+    // Deliberately silent; the choice below still renders.
+  }
+
+  if (isPupil) redirect('/student')
+
+  /**
    * Still nothing. Both destinations below are real and reachable, and sign-out is present —
    * which is the whole point of rendering rather than redirecting.
    */

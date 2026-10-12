@@ -36,6 +36,16 @@ export async function GET(): Promise<Response> {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
 
+    /*
+      The departure prompt rides along with the preferences read.
+
+      It belongs here rather than on its own endpoint because the parent portal
+      already fetches preferences, and a second request on every page load to ask
+      "should I show a card" is a round-trip for a question whose answer is almost
+      always no.
+    */
+    const prompt = await client.rpc('my_departure_prompt').maybeSingle()
+
     const { data, error } = await client
       .from('parents')
       .select(
@@ -66,6 +76,29 @@ export async function GET(): Promise<Response> {
       serviceMessages: data.whatsapp_opted_in,
       marketing: data.marketing_opt_in,
       marketingChangedAt: data.marketing_opt_in_at,
+
+      /*
+        TRANSFER.md and PARENT_LINKING.md both describe this: asked once when a
+        child leaves, never pre-ticked. A failure to resolve it must not fail the
+        preferences page, so an error reads as "do not ask".
+      */
+      departurePrompt: prompt.error
+        ? null
+        : (() => {
+            const row = prompt.data as {
+              out_show: boolean
+              out_student_name: string | null
+              out_school_name: string | null
+              out_status: string | null
+            } | null
+            return row?.out_show
+              ? {
+                  studentName: row.out_student_name,
+                  schoolName: row.out_school_name,
+                  status: row.out_status,
+                }
+              : null
+          })(),
     })
   })
 }
@@ -123,6 +156,33 @@ export async function PATCH(request: Request): Promise<Response> {
           : parsed.data.marketing === false
             ? 'Saved. AfriTech will not send you promotional messages.'
             : 'Preferences saved.',
+    })
+  })
+}
+
+/**
+ * Answers the departure prompt.
+ *
+ * Separate from PATCH because it is not a preference change — it is a one-time
+ * question, and clicking Continue without ticking is an ANSWER. `answer_departure_prompt()`
+ * stamps `marketing_prompted_at` either way so the card does not return, which a plain
+ * preference update would not do.
+ */
+export async function PUT(request: Request): Promise<Response> {
+  return guard(async () => {
+    const body = await request.json().catch(() => null)
+    const optIn = (body as { optIn?: unknown } | null)?.optIn === true
+
+    const client = await createUserClient()
+    if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    const { error } = await client.rpc('answer_departure_prompt', { p_opt_in: optIn })
+    if (error) return fromPostgrestError(error)
+
+    return ok({
+      message: optIn
+        ? 'Thank you. You will hear from AfriTech occasionally — no more than four messages a month.'
+        : 'Noted. AfriTech will not send you anything.',
     })
   })
 }

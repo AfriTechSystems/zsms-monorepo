@@ -9,6 +9,42 @@
 
 ---
 
+## Implementation Status (2026-10-11)
+
+**Built end to end, including the letter.**
+
+The external transfer and withdrawal flow lives on the pupil's own page —
+`/school/[code]/students/[id]`, exactly where this document says — calling
+`transfer_student()` through `POST /api/school/students/year-end`.
+
+**The transfer letter was the gap, and it is closed.** `transfer_letter` had been an
+allowed `doc_type` since `0087`, a type in `packages/documents`, and listed in
+`/api/documents` — and nothing ever rendered one. A school transferring a pupil had no
+letter for the family, which is the one physical artefact a transfer produces.
+
+- `renderTransferLetter()` produces it to the contents specified below.
+- `0246` adds `worker_transfer_letter_context()` and `next_transfer_reference()`.
+- The job is **queued**, not rendered in the request, so the pupil's status still changes
+  when R2 is briefly unavailable — the status must not fail; the letter is retryable.
+- Stored at `{school_id}/documents/transfers/{reference}.pdf`, as specified, because a
+  registrar may be handed a signed URL years later and a path that moved between releases
+  is a link that stopped working for the document people keep longest.
+- The checkbox is ticked by default, as recommended here.
+
+The reference counts letters already issued rather than using a sequence: a sequence
+would also number transfers whose letter failed to render, so the reference would drift
+from the letters that exist.
+
+**Alumni access after transfer is built** — `0239` keys pupil access on
+`students.clerk_user_id` and never on the organisation claim, so a transferred pupil
+keeps reading their own history. See ADR-046.
+
+**Not built:** the marketing opt-in prompt at transfer. `parents.marketing_opt_in`
+exists and defaults FALSE (`0229`); the prompt described below is a screen nobody has
+written yet.
+
+---
+
 ## Purpose
 
 This document defines the student transfer flow — how a student moves from one school to another, what happens to their historical data at the origin school, and how parents and students retain permanent read-only alumni access after transfer.

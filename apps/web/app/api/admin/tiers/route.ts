@@ -49,12 +49,24 @@ export async function GET(): Promise<Response> {
     const client = await createUserClient()
     if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
 
-    const [tiers, schools] = await Promise.all([
+    const [tiers, schools, allowances] = await Promise.all([
       client
         .from('subscription_tier_catalogue')
         .select('*')
         .order('display_order', { ascending: true }),
       client.from('schools').select('subscription_tier, status'),
+      /*
+        Included AI credits per tier (`0264`).
+
+        `afritech.tier_ai_allowances` was empty with nothing able to write it, so
+        every school on every tier resolved to zero included credits and the only
+        way to change that was a migration. That is the failure ADR-031 exists to
+        prevent, and this is the read half of the fix.
+
+        Gated on `billing:read`, so its error is tolerated below rather than
+        failing the page for an operator who may legitimately not see it.
+      */
+      client.rpc('admin_tier_ai_allowances'),
     ])
 
     if (tiers.error) return fromPostgrestError(tiers.error)
@@ -68,7 +80,22 @@ export async function GET(): Promise<Response> {
       billingPerTier[row.subscription_tier] = (billingPerTier[row.subscription_tier] ?? 0) + 1
     }
 
-    return ok({ tiers: tiers.data ?? [], billingPerTier })
+    /*
+      Keyed by tier so the screen can look one up without scanning, and carrying
+      `isSet` because "deliberately zero" and "nobody has decided" are different
+      facts a pricing screen must not conflate.
+    */
+    const aiAllowances: Record<string, { credits: number; isSet: boolean }> = {}
+    if (!allowances.error) {
+      for (const row of (allowances.data ?? []) as Array<Record<string, unknown>>) {
+        aiAllowances[row['out_tier_name'] as string] = {
+          credits: Number(row['out_monthly_credits'] ?? 0),
+          isSet: Boolean(row['out_is_set']),
+        }
+      }
+    }
+
+    return ok({ tiers: tiers.data ?? [], billingPerTier, aiAllowances })
   })
 }
 
@@ -115,5 +142,53 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       .maybeSingle()
 
     return ok(data)
+  })
+}
+
+/**
+ * PUT — set a tier's included monthly AI credits.
+ *
+ * Spec: `18 AI Module/AI_OVERVIEW.md`, ADR-031
+ *
+ * Separate from PATCH (which edits prices and ceilings) because it is a different
+ * decision made at a different time, and `admin_set_tier_ai_allowance()` requires
+ * `billing:write` while some tier fields do not.
+ *
+ * No amounts are defaulted here or in `0264`: the table stays empty until somebody
+ * decides, because a seeded guess would make a commercial decision by accident.
+ */
+const allowanceSchema = z.object({
+  tierName: z.string().trim().min(1).max(40),
+  // 0 is meaningful: it records a decision that this tier includes none.
+  monthlyCredits: z.number().int().min(0).max(100000),
+})
+
+export async function PUT(request: NextRequest): Promise<Response> {
+  return guard(async () => {
+    const parsed = allowanceSchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) {
+      return fail('VALIDATION_ERROR', parsed.error.issues[0]?.message ?? 'Invalid request.')
+    }
+
+    const client = await createUserClient()
+    if (!client) return fail('UNAUTHORIZED', 'Authentication required.')
+
+    const { error } = await client.rpc('admin_set_tier_ai_allowance', {
+      p_tier_name: parsed.data.tierName,
+      p_monthly_credits: parsed.data.monthlyCredits,
+    })
+
+    if (error) {
+      if (error.code === '42501') return fail('FORBIDDEN', error.message)
+      if (error.code === '22023') return fail('VALIDATION_ERROR', error.message)
+      return fromPostgrestError(error)
+    }
+
+    return ok({
+      message:
+        parsed.data.monthlyCredits === 0
+          ? 'Saved. This tier now explicitly includes no AI credits.'
+          : `Saved. Schools on this tier now include ${parsed.data.monthlyCredits} AI credits a month.`,
+    })
   })
 }

@@ -41,6 +41,7 @@
  */
 
 import type { JSX } from 'react'
+import { AiAura } from './ai-aura'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -361,12 +362,20 @@ export function AssistantPanel({
       <aside
         role="dialog"
         aria-label="Ask AI"
-        className={`fixed inset-y-0 right-0 z-50 flex h-dvh flex-col border-l border-border bg-surface shadow-2xl transition-[width] ${
+        /*
+          `bg-surface` stays, and stays SOLID. The aura is painted inside the panel
+          behind its own scrim, not by making the panel translucent — a translucent
+          panel would show the dashboard through it, which is what makes text hard to
+          read on a busy screen.
+        */
+        className={`fixed inset-y-0 right-0 z-50 flex h-dvh flex-col overflow-hidden border-l border-border bg-surface shadow-2xl transition-[width] ${
           expanded ? 'w-full lg:w-[48rem]' : 'w-full sm:w-[26rem]'
         }`}
       >
+        <AiAura />
+
         {/* ---------------- header ---------------- */}
-        <header className="flex items-center gap-1 border-b border-border p-stack">
+        <header className="relative flex items-center gap-1 border-b border-border p-stack">
           <button
             type="button"
             onClick={() => setHistoryOpen((v) => !v)}
@@ -413,7 +422,7 @@ export function AssistantPanel({
 
         {/* ---------------- history ---------------- */}
         {historyOpen && (
-          <div className="border-b border-border p-stack">
+          <div className="relative border-b border-border p-stack">
             <div className="relative">
               <Search
                 aria-hidden="true"
@@ -460,7 +469,7 @@ export function AssistantPanel({
         )}
 
         {/* ---------------- conversation ---------------- */}
-        <div className="flex-1 overflow-y-auto p-card">
+        <div className="relative flex-1 overflow-y-auto p-card">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center gap-cards pt-cards">
               <div className="text-center">
@@ -629,7 +638,7 @@ export function AssistantPanel({
 
         {/* ---------------- composer ---------------- */}
         <form
-          className="border-t border-border p-stack"
+          className="relative border-t border-border p-stack"
           onSubmit={(e) => {
             e.preventDefault()
             void send(draft)

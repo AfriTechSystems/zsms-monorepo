@@ -178,6 +178,27 @@ export default function AdminOverviewPage(): JSX.Element {
     }
   }, [data?.history, range])
 
+  /*
+    Sparkline series, from the same snapshots as the chart.
+
+    Taken from the LAST 12 captured days rather than thinned by month: a sparkline is
+    answering "which way lately", and a monthly point loses every movement inside the
+    month. The chart and the sparkline are deliberately different resolutions because
+    they answer different questions.
+
+    Empty when there are fewer than three days — `StatCard` draws nothing, rather than
+    a two-point straight line that says "steady" regardless of what happened.
+  */
+  const sparks = useMemo(() => {
+    const recent = (data?.history ?? []).slice(-12)
+    if (recent.length < 3) return { schools: undefined, students: undefined, mrr: undefined }
+    return {
+      schools: recent.map((h) => h.out_schools_total),
+      students: recent.map((h) => h.out_students_total),
+      mrr: recent.map((h) => Number(h.out_mrr_zmw)),
+    }
+  }, [data?.history])
+
 
   return (
     <>
@@ -221,6 +242,7 @@ export default function AdminOverviewPage(): JSX.Element {
               <div className="grid grid-cols-2 gap-cards lg:grid-cols-3">
                 <StatCard
                   label="Monthly recurring revenue"
+                  spark={sparks.mrr}
                   value={formatKwacha(data.business.mrr_zmw)}
                   hint={`${data.business.paying_schools} paying school${
                     data.business.paying_schools === 1 ? '' : 's'
@@ -332,6 +354,7 @@ export default function AdminOverviewPage(): JSX.Element {
             <div className="grid grid-cols-2 gap-cards lg:grid-cols-3">
               <StatCard
                 label="Schools"
+                spark={sparks.schools}
                 href="/admin/schools"
                 hrefLabel="All schools"
                 value={String(data.metrics?.schools_total ?? 0)}

@@ -87,6 +87,18 @@ export interface StatCardProps {
    * rather than a quantity (storage used, marks entered, staff seats).
    */
   progress?: number
+  /**
+   * A tiny trend line behind the figure (reference W1).
+   *
+   * Needs at least **three** points. Two draw a straight line, which says "steady"
+   * regardless of what happened — a shape that reads as information while carrying
+   * none. Fewer than three and nothing is drawn.
+   *
+   * It is deliberately unlabelled and unreadable in detail: it answers "which way,
+   * roughly" at a glance, and `trend` beside it carries the number. Anybody needing
+   * the values opens the chart the card links to.
+   */
+  spark?: number[]
   className?: string
 }
 
@@ -100,6 +112,7 @@ export function StatCard({
   hrefLabel,
   trend,
   trendLabel,
+  spark,
   trendUp = 'good',
   progress,
   className,
@@ -212,6 +225,15 @@ export function StatCard({
         </p>
       )}
 
+      {/*
+        The sparkline. Under the figure and the trend, not behind them: behind would
+        put a coloured line through the one number the card exists to show, and a
+        figure is harder to read over a shape than over nothing.
+      */}
+      {Array.isArray(spark) && spark.length >= 3 && (
+        <Sparkline points={spark} className={t.mark} />
+      )}
+
       {typeof progress === 'number' && (
         <div className="mt-2">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-current/15">
@@ -250,5 +272,55 @@ export function StatCard({
     >
       {body}
     </Link>
+  )
+}
+
+/**
+ * A sparkline: the shape of a series, with no axes, labels or values.
+ *
+ * Normalised to its own minimum and maximum, so a flat-ish series still shows its
+ * shape rather than a dead horizontal line — the card is answering "which way", and
+ * a series that moved from 400 to 404 did move. The trade is that two sparklines are
+ * NOT comparable to each other, which is why neither carries a number.
+ */
+function Sparkline({ points, className }: { points: number[]; className?: string }): JSX.Element {
+  const width = 100
+  const height = 24
+
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  // A perfectly flat series has no range to divide by; draw it down the middle
+  // rather than dividing by zero.
+  const span = max - min || 1
+
+  const d = points
+    .map((p, i) => {
+      const x = (i / (points.length - 1)) * width
+      const y = height - ((p - min) / span) * height
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      role="presentation"
+      aria-hidden="true"
+      className={cn('mt-2 h-6 w-full', className)}
+    >
+      <path
+        d={d}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        /* Scaling a stroke with the viewBox would make it thick on a wide card and
+           hairline on a narrow one. */
+        vectorEffect="non-scaling-stroke"
+        opacity={0.85}
+      />
+    </svg>
   )
 }

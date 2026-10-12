@@ -182,3 +182,262 @@
     animation: none;
   }
 }
+
+/* ===========================================================================
+   The Ask AI aura
+   ---------------------------------------------------------------------------
+   A slow, soft bloom behind the assistant panel, in the ZSMS palette.
+
+   ## Why CSS and not a canvas
+
+   The reference is a particle field rendered in a shader. A canvas running a
+   requestAnimationFrame loop behind a panel that may sit open all afternoon costs
+   battery on exactly the phones this product has to support — and on an old Android
+   it costs frames the message list needs. Three blurred gradients animated by the
+   compositor cost nothing per frame and look like the reference at the size it is
+   actually seen.
+
+   ## Why it cannot make text unreadable
+
+   The aura is painted on its own layer UNDER a solid `bg-surface`-tinted scrim, and
+   every blob is clipped to the panel. Contrast is therefore decided by the scrim, not
+   by wherever a blob happens to drift — which is the failure mode of putting colour
+   directly behind text. Opacity is deliberately low: the aura should be noticed when
+   looked for and never while reading.
+
+   ## Motion
+
+   Three different durations and no shared origin, so the shapes never resolve into a
+   pulse — a synchronised throb reads as a loading state and this is decoration.
+   Frozen entirely under `prefers-reduced-motion`, where the static gradient still
+   carries the look.
+   =========================================================================== */
+
+@keyframes zsms-aura-a {
+  0%,
+  100% {
+    transform: translate3d(-8%, -4%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(10%, 8%, 0) scale(1.18);
+  }
+}
+
+@keyframes zsms-aura-b {
+  0%,
+  100% {
+    transform: translate3d(6%, 6%, 0) scale(1.12);
+  }
+  50% {
+    transform: translate3d(-10%, -6%, 0) scale(0.92);
+  }
+}
+
+@keyframes zsms-aura-c {
+  0%,
+  100% {
+    transform: translate3d(0, 8%, 0) scale(0.95);
+  }
+  50% {
+    transform: translate3d(8%, -8%, 0) scale(1.22);
+  }
+}
+
+.zsms-aura {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Its own stacking context, so a blob can never paint over panel content
+     regardless of what the content's own z-index turns out to be. */
+  isolation: isolate;
+}
+
+.zsms-aura__blob {
+  position: absolute;
+  border-radius: 9999px;
+  /* `filter: blur` on a large element is the expensive part, so the blobs are few
+     and the radius is modest. `will-change` keeps them on the compositor. */
+  filter: blur(44px);
+  will-change: transform;
+}
+
+.zsms-aura__blob--a {
+  inset: -18% -10% auto -14%;
+  height: 58%;
+  background: radial-gradient(circle at 50% 50%, #3a8dde, transparent 68%);
+  opacity: 0.4;
+  animation: zsms-aura-a 19s ease-in-out infinite;
+}
+
+.zsms-aura__blob--b {
+  inset: 12% -22% auto auto;
+  width: 72%;
+  height: 54%;
+  background: radial-gradient(circle at 50% 50%, #7c5bd9, transparent 68%);
+  opacity: 0.34;
+  animation: zsms-aura-b 24s ease-in-out infinite;
+}
+
+.zsms-aura__blob--c {
+  inset: auto -12% -20% -16%;
+  height: 56%;
+  background: radial-gradient(circle at 50% 50%, #1ba0b0, transparent 70%);
+  opacity: 0.36;
+  animation: zsms-aura-c 29s ease-in-out infinite;
+}
+
+/*
+  The scrim. This is what guarantees the panel stays readable: it sits between the
+  aura and the content, so text contrast is a fixed decision rather than a function
+  of where a blob has drifted to.
+*/
+.zsms-aura__scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zsms-aura__blob {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+   Printing
+   ---------------------------------------------------------------------------
+   Schools in Zambia print registers and mark sheets, and keep paper alongside the
+   system rather than instead of it — a register signed on paper is what survives a
+   power cut and what an inspector asks for. Printing one today also prints the
+   sidebar, the header and every button, so the page that comes out is unusable.
+
+   This is deliberately global rather than per screen. A school will print whatever
+   is on screen, not only the two pages we expect, so the chrome is removed
+   everywhere and each screen only has to opt its own extras out with
+   `.print-hide`.
+   =========================================================================== */
+
+@media print {
+  /*
+    Black on white regardless of theme. A school printing from dark mode would
+    otherwise send a page of near-black ink through a printer that charges by the
+    cartridge — and the output is unreadable anyway.
+  */
+  :root {
+    --color-surface: #ffffff;
+    --color-sunken: #ffffff;
+    --color-foreground: #000000;
+    --color-border: #999999;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* The application's own chrome. */
+  aside,
+  nav[aria-label$='sections'],
+  .print-hide {
+    display: none !important;
+  }
+
+  /*
+    The sticky header goes, and so does the stickiness: a `position: sticky` element
+    repeats at the top of every printed page in some browsers, which looks like a
+    defect in the data.
+  */
+  header.sticky {
+    display: none !important;
+  }
+
+  [class*='sticky'],
+  [class*='fixed'] {
+    position: static !important;
+  }
+
+  /* Controls cannot be pressed on paper. */
+  button,
+  [role='button'],
+  input[type='checkbox'],
+  input[type='search'] {
+    display: none !important;
+  }
+
+  /*
+    A link's text stays; its underline and colour go. Printing the href after every
+    link — a common print-stylesheet trick — would put a URL beside every pupil's
+    name on a register.
+  */
+  a {
+    color: #000000 !important;
+    text-decoration: none !important;
+  }
+
+  /*
+    Tables are the point. `DataTable` renders a real `<table>` from `sm` up and cards
+    below it, and print resolves `sm:` as false — so without this a printed register
+    is one card per pupil, several pages long. Forcing the table back is the single
+    most important rule here.
+  */
+  /*
+    Global, not opt-in per screen.
+
+    `DataTable` renders a real table from `sm` up and one card per row below it. Print
+    media does not match `sm`, so WITHOUT this every printed list is one card per
+    pupil — a 40-pupil register over several pages. Requiring each screen to opt in
+    would mean the next list somebody adds prints wrongly and nobody notices until a
+    school has wasted the paper.
+  */
+  table {
+    display: table !important;
+    width: 100% !important;
+  }
+
+  .hidden.sm\:block,
+  .hidden.sm\:table,
+  .hidden.md\:block {
+    display: revert !important;
+  }
+
+  /* The phone card list, which the table above replaces on paper. */
+  ul.sm\:hidden,
+  .sm\:hidden.divide-y {
+    display: none !important;
+  }
+
+  /* A row split across a page break loses the pupil's name from one half. */
+  tr,
+  li {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  /* Cards become plain blocks: a shadow prints as a grey smear. */
+  [class*='shadow'] {
+    box-shadow: none !important;
+  }
+
+  [class*='rounded'] {
+    border-radius: 0 !important;
+  }
+
+  /*
+    A printed page needs to say what it is and when it was taken — a register with no
+    date is worthless as a record. Screens supply this through `.print-only`, which
+    is invisible on screen and appears on paper.
+  */
+  .print-only {
+    display: block !important;
+  }
+}
+
+/* Visible on paper only. */
+.print-only {
+  display: none;
+}

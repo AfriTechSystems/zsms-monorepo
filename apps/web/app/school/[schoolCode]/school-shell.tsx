@@ -22,6 +22,7 @@
  */
 
 import type { JSX, ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BellRing,
   CalendarCheck,
@@ -71,6 +72,44 @@ export function SchoolShell({
   children: ReactNode
   headerActions?: ReactNode
 }): JSX.Element {
+  /*
+    Counts of work waiting, shown on the nav rows that lead to it (reference W1/W2).
+
+    Fetched here rather than on each screen because the point of a badge is to be seen
+    from ANYWHERE in the portal — a payment sitting unverified while somebody is
+    reading the attendance register is exactly the case it exists for.
+
+    Null on failure, which renders nothing. A nav that breaks because a count did is
+    worse than a nav with no count, and the same rule the admin shell already follows.
+
+    Gated by capability before the request is made: asking for the verification queue
+    as a teacher would be a guaranteed 403 on every page load, and a badge nobody is
+    allowed to act on is noise.
+  */
+  const [unverifiedPayments, setUnverifiedPayments] = useState<number | null>(null)
+
+  const mayVerify = can(role, 'fees:write')
+
+  useEffect(() => {
+    if (!mayVerify) return undefined
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const response = await fetch('/api/school/fees/verify')
+        if (!response.ok) return
+        const body = (await response.json()) as { data?: { pending?: unknown[] } }
+        if (!cancelled) setUnverifiedPayments(body.data?.pending?.length ?? 0)
+      } catch {
+        // Left null, which renders nothing.
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [mayVerify])
+
   /**
    * Grouped by the JOB, not by the data type — which is the correction this file is on its second
    * attempt at.
@@ -136,7 +175,7 @@ export function SchoolShell({
       // Student money. Nothing else belongs here.
       label: 'Finance',
       items: [
-        { path: '/fees', label: 'Fees & payments', icon: Wallet, needs: 'fees:read' },
+        { path: '/fees', label: 'Fees & payments', icon: Wallet, needs: 'fees:read', badge: unverifiedPayments },
       ],
     },
     {

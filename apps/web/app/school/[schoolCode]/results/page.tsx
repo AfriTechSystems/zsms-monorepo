@@ -44,6 +44,7 @@ import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
+import { PrintButton, PrintHeading } from '../../../../components/ui/print-button'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { formatLevel } from '../school-shared'
 import { ReportCards } from './report-cards'
@@ -361,7 +362,22 @@ function MarkSheet(): JSX.Element {
         title="Results"
         description="Enter marks for a class and subject, then publish the term."
         note="An empty box is not a zero. A zero is a pupil who sat the paper and scored nothing; an empty box is a pupil who was not examined, and the two mean opposite things on a report card. Grades are worked out by the school's grading scale and shown here — you enter marks, never letters. Publishing is one-way: a result a parent has seen can be corrected, but not withdrawn."
+        actions={
+          classId && subjectCode ? <PrintButton label="Print mark sheet" /> : undefined
+        }
       />
+
+      {/*
+        What the printed mark sheet is. On paper there is no header saying which class
+        or subject these marks belong to, and a sheet of numbers with no subject on it
+        cannot be filed.
+      */}
+      {classId && subjectCode && (
+        <PrintHeading
+          title={`Marks — ${subjectCode}, ${classId}`}
+          subtitle={`${academicYear}, term ${termNumber}`}
+        />
+      )}
 
       <div className="space-y-cards">
         <FormSection>

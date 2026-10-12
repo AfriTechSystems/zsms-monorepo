@@ -42,6 +42,7 @@ import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
+import { PrintButton, PrintHeading } from '../../../../components/ui/print-button'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { FormGrid, FormSection } from '../../../../components/ui/form'
 import { cn } from '../../../../lib/utils'
@@ -193,7 +194,27 @@ function Register(): JSX.Element {
         title="Attendance"
         description="Mark today's register, or open a past date to correct one."
         note="A teacher can only mark registers for the classes they are assigned to on the Teaching screen. A pupil left unmarked is recorded as nothing at all — not as present — so an unopened register never reads as a full attendance."
+        actions={classId ? <PrintButton label="Print register" /> : undefined}
       />
+
+      {/*
+        The printed sheet's own heading.
+
+        Invisible on screen; on paper it is the only thing identifying what the sheet
+        is, because the print rules have removed the header that says so. A register
+        with no class and no date is not a record of anything.
+      */}
+      {classId && (
+        <PrintHeading
+          title={`Attendance register — ${classId}`}
+          subtitle={`For ${new Date(date).toLocaleDateString('en-GB', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}`}
+        />
+      )}
 
       <FormSection className="mb-cards">
         <FormGrid columns={3}>

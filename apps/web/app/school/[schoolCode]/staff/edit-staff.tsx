@@ -33,6 +33,7 @@ import { Loader2, Save, X } from 'lucide-react'
 import { Button } from '../../../../components/ui/button'
 import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
 import { FormGrid } from '../../../../components/ui/form'
+import { Dialog } from '../../../../components/ui/dialog'
 import { apiSend } from '../../../../lib/use-api'
 import { useToast } from '../../../../components/ui/toast'
 
@@ -111,14 +112,21 @@ export function EditStaff({
   )
 
   return (
-    <form
-      onSubmit={save}
-      className="flex flex-col gap-cards rounded-lg border border-border bg-surface p-card"
+    /*
+      A modal, not a panel above the table.
+
+      Nine fields rendered inline pushed the row being edited off screen, so the
+      person filling the form could no longer see who they were editing — and on a
+      phone the table scrolled away entirely. `Dialog` uses `showModal()`, so the rest
+      of the page is inert and focus cannot wander back into a table behind the form.
+    */
+    <Dialog
+      open
+      title={`${staff.first_name} ${staff.last_name}`}
+      onClose={onCancel}
     >
+      <form id="edit-staff" onSubmit={save} className="flex flex-col gap-cards">
       <div>
-        <h3 className="font-semibold">
-          {staff.first_name} {staff.last_name}
-        </h3>
         {/* The Clerk identity. Shown for recognition, not editable — changing it here
             would desynchronise the record from the account they sign in with. */}
         <p className="text-sm text-muted-foreground">
@@ -250,6 +258,7 @@ export function EditStaff({
           Changing what they can <em>do</em> is the access control on their row.
         </p>
       </div>
-    </form>
+      </form>
+    </Dialog>
   )
 }

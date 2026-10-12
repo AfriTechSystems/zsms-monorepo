@@ -289,9 +289,9 @@ export default function StaffPage({
       {loading && !data && !error && <TableSkeleton rows={6} columns={4} />}
 
 
-      {/* Opened from a row's staff record. Above the table rather than inline, so a
-
-          form with nine fields does not push the row being edited off screen. */}
+      {/* Opened from a row's staff record, as a modal. Nine fields rendered inline
+          pushed the row being edited off screen, and on a phone scrolled the table
+          away entirely. */}
 
       {editing && (
 

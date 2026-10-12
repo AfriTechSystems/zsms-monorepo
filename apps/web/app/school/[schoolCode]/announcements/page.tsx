@@ -32,10 +32,11 @@
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check, FileText, Gauge, Loader2, Send, X } from 'lucide-react'
+import { Check, FileText, Gauge, Loader2, Megaphone, Send, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
+import { Dialog } from '../../../../components/ui/dialog'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
@@ -46,7 +47,7 @@ import { DraftNotice } from '../../../../components/ui/draft-notice'
 import { draftAge, useFormDraft } from '../../../../lib/use-form-draft'
 import { useAuth } from '@zsms/auth-provider/react'
 import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
-import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
+import { FormActions, FormGrid } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { useToast } from '../../../../components/ui/toast'
 import { RecipientPicker } from './recipient-picker'
@@ -198,6 +199,14 @@ export default function AnnouncementsPage(): JSX.Element {
   const [targetIds, setTargetIds] = useState<string[]>(prefilledIds)
   const [scheduledAt, setScheduledAt] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  /*
+    Whether the composer is open. Not persisted: a draft IS persisted, by
+    `useFormDraft`, so reopening restores the words — but reopening the DIALOG on
+    every visit would put the form back in front of a reader who came to check a
+    sent notice.
+  */
+  const [composerOpen, setComposerOpen] = useState(false)
+
   const [formError, setFormError] = useState<string | null>(null)
 
   /**
@@ -438,8 +447,24 @@ export default function AnnouncementsPage(): JSX.Element {
             </Alert>
           )}
 
+          {/*
+            The composer is a modal now, not a permanent section above the list.
+
+            An eight-field form sat above every visit to this screen, including the
+            many that are only to check whether yesterday's notice went out — so the
+            list it exists beside started below the fold. A button opens it; the list
+            is what the screen is.
+
+            State stays in the page, so a half-written message survives closing the
+            dialog, and `useFormDraft` still has it if the tab is closed.
+          */}
           {data.canWrite ? (
-            <FormSection title="Write an announcement">
+            <Dialog
+              open={composerOpen}
+              title="Write an announcement"
+              onClose={() => setComposerOpen(false)}
+            >
+
               <form onSubmit={(e) => void submit('draft', e)} noValidate>
                 {/* A starting point, not a finished message. The bracketed parts are
                     deliberately obvious so nobody sends one unedited. */}
@@ -758,11 +783,20 @@ export default function AnnouncementsPage(): JSX.Element {
                   </Button>
                 </FormActions>
               </form>
-            </FormSection>
+            </Dialog>
           ) : (
             <Alert variant="info" title="Announcements are written by the school office">
               You can see what has been sent. The owner, principal and administrator write them.
             </Alert>
+          )}
+
+          {data.canWrite && (
+            <div className="mb-cards">
+              <Button onClick={() => setComposerOpen(true)}>
+                <Megaphone aria-hidden="true" className="size-4" />
+                Write an announcement
+              </Button>
+            </div>
           )}
 
           <Card>

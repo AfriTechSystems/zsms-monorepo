@@ -36,6 +36,7 @@ import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { Field, Input, Select } from '../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../components/ui/form'
+import { Dialog } from '../../../components/ui/dialog'
 import { useToast } from '../../../components/ui/toast'
 
 interface Network {
@@ -112,6 +113,9 @@ const SCOPE_LABEL: Record<string, string> = {
 }
 
 export default function AdminNetworksPage(): JSX.Element {
+  // Whether the create form is open. Rare action, so it starts closed.
+  const [creating, setCreating] = useState(false)
+
   const { data, loading, error, code, reload } = useApi<Payload>('/api/admin/networks')
   const { toast } = useToast()
 
@@ -193,9 +197,25 @@ export default function AdminNetworksPage(): JSX.Element {
           </Alert>
         )}
 
-        <FormSection
+        {/*
+          A modal, not a permanent section.
+
+          Creating a network is rare — most visits to this screen are to look at the
+          networks that exist — and a five-field form above the list pushed it below
+          the fold on every one of them.
+        */}
+        <div className="mb-cards">
+          <Button onClick={() => setCreating(true)}>
+            <Plus aria-hidden="true" className="size-4" />
+            Create a network
+          </Button>
+        </div>
+
+        <Dialog
+          open={creating}
           title="Create a network"
           description="Only AfriTech can create one — a school's ownership is not something ZSMS can verify."
+          onClose={() => setCreating(false)}
         >
           <form onSubmit={createNetwork} noValidate>
             <FormGrid columns={2}>
@@ -243,7 +263,7 @@ export default function AdminNetworksPage(): JSX.Element {
               </Button>
             </FormActions>
           </form>
-        </FormSection>
+        </Dialog>
 
         {/*
           Groups that look like they want a network.

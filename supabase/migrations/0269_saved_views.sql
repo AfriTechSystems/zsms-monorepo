@@ -131,15 +131,41 @@ BEGIN
     RAISE EXCEPTION '0269: RLS is not enabled';
   END IF;
 
-  -- The name constraint must actually refuse a blank name.
-  BEGIN
-    INSERT INTO public.saved_views (school_id, surface, name, created_by)
-    SELECT id, 'students', '   ', 'user_test' FROM public.schools LIMIT 1;
-    RAISE EXCEPTION '0269: a blank name was accepted';
-  EXCEPTION
-    WHEN check_violation THEN NULL;
-    WHEN no_data_found THEN NULL;
-  END;
+  /*
+    The name constraint must actually refuse a blank name.
+
+    Exercised against a real school when one exists, and asserted from the catalogue
+    when none does. **The first version of this block only did the first half and
+    broke CI**: on an EMPTY database `INSERT ... SELECT ... FROM schools LIMIT 1`
+    inserts zero rows, which raises nothing at all, so the "was accepted" branch
+    fired on a database where nothing had been accepted. It passed on `zsms-dev`
+    purely because dev has seeded schools.
+
+    The general lesson is the one CI exists for: a migration verified only against a
+    populated database is not verified. Anything that exercises behaviour has to say
+    what it does when there is no data to exercise it with.
+  */
+  IF EXISTS (SELECT 1 FROM public.schools) THEN
+    BEGIN
+      INSERT INTO public.saved_views (school_id, surface, name, created_by)
+      SELECT id, 'students', '   ', 'user_test' FROM public.schools LIMIT 1;
+      RAISE EXCEPTION '0269: a blank name was accepted';
+    EXCEPTION
+      WHEN check_violation THEN NULL;
+    END;
+  ELSE
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = 'public.saved_views'::REGCLASS
+        AND contype = 'c'
+        -- Matched against how POSTGRES renders it, which is `TRIM(BOTH FROM name)`
+        -- and not the `btrim(name)` the first attempt guessed. Verified by reading
+        -- pg_get_constraintdef on the real table rather than assuming.
+        AND pg_get_constraintdef(oid) ILIKE '%length(trim(both from name))%'
+    ) THEN
+      RAISE EXCEPTION '0269: the name length constraint is missing';
+    END IF;
+  END IF;
 
   RAISE NOTICE '0269: verified — grants present, UPDATE withheld, RLS on, blank name refused';
 END;

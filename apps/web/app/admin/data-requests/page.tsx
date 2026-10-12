@@ -50,7 +50,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../../components/ui/card'
-import { PageHeader } from '../../../components/ui/data-states'
+import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { Field, Input, Select, Textarea } from '../../../components/ui/field'
 import { FormGrid } from '../../../components/ui/form'
 import { apiSend, useApi } from '../../../lib/use-api'
@@ -172,10 +172,39 @@ export default function DataRequests(): JSX.Element {
       />
 
       <div className="space-y-cards">
+        {/*
+          The queue's own loading and failure states, which this screen never had.
+
+          It matters more here than on most screens. The list is a statutory clock —
+          access and erasure within 30 days — and the old code rendered the queue only
+          when it had rows. **A failed request and an empty queue looked identical**:
+          both showed the manual lookup form and nothing else, so an operator whose
+          request had failed would conclude nobody had asked.
+        */}
+        {inbox.loading && !inbox.data && !inbox.error && <TableSkeleton rows={3} columns={3} />}
+
+        {inbox.error && (
+          <ErrorState
+            message={inbox.error}
+            code={inbox.code}
+            onRetry={inbox.reload}
+          />
+        )}
+
+        {/*
+          And an empty queue said explicitly. "Nobody has asked" is a fact an operator
+          can act on; a missing section is not distinguishable from a broken one.
+        */}
+        {!inbox.loading && !inbox.error && (inbox.data?.requests.length ?? 0) === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No access or erasure requests are waiting.
+          </p>
+        )}
+
         {/* People who have asked, before the manual tools. An operator opening this
             screen should see the queue, not a blank lookup form — the clock started
             when they asked, not when somebody noticed. */}
-        {(inbox.data?.requests.length ?? 0) > 0 && (
+        {!inbox.error && (inbox.data?.requests.length ?? 0) > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

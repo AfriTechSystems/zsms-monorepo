@@ -60,6 +60,7 @@ import { cn } from '../../lib/utils'
 import { clearAllDrafts } from '../../lib/use-form-draft'
 import { useTheme, type ThemeChoice } from '../../lib/use-theme'
 import { Avatar } from './avatar'
+import { DensityToggle } from './density-toggle'
 
 interface Portal {
   key: string
@@ -222,6 +223,16 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* --- density ----------------------------------------------------
+              Beside the theme because it is the same kind of setting: how this
+              browser shows things, remembered per device rather than per account. */}
+          <div className="flex items-center justify-between gap-2 border-b border-border p-3">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Row height
+            </span>
+            <DensityToggle />
           </div>
 
           {/* --- schools ----------------------------------------------------

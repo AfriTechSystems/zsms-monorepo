@@ -89,6 +89,7 @@ export default async function SchoolLayout({
         base={base}
         schoolName={session.school.name}
         logoUrl={session.school.logoUrl}
+        accentColor={session.school.accentColor}
         roleLabel={`${session.school.schoolCode} · ${ROLE_LABEL[session.role] ?? session.role}`}
         role={session.role}
         headerActions={

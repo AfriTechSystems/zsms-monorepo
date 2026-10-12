@@ -61,6 +61,7 @@ export function SchoolShell({
   base,
   schoolName,
   logoUrl,
+  accentColor,
   roleLabel,
   role,
   children,
@@ -70,6 +71,8 @@ export function SchoolShell({
   schoolName: string
   /** The school's logo, beside its name in the sidebar. Null renders nothing. */
   logoUrl?: string | null
+  /** A decorative stripe at the top of the sidebar. Never behind text. */
+  accentColor?: string | null
   roleLabel: string
   role: Role
   children: ReactNode
@@ -348,6 +351,7 @@ export function SchoolShell({
       base={base}
       title={schoolName}
       logoUrl={logoUrl}
+      accentColor={accentColor}
       subtitle={roleLabel}
       groups={visible}
       headerActions={

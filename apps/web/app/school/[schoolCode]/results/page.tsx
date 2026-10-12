@@ -156,6 +156,15 @@ function MarkSheet(): JSX.Element {
     numbers.
   */
   const [notes, setNotes] = useState<Record<string, string>>({})
+
+  /*
+    The order Enter walks, in the order the rows are RENDERED.
+
+    Derived from `data.rows` rather than from the DOM so the sequence is decided by
+    the same list the table is built from — reading the DOM would work until a row
+    was conditionally hidden, and then skip silently.
+  */
+  const marksOrder = useMemo(() => (data?.rows ?? []).map((r) => r.studentId), [data?.rows])
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   /**
@@ -566,6 +575,38 @@ function MarkSheet(): JSX.Element {
                           <Input
                             id={`mark-${r.studentId}`}
                             type="number"
+                            /*
+                              A stable handle for the row below, so Enter can move
+                              there. Keyed by pupil rather than by index: the list
+                              re-sorts when a filter changes, and an index would then
+                              send the teacher to a different pupil than the one under
+                              their eyes.
+                            */
+                            data-mark-for={r.studentId}
+                            onKeyDown={(e) => {
+                              if (e.key !== 'Enter') return
+                              /*
+                                Enter moves DOWN, as it does in a mark book and in
+                                every spreadsheet. Without this it submits the form —
+                                so a teacher entering forty marks either reaches for
+                                the mouse forty times, or saves the sheet by accident
+                                on the first one.
+
+                                Tab is left alone: it already moves to the next
+                                control, and taking it over would break the way
+                                somebody reaches the comment field beside the mark.
+                              */
+                              e.preventDefault()
+                              const next = marksOrder[marksOrder.indexOf(r.studentId) + 1]
+                              if (!next) return
+                              const el = document.querySelector<HTMLInputElement>(
+                                `[data-mark-for="${next}"]`,
+                              )
+                              el?.focus()
+                              // Select, so typing replaces rather than appends to a
+                              // mark that is already there.
+                              el?.select()
+                            }}
                             min={0}
                             max={total}
                             step="0.5"

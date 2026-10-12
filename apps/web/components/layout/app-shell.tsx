@@ -72,6 +72,16 @@ export interface AppShellProps {
    * on the settings screen, where somebody can act on it.
    */
   logoUrl?: string | null
+  /**
+   * The school's own colour, as a thin stripe at the top of the sidebar.
+   *
+   * **Decorative only, and deliberately so.** `school_branding.anchor_color` is
+   * CHECK-constrained to 4.5:1 against a LIGHT background, which says nothing about
+   * the dark sidebar — so the colour is never used behind text, for an active state,
+   * or for anything a reader has to perceive. A stripe carries no information, so it
+   * has no contrast requirement to fail.
+   */
+  accentColor?: string | null
   groups: NavGroup[]
   /** Account menu, theme toggle, school switcher — whatever belongs to this portal. */
   headerActions?: ReactNode
@@ -85,6 +95,7 @@ export function AppShell({
   title,
   subtitle,
   logoUrl,
+  accentColor,
   groups,
   headerActions,
   footer,
@@ -247,6 +258,14 @@ export function AppShell({
           collapsed ? 'w-16' : 'w-64',
         )}
       >
+        {accentColor && (
+          <span
+            aria-hidden="true"
+            className="block h-1 w-full shrink-0"
+            style={{ backgroundColor: accentColor }}
+          />
+        )}
+
         <div className={cn('flex items-center gap-2 border-b border-border px-4 py-3', collapsed && 'justify-center px-2')}>
           <Link href={base} className="min-w-0 flex-1">
             {collapsed ? (

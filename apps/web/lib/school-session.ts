@@ -56,6 +56,8 @@ export interface SchoolRecord {
   whatsappEnabled: boolean
   /** Beside the name in the sidebar. Null is the common case and renders nothing. */
   logoUrl: string | null
+  /** A decorative stripe at the top of the sidebar. Never behind text. */
+  accentColor: string | null
 }
 
 export interface SchoolSession {
@@ -199,6 +201,15 @@ export const requireSchoolSession = cache(async function requireSchoolSession(
       // where there is something to do about it.
       logoUrl: (school.logo_url as string | null) ?? null,
       whatsappEnabled: school.whatsapp_enabled as boolean,
+      /*
+        The school's own colour, for a decorative stripe in the sidebar.
+
+        The RAW anchor colour, not a resolved token: it is used only as a stripe with
+        nothing on it, so it needs no contrast treatment — and `school_branding`
+        already CHECK-constrains it to 4.5:1 against a light background, which is a
+        guarantee about ink rather than about this.
+      */
+      accentColor: ((branding as { anchor_color?: string | null } | null)?.anchor_color) ?? null,
     },
     capacity: toCapacity(capacityResult.data),
     theme: resolveTheme(branding),

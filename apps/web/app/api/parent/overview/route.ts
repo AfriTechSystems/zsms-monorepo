@@ -132,6 +132,9 @@ export async function GET(request: NextRequest): Promise<Response> {
         studentId: child.student_id,
         firstName: child.first_name,
         lastName: child.last_name,
+        // The school's photograph of the pupil. A parent sees it; only the school
+        // sets it, which is why there is no write path from this portal.
+        photoUrl: child.photo_url ?? null,
         gradeId: child.grade_id,
         classId: child.class_id,
         status: child.status,

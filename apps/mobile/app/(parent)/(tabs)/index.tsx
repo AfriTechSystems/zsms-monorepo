@@ -18,8 +18,9 @@
 import type { JSX } from 'react'
 import { RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { CircleAlert } from 'lucide-react-native'
+import { CalendarCheck, CircleAlert, GraduationCap, Wallet } from 'lucide-react-native'
 
+import { Avatar } from '../../../components/avatar'
 import { ChildSwitcher } from '../../../components/child-switcher'
 import { FeatureGrid } from '../../../components/feature-grid'
 import {
@@ -34,6 +35,7 @@ import {
   Title,
   usePalette,
 } from '../../../components/ui'
+import { Ring, SectionTitle, StatTile } from '../../../components/stats'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { PARENT_FEATURES, parentFeatureState } from '../../../lib/parent-features'
 import { useApi } from '../../../lib/use-api'
@@ -41,9 +43,15 @@ import { NUMERIC, SPACE, TYPE } from '../../../theme'
 
 interface Overview {
   children: Child[]
-  selected: { id: string; firstName: string; lastName: string } | null
+  selected: {
+    id: string
+    firstName: string
+    lastName: string
+    /** Set by the school. A parent sees it and cannot change it (`0265`). */
+    photoUrl?: string | null
+  } | null
   school: { name?: string } | null
-  balance: { outstanding?: number | null } | null
+  balance: { outstanding?: number | null; total_due?: number | null; total_paid?: number | null } | null
   attendance: { days: number; present: number; absent: number; rate: number | null }
   results: unknown[]
   announcements: unknown[]
@@ -64,6 +72,21 @@ export default function ParentHome(): JSX.Element {
   const kids = data?.children ?? []
   const hasChild = kids.length > 0
   const outstanding = data?.balance?.outstanding ?? 0
+
+  /*
+    How much of the term has been paid, as a percentage.
+
+    `undefined` when there is no total to be a proportion of — a school that has not
+    billed anything yet would otherwise show a full bar, which reads as "paid up"
+    when nothing has been charged at all.
+
+    Verified payments only, because that is what `student_fee_balance` nets. A parent
+    who uploaded proof this morning sees it as a claim on the Fees screen and not in
+    this bar, which is the same distinction the school side draws.
+  */
+  const totalDue = data?.balance?.total_due ?? 0
+  const paidPercent =
+    totalDue > 0 ? ((data?.balance?.total_paid ?? 0) / totalDue) * 100 : undefined
 
   return (
     <Screen>
@@ -99,57 +122,100 @@ export default function ParentHome(): JSX.Element {
 
         {hasChild && data?.selected && (
           <>
-            <View style={{ gap: 2 }}>
-              <Title>
-                {data.selected.firstName} {data.selected.lastName}
-              </Title>
-              {data.school?.name && <Caption>{data.school.name}</Caption>}
-            </View>
+            {/*
+              Who this is about, with a face.
 
-            {/* Money first. It is the question that changes what somebody does today. */}
+              The name alone sat at the top of a stack of numbers; a parent of three
+              switching between children had nothing but a line of text to confirm
+              which one they were looking at. The photograph is the school's, read-only
+              here — a parent sees what the school recorded.
+            */}
+            <Row gap={SPACE.md}>
+              <Avatar
+                name={`${data.selected.firstName} ${data.selected.lastName}`}
+                src={data.selected.photoUrl ?? null}
+                size="lg"
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Title>
+                  {data.selected.firstName} {data.selected.lastName}
+                </Title>
+                {data.school?.name && <Caption>{data.school.name}</Caption>}
+              </View>
+            </Row>
+
+            {/*
+              Money first. It is the question that changes what somebody does today.
+
+              The bar is new and it is the point: an outstanding figure on its own says
+              nothing about whether a parent is nearly finished paying or has barely
+              started, and that is what they actually want to know. It only appears
+              when a total exists to be a proportion OF.
+            */}
+            <StatTile
+              label="Fees outstanding"
+              value={kwacha(outstanding)}
+              icon={Wallet}
+              tone={outstanding > 0 ? 'danger' : 'success'}
+              progress={paidPercent}
+              hint={
+                outstanding > 0
+                  ? paidPercent === undefined
+                    ? 'Tap Fees below for the breakdown.'
+                    : `${Math.round(paidPercent)}% of this term's fees paid.`
+                  : 'Nothing owed. Thank you.'
+              }
+            />
+
+            <SectionTitle>How your child is doing</SectionTitle>
+
+            {/*
+              The ring carries attendance, because a percentage is exactly the shape a
+              ring reads well — and `null` draws an empty track with an em dash rather
+              than a red ring at zero, which for a newly enrolled pupil would be a
+              false accusation.
+            */}
             <Card>
-              <Caption>Fees outstanding</Caption>
-              <Text
-                style={[
-                  TYPE.display,
-                  NUMERIC,
-                  { color: outstanding > 0 ? c.danger : c.success },
-                ]}
-              >
-                {kwacha(outstanding)}
-              </Text>
-              <Body muted>
-                {outstanding > 0
-                  ? 'Tap Fees below for the breakdown and what has been paid.'
-                  : 'Nothing owed. Thank you.'}
-              </Body>
+              <Row gap={SPACE.lg}>
+                <Ring
+                  value={data.attendance.rate}
+                  tone={
+                    data.attendance.rate === null
+                      ? 'neutral'
+                      : data.attendance.rate >= 90
+                        ? 'success'
+                        : data.attendance.rate >= 80
+                          ? 'warning'
+                          : 'danger'
+                  }
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Row gap={SPACE.sm}>
+                    <CalendarCheck size={16} color={c.textMuted} strokeWidth={2} />
+                    <Text style={[TYPE.heading, { color: c.text }]}>Attendance</Text>
+                  </Row>
+                  <Caption>
+                    {data.attendance.days > 0
+                      ? `Present ${data.attendance.present} of ${data.attendance.days} days marked`
+                      : 'Nothing marked yet this term'}
+                  </Caption>
+                </View>
+              </Row>
             </Card>
 
-            <Row gap={SPACE.md}>
-              <Card style={{ flex: 1 }}>
-                <Caption>Attendance</Caption>
-                <Text style={[TYPE.heading, NUMERIC, { color: c.text }]}>
-                  {/* null, not 0, when there is nothing to divide by — a newly
-                      enrolled pupil showing 0% would be a false accusation. */}
-                  {data.attendance.rate === null ? '—' : `${data.attendance.rate}%`}
-                </Text>
-                <Caption>
-                  {data.attendance.days > 0
-                    ? `${data.attendance.present} of ${data.attendance.days} days`
-                    : 'Nothing marked yet'}
-                </Caption>
-              </Card>
+            <StatTile
+              label="Published results"
+              value={String(data.results.length)}
+              icon={GraduationCap}
+              tone={data.results.length > 0 ? 'primary' : 'neutral'}
+              hint={
+                data.results.length === 0
+                  ? 'None published yet this term.'
+                  : 'Tap Results below to read them.'
+              }
+            />
 
-              <Card style={{ flex: 1 }}>
-                <Caption>Published results</Caption>
-                <Text style={[TYPE.heading, NUMERIC, { color: c.text }]}>
-                  {data.results.length}
-                </Text>
-                <Caption>
-                  {data.results.length === 0 ? 'None yet this term' : 'Tap Results to read'}
-                </Caption>
-              </Card>
-            </Row>
+            <SectionTitle>Everything else</SectionTitle>
           </>
         )}
 

@@ -26,10 +26,11 @@ import type { JSX } from 'react'
 import { useMemo } from 'react'
 import { useRouter } from 'expo-router'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
-import { ChevronRight, School } from 'lucide-react-native'
+import { CalendarCheck, ChevronRight, ClipboardList, School } from 'lucide-react-native'
 
 import { FEATURES, featureState } from '../../../lib/features'
 import { FeatureGrid } from '../../../components/feature-grid'
+import { SectionTitle, StatTile } from '../../../components/stats'
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
 import { Badge, Body, Caption, Card, Row, Screen, Title, usePalette } from '../../../components/ui'
@@ -38,6 +39,10 @@ import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 interface Overview {
   school: { name?: string } | null
   assignments: Array<{ classId: string | null }>
+  /** Per class, whether today's register has been marked. */
+  classes?: Array<{ classId: string; registerMarkedToday: boolean }>
+  /** Sheets with marks entered that the head has not published. */
+  unpublishedSheets?: unknown[]
 }
 
 export default function Home(): JSX.Element {
@@ -59,6 +64,17 @@ export default function Home(): JSX.Element {
     () => new Set((data?.assignments ?? []).map((a) => a.classId).filter(Boolean)).size,
     [data],
   )
+
+  /*
+    Counted here rather than in the JSX so the two conditions that decide whether the
+    section renders at all are the same values the tiles display. Computing them twice
+    is how a heading appears above nothing.
+  */
+  const unmarkedCount = useMemo(
+    () => (data?.classes ?? []).filter((k) => !k.registerMarkedToday).length,
+    [data],
+  )
+  const unpublishedCount = data?.unpublishedSheets?.length ?? 0
 
   const today = useMemo(
     () => new Date().toLocaleDateString('en-ZM', { weekday: 'long', day: 'numeric', month: 'long' }),
@@ -108,6 +124,48 @@ export default function Home(): JSX.Element {
             </View>
           </Row>
         </Card>
+
+        {/*
+          What is outstanding today, before the grid of everything.
+
+          Built from data this screen already fetched — `classes[].registerMarkedToday`
+          and `unpublishedSheets` — and never shown as zeros. A teacher opening the app
+          between lessons wants to know whether anything is waiting, and two tiles
+          reading "0" on a quiet day is furniture that pushes the grid down.
+
+          The web screen got the same strip, from the same fields, for the same reason.
+        */}
+        {linked && (unmarkedCount > 0 || unpublishedCount > 0) && (
+          <>
+            <SectionTitle>Waiting for you</SectionTitle>
+
+            {unmarkedCount > 0 && (
+              <StatTile
+                label="Registers still to mark"
+                value={String(unmarkedCount)}
+                icon={CalendarCheck}
+                tone="warning"
+                hint={
+                  unmarkedCount === 1
+                    ? 'One class has no register for today.'
+                    : `${unmarkedCount} classes have no register for today.`
+                }
+              />
+            )}
+
+            {unpublishedCount > 0 && (
+              <StatTile
+                label="Mark sheets not published"
+                value={String(unpublishedCount)}
+                icon={ClipboardList}
+                tone="primary"
+                hint="Entered but not yet released by the head."
+              />
+            )}
+          </>
+        )}
+
+        <SectionTitle>Everything else</SectionTitle>
 
         <FeatureGrid
           features={FEATURES.map((f) => ({

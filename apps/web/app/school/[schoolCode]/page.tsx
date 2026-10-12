@@ -44,6 +44,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, StatSkeleton } from '../../../components/ui/data-states'
 import { StatCard } from '../../../components/ui/stat-card'
+import { ActivityFeed } from '../../../components/ui/activity-feed'
+import { RailPanel } from '../../../components/ui/context-rail'
+import { SectionLink } from '../../../components/ui/section-link'
 import { formatCount, formatDate, formatKwacha } from './school-shared'
 
 interface Capacity {
@@ -354,6 +357,23 @@ export default function SchoolDashboardPage({
                 )}
               </CardContent>
             </Card>
+
+            {/*
+              What other people have been doing (reference W1; `0268`).
+
+              Beside the roll rather than below everything: on a school dashboard the
+              question "has anything changed since I last looked" is asked at the same
+              moment as "how many pupils do we have", not after scrolling past it.
+
+              `recent_activity()` excludes the reader's OWN actions, so a head teacher
+              who has just marked a register does not see themselves reported back.
+            */}
+            <RailPanel
+              title="Recent activity"
+              action={<SectionLink href={`${base}/settings/audit`}>Audit trail</SectionLink>}
+            >
+              <ActivityFeed limit={6} />
+            </RailPanel>
           </div>
         </div>
       )}

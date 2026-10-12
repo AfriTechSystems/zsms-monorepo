@@ -26,6 +26,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
+import { Avatar } from '../../../../components/ui/avatar'
 import { use, useCallback, useState } from 'react'
 import { Loader2, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
 
@@ -51,6 +52,7 @@ interface StaffRow {
   phone_e164: string | null
   location: string | null
   qualifications: string | null
+  photo_url: string | null
   first_name: string | null
   last_name: string | null
   email: string | null
@@ -349,12 +351,27 @@ export default function StaffPage({
                       header: 'Person',
                       primary: true,
                       cell: (r) => (
-                        <>
-                          <span className="font-medium text-foreground">{fullName(r)}</span>
-                          {r.email && (
-                            <span className="block truncate text-xs text-subtle">{r.email}</span>
-                          )}
-                        </>
+                        /*
+                          A face beside the name. `photo_url` has been on
+                          `staff_members` and in this route's select the whole time;
+                          nothing rendered it.
+
+                          Read-only here. A member of staff sets their own picture on
+                          their account screen — the school records who they are, not
+                          what they look like, and a colleague editing somebody else's
+                          photograph is not a permission this product wants.
+                        */
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <Avatar name={fullName(r)} src={r.photo_url} size="sm" />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-foreground">
+                              {fullName(r)}
+                            </span>
+                            {r.email && (
+                              <span className="block truncate text-xs text-subtle">{r.email}</span>
+                            )}
+                          </span>
+                        </span>
                       ),
                     },
                     {

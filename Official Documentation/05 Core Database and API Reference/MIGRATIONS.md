@@ -564,9 +564,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0265`** — available for the next migration.
+**`0266`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0264` are written and applied to `zsms-dev`, and the whole sequence is verified by CI to apply to an empty database. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0265` are written and applied to `zsms-dev`, and the whole sequence is verified by CI to apply to an empty database. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 

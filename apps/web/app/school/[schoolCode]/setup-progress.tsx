@@ -25,10 +25,10 @@
 import type { JSX } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChevronDown, ChevronRight, Lock, Rocket } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronRight, Lock, Rocket, X } from 'lucide-react'
 
 import { Badge } from '../../../components/ui/badge'
-import { Card, CardContent } from '../../../components/ui/card'
+import { Button } from '../../../components/ui/button'
 import { useApi } from '../../../lib/use-api'
 import { STEP_DESTINATIONS } from '../../../lib/onboarding-steps'
 
@@ -57,6 +57,19 @@ export function SetupProgress({ base }: { base: string }): JSX.Element | null {
   const [collapsed, setCollapsed] = useState(false)
 
   /*
+    Dismissed, not merely collapsed.
+
+    Collapsing still left a full card sitting above the figures, and a head teacher who
+    has read the checklist once does not need it occupying the top of the dashboard
+    every morning. Dismissal is remembered per browser and per school.
+
+    It is keyed by HOW MANY required steps remain, so the banner returns by itself when
+    a new blocking item appears — dismissing it can never hide something that newly
+    stops the school working.
+  */
+  const [dismissedAt, setDismissedAt] = useState<string | null>(null)
+
+  /*
     Read after mount, never during render.
 
     `localStorage` does not exist on the server, so reading it in the initial state
@@ -66,6 +79,7 @@ export function SetupProgress({ base }: { base: string }): JSX.Element | null {
   useEffect(() => {
     try {
       setCollapsed(window.localStorage.getItem(STORAGE_KEY) === '1')
+      setDismissedAt(window.localStorage.getItem(`${STORAGE_KEY}.dismissed`))
     } catch {
       /* Blocked storage: show it open, which is the safe default. */
     }
@@ -89,42 +103,72 @@ export function SetupProgress({ base }: { base: string }): JSX.Element | null {
   )
   const required = useMemo(() => outstanding.filter((i) => i.out_mandatory), [outstanding])
 
+  const dismiss = (): void => {
+    const stamp = `${required.length}:${outstanding.length}`
+    setDismissedAt(stamp)
+    try {
+      window.localStorage.setItem(`${STORAGE_KEY}.dismissed`, stamp)
+    } catch {
+      /* Not worth interrupting anybody over a remembered preference. */
+    }
+  }
+
   // Nothing left the school can act on. The checklist stays in Settings for later.
   if (!data || outstanding.length === 0) return null
 
+  /*
+    Still dismissed only while the work is unchanged. A new required step changes the
+    stamp, the comparison fails, and the banner comes back.
+  */
+  if (dismissedAt === `${required.length}:${outstanding.length}`) return null
+
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-stack pt-card">
+    /*
+      A banner, not a card.
+
+      This used to be a full `Card` with card padding, a heading row, a progress bar and
+      a five-item list — taller than the stat row beneath it, on a dashboard whose job is
+      the figures. It is now one line at rest: icon, sentence, count, progress, actions.
+
+      Everything it did still works. The list is behind the chevron, the required count
+      is still visible when collapsed, and the progress bar is still the one-line summary
+      — it has just stopped being the largest thing on the page.
+    */
+    <div className="rounded-lg border border-border bg-primary-tint px-card py-2.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Rocket aria-hidden="true" className="size-4 shrink-0 text-primary-text" />
+
         <button
           type="button"
           onClick={toggle}
           aria-expanded={!collapsed}
           className="flex min-h-tap items-center gap-2 text-left"
         >
-          {collapsed ? (
-            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-          )}
-          <Rocket aria-hidden="true" className="size-5 shrink-0 text-primary" />
-          <span className="font-semibold">Finish setting up</span>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm font-medium text-primary-text">Finish setting up</span>
+          <span className="text-sm text-primary-text/80">
             <span data-numeric>{data.complete}</span> of{' '}
             <span data-numeric>{data.total}</span>
           </span>
-          {/* Visible even when collapsed: a school cannot enrol anybody until these are
-              done, and that should not be hidden behind a chevron. */}
-          {required.length > 0 && (
-            <Badge variant="danger" className="ml-auto">
-              <Lock aria-hidden="true" className="size-3" />
-              {required.length} required
-            </Badge>
+          {collapsed ? (
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-primary-text/70" />
+          ) : (
+            <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-primary-text/70" />
           )}
         </button>
 
-        {/* The bar stays visible when collapsed — it is the whole summary in one line. */}
+        {/* Visible even when collapsed: a school cannot enrol anybody until these are
+            done, and that should not be hidden behind a chevron. */}
+        {required.length > 0 && (
+          <Badge variant="danger">
+            <Lock aria-hidden="true" className="size-3" />
+            {required.length} required
+          </Badge>
+        )}
+
+        {/* The bar is the whole summary in one line, so it sits inline rather than
+            taking a row of its own. */}
         <div
-          className="h-2 w-full overflow-hidden rounded-full bg-sunken"
+          className="h-1.5 min-w-[80px] flex-1 overflow-hidden rounded-full bg-surface/60"
           role="progressbar"
           aria-valuenow={data.percent}
           aria-valuemin={0}
@@ -137,48 +181,61 @@ export function SetupProgress({ base }: { base: string }): JSX.Element | null {
           />
         </div>
 
-        {!collapsed && (
-          <>
-            <ul className="flex flex-col gap-1">
-              {outstanding.slice(0, 5).map((item) => {
-                const destination = STEP_DESTINATIONS[item.out_item_key]
-                const href = destination
-                  ? `${base}${destination.href}${destination.tab ? `?section=${destination.tab}` : ''}`
-                  : `${base}/settings/readiness`
+        <Button asChild size="sm" variant="outline">
+          <Link href={`${base}/settings/readiness`}>
+            Open checklist
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </Button>
 
-                return (
-                  <li key={item.out_item_key}>
-                    <Link
-                      href={href}
-                      className="flex min-h-tap flex-wrap items-center gap-2 rounded-md px-1 text-sm transition-colors hover:bg-muted"
-                    >
-                      <span className="font-medium">{item.out_label}</span>
-                      {item.out_mandatory && <Badge variant="danger">Required</Badge>}
-                      {item.out_blocks && (
-                        <Badge variant="warning">blocks {item.out_blocks.toLowerCase()}</Badge>
-                      )}
-                      <ArrowRight
-                        aria-hidden="true"
-                        className="ml-auto size-4 shrink-0 text-primary-text"
-                      />
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
+        {/*
+          Dismiss is offered only when nothing is REQUIRED.
 
-            <Link
-              href={`${base}/settings/readiness`}
-              className="inline-flex min-h-tap items-center gap-1.5 self-start text-sm font-medium text-primary-text hover:underline"
-            >
-              {outstanding.length > 5
-                ? `See all ${outstanding.length} outstanding`
-                : 'See the full checklist'}
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
-          </>
+          A school can put off optional setup; it cannot be allowed to hide the steps
+          that stop a register being marked. Hiding those would turn a visible blocker
+          into a mystery.
+        */}
+        {required.length === 0 && (
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label="Dismiss the setup reminder"
+            className="flex size-8 min-h-tap items-center justify-center rounded-md text-primary-text/70 transition-colors hover:bg-surface/60 hover:text-primary-text"
+          >
+            <X aria-hidden="true" className="size-4" />
+          </button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {!collapsed && (
+        <ul className="mt-2 flex flex-col gap-0.5 border-t border-border/60 pt-2">
+          {outstanding.slice(0, 5).map((item) => {
+            const destination = STEP_DESTINATIONS[item.out_item_key]
+            const href = destination
+              ? `${base}${destination.href}${destination.tab ? `?section=${destination.tab}` : ''}`
+              : `${base}/settings/readiness`
+
+            return (
+              <li key={item.out_item_key}>
+                <Link
+                  href={href}
+                  className="flex min-h-tap flex-wrap items-center gap-2 rounded-md px-1 text-sm transition-colors hover:bg-surface/60"
+                >
+                  <span className="font-medium">{item.out_label}</span>
+                  {item.out_mandatory && <Badge variant="danger">Required</Badge>}
+                  {item.out_blocks && (
+                    <Badge variant="warning">blocks {item.out_blocks.toLowerCase()}</Badge>
+                  )}
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="ml-auto size-4 shrink-0 text-primary-text"
+                  />
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
   )
 }

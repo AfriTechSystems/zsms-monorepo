@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -2109,6 +2109,7 @@ export type Database = {
           marketing_prompted_at: string | null
           national_id: string | null
           phone_e164: string | null
+          photo_url: string | null
           preferred_contact: string
           updated_at: string
           whatsapp_opted_in: boolean
@@ -2125,6 +2126,7 @@ export type Database = {
           marketing_prompted_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
+          photo_url?: string | null
           preferred_contact?: string
           updated_at?: string
           whatsapp_opted_in?: boolean
@@ -2141,6 +2143,7 @@ export type Database = {
           marketing_prompted_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
+          photo_url?: string | null
           preferred_contact?: string
           updated_at?: string
           whatsapp_opted_in?: boolean
@@ -6428,6 +6431,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_set_tier_ai_allowance: {
+        Args: { p_monthly_credits: number; p_tier_name: string }
+        Returns: boolean
+      }
       admin_set_tier_feature: {
         Args: {
           p_actor: string
@@ -6459,6 +6466,17 @@ export type Database = {
           out_price: number
           out_sort_order: number
           out_subscribers: number
+        }[]
+      }
+      admin_tier_ai_allowances: {
+        Args: never
+        Returns: {
+          out_display_name: string
+          out_is_set: boolean
+          out_monthly_credits: number
+          out_monthly_price: number
+          out_tier_name: string
+          out_updated_at: string
         }[]
       }
       admin_trial_status: {
@@ -7683,6 +7701,20 @@ export type Database = {
         Args: { p_grant_id: string }
         Returns: boolean
       }
+      sage50_export_rows: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          out_amount: number
+          out_currency: string
+          out_fee_label: string
+          out_method: string
+          out_paid_at: string
+          out_payment_id: string
+          out_receipt_number: string
+          out_student_name: string
+          out_term_number: number
+        }[]
+      }
       save_exam_marks: {
         Args: {
           p_academic_year: string
@@ -8126,6 +8158,7 @@ export type Database = {
         Args: { p_incident_id: string; p_note?: string; p_status: string }
         Returns: boolean
       }
+      set_my_parent_photo: { Args: { p_photo_url: string }; Returns: boolean }
       set_onboarding_override: {
         Args: {
           p_item_key: string
@@ -8210,6 +8243,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_student_photo: {
+        Args: { p_photo_url: string; p_student_id: string }
+        Returns: boolean
       }
       set_timetable_period: {
         Args: {

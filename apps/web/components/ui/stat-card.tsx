@@ -137,11 +137,42 @@ export function StatCard({
         )}
       </div>
 
-      {/* Tabular figures so a row of stat cards aligns rather than jitters.
-          `text-2xl` on a phone and `text-3xl` from `sm` up: at two cards per row
-          on a 390px screen a 3xl figure is what pushes a long one — "K 588,000"
-          — onto a second line and makes the card grow. */}
-      <p data-numeric className={cn('mt-1.5 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-3xl', t.label)}>
+      {/*
+        Tabular figures so a row of stat cards aligns rather than jitters, and the
+        size STEPS DOWN as the figure gets longer.
+
+        A fixed `text-3xl` was wrapping "K 1,284,350.00" onto a second line and
+        clipping it — observed on the school dashboard's Outstanding fees card. The
+        amounts only grow: a secondary school deals in millions, and a platform-wide
+        total for AfriTech reaches billions. A card whose layout depends on the number
+        being small is a card that breaks exactly when the school is doing well.
+
+        So the figure is measured and sized to fit rather than assumed to be short.
+        The steps are deliberately coarse — three buckets, not a continuous scale —
+        because a row of cards whose figures are all slightly different sizes reads as
+        sloppy, while a row where one long figure is visibly a step smaller reads as
+        considered.
+      */}
+      <p
+        data-numeric
+        className={cn(
+          'mt-1.5 font-semibold tracking-tight sm:mt-2',
+          // Breakpoints chosen against the real worst cases: "K 1,284,350.00" is 14,
+          // "248" is 3. Below 9 keeps the generous size the design wants.
+          value.length <= 8
+            ? 'text-2xl sm:text-3xl'
+            : value.length <= 12
+              ? 'text-xl sm:text-2xl'
+              : 'text-lg sm:text-xl',
+          // The last line of defence. If a figure still overruns — an unexpected
+          // currency, a longer locale separator — it shrinks rather than clipping,
+          // and `break-words` lets it wrap as a last resort instead of overflowing
+          // the card and pushing the row sideways.
+          'break-words [overflow-wrap:anywhere]',
+          t.label,
+        )}
+        title={value}
+      >
         {value}
       </p>
 

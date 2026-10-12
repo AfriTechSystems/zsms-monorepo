@@ -33,11 +33,14 @@ import { use, useCallback, useEffect, useState } from 'react'
 import { Loader2, Mail, Phone, Plus, Save, UserMinus, Users } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
+import { can } from '../../../../../lib/roles'
+import type { Role } from '@zsms/auth-provider'
 import { Alert } from '../../../../../components/ui/alert'
 import { Badge } from '../../../../../components/ui/badge'
 import { Button } from '../../../../../components/ui/button'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
+import { Avatar } from '../../../../../components/ui/avatar'
 import { CustomFieldsPanel } from './custom-fields-panel'
 import { useToast } from '../../../../../components/ui/toast'
 import { Field, Input, Select } from '../../../../../components/ui/field'
@@ -70,6 +73,8 @@ interface Student {
   id: string
   student_id: string
   school_id: string
+  /** Set by the school, never by a parent — see `0265`. */
+  photo_url?: string | null
   first_name: string
   last_name: string
   grade_id: string
@@ -88,6 +93,8 @@ interface Student {
 }
 
 interface Structure {
+  /** The caller's role at this school, as the students list already reads it. */
+  role?: string
   gradeLevels: Array<{ level_id: string; display_name: string }>
   classesByGrade: Record<string, string[]>
 }
@@ -105,6 +112,35 @@ export default function StudentDetailPage({
   const { toast } = useToast()
   const { data, loading, error, code, reload } = useApi<Student>(`/api/students/${id}`)
   const { data: structure } = useApi<Structure>('/api/school/structure')
+
+  /*
+    Who may change a pupil's picture.
+
+    `set_student_photo()` (`0265`) admits the owner, principal and administrator and
+    refuses a teacher and a parent — because this photo identifies the child at a gate
+    and on a register, so it is the school's record rather than the family's choice.
+
+    Gated here as well so the camera affordance simply does not appear for a teacher.
+    The function is the enforcement; this is the courtesy. Offering a control that is
+    going to be refused is worse than offering none.
+  */
+  const maySetPhoto = can(structure?.role as Role | undefined, 'students:write')
+
+  const setPhoto = useCallback(
+    async (url: string): Promise<void> => {
+      const result = await apiSend<{ message?: string }>(
+        `/api/students/${id}/photo`,
+        'PUT',
+        { photoUrl: url },
+      )
+      if (result.error) {
+        toast(result.error, 'danger')
+        return
+      }
+      reload()
+    },
+    [id, reload, toast],
+  )
 
   const [form, setForm] = useState<Partial<Student>>({})
   /**
@@ -321,6 +357,18 @@ export default function StudentDetailPage({
             backLabel="All pupils"
             title={`${data.first_name} ${data.last_name}`}
             description={data.student_id}
+            /*
+              The picture beside the name, as every reference record does. Editable only
+              for the roles the database would actually accept.
+            */
+            leading={
+              <Avatar
+                name={`${data.first_name} ${data.last_name}`}
+                src={data.photo_url}
+                size="xl"
+                onChange={maySetPhoto ? setPhoto : undefined}
+              />
+            }
             note="Changes here take effect immediately for every teacher and parent who can see this pupil. Moving a pupil off the roll frees a place against the school's limit; it never deletes anything."
             actions={
               <div className="flex flex-wrap items-center gap-2">

@@ -34,6 +34,7 @@ import { EmptyState } from '../../components/ui/empty-state'
 import { ErrorState, PageHeader, StatSkeleton, TableSkeleton } from '../../components/ui/data-states'
 import { StatCard, type StatTone } from '../../components/ui/stat-card'
 import { BarChart, ChartFrame, DonutChart } from '../../components/ui/chart'
+import { SectionLink } from '../../components/ui/section-link'
 import { HealthBadge, formatKwacha, type HealthRow } from './health-shared'
 
 interface Metrics {
@@ -260,59 +261,6 @@ export default function AdminOverviewPage(): JSX.Element {
             are both fed from data the API already returns: the health bands from
             `school_health_scores()`, and the tier split from `admin_revenue_by_tier()`.
           */}
-          <section aria-labelledby="breakdown" className="mb-cards">
-            <h2 id="breakdown" className="sr-only">
-              Platform breakdown
-            </h2>
-
-            <div className="grid gap-cards lg:grid-cols-2">
-              <ChartFrame
-                title="Schools by health score"
-                description="Operational, financial and engagement, combined"
-                action={
-                  <Link href="/admin/health" className="text-sm text-primary underline">
-                    View all
-                  </Link>
-                }
-              >
-                <DonutChart
-                  centreValue={String(data.health.length)}
-                  centreLabel={data.health.length === 1 ? 'School' : 'Schools'}
-                  emptyMessage="No school has enough data to score yet."
-                  slices={BAND_ORDER.map((band) => ({
-                    label: BAND_LABEL[band],
-                    value: data.health.filter((r) => r.band === band).length,
-                    /*
-                      Fixed colours, not the series palette: these are STATUS bands with
-                      settled meanings, and excellent must be green on every screen that
-                      shows it rather than green only when it happens to sort first.
-                    */
-                    colour: BAND_COLOUR[band],
-                  })).filter((sl) => sl.value > 0)}
-                />
-              </ChartFrame>
-
-              <ChartFrame
-                title="Monthly revenue by tier"
-                description="Where recurring revenue actually comes from"
-                action={
-                  <Link href="/admin/pricing" className="text-sm text-primary underline">
-                    Pricing
-                  </Link>
-                }
-              >
-                <BarChart
-                  emptyMessage="No school is on a paid tier yet."
-                  data={(data.revenueByTier ?? [])
-                    .filter((t) => Number(t.mrr_zmw) > 0)
-                    .map((t) => ({
-                      label: t.display_name,
-                      value: Math.round(Number(t.mrr_zmw)),
-                    }))}
-                />
-              </ChartFrame>
-            </div>
-          </section>
 
           <section aria-labelledby="figures">
             <h2 id="figures" className="sr-only">
@@ -384,14 +332,66 @@ export default function AdminOverviewPage(): JSX.Element {
             </p>
           </section>
 
+          <section aria-labelledby="breakdown" className="mb-cards">
+            <h2 id="breakdown" className="sr-only">
+              Platform breakdown
+            </h2>
+
+            <div className="grid gap-cards lg:grid-cols-2">
+              <ChartFrame
+                title="Schools by health score"
+                description="Operational, financial and engagement, combined"
+                action={
+                  <SectionLink href="/admin/health" ariaLabel="View all school health scores">
+                    View all
+                  </SectionLink>
+                }
+              >
+                <DonutChart
+                  centreValue={String(data.health.length)}
+                  centreLabel={data.health.length === 1 ? 'School' : 'Schools'}
+                  emptyMessage="No school has enough data to score yet."
+                  slices={BAND_ORDER.map((band) => ({
+                    label: BAND_LABEL[band],
+                    value: data.health.filter((r) => r.band === band).length,
+                    /*
+                      Fixed colours, not the series palette: these are STATUS bands with
+                      settled meanings, and excellent must be green on every screen that
+                      shows it rather than green only when it happens to sort first.
+                    */
+                    colour: BAND_COLOUR[band],
+                  })).filter((sl) => sl.value > 0)}
+                />
+              </ChartFrame>
+
+              <ChartFrame
+                title="Monthly revenue by tier"
+                description="Where recurring revenue actually comes from"
+                action={
+                  <SectionLink href="/admin/pricing" ariaLabel="Open pricing and tiers">
+                    Pricing
+                  </SectionLink>
+                }
+              >
+                <BarChart
+                  emptyMessage="No school is on a paid tier yet."
+                  data={(data.revenueByTier ?? [])
+                    .filter((t) => Number(t.mrr_zmw) > 0)
+                    .map((t) => ({
+                      label: t.display_name,
+                      value: Math.round(Number(t.mrr_zmw)),
+                    }))}
+                />
+              </ChartFrame>
+            </div>
+          </section>
+
           <section aria-labelledby="attention">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <h2 id="attention" className="text-xl font-semibold tracking-tight">
                 Schools needing attention
               </h2>
-              <Link href="/admin/health" className="text-sm text-primary-text hover:underline">
-                Full health breakdown
-              </Link>
+              <SectionLink href="/admin/health">Full health breakdown</SectionLink>
             </div>
 
             {data.health.filter((h) => h.band === 'at_risk' || h.band === 'critical').length === 0 ? (

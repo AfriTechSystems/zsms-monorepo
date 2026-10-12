@@ -33,6 +33,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, UserPlus, Users, Upload } from 'lucide-react'
 
 import { Pagination } from '../../../../components/ui/pagination'
+import { Avatar } from '../../../../components/ui/avatar'
 import { useApi } from '../../../../lib/use-api'
 import { can } from '../../../../lib/roles'
 import { YearEnd } from './year-end'
@@ -54,6 +55,8 @@ import {
 } from '../school-shared'
 
 interface Student {
+  /** Already returned by `/api/students`; nothing rendered it until now. */
+  photo_url?: string | null
   id: string
   student_id: string
   first_name: string
@@ -273,15 +276,37 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
                     header: 'Pupil',
                     primary: true,
                     cell: (s) => (
-                      <>
-                        <Link
-                          href={`${base}/students/${s.id}`}
-                          className="font-medium text-foreground hover:underline"
-                        >
-                          {s.last_name}, {s.first_name}
-                        </Link>
-                        <span className="block font-mono text-xs text-subtle">{s.student_id}</span>
-                      </>
+                      /*
+                        Picture, name, number — the shape every reference list uses.
+
+                        The name stays an ordinary link rather than becoming a button:
+                        it is the row's subject, and a button in every row would be a
+                        wall of chrome. The agreed principle promotes links that are
+                        ACTIONS beside a heading, not the identity of a record.
+
+                        The avatar is not editable here. A pupil's photo is set on their
+                        record, where there is room to see what is being replaced —
+                        changing a face from a list of forty is how the wrong child gets
+                        the wrong picture.
+                      */
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <Avatar
+                          name={`${s.first_name} ${s.last_name}`}
+                          src={s.photo_url}
+                          size="sm"
+                        />
+                        <span className="min-w-0">
+                          <Link
+                            href={`${base}/students/${s.id}`}
+                            className="block truncate font-medium text-foreground hover:underline"
+                          >
+                            {s.last_name}, {s.first_name}
+                          </Link>
+                          <span className="block font-mono text-xs text-subtle">
+                            {s.student_id}
+                          </span>
+                        </span>
+                      </span>
                     ),
                   },
                   { key: 'grade', header: 'Grade', cell: (s) => formatLevel(s.grade_id) },

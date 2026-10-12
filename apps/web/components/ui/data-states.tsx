@@ -123,10 +123,19 @@ export function PageHeader({
   backTo,
   backLabel,
   note,
+  leading,
 }: {
   title: string
   description?: string
   actions?: ReactNode
+  /**
+   * Something that sits to the LEFT of the heading — a pupil's photo, a school crest.
+   *
+   * A slot rather than a `photoUrl` prop: the header should not know what an avatar
+   * is, who may change one, or how an upload works. The caller already knows all
+   * three.
+   */
+  leading?: ReactNode
   /** Where "back" goes. Always a real destination, never `history.back()`. */
   backTo?: string
   /** What that destination is called. Required whenever `backTo` is given. */
@@ -160,15 +169,20 @@ export function PageHeader({
     // against the gutter, and a long title pushed a button off the edge before
     // the wrap took effect.
     <div className="mb-cards flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
-      <div className="min-w-0">
-        {/* `break-words` because a school name is user data and can be one long
-            token; without it the h1 sets the page's minimum width. */}
-        <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          {title}
-        </h1>
-        {description && (
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">{description}</p>
-        )}
+      <div className="flex min-w-0 items-start gap-4">
+        {leading && <div className="shrink-0">{leading}</div>}
+        <div className="min-w-0">
+          {/* `break-words` because a school name is user data and can be one long
+              token; without it the h1 sets the page's minimum width. */}
+          <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">
+              {description}
+            </p>
+          )}
+        </div>
       </div>
       {actions && <div className="flex flex-wrap gap-2 sm:shrink-0">{actions}</div>}
     </div>

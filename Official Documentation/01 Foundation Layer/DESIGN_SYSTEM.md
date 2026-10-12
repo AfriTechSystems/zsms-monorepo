@@ -217,6 +217,59 @@ The parent and teacher portals are genuinely used on phones and get the fuller t
 
 ---
 
+## Navigation that is an action is a button
+
+**Added 2026-10-12.**
+
+A link that takes the reader to another section or page, offered alongside other things
+they can do, is a **button with a trailing arrow** — not underlined text. Use
+`SectionLink` (`components/ui/section-link.tsx`), which renders the agreed shape once so
+the decision is not re-made per screen.
+
+"View all" beside a panel heading, "Pricing" leaving the dashboard, "Open checklist" —
+all buttons. As underlined text they read as a footnote, they are smaller than the 44px
+touch target, and they sit inconsistently beside the real buttons next to them.
+
+**What deliberately stays an ordinary link:**
+
+| Case | Why |
+|---|---|
+| A name in a table cell that opens its record | The row is the subject. A button in every row is a wall of chrome |
+| A word inside a sentence | A consent line pointing at the privacy policy, "set on the school profile". Promoting it breaks the sentence |
+| A card title that opens the card's subject | The whole card is already the affordance |
+| `tel:` and `mailto:` | Not navigation |
+
+---
+
+## Profile pictures
+
+**Added 2026-10-12.** `Avatar` and `AvatarName` (`components/ui/avatar.tsx`).
+
+The **initials fallback is the main case, not the error case** — almost no pupil has a
+photo on the day a school is onboarded. A tinted disc with one or two letters, coloured
+deterministically from the name so one person is one colour on every screen. Grey circles
+for everybody would make a class list unreadable.
+
+Who may set whose, enforced by `0265` and not merely by the UI:
+
+| Whose | Who may set it |
+|---|---|
+| A pupil | The school — owner, principal, administrator |
+| A member of staff | Themselves |
+| A parent | Themselves |
+
+**A parent may see their child's photo and may not change it.** The picture identifies a
+child at a gate and on a register, so it is the school's record of who the child is. A
+teacher is excluded too: marking a register is not a reason to change what a child looks
+like.
+
+Uploads go through `/api/uploads/photo` — **2MB**, JPG/PNG/WebP only, verified against the
+file's own magic bytes rather than its declared type. SVG is refused: it is a document
+that can carry script, and serving one from our origin would run that script with our
+origin's privileges.
+
+---
+
 ## Per-School Theming
 
 A school configures **colours and a logo. Nothing else.**

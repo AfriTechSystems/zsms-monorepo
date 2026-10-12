@@ -13,6 +13,7 @@
  */
 
 import type { JSX } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -33,8 +34,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { EmptyState } from '../../components/ui/empty-state'
 import { ErrorState, PageHeader, StatSkeleton, TableSkeleton } from '../../components/ui/data-states'
 import { StatCard, type StatTone } from '../../components/ui/stat-card'
-import { BarChart, ChartFrame, DonutChart } from '../../components/ui/chart'
+import { BarChart, ChartFrame, DonutChart, TrendChart } from '../../components/ui/chart'
+import { ActivityFeed } from '../../components/ui/activity-feed'
+import { RailPanel } from '../../components/ui/context-rail'
 import { SectionLink } from '../../components/ui/section-link'
+import { Select } from '../../components/ui/field'
 import { HealthBadge, formatKwacha, type HealthRow } from './health-shared'
 
 interface Metrics {
@@ -106,7 +110,17 @@ const BAND_COLOUR: Record<(typeof BAND_ORDER)[number], string> = {
   critical: '#E15A44',
 }
 
+interface HistoryPoint {
+  out_captured_on: string
+  out_schools_total: number
+  out_schools_active: number
+  out_students_total: number
+  out_mrr_zmw: string
+}
+
 interface Overview {
+  /** Daily snapshots (`0267`). Empty until the worker has run at least twice. */
+  history: HistoryPoint[]
   metrics: Metrics | null
   business: Business | null
   revenueByTier: TierRevenue[]
@@ -115,7 +129,55 @@ interface Overview {
 }
 
 export default function AdminOverviewPage(): JSX.Element {
+  /*
+    How far back the growth chart looks. Not persisted: a dashboard range is a
+    glance, not a preference, and remembering it means somebody returns to a window
+    they no longer remember choosing.
+  */
+  const [range, setRange] = useState(365)
+
   const { data, loading, error, code, reload } = useApi<Overview>('/api/admin/overview')
+
+  /*
+    The growth series, thinned to one point per month.
+
+    The API returns up to a year of DAILY rows. Drawing 365 points across 640px gives
+    a line nobody can read a value off, and the question the chart answers — "are we
+    growing" — is a monthly one. So each month contributes its LAST captured reading,
+    which is the month's end state rather than an average that belongs to no real day.
+  */
+  const growth = useMemo(() => {
+    const rows = (data?.history ?? []).filter((h) => {
+      const age = (Date.now() - new Date(h.out_captured_on).getTime()) / 86_400_000
+      return age <= range
+    })
+
+    if (rows.length === 0) return { labels: [], points: [], span: '' }
+
+    const lastPerMonth = new Map<string, (typeof rows)[number]>()
+    for (const r of rows) {
+      lastPerMonth.set(r.out_captured_on.slice(0, 7), r)
+    }
+
+    const months = [...lastPerMonth.entries()].sort(([a], [b]) => a.localeCompare(b))
+
+    // A single point is not a trend, and TrendChart's empty state says so better
+    // than a chart with one dot in it.
+    if (months.length < 2) return { labels: [], points: [], span: '' }
+
+    const label = (iso: string): string =>
+      new Date(iso).toLocaleDateString('en-GB', { month: 'short' })
+
+    return {
+      labels: months.map(([, r]) => label(r.out_captured_on)),
+      points: [
+        { label: 'Total schools', points: months.map(([, r]) => r.out_schools_total) },
+        { label: 'Active schools', points: months.map(([, r]) => r.out_schools_active) },
+      ],
+      span: `${label(months[0]![1].out_captured_on)} to ${label(months[months.length - 1]![1].out_captured_on)}`,
+    }
+  }, [data?.history, range])
+
 
   return (
     <>
@@ -332,6 +394,65 @@ export default function AdminOverviewPage(): JSX.Element {
             </p>
           </section>
 
+          {/*
+            School growth (reference W1).
+
+            This is the chart I would not draw before: `platform_metrics()` returns
+            current counts, so a line through them would have been invented. `0267`
+            records a daily snapshot, and this shows only days that were actually
+            captured — no gap filling, because a line through interpolated points looks
+            exactly like a line through measured ones.
+          */}
+          <section aria-labelledby="growth" className="mb-cards">
+            <h2 id="growth" className="sr-only">
+              Platform growth
+            </h2>
+
+            <ChartFrame
+              title="School growth"
+              description={
+                growth.points.length > 0
+                  ? `Total and active schools, ${growth.span}`
+                  : 'Total and active schools over time'
+              }
+              action={
+                /*
+                  A range control, not a date picker.
+
+                  The image shows "1 Oct - 31 Oct 2026". Arbitrary ranges would imply
+                  the data supports any window; it supports whatever has been captured,
+                  which today is days rather than years. Three coarse choices say that
+                  honestly and cannot produce an empty chart by accident.
+                */
+                <Select
+                  value={String(range)}
+                  onChange={(e) => setRange(Number(e.target.value))}
+                  aria-label="Period shown"
+                  className="w-auto"
+                >
+                  <option value="90">Last 3 months</option>
+                  <option value="180">Last 6 months</option>
+                  <option value="365">Last 12 months</option>
+                </Select>
+              }
+            >
+              <TrendChart
+                labels={growth.labels}
+                series={growth.points}
+                emptyMessage={
+                  /*
+                    Two different absences, said differently. Nothing recorded at all is
+                    a worker that has not run; one point is a worker that has run once,
+                    and a single point is not a trend.
+                  */
+                  (data.history?.length ?? 0) === 0
+                    ? 'No history has been recorded yet. The daily snapshot runs at 01:30 and the line appears once there are two days to join.'
+                    : 'Only one day has been recorded so far. A second will make a line.'
+                }
+              />
+            </ChartFrame>
+          </section>
+
           <section aria-labelledby="breakdown" className="mb-cards">
             <h2 id="breakdown" className="sr-only">
               Platform breakdown
@@ -384,6 +505,25 @@ export default function AdminOverviewPage(): JSX.Element {
                 />
               </ChartFrame>
             </div>
+          </section>
+
+          {/*
+            Recent activity (reference W1).
+
+            `audit_logs` has held this all along; what was missing was a sentence.
+            `recent_activity()` (`0268`) maps a row to one, and excludes the reader's
+            own actions — a feed telling you what you just did is a receipt, not news.
+          */}
+          <section aria-labelledby="activity" className="mb-cards">
+            <h2 id="activity" className="sr-only">
+              Recent activity
+            </h2>
+            <RailPanel
+              title="Recent activity"
+              action={<SectionLink href="/admin/audit">Full audit trail</SectionLink>}
+            >
+              <ActivityFeed limit={6} />
+            </RailPanel>
           </section>
 
           <section aria-labelledby="attention">

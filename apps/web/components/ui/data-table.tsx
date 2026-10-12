@@ -96,6 +96,24 @@ export interface DataTableProps<T> {
    */
   collapsible?: boolean
   className?: string
+
+  /**
+   * Row selection, for bulk actions.
+   *
+   * **Controlled on purpose.** The owner holds the ids, because the bulk action is
+   * theirs to perform and a selection the table kept to itself could not be acted
+   * on. Omitting `selected` omits the checkbox column entirely — no table grows one
+   * by accident.
+   *
+   * Selection is scoped to the PAGE in hand. "Select all" checks the rows on screen
+   * and nothing else: a control that silently selected 400 pupils across 16 pages,
+   * from a box next to 25 of them, is how somebody messages the whole school meaning
+   * to message one class.
+   */
+  selected?: Set<string>
+  onSelectedChange?: (next: Set<string>) => void
+  /** Noun for the select-all label — "Select all 25 pupils". */
+  selectNoun?: string
 }
 
 export function DataTable<T>({
@@ -107,11 +125,42 @@ export function DataTable<T>({
   href,
   collapsible = true,
   className,
+  selected,
+  onSelectedChange,
+  selectNoun = 'rows',
 }: DataTableProps<T>): JSX.Element {
   // Which mobile cards are open. Held for the whole list rather than per row so
   // the state survives a re-render — a reload that collapsed everything the
   // reader had just opened would be worse than not collapsing at all.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  /*
+    Selectable only when BOTH halves are supplied. A `selected` set with no handler
+    would render checkboxes that cannot change — worse than none, because they look
+    like they work.
+  */
+  const selectable = Boolean(selected && onSelectedChange)
+  const pageKeys = rows.map((r) => rowKey(r))
+  const allOnPage = selectable && pageKeys.length > 0 && pageKeys.every((k) => selected!.has(k))
+  const someOnPage = selectable && pageKeys.some((k) => selected!.has(k))
+
+  const toggleOne = (key: string): void => {
+    if (!selected || !onSelectedChange) return
+    const next = new Set(selected)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    onSelectedChange(next)
+  }
+
+  const toggleAllOnPage = (): void => {
+    if (!selected || !onSelectedChange) return
+    const next = new Set(selected)
+    // Clearing removes only THIS page's keys, leaving a selection made on another
+    // page intact — the reader did not ask to undo that.
+    if (allOnPage) pageKeys.forEach((k) => next.delete(k))
+    else pageKeys.forEach((k) => next.add(k))
+    onSelectedChange(next)
+  }
 
   const primary = columns.find((c) => c.primary) ?? columns[0]
   const rest = columns.filter((c) => c !== primary)
@@ -139,8 +188,26 @@ export function DataTable<T>({
           const showDetails = !collapsible || isOpen
 
           return (
-            <li key={key}>
+            <li key={key} className={cn(selectable && selected!.has(key) && 'bg-primary-tint/40')}>
               <div className="flex items-start gap-2 p-card">
+                {/*
+                  The checkbox before the name, not after it.
+
+                  A phone card is tapped to open the record, so the box needs its own
+                  tap target away from that — and `min-h-tap` on the wrapper keeps it
+                  reachable with a thumb rather than a fingernail.
+                */}
+                {selectable && (
+                  <label className="flex min-h-tap shrink-0 items-center pr-1">
+                    <input
+                      type="checkbox"
+                      checked={selected!.has(key)}
+                      onChange={() => toggleOne(key)}
+                      aria-label="Select this row"
+                      className="size-4 cursor-pointer rounded border-border accent-[var(--color-primary)]"
+                    />
+                  </label>
+                )}
                 <div className="min-w-0 flex-1">
                   {primary && (
                     <div className="text-base font-medium text-foreground">
@@ -219,6 +286,22 @@ export function DataTable<T>({
           <caption className="sr-only">{caption}</caption>
           <thead className="border-b border-border bg-sunken text-left">
             <tr>
+              {selectable && (
+                <th scope="col" className="w-10 px-4 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={allOnPage}
+                    /* Indeterminate when some but not all are checked — the only
+                       honest third state for a box that stands for 25 others. */
+                    ref={(el) => {
+                      if (el) el.indeterminate = someOnPage && !allOnPage
+                    }}
+                    onChange={toggleAllOnPage}
+                    aria-label={`Select all ${rows.length} ${selectNoun} on this page`}
+                    className="size-4 cursor-pointer rounded border-border accent-[var(--color-primary)]"
+                  />
+                </th>
+              )}
               {columns.map((c) => (
                 <th
                   key={c.key}
@@ -239,8 +322,20 @@ export function DataTable<T>({
                   // A row that leads somewhere says so on hover. Without it the
                   // only clue is the link inside the first cell.
                   href && 'transition-colors hover:bg-sunken',
+                  selectable && selected!.has(rowKey(row)) && 'bg-primary-tint/40',
                 )}
               >
+                {selectable && (
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected!.has(rowKey(row))}
+                      onChange={() => toggleOne(rowKey(row))}
+                      aria-label={`Select this row`}
+                      className="size-4 cursor-pointer rounded border-border accent-[var(--color-primary)]"
+                    />
+                  </td>
+                )}
                 {columns.map((c) =>
                   c === primary ? (
                     <th key={c.key} scope="row" className="px-4 py-3 text-left font-normal">

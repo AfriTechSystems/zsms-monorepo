@@ -344,6 +344,24 @@ export async function startWorkers(): Promise<void> {
     BULK like fee reminders, and for the same reason: a run that touches every
     school must never starve a receipt somebody is waiting on.
   */
+  /*
+    The daily platform snapshot (`0267`).
+
+    One narrow RPC and no handler module: there is no decision to make, no message to
+    send and nothing to report per school — the function does the counting. A handler
+    file would be a wrapper around a single call.
+  */
+  await createWorker<Record<string, never>, unknown>(
+    'capture-platform-metrics',
+    async () => {
+      const db = workerDb()
+      const { error } = await db.rpc('worker_capture_platform_metrics')
+      if (error) throw new Error(`Capturing platform metrics failed: ${error.message}`)
+      return { captured: true }
+    },
+    { concurrency: 1 },
+  )
+
   await createWorker<{ schoolId?: string }, unknown>(
     'send-absence-alerts',
     async ({ payload }) =>

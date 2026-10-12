@@ -6298,6 +6298,16 @@ export type Database = {
           out_school_names: string[]
         }[]
       }
+      admin_platform_history: {
+        Args: { p_days?: number }
+        Returns: {
+          out_captured_on: string
+          out_mrr_zmw: number
+          out_schools_active: number
+          out_schools_total: number
+          out_students_total: number
+        }[]
+      }
       admin_platform_settings: {
         Args: never
         Returns: {
@@ -7474,6 +7484,17 @@ export type Database = {
         Args: { p_id: string; p_rating: number }
         Returns: number
       }
+      recent_activity: {
+        Args: { p_limit?: number }
+        Returns: {
+          out_actor: string
+          out_at: string
+          out_detail: string
+          out_id: string
+          out_kind: string
+          out_title: string
+        }[]
+      }
       record_api_key_usage: {
         Args: {
           p_key_id: string
@@ -8529,6 +8550,7 @@ export type Database = {
           out_user_id: string
         }[]
       }
+      worker_capture_platform_metrics: { Args: never; Returns: boolean }
       worker_claim_scheduled_announcements: {
         Args: { p_limit?: number }
         Returns: {

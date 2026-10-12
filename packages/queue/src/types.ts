@@ -26,6 +26,7 @@ export type JobType =
     firing twice during a deploy is harmless.
   */
   | 'expire-trials'
+  | 'capture-platform-metrics'
   /*
     Renders the letter a family carries to the next school (`0246`, TRANSFER.md).
 

@@ -67,6 +67,13 @@ interface Row {
   gradePoints: number | null
   published: boolean
   hasScaleVersion: boolean
+  /**
+   * The teacher's remark for this pupil in this subject.
+   *
+   * On `exam_results` since `0071`, read and accepted by the route the whole time —
+   * nothing ever rendered a field, so no teacher could write one.
+   */
+  comments: string | null
 }
 
 interface Payload {
@@ -134,6 +141,20 @@ function MarkSheet(): JSX.Element {
 
   const [marksTotal, setMarksTotal] = useState('100')
   const [entries, setEntries] = useState<Record<string, string>>({})
+
+  /*
+    A comment per pupil per subject.
+
+    The column has existed on `exam_results` since `0071` and the route has read it
+    and accepted it in its POST schema the whole time — nothing ever rendered a field
+    for it, so no teacher could write one.
+
+    Kept in its own map rather than folded into `entries`: a mark is a number that
+    drives a grade and a position, a comment is prose that drives nothing. Merging
+    them would mean every mark-validation path having to know which strings are
+    numbers.
+  */
+  const [notes, setNotes] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   /**
@@ -164,6 +185,11 @@ function MarkSheet(): JSX.Element {
       seeded[r.studentId] = r.marksObtained === null ? '' : String(r.marksObtained)
     }
     setEntries(seeded)
+    setNotes(
+      Object.fromEntries(
+        (data?.rows ?? []).map((r) => [r.studentId, r.comments ?? '']),
+      ),
+    )
     const total = data.rows.find((r) => r.marksTotal !== null)?.marksTotal
     if (total) setMarksTotal(String(total))
   }, [data])
@@ -215,6 +241,12 @@ function MarkSheet(): JSX.Element {
             studentId: r.studentId,
             // The empty string becomes null, not 0 — the whole point.
             marksObtained: entries[r.studentId]?.trim() ? Number(entries[r.studentId]) : null,
+            /*
+              `undefined` when empty, never `''`. The route's schema treats the field
+              as optional, so omitting it leaves whatever is stored — and an empty
+              string would overwrite a comment the teacher simply did not scroll to.
+            */
+            comments: notes[r.studentId]?.trim() || undefined,
           })),
         },
       )
@@ -233,7 +265,16 @@ function MarkSheet(): JSX.Element {
       )
       reload()
     },
-    [data, entries, classId, subjectCode, academicYear, termNumber, total, structure.data, toast, reload],
+    /*
+      `notes` belongs here, and lint caught it.
+
+      Without it the callback closes over the comments as they were on first render —
+      empty — so every save would have sent `undefined` for every comment and a
+      teacher's remarks would have silently gone nowhere. Worth noting as the exact
+      class of defect `npm run lint` existed to find and could not, before the script
+      was actually wired up.
+    */
+    [data, entries, notes, classId, subjectCode, academicYear, termNumber, total, structure.data, toast, reload],
   )
 
   const unlock = useCallback(
@@ -574,6 +615,51 @@ function MarkSheet(): JSX.Element {
                             <span className="text-sm text-muted-foreground">—</span>
                           )}
                         </div>
+
+                        {/*
+                          The subject comment.
+
+                          Full width on its own line rather than a column: a remark is
+                          prose, and a 120px cell makes a teacher write "gd prgrs". Six
+                          words of useful comment need the room to be six words.
+
+                          Hidden once published, by the same per-ROW rule as the mark —
+                          `data.published` is `rows.some(...)`, so a sheet-level flag
+                          would lock a row a principal had just unlocked for correction.
+                        */}
+                        {data.canWrite && !r.published && (
+                          <div className="w-full basis-full">
+                            <label
+                              htmlFor={`note-${r.studentId}`}
+                              className="text-xs text-muted-foreground"
+                            >
+                              Comment for {r.firstName}{' '}
+                              <span className="text-muted-foreground">(optional)</span>
+                            </label>
+                            <Input
+                              id={`note-${r.studentId}`}
+                              value={notes[r.studentId] ?? ''}
+                              onChange={(e) =>
+                                setNotes((n) => ({ ...n, [r.studentId]: e.target.value }))
+                              }
+                              maxLength={500}
+                              placeholder="Appears on the report card"
+                              className="mt-1"
+                            />
+                          </div>
+                        )}
+
+                        {/*
+                          A published comment, read-only. Shown rather than dropped: it is
+                          what the parent will read, and a teacher checking a report card
+                          needs to see what it says.
+                        */}
+                        {r.published && r.comments ? (
+                          <div className="w-full basis-full">
+                            <p className="text-xs text-muted-foreground">Comment</p>
+                            <p className="text-sm">{r.comments}</p>
+                          </div>
+                        ) : null}
 
                         {/*
                           Awarding a grade, inline under the pupil it concerns.

@@ -26,7 +26,7 @@ export async function GET(): Promise<Response> {
 
     // Both functions are SECURITY INVOKER, so RLS scopes them to what this
     // operator may see. The 403 above is the courtesy; this is the boundary.
-    const [metrics, health, integrations, consent, trials, business, byTier] =
+    const [metrics, health, integrations, consent, trials, business, byTier, history] =
       await Promise.all([
       client.rpc('platform_metrics'),
       client.rpc('school_health_scores'),
@@ -64,6 +64,14 @@ export async function GET(): Promise<Response> {
       */
       client.rpc('admin_business_metrics'),
       client.rpc('admin_revenue_by_tier'),
+      /*
+        The daily snapshots behind the growth chart (`0267`).
+
+        365 days is the window, not the chart's resolution: the component thins it to
+        one point per month. Asking for a year and thinning here means changing the
+        chart's granularity needs no API change.
+      */
+      client.rpc('admin_platform_history', { p_days: 365 }),
     ])
 
     if (metrics.error) return fromPostgrestError(metrics.error)
@@ -85,6 +93,14 @@ export async function GET(): Promise<Response> {
       revenueByTier: byTier.error
         ? []
         : ((byTier.data as Array<Record<string, unknown>>) ?? []),
+      /*
+        Only days that were actually captured — `admin_platform_history()` does no gap
+        filling. A line through interpolated points looks exactly like a line through
+        measured ones, and this chart's whole value is being believed.
+      */
+      history: history.error
+        ? []
+        : ((history.data as Array<Record<string, unknown>>) ?? []),
       metrics: (metrics.data as Array<Record<string, unknown>>)?.[0] ?? null,
       health: rows,
       // Counted here rather than in the component so the number on the card and

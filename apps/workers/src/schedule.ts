@@ -74,6 +74,23 @@ const SCHEDULE: Recurring[] = [
     why: 'tell parents their child was marked absent (0255, ADR-047)',
   },
   {
+    jobType: 'capture-platform-metrics',
+    /*
+      01:30 Lusaka, daily — half an hour before `expire-trials`.
+
+      The order matters. Trial expiry CHANGES `schools.status`, so a snapshot taken
+      after it would record the day's schools as already expired and the growth line
+      would show a cliff that happened overnight rather than over the month. Capturing
+      first records the day as it was lived.
+
+      Daily rather than hourly because the chart is monthly: finer resolution would be
+      rows nobody reads. Re-running on the same day overwrites rather than duplicating,
+      so a retry after a partial failure leaves the later, more complete reading.
+    */
+    cron: '30 1 * * *',
+    why: 'record today\'s platform counts, so a growth line has something true to draw (0267)',
+  },
+  {
     jobType: 'expire-trials',
     /*
       02:00 Lusaka, daily.

@@ -31,6 +31,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Check, FileText, Gauge, Loader2, Send, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
@@ -167,9 +168,34 @@ export default function AnnouncementsPage(): JSX.Element {
     These are the extras, and most are not switched on yet; the form says which.
   */
   const [extraChannels, setExtraChannels] = useState<string[]>([])
-  const [targetAudience, setTargetAudience] = useState('parents')
-  const [targetScope, setTargetScope] = useState('school')
-  const [targetIds, setTargetIds] = useState<string[]>([])
+  /*
+    The audience can arrive prefilled from the pupil list's bulk bar: a reader selects
+    pupils there and lands here addressing their parents.
+
+    Read ONCE, as the initial state, not synced to the URL. A composer that re-read
+    the query string would throw away an audience the writer then changed by hand —
+    and the back button is how they would get here a second time.
+  */
+  const prefilled = useSearchParams().get('to')
+  const prefilledIds = useMemo(
+    () =>
+      (prefilled ?? '')
+        .split(',')
+        .map((x) => x.trim())
+        // Only well-formed ids. A hand-edited query string should degrade to an
+        // empty audience rather than sending a malformed one to the route.
+        .filter((x) => /^[0-9a-f-]{36}$/i.test(x)),
+    [prefilled],
+  )
+
+  const [targetAudience, setTargetAudience] = useState(
+    prefilledIds.length > 0 ? 'individuals' : 'parents',
+  )
+  const [targetScope, setTargetScope] = useState(
+    // The route's own refine: addressing named people means BOTH must agree.
+    prefilledIds.length > 0 ? 'individual' : 'school',
+  )
+  const [targetIds, setTargetIds] = useState<string[]>(prefilledIds)
   const [scheduledAt, setScheduledAt] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)

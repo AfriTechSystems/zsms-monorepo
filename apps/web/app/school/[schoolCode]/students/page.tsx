@@ -27,10 +27,10 @@
  */
 
 import type { FormEvent, JSX } from 'react'
-import { Suspense, use, useCallback, useMemo } from 'react'
+import { Suspense, use, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, UserPlus, Users, Upload } from 'lucide-react'
+import { ArrowRight, Search, UserPlus, Users, Upload } from 'lucide-react'
 
 import { Pagination } from '../../../../components/ui/pagination'
 import { Avatar } from '../../../../components/ui/avatar'
@@ -42,6 +42,7 @@ import { Alert } from '../../../../components/ui/alert'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { DataTable } from '../../../../components/ui/data-table'
+import { BulkBar } from '../../../../components/ui/bulk-bar'
 import { RailPanel, RailStats, WithRail } from '../../../../components/ui/context-rail'
 import { SectionLink } from '../../../../components/ui/section-link'
 import { EmptyState } from '../../../../components/ui/empty-state'
@@ -112,6 +113,16 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
     rather than adding a `students:promote` nobody else would ever check.
   */
   const canPromote = can(structure?.role as Role | undefined, 'results:publish')
+
+  /*
+    Selection is gated on `announcements:write`, not on `students:write`.
+
+    The only bulk action is messaging parents, so the capability that matters is the
+    one that sends it. Gating on pupil write access would show checkboxes and a
+    "Message their parents" button to a registrar who cannot send an announcement —
+    a control that fails at the end of the journey rather than being absent.
+  */
+  const canBulkMessage = can(structure?.role as Role | undefined, 'announcements:write')
   const ceiling = capacity?.is_unlimited ? null : (capacity?.student_limit ?? null)
 
   /*
@@ -162,6 +173,16 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
     [meta?.recent],
   )
 
+  /*
+    Selected pupils, for the bulk bar.
+
+    Keyed by pupil id and NOT reset when the page changes, so a reader can gather
+    pupils across pages. It IS reset by the filters, further down — a selection made
+    under one filter means something different under another, and acting on rows the
+    reader can no longer see is how the wrong parents get messaged.
+  */
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
   const total = meta?.total ?? 0
   const perPage = meta?.perPage ?? 25
 
@@ -174,7 +195,19 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
       }
       // Any filter change returns to page 1. Staying on page 4 of a result set
       // that now has one page shows an empty table that looks like no matches.
-      if (!('page' in next)) q.delete('page')
+      if (!('page' in next)) {
+        q.delete('page')
+        /*
+          A filter change also clears the selection; a page change does NOT.
+
+          Paging keeps it on purpose, so pupils can be gathered across pages. But a
+          selection made under one filter means something different under another,
+          and carrying it forward would let somebody message parents of pupils the
+          list no longer shows — the mistake is invisible, because the bar's count is
+          the only evidence those rows are still selected.
+        */
+        setSelected(new Set())
+      }
       router.push(`${pathname}?${q.toString()}`)
     },
     [params, pathname, router],
@@ -376,6 +409,9 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
                   per pupil below it. See components/ui/data-table.tsx for why a
                   horizontally scrolling table is not a mobile table. */}
               <DataTable
+                selected={canBulkMessage ? selected : undefined}
+                onSelectedChange={canBulkMessage ? setSelected : undefined}
+                selectNoun="pupils"
                 caption="Pupils at this school"
                 rows={data}
                 rowKey={(s) => s.id}
@@ -450,6 +486,24 @@ function StudentsTable({ base }: { base: string }): JSX.Element {
             noun="pupils"
             onPageChange={(next) => setParam({ page: String(next) })}
           />
+
+          {/*
+            The one bulk action that has a backend.
+
+            `/api/school/announcements` already accepts an `individuals` audience with
+            explicit `targetIds`, so this hands the composer a real audience rather
+            than being a button that needs an endpoint written for it. Everything else
+            a reader might expect here — bulk status change, bulk export, bulk class
+            move — has no endpoint, and offering it would be a control that cannot work.
+          */}
+          <BulkBar count={selected.size} noun="pupil" onClear={() => setSelected(new Set())}>
+            <Button asChild size="sm">
+              <Link href={`${base}/announcements?to=${[...selected].join(',')}`}>
+                Message their parents
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            </Button>
+          </BulkBar>
         </WithRail>
       )}
 

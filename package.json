@@ -52,7 +52,8 @@
     "api:inventory": "node scripts/endpoint-inventory.mjs",
     "webhook:smoke": "node --import tsx scripts/webhook-smoke.ts",
     "security:audit": "node --env-file-if-exists=.env.local scripts/security-audit.mjs",
-    "test:unit": "node --import tsx --test \"apps/web/lib/**/*.test.ts\""
+    "test:unit": "node --import tsx --test \"apps/web/lib/**/*.test.ts\"",
+    "dev:fast": "node scripts/dev-server.mjs --turbopack"
   },
   "//react": "Declared at the root ONLY to control npm hoisting, not because the root builds anything. Every workspace is now on React 19 — apps/mobile moved with Expo SDK 57 (React Native 0.86.3 peer-requires ^19.2.3), so the old two-majors problem is gone. It stays pinned here because `styled-jsx`, a transitive dependency of `next`, hoists to the root and resolves React from it; without a root pin npm is free to put a second copy there and prerendering fails with `Cannot read properties of null (reading 'useContext')`. One version everywhere is the whole point.",
   "//types-react": "Pinned through `overrides` so every hoisted package compiles against the same React types. A stale @types/react 18 survived at the root from the SDK-52 era and react-native's own types resolved against it, which made every class component 'not a valid JSX element type'.",

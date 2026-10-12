@@ -62,6 +62,31 @@ export interface StatCardProps {
   href?: string
   /** Overrides the default "View <label>" screen-reader label on the link. */
   hrefLabel?: string
+  /**
+   * A period-on-period movement, as a signed percentage.
+   *
+   * Spec: reference images W1 and W2, where every card carries "+12% vs last month".
+   *
+   * `null` is meaningful and is NOT zero: it means no prior period exists to compare
+   * against. A school in its first month has no trend, and rendering 0% would state
+   * that nothing changed — a claim the data does not support.
+   */
+  trend?: number | null
+  /** What the trend is measured against. Required whenever `trend` is a number. */
+  trendLabel?: string
+  /**
+   * Whether a rise is good.
+   *
+   * Defaults to true. Set false for a figure where up is bad — open incidents,
+   * arrears, the onboarding backlog — so the arrow and the colour agree with the
+   * meaning rather than with the sign.
+   */
+  trendUp?: 'good' | 'bad'
+  /**
+   * A 0-100 completion bar under the figure, for a card that reports progress
+   * rather than a quantity (storage used, marks entered, staff seats).
+   */
+  progress?: number
   className?: string
 }
 
@@ -73,9 +98,25 @@ export function StatCard({
   icon,
   href,
   hrefLabel,
+  trend,
+  trendLabel,
+  trendUp = 'good',
+  progress,
   className,
 }: StatCardProps): JSX.Element {
   const t = TONE[tone]
+
+  /*
+    The arrow follows the SIGN; the colour follows the MEANING.
+
+    A rise in open incidents gets an up arrow and a danger colour, because the number
+    did go up and that is bad. Tying the colour to the sign would paint a growing
+    backlog green.
+  */
+  const hasTrend = typeof trend === 'number'
+  const rising = hasTrend && trend > 0
+  const flat = hasTrend && trend === 0
+  const favourable = flat || (trendUp === 'good' ? rising : !rising)
 
   const body = (
     // `p-card` rather than a fixed `p-4`: the token already tightens below
@@ -103,6 +144,53 @@ export function StatCard({
       <p data-numeric className={cn('mt-1.5 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-3xl', t.label)}>
         {value}
       </p>
+
+      {/*
+        The trend line. Arrow + sign + what it is measured against — three pieces,
+        because "+12%" alone does not say since when.
+      */}
+      {hasTrend && (
+        <p className={cn('mt-1 flex flex-wrap items-center gap-1 text-xs sm:text-sm', t.label)}>
+          <span
+            aria-hidden
+            className={cn(
+              'inline-flex items-center font-medium',
+              favourable ? 'text-success-text' : 'text-danger-text',
+            )}
+          >
+            {flat ? '\u2192' : rising ? '\u2197' : '\u2198'}
+          </span>
+          <span
+            data-numeric
+            className={cn('font-medium', favourable ? 'text-success-text' : 'text-danger-text')}
+          >
+            {trend > 0 ? '+' : ''}
+            {trend}%
+          </span>
+          {trendLabel && <span className="opacity-80">{trendLabel}</span>}
+        </p>
+      )}
+
+      {/*
+        Explicitly absent rather than silently missing. "No comparison yet" is a fact
+        a reader can act on; a blank space reads as an oversight.
+      */}
+      {trend === null && (
+        <p className={cn('mt-1 text-xs opacity-70 sm:text-sm', t.label)}>
+          No earlier period to compare
+        </p>
+      )}
+
+      {typeof progress === 'number' && (
+        <div className="mt-2">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-current/15">
+            <div
+              className="h-full rounded-full bg-current transition-[width]"
+              style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {hint && <p className={cn('mt-1 text-xs leading-snug opacity-80 sm:text-sm', t.label)}>{hint}</p>}
 

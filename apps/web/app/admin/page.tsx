@@ -33,6 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { EmptyState } from '../../components/ui/empty-state'
 import { ErrorState, PageHeader, StatSkeleton, TableSkeleton } from '../../components/ui/data-states'
 import { StatCard, type StatTone } from '../../components/ui/stat-card'
+import { BarChart, ChartFrame, DonutChart } from '../../components/ui/chart'
 import { HealthBadge, formatKwacha, type HealthRow } from './health-shared'
 
 interface Metrics {
@@ -79,6 +80,29 @@ interface TierRevenue {
   students: number
   mrr_zmw: string
   mrr_share_pct: string | null
+}
+
+/**
+ * The health bands, in the order a reader expects to meet them.
+ *
+ * Status colours rather than series colours: a band means the same thing on every
+ * screen, so it must not take whichever hue its position in the array happens to give
+ * it. These match `HealthBadge`'s own variants in `health-shared`.
+ */
+const BAND_ORDER = ['excellent', 'good', 'at_risk', 'critical'] as const
+
+const BAND_LABEL: Record<(typeof BAND_ORDER)[number], string> = {
+  excellent: 'Excellent',
+  good: 'Good',
+  at_risk: 'At risk',
+  critical: 'Critical',
+}
+
+const BAND_COLOUR: Record<(typeof BAND_ORDER)[number], string> = {
+  excellent: '#4A9B4F',
+  good: '#3A8DDE',
+  at_risk: '#C87F0F',
+  critical: '#E15A44',
 }
 
 interface Overview {
@@ -223,6 +247,72 @@ export default function AdminOverviewPage(): JSX.Element {
               )}
             </section>
           )}
+
+          {/*
+            Two charts, and deliberately not three.
+
+            Reference W1 shows a school-growth LINE chart beside the health donut. There
+            is no time series behind it: `platform_metrics()` returns current counts, not
+            a month-by-month history. Drawing that line would mean inventing ten months of
+            data, which §7 of the brief forbids and which would be read as fact.
+
+            So the growth chart is omitted until a history exists, and the two charts here
+            are both fed from data the API already returns: the health bands from
+            `school_health_scores()`, and the tier split from `admin_revenue_by_tier()`.
+          */}
+          <section aria-labelledby="breakdown" className="mb-cards">
+            <h2 id="breakdown" className="sr-only">
+              Platform breakdown
+            </h2>
+
+            <div className="grid gap-cards lg:grid-cols-2">
+              <ChartFrame
+                title="Schools by health score"
+                description="Operational, financial and engagement, combined"
+                action={
+                  <Link href="/admin/health" className="text-sm text-primary underline">
+                    View all
+                  </Link>
+                }
+              >
+                <DonutChart
+                  centreValue={String(data.health.length)}
+                  centreLabel={data.health.length === 1 ? 'School' : 'Schools'}
+                  emptyMessage="No school has enough data to score yet."
+                  slices={BAND_ORDER.map((band) => ({
+                    label: BAND_LABEL[band],
+                    value: data.health.filter((r) => r.band === band).length,
+                    /*
+                      Fixed colours, not the series palette: these are STATUS bands with
+                      settled meanings, and excellent must be green on every screen that
+                      shows it rather than green only when it happens to sort first.
+                    */
+                    colour: BAND_COLOUR[band],
+                  })).filter((sl) => sl.value > 0)}
+                />
+              </ChartFrame>
+
+              <ChartFrame
+                title="Monthly revenue by tier"
+                description="Where recurring revenue actually comes from"
+                action={
+                  <Link href="/admin/pricing" className="text-sm text-primary underline">
+                    Pricing
+                  </Link>
+                }
+              >
+                <BarChart
+                  emptyMessage="No school is on a paid tier yet."
+                  data={(data.revenueByTier ?? [])
+                    .filter((t) => Number(t.mrr_zmw) > 0)
+                    .map((t) => ({
+                      label: t.display_name,
+                      value: Math.round(Number(t.mrr_zmw)),
+                    }))}
+                />
+              </ChartFrame>
+            </div>
+          </section>
 
           <section aria-labelledby="figures">
             <h2 id="figures" className="sr-only">

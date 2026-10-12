@@ -50,6 +50,66 @@ export const BRAND = {
 } as const
 
 /**
+ * The categorical series palette for charts.
+ *
+ * Spec: `19 Design System/ZSMS_UI_REDESIGN_MASTER_PROMPT.md` §7
+ *
+ * ## Why this is not simply `BRAND`
+ *
+ * It was, and it failed validation. Running the brand six through the colour
+ * checks against a light chart surface produced two hard failures and a warning,
+ * both caused by the same colour:
+ *
+ *   - `amber #F5A623` sits at lightness 0.784, outside the band a series fill may
+ *     occupy, and reaches only **1.97:1** against the surface. As a chip with a
+ *     label beside it that is fine; as an unlabelled wedge in a donut it is a
+ *     shape the reader cannot see.
+ *   - Darkening it to clear those two then collided with `coral` — both warm, and
+ *     3.6 apart under deuteranopia where 8 is the floor.
+ *
+ * So chart amber is a **darker step** than brand amber, and the ORDER below is
+ * part of the palette rather than decoration.
+ *
+ * ## The order is load-bearing
+ *
+ * `green` and any warm hue are the canonical red–green confusion pair, and every
+ * arrangement that put them side by side failed protanopia separation. This order
+ * keeps a cool hue between green and both warms, and passes all six checks
+ * against the light surface AND the dark card `#1A1F2A`:
+ *
+ *   lightness band · chroma floor · CVD separation · normal-vision floor · contrast
+ *
+ * **Assign in this order and never cycle it.** A seventh series is not a generated
+ * hue — it folds into "Other", or the chart becomes small multiples.
+ *
+ * Re-run after any change:
+ * `node scripts/validate_palette.js "<hex,…>" --mode light`
+ */
+export const CHART_SERIES = [
+  '#4A9B4F', // green  — brand
+  '#3A8DDE', // blue   — brand
+  '#C87F0F', // amber  — DARKER than brand #F5A623; see above
+  '#1BA0B0', // teal   — brand
+  '#E15A44', // coral  — brand
+  '#7C5BD9', // purple — chart-only, needed for a sixth series
+] as const
+
+/**
+ * Status colours, which are NOT series colours.
+ *
+ * Reserved for good / warning / serious / critical and never reused as "series 4".
+ * Brand amber lives here rather than in `CHART_SERIES` because a status always
+ * ships with an icon and a label, so its low contrast is carried by the text
+ * beside it rather than by the colour alone.
+ */
+export const CHART_STATUS = {
+  good: '#4A9B4F',
+  warning: '#F5A623',
+  serious: '#E15A44',
+  critical: '#B3321F',
+} as const
+
+/**
  * Neutrals, tinted toward lavender-blue rather than pure grey.
  *
  * The hue runs at roughly 228°, at very low saturation. Two things follow:

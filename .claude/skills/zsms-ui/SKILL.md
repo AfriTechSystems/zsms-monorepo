@@ -172,3 +172,41 @@ Ask: can a real person with the right role actually finish this, start to end?
 first load is slow — 50.9s for the homepage under webpack, about half that with
 `npm run dev:fast` — and a screen that has not finished compiling is not a screen you have
 seen.
+
+---
+
+## Links: button or text?
+
+Settled 2026-10-12 after a sweep of every underlined link in the application.
+
+| Shape | Treatment | Why |
+|---|---|---|
+| **Standalone navigation** — "View all", "Pricing", "See the roll" after an import | `SectionLink` (a `Button` with a trailing arrow) | It is an affordance, not prose. It should look pressable. |
+| **Inside a sentence** — "recorded in the audit trail", "your logo is set on the school profile" | Underlined link, unchanged | Turning a phrase into a button breaks the sentence it belongs to. |
+| **A row's identity** — a school name in a table cell | Underlined link | It names the row; it is not a call to action. |
+
+Three of the four candidates found by the sweep were the second kind, so the rule
+is **not** "no underlined links anywhere".
+
+---
+
+## Printing
+
+Global rules live in `app/globals.css` under "Printing", and they are global on
+purpose: `DataTable` renders a real table from `sm` up and one card per row below,
+and **print media does not match `sm`** — so without a global rule every printed
+list is one card per pupil. Opt-in per screen would mean the next list prints wrongly
+and nobody finds out until a school has wasted the paper.
+
+A screen adds two things: `PrintButton` and `PrintHeading`. The heading is invisible
+on screen and carries the class, the date covered, and the date printed — the last two
+are different facts, and a register with neither is not a record of anything.
+
+---
+
+## The aura
+
+`AiAura` is three CSS gradients on their own layer behind a scrim, not a canvas. The
+scrim is what guarantees readability: contrast is one fixed decision rather than a
+function of where a blob has drifted to. Anything placed inside the assistant panel
+must be `relative`, or it paints *under* the aura.

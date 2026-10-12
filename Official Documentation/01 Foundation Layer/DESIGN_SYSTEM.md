@@ -217,6 +217,58 @@ The parent and teacher portals are genuinely used on phones and get the fuller t
 
 ---
 
+## Global search
+
+**Added 2026-10-12** (`0266`). `GlobalSearch` in the top bar, backed by
+`search_everything()`.
+
+### Who gets a box
+
+| Portal | Finds | Why |
+|---|---|---|
+| **AfriTech Admin** | Schools | A platform operator navigates by school name |
+| **School** | Pupils, staff | The two things an office looks up all day |
+| **Teacher** (in a school) | Pupils in their own classes | The same box and the same query — RLS narrows the results, not a different code path |
+| Parent | **No box** | One or two children. A search over two names is furniture |
+| Student / Alumni | **No box** | One record, their own |
+
+The parent and student exclusions are **usefulness decisions, not security ones**. The
+function is safe for them; it would simply find nothing worth finding.
+
+### The security model, which is the whole design
+
+`search_everything()` is **SECURITY INVOKER**, and that is deliberate. Every other
+cross-table function in this schema is DEFINER with a hand-written tenant clause; a
+DEFINER search would have to re-implement, in one function, every rule governing who may
+see a pupil, a member of staff and a school — including the teacher-sees-only-their-
+classes rule in `teacher_assignments`. Four policies restated where no policy test covers
+them, and the restatement is what drifts.
+
+As INVOKER, Postgres applies the caller's existing policies to every table it touches.
+**The function contains no school clause of any kind, and creates no access that did not
+already exist** — it can only return rows the caller could have fetched one table at a
+time.
+
+That also means its own SQL is no evidence that it is safe, so
+`supabase/tests/rls/global_search_test.sql` proves it by running as each audience: two
+schools each hold a pupil surnamed Mwansa, and each school finds exactly one.
+
+### Behaviour
+
+- **Two characters minimum.** A one-character query matches almost everything and is
+  refused outright rather than returning the roll.
+- **Debounced 200ms with an abort controller.** Without the abort, a slow early response
+  can land after a fast later one and replace the right results with stale ones.
+- **Ctrl/Cmd+K** focuses it; arrows and Enter work; Escape closes.
+- **Soft-deleted pupils are not findable.** Search is how somebody would casually check
+  whether a withdrawn pupil is "still in the system", and the answer the roll gives
+  everywhere else is no.
+- **ILIKE, not a trigram index.** `pg_trgm` is available and deliberately not installed:
+  a school has hundreds of pupils, the platform hundreds of schools, and the limit caps
+  the work. Revisit at a scale that actually hurts; the function's shape does not change.
+
+---
+
 ## Navigation that is an action is a button
 
 **Added 2026-10-12.**

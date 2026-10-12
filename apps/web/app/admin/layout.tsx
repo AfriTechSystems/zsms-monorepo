@@ -19,6 +19,7 @@ import { getAuthProvider } from '@zsms/auth-provider'
 import { platformTheme, ThemeStyle } from '../../lib/theme'
 import { AccountMenu } from '../../components/ui/account-menu'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
+import { GlobalSearch } from '../../components/ui/global-search'
 import { AskAi } from '../../components/assistant/ask-ai'
 import { AdminShell } from './admin-shell'
 
@@ -53,6 +54,16 @@ export default async function AdminLayout({
       <AdminShell
         headerActions={
           <>
+            {/*
+              Global search (`0266`).
+
+              Mounted per portal rather than in the shell, because not every audience
+              benefits: a parent has one or two children, so a box that searches them is
+              furniture. The function itself is safe for anyone — it is SECURITY INVOKER
+              and RLS scopes every result — so this is a usefulness decision, not a
+              security one.
+            */}
+            <GlobalSearch placeholder="Search schools…" />
             {/*
               Ask AI, which the AfriTech admin was missing entirely.
 

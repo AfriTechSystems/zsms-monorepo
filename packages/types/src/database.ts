@@ -8098,6 +8098,16 @@ export type Database = {
           out_teachers: number
         }[]
       }
+      search_everything: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          out_href: string
+          out_id: string
+          out_kind: string
+          out_subtitle: string
+          out_title: string
+        }[]
+      }
       search_schools: {
         Args: {
           p_boarding?: boolean

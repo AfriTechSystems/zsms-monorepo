@@ -81,7 +81,54 @@ export async function GET(request: NextRequest): Promise<Response> {
       capacity = (Array.isArray(row) ? row[0] : row) ?? null
     }
 
-    return ok(data ?? [], { page, perPage, total: count ?? 0, capacity })
+    /*
+      Two aggregates for the context rail, computed over the WHOLE roll rather than the
+      page in hand.
+
+      This matters more than it looks. The rail shows a year-group distribution beside a
+      paginated table, and deriving it from `data` would describe the ten rows on screen
+      — so "Year 7: 4" would mean four on this page, not four in the school. A reader
+      has no way to tell those apart, which makes the panel worse than absent.
+
+      Both are read-only and respect the same RLS as the listing above. They deliberately
+      ignore the caller's filters: the distribution answers "how is the school made up",
+      which does not change because somebody searched for a surname.
+    */
+    const [spread, newest] = await Promise.all([
+      client
+        .from('students')
+        .select('grade_id')
+        .eq('is_deleted', false)
+        .in('status', ['active', 'on_leave']),
+      client
+        .from('students')
+        .select('id, student_id, first_name, last_name, grade_id, photo_url, created_at')
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ])
+
+    const byGrade: Record<string, number> = {}
+    if (!spread.error) {
+      for (const row of (spread.data ?? []) as Array<{ grade_id: string | null }>) {
+        const key = row.grade_id ?? 'Unassigned'
+        byGrade[key] = (byGrade[key] ?? 0) + 1
+      }
+    }
+
+    return ok(data ?? [], {
+      page,
+      perPage,
+      total: count ?? 0,
+      capacity,
+      /*
+        `null` when the aggregate itself failed, so the rail can say the breakdown is
+        unavailable rather than render an empty one — an empty distribution reads as a
+        school with no pupils.
+      */
+      distribution: spread.error ? null : byGrade,
+      recent: newest.error ? [] : (newest.data ?? []),
+    })
   })
 }
 

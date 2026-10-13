@@ -33,7 +33,17 @@ import { FeatureGrid } from '../../../components/feature-grid'
 import { SectionTitle, StatTile } from '../../../components/stats'
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
-import { Badge, Body, Caption, Card, Row, Screen, Title, usePalette } from '../../../components/ui'
+import {
+  Badge,
+  Body,
+  Caption,
+  Card,
+  ErrorNote,
+  Row,
+  Screen,
+  Title,
+  usePalette,
+} from '../../../components/ui'
 import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 
 interface Overview {
@@ -49,7 +59,7 @@ export default function Home(): JSX.Element {
   const c = usePalette()
   const router = useRouter()
   const { firstName } = useSession()
-  const { data, loading, reload } = useApi<Overview>('/api/teacher/overview')
+  const { data, loading, error, reload } = useApi<Overview>('/api/teacher/overview')
 
   /*
     Linked is "the session resolves a school", not "assignments exist".
@@ -57,6 +67,14 @@ export default function Home(): JSX.Element {
     A teacher invited this morning has a school and no classes yet, and telling them
     attendance needs a school would be wrong — they need a class, which their school
     gives them.
+  */
+  /*
+    `linked` must mean "we asked and the answer was no", not "we have no answer".
+
+    Previously a FAILED request left `data` null, so `linked` was false and the card
+    read "No school linked" — telling a teacher something false about their own
+    account because the network was down. The error state below takes precedence, and
+    this stays false only when the request actually succeeded.
   */
   const linked = Boolean(data?.school)
 
@@ -94,8 +112,19 @@ export default function Home(): JSX.Element {
           <Title>{firstName ? `Hello, ${firstName}` : 'Your teaching'}</Title>
         </View>
 
+        {/*
+          Stated, and above everything that depends on the answer. Without this a
+          failed request fell through to "No school linked", which is a claim about
+          the teacher's account rather than about the connection.
+        */}
+        {error && <ErrorNote message={error} onRetry={reload} />}
+
         {/* The school, or the absence of one, said plainly. A standalone teacher is not
-            in a broken state and the card does not imply they are. */}
+            in a broken state and the card does not imply they are.
+
+            Hidden entirely while the answer is unknown — a failed or in-flight request
+            must not render a claim either way. */}
+        {!error && (data || !loading) && (
         <Card>
           <Row gap={SPACE.md}>
             <View
@@ -124,6 +153,7 @@ export default function Home(): JSX.Element {
             </View>
           </Row>
         </Card>
+        )}
 
         {/*
           What is outstanding today, before the grid of everything.

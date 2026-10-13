@@ -15,8 +15,6 @@
     "ai:smoke": "node --env-file=.env.local --import tsx scripts/ai-smoke.ts",
     "api:inventory": "node scripts/endpoint-inventory.mjs",
     "apikey:smoke": "node --env-file=.env.local --import tsx scripts/api-key-smoke.ts",
-    "apk": "npm --prefix apps/mobile exec -- eas build --platform android --profile preview",
-    "apk:local": "npm --prefix apps/mobile exec -- eas build --platform android --profile preview --local",
     "assistant:smoke": "node --env-file=.env.local --import tsx scripts/assistant-smoke.ts",
     "brand:assets": "node scripts/generate-brand-assets.mjs",
     "build": "turbo build",

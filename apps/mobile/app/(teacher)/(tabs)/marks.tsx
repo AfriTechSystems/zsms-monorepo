@@ -48,6 +48,7 @@ import {
   Screen,
   usePalette,
 } from '../../../components/ui'
+import { ProgressBar } from '../../../components/stats'
 import { NUMERIC, RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 import { formatClass } from './attendance'
 
@@ -231,6 +232,24 @@ export default function Marks(): JSX.Element {
               />
               {unmarked > 0 && <Badge label={`${unmarked} not marked`} tone="warning" />}
             </Row>
+
+            {/*
+              How far through the sheet, matching the register.
+
+              The badge says how many are left; the bar says how far through, which is
+              the question somebody entering forty marks keeps asking. Hidden once the
+              sheet is complete — the Save button already says so, and a full bar is a
+              congratulation nobody needs.
+            */}
+            {unmarked > 0 && (
+              <View style={{ gap: 4 }}>
+                <ProgressBar
+                  value={((rows.length - unmarked) / rows.length) * 100}
+                  tone="primary"
+                />
+                <Caption>{`${rows.length - unmarked} of ${rows.length} entered`}</Caption>
+              </View>
+            )}
 
             {rows.map((r) => (
               <Row

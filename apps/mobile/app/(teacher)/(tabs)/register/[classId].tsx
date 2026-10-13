@@ -64,6 +64,7 @@ import {
   Screen,
   usePalette,
 } from '../../../../components/ui'
+import { ProgressBar } from '../../../../components/stats'
 import { RADIUS, SPACE, TAP, TYPE } from '../../../../theme'
 import { formatClass } from '../attendance'
 
@@ -203,6 +204,32 @@ export default function Register(): JSX.Element {
               {unmarked > 0 && <Badge label={`${unmarked} not marked`} tone="warning" />}
               {data.alreadyMarked && <Badge label="Already saved today" tone="primary" />}
             </Row>
+
+            {/*
+              How far through the register the teacher is.
+
+              The badges say how many are in and out; neither says how much is LEFT,
+              which on a class of forty is the thing somebody standing in front of the
+              room wants. Hidden once everything is marked — a full bar is a
+              congratulation nobody needs and the Save button already says the sheet is
+              complete.
+
+              Deliberately no avatars on the rows here, unlike the parent lists. This is
+              a work surface worked down at speed, and a picture on every row would add
+              about a third to the height of a forty-pupil list for recognition a
+              teacher does not need of their own class.
+            */}
+            {unmarked > 0 && (
+              <View style={{ gap: 4 }}>
+                <ProgressBar
+                  value={((rows.length - unmarked) / rows.length) * 100}
+                  tone="primary"
+                />
+                <Caption>
+                  {`${rows.length - unmarked} of ${rows.length} marked`}
+                </Caption>
+              </View>
+            )}
 
             {/* Most days most pupils are present, so the work is correcting the few who
                 are not. This turns thirty-eight taps into four. */}

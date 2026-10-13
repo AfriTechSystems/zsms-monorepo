@@ -39,6 +39,7 @@ import {
   Screen,
   usePalette,
 } from '../../../components/ui'
+import { ProgressBar } from '../../../components/stats'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { useApi } from '../../../lib/use-api'
 import { NUMERIC, SPACE, TYPE } from '../../../theme'
@@ -98,6 +99,15 @@ export default function ParentFees(): JSX.Element {
 
   const outstanding = data?.balance?.outstanding ?? 0
 
+  /*
+    Verified payments only — that is what the balance nets. A parent who uploaded
+    proof this morning sees it below as a claim and not in this bar, which is the same
+    distinction the school side draws and the reason the two never disagree.
+  */
+  const billed = data?.balance?.total_billed ?? 0
+  const paidPercent =
+    billed > 0 ? ((data?.balance?.total_paid ?? 0) / billed) * 100 : undefined
+
   return (
     <Screen>
       <ChildSwitcher children={data?.children ?? []} selectedId={childId} onSelect={setChildId} />
@@ -130,9 +140,32 @@ export default function ParentFees(): JSX.Element {
               <Caption>Outstanding</Caption>
               <Text
                 style={[TYPE.display, NUMERIC, { color: outstanding > 0 ? c.danger : c.success }]}
+                // One line. Zambian school fees reach six figures and a wrapped
+                // figure makes the card taller than the one beside it.
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
               >
                 {kwacha(outstanding)}
               </Text>
+
+              {/*
+                How far through the term's fees this parent is.
+
+                The outstanding figure alone does not say whether they are nearly done
+                or have barely started, which is the thing somebody actually wants to
+                know before deciding what to pay today. Shown only when there is a
+                billed total to be a proportion of — otherwise a school that has not
+                billed yet would show a full bar reading as "paid up".
+              */}
+              {paidPercent !== undefined && (
+                <View style={{ gap: 4, marginTop: SPACE.sm }}>
+                  <ProgressBar value={paidPercent} tone="success" />
+                  <Caption>
+                    {`${Math.round(paidPercent)}% of ${kwacha(billed)} paid`}
+                  </Caption>
+                </View>
+              )}
               {/*
                 The action, immediately under the number it acts on.
 

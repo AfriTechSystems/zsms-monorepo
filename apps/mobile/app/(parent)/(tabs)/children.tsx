@@ -23,6 +23,7 @@ import type { JSX } from 'react'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { UserPlus, Users } from 'lucide-react-native'
 
+import { Avatar } from '../../../components/avatar'
 import {
   Body,
   Caption,
@@ -76,8 +77,18 @@ export default function ParentChildren(): JSX.Element {
               const selected = childId ? child.id === childId : child === kids[0]
               return (
                 <Card key={child.id}>
-                  <Row gap={SPACE.sm}>
-                    <Users size={19} color={c.primaryMark} strokeWidth={2} />
+                  <Row gap={SPACE.md}>
+                    {/*
+                      A face rather than a generic person icon, which was the same
+                      glyph on every row — so a parent of three scanned three
+                      identical cards. The initials fallback is deterministic from
+                      the name, so each child keeps their colour between sessions.
+                    */}
+                    <Avatar
+                      name={`${child.firstName} ${child.lastName}`}
+                      src={child.photoUrl ?? null}
+                      size="md"
+                    />
                     <View style={{ flex: 1 }}>
                       <Text style={[TYPE.body, { color: c.text, fontWeight: '600' }]}>
                         {child.firstName} {child.lastName}

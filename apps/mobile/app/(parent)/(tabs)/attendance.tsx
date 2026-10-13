@@ -32,6 +32,7 @@ import {
   Screen,
   usePalette,
 } from '../../../components/ui'
+import { Ring } from '../../../components/stats'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { useApi } from '../../../lib/use-api'
 import { NUMERIC, SPACE, TYPE } from '../../../theme'
@@ -91,16 +92,38 @@ export default function ParentAttendance(): JSX.Element {
 
         {data && a && (
           <>
+            {/*
+              The rate as a ring, matching the home screen so the same number looks
+              the same in both places.
+
+              The colour carries the same bands the school side uses — 90 and 80 — and
+              a null rate draws an empty track rather than a red ring at zero, which
+              for a pupil with nothing marked would read as total absence.
+            */}
             <Card>
-              <Caption>Attendance over the last 30 days</Caption>
-              <Text style={[TYPE.display, NUMERIC, { color: c.text }]}>
-                {a.rate === null || a.rate === undefined ? '—' : `${a.rate}%`}
-              </Text>
-              <Body muted>
-                {a.days > 0
-                  ? `${a.present ?? 0} of ${a.days} school days marked present.`
-                  : 'Your school has not marked a register for this period yet.'}
-              </Body>
+              <Row gap={SPACE.lg}>
+                <Ring
+                  value={a.rate ?? null}
+                  size={84}
+                  tone={
+                    a.rate === null || a.rate === undefined
+                      ? 'neutral'
+                      : a.rate >= 90
+                        ? 'success'
+                        : a.rate >= 80
+                          ? 'warning'
+                          : 'danger'
+                  }
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Caption>Attendance over the last 30 days</Caption>
+                  <Body muted>
+                    {a.days > 0
+                      ? `${a.present ?? 0} of ${a.days} school days marked present.`
+                      : 'Your school has not marked a register for this period yet.'}
+                  </Body>
+                </View>
+              </Row>
             </Card>
 
             <Row gap={SPACE.sm}>

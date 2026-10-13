@@ -8,13 +8,16 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "zm.co.zsms.app"
+      "bundleIdentifier": "zm.co.zsms.app",
+      "buildNumber": "1"
     },
     "android": {
       "package": "zm.co.zsms.app",
       "adaptiveIcon": {
-        "backgroundColor": "#1D4ED8"
-      }
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3A8DDE"
+      },
+      "versionCode": 1
     },
     "plugins": [
       "expo-router",
@@ -25,6 +28,12 @@
     "scheme": "zsms",
     "experiments": {
       "typedRoutes": true
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
     }
   }
 }

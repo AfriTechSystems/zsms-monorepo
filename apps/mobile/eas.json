@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/expo/eas-cli/main/schema.json",
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "//": [
+      "Three profiles, and the one you want for a phone is `preview`.",
+      "",
+      "`preview` produces an .apk you download and install directly. `production`",
+      "produces an .aab, which is the Play Store upload format and CANNOT be",
+      "installed on a phone — asking for one and then trying to install it is the",
+      "usual first wrong turn.",
+      "",
+      "EXPO_PUBLIC_API_URL is baked in AT BUILD TIME. An APK built against a laptop's",
+      "LAN address stops working the moment that address changes, which it does every",
+      "time the router hands out a new lease. That is fine for an afternoon of testing",
+      "and wrong for anything you hand to a school."
+    ],
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "//": "Replace with the LAN address `npm run dev` prints. Not localhost — on the phone, localhost is the phone.",
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:3000"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://zsms.co.zm"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

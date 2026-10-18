@@ -245,7 +245,7 @@ export const SPACING = {
  * protector is not the place to test whether 36px is good enough.
  */
 export const SIZING = {
-  /** ≥ 480px. */
+  /** At and above `BREAKPOINT_SM`. */
   base: {
     cardPadding: 20,
     cardGap: 20,
@@ -254,7 +254,7 @@ export const SIZING = {
     pageGutter: 24,
     tapTarget: 44,
   },
-  /** < 480px. */
+  /** Below `BREAKPOINT_SM`. */
   mobile: {
     cardPadding: 14,
     cardGap: 12,
@@ -265,8 +265,43 @@ export const SIZING = {
   },
 } as const
 
-/** The breakpoint the mobile row applies below. */
-export const MOBILE_MAX_WIDTH = 480
+/**
+ * **The one breakpoint.** Tailwind's `sm` must equal this, and
+ * `apps/web/lib/breakpoints.test.ts` fails the build if it does not.
+ *
+ * ## Why this is 640 and not 480
+ *
+ * It was 480 until 2026-10-18, and Tailwind's `sm` has always been its stock
+ * 640px — a value this repository never declared and therefore never reconciled.
+ * The two systems divide the viewport differently, so **between 480px and 640px a
+ * screen got desktop type and padding inside a mobile layout**: `data-table.tsx`
+ * renders one card per row below `sm` and `app-shell.tsx` switches to its drawer
+ * there, while the token layer had already handed back the 20px card padding, the
+ * 24px gutter and the full-size headings at 481px.
+ *
+ * That band is not an edge case. It covers most phones held in landscape and the
+ * narrow half of a split-screen tablet.
+ *
+ * Raising this to match `sm` was the one-line half of the fix; the other half is
+ * that nothing connected them. Tailwind only ever *names* CSS variables emitted
+ * from here, so there is no import to make the agreement structural — hence the
+ * test, which reads both and asserts they are the same number.
+ *
+ * Changing this value is a visual change at every width in the affected band.
+ * Change it here, and only here.
+ */
+export const BREAKPOINT_SM = 640
+
+/**
+ * The media query bound for the mobile row, as `max-width`.
+ *
+ * `BREAKPOINT_SM - 0.02` rather than `BREAKPOINT_SM`, because Tailwind's `sm:`
+ * compiles to `min-width: 640px`. A `max-width: 640px` here would make both rules
+ * apply at exactly 640px — mobile tokens inside a desktop layout, the same class of
+ * bug one pixel wide. Subtracting a hundredth leaves no width where neither applies
+ * and none where both do.
+ */
+export const MOBILE_MAX_WIDTH = BREAKPOINT_SM - 0.02
 
 export const RADIUS = {
   none: 0,

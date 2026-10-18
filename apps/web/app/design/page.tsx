@@ -8,7 +8,31 @@
  * Everything on this page reads from `@zsms/design-tokens`. Nothing is
  * hardcoded, so the page is also the proof that the token pipeline works
  * end-to-end: change a token, reload, see it here.
+ *
+ * ## Not public, as of 2026-10-18
+ *
+ * This said "not shipped to users" for two months while being **publicly
+ * routable**: `middleware.ts` authenticates a request but does not authorise one
+ * — route protection is each page's own job, and this page had none. It was
+ * confirmed by loading it with no session at all.
+ *
+ * Nothing here is a tenant's data; it is swatches, type and a synthetic school
+ * theme, so this was never a disclosure. It is internal design tooling on a
+ * commercial domain, which is a different problem and still one worth not
+ * having.
+ *
+ * So: available in development to anybody, and in production only to a signed-in
+ * AfriTech admin. **404, not 403** — consistent with the school portal, where a
+ * segment/session mismatch is a 404 so the existence of a route is not itself a
+ * disclosure. The team keeps the reference in production; nobody else learns it
+ * is there.
  */
+
+import { notFound } from 'next/navigation'
+
+import { getAuthProvider } from '@zsms/auth-provider'
+
+import { AFRITECH_ORG_SLUG } from '../../lib/admin-context'
 
 import {
   auditTheme,
@@ -262,7 +286,21 @@ function DashboardPieces(): JSX.Element {
   )
 }
 
-export default function DesignFoundationPage(): JSX.Element {
+export default async function DesignFoundationPage(): Promise<JSX.Element> {
+  /*
+    Development is open: this is the reference a session reloads constantly while
+    changing a token, and requiring a session for that would mean signing in to see
+    whether a colour moved.
+
+    Production is AfriTech only, and the refusal is `notFound()` rather than a
+    redirect or a 403 — a 403 confirms the route exists, which is the one thing a
+    page that is "not shipped to users" should not do.
+  */
+  if (process.env.NODE_ENV === 'production') {
+    const session = await getAuthProvider().getSessionUser()
+    if (session?.organisationSlug !== AFRITECH_ORG_SLUG) notFound()
+  }
+
   const zsms = resolveTheme(null)
   // A plausible school theme — deep maroon and forest green, nothing like the
   // ZSMS defaults, to show the derivation holding up on unfamiliar input.

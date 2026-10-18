@@ -13,11 +13,33 @@
 import type { Config } from 'tailwindcss'
 import animate from 'tailwindcss-animate'
 
+import { BREAKPOINT_SM } from '@zsms/design-tokens'
+
 const config: Config = {
   darkMode: ['class', '[data-theme="dark"]'],
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        /*
+          `sm` is declared rather than inherited, and it is read from the token
+          package rather than typed here.
+
+          Until 2026-10-18 this file declared no breakpoint at all, so `sm` was
+          Tailwind's stock 640px while `MOBILE_MAX_WIDTH` in the token package was
+          480px. Nothing reconciled them, and **between 480px and 640px a screen got
+          desktop type and padding inside a mobile layout** — `data-table.tsx` goes
+          to one card per row below `sm`, `app-shell.tsx` switches to its drawer
+          there, and the token layer had already restored the desktop values at
+          481px. Most phones in landscape sit in that band.
+
+          Importing the constant makes the agreement structural: there is one number
+          and both systems read it. `lib/breakpoints.test.ts` still asserts it,
+          because this import could be replaced by a literal in a hurry and the
+          symptom would be invisible.
+        */
+        sm: `${BREAKPOINT_SM}px`,
+      },
       colors: {
         border: 'var(--border)',
         input: 'var(--input)',

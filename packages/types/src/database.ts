@@ -6744,6 +6744,13 @@ export type Database = {
             }
             Returns: boolean
           }
+      anon_executable_definer_functions: {
+        Args: never
+        Returns: {
+          out_arguments: string
+          out_function_name: string
+        }[]
+      }
       answer_departure_prompt: { Args: { p_opt_in: boolean }; Returns: boolean }
       archive_old_ai_conversations: { Args: never; Returns: number }
       attach_own_registered_school: {

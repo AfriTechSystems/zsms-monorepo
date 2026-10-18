@@ -564,9 +564,9 @@ Creates the audit log table last because it references all other tables conceptu
 
 ## Next Available Sequence Number
 
-**`0272`** — available for the next migration.
+**`0273`** — available for the next migration.
 
-`0001`–`0021` and `0069`–`0271` are written and applied to `zsms-dev`, and the whole sequence is verified by CI to apply to an empty database. **`0022`–`0068` are void as numbers.**
+`0001`–`0021` and `0069`–`0272` are written and applied to `zsms-dev`, and the whole sequence is verified by CI to apply to an empty database. **`0022`–`0068` are void as numbers.**
 
 ### Why the middle block is void
 
@@ -648,6 +648,7 @@ This section is updated each time a migration reaches production.
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-10-18 | **Added `0272` — 64 SECURITY DEFINER functions were executable by `anon`** | `public` holds 216 SECURITY DEFINER functions and **67 could be executed by the `anon` role** over PostgREST. The anon key ships in the browser bundle, so `anon` is anybody. The sharpest two were `worker_parent_push_tokens()` and `worker_retire_push_token()`: a `worker_*` function exists to bypass RLS for a worker holding the service role key, so it carries no tenant clause and no role check — one POST with a list of Clerk user ids returned parents' device push tokens. Fourteen of the sixteen `worker_*` functions were already closed to both `anon` and `authenticated`, so the discipline existed and these two newest ones missed it. **914 assertions did not catch it because every suite asserts a policy, and a SECURITY DEFINER function never consults one** — Postgres checks EXECUTE one layer in front of RLS. Three functions stay anon-reachable (`search_schools`, `school_public_profile`, `school_branding_by_slug`): `anon` can SELECT 0 of 93 relations in `public`, verified, so those three ARE the public disclosure boundary. The revoke needs both `FROM PUBLIC` and `FROM anon` because the privileges came from two places — Postgres's default PUBLIC grant on every new function, and explicit `anon=X` entries — and `authenticated` is granted explicitly FIRST, since on a function drawing its EXECUTE from PUBLIC the other order removes the capability along with the exposure and succeeds quietly. Trigger functions keep `authenticated` deliberately: whether Postgres re-checks EXECUTE when a trigger FIRES was not verified, and if it does, revoking would break every write. Catalogue-driven rather than a list of 64 names, with the specification shipped as `anon_executable_definer_functions()` and asserted empty by a new 12-assertion suite in CI — the `0270` answer to a gap whose symptom is nothing at all. Next available advances to `0273`. |
 | 2026-04-26 | Initial complete plan | Stage 5 API reference documentation — pre-development migration planning |
 | 2026-08-13 | **Added migrations `0061`–`0065` — dynamic configuration registry tables** | Closes the gap flagged in `DYNAMIC_CONFIG.md`: eight `afritech` tables were specified with no migration |
 | 2026-08-13 | Gap scope corrected from five tables to eight | Cross-check found `platform_settings`, `platform_products`, and `commission_rates` also missing |
@@ -798,7 +799,7 @@ Creates AfriTech financial tracking and nightly metrics cache tables.
 Creates all indexes for tables added in migrations 0036-0054.
 - Indexes for: `timetable_slots`, `announcements`, `announcement_reads`, `parent_push_tokens`, `alumni_profiles`, `lenders`, `school_integrations`, `integration_log`, `afritech.school_feature_overrides`, `afritech.loan_commissions`, `afritech.platform_metrics`
 - Related: `docs/api/INDEXES.md`
-**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document — `0092`.**
+**NEXT AVAILABLE: see *Next Available Sequence Number* near the top of this document.** No number is repeated here — this line named `0092` for about 180 migrations.
 
 ---
 
@@ -1110,7 +1111,7 @@ CREATE INDEX idx_rate_limit_config_lookup
 
 ---
 
-**NEXT AVAILABLE: `0092`** — see *Next Available Sequence Number* above, which is authoritative.
+**NEXT AVAILABLE: see *Next Available Sequence Number* above, which is authoritative.** No number is repeated here — this line named `0092` for about 180 migrations.
 | 2026-08-16 | **Added `0092` — `school_branding`, with the WCAG AA guardrail as a CHECK constraint** | `validateTheme()` alone would leave the rule absent from every writer that is not the API. Implementing the luminance formula a second time in SQL is real duplication, paid because a guardrail present in one of two writers is one that will eventually be walked past. ADR-043. |
 | 2026-08-16 | **Added `0093` — brand colours in `worker_payment_context()`** | Receipts assemble from a single call whose `school` object predates `school_branding`; without this a themed school would send themed report cards and unthemed receipts. Next available advances to `0094`. |
 | 2026-08-17 | **Added `0094` — branding contrast re-measured against the page ground** | The page stopped being white, so thresholds measured against white were measuring the wrong surface. Next available advances to `0095`. |

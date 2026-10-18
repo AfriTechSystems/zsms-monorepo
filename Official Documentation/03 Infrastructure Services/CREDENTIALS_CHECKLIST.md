@@ -201,6 +201,27 @@ SENTRY_AUTH_TOKEN=...                  # source maps at build time
 
 ## 2. Blocking launch
 
+### How to verify any of section 2, the moment it lands
+
+`npm run notifications:smoke -- --to-phone +260... --to-email you@example.com`
+
+Written 2026-10-18, before the credentials, so their arrival is a five-minute
+confirmation rather than another round of discovery. It sends **one real message per
+configured channel** and then exercises the WhatsApp → email → SMS chain, reporting
+which channel actually delivered.
+
+Two refusals are deliberate and worth knowing before you run it:
+
+- **It exits non-zero unless `NOTIFICATION_PROVIDER=live`.** Otherwise every channel
+  is `MockChannel`, which always succeeds — a green run against the mock would report
+  delivery that did not happen, which is the false confidence that let this gap
+  survive as long as it has.
+- **It has no default recipient.** A seeded fixture number belongs to a real handset
+  in Lusaka. Pass the destination explicitly.
+
+A channel with absent credentials reports **SKIP**, never PASS, and the summary says
+so: "we did not try" and "it worked" must not look the same.
+
 ### 2.1 Meta WhatsApp Business
 
 The primary channel for every parent notification. Nothing has ever left this machine.

@@ -45,6 +45,7 @@
     "mobile": "node scripts/mobile-server.mjs",
     "mobile:clean": "node scripts/mobile-server.mjs --clear",
     "port:free": "node scripts/dev-server.mjs --kill-only",
+    "notifications:smoke": "node --env-file=.env.local --import tsx scripts/notifications-smoke.ts",
     "posthog:smoke": "node --env-file=.env.local --import tsx scripts/posthog-smoke.ts",
     "queue:smoke": "node --env-file=.env.local --import tsx scripts/queue-smoke.ts",
     "r2:smoke": "node --env-file=.env.local --import tsx scripts/r2-smoke.ts",

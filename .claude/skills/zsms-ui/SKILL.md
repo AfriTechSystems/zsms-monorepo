@@ -70,6 +70,36 @@ Six of the 40 are feature components that happen to live in `ui/` rather than pr
 `custom-field-input`, `draft-notice`, and `school-logo` (which duplicates
 `brand/school-logo.tsx`). Do not treat everything in this folder as a primitive.
 
+### Added 2026-10-18 — reach for these before writing the behaviour again
+
+- **Dates: `DateField` / `DateRangeField`** (`components/ui/date-field`), never a raw
+  `<input type="date">`. There were eighteen of those across twelve files.
+  `DateRangeField` links the two bounds — the `from` input's `max` is whatever `to`
+  holds and vice versa — so an inverted range cannot be entered. Five existing
+  from/to pairs had no such check and returned an empty result that read as "no
+  data". Use `notFuture` where a future value is always a typo (a date of birth, a
+  join date, an audit window, a register) and leave it off where the future is
+  legitimate (an enrolment next term, a fee due date).
+- **`todayIso()` lives in `lib/dates`**, and it is the only correct one. **Never
+  `new Date().toISOString().slice(0, 10)`** — that is UTC, and Zambia is UTC+2, so
+  for the first two hours of every local day it returns *yesterday*. As a default it
+  opens the wrong day; as a `max` it refuses the date a teacher is sitting in.
+- **Menus and dropdowns: `usePopover()`** (`lib/use-popover`). Handles Escape,
+  outside click, Tab-out, `aria-expanded`/`aria-haspopup`/`aria-controls`, and
+  **returns focus to the trigger on close**. Three components had hand-rolled copies
+  that drifted. A menu must **not** trap focus — that is a modal's job and
+  `ui/dialog` already does it natively; see the file for why.
+- **Stacking: `z-raised` / `z-sticky` / `z-chrome` / `z-overlay` / `z-popover` /
+  `z-top`**, not `z-10`…`z-50`. If you are reaching for `z-[60]`, the layer you want
+  is `z-top`.
+- **Motion: `duration-fast|base|slow` and `ease-standard|gentle|emphasised`.** The
+  ambient loop timings in `globals.css` are deliberately not tokens — they are scene
+  timings, not a scale.
+- **One breakpoint.** `BREAKPOINT_SM` (640) is the only one; Tailwind's `sm` is
+  imported from it and `lib/breakpoints.test.ts` fails the build if they diverge. The
+  token layer swaps type and spacing below it, which is why `p-card` and `text-3xl`
+  need no responsive modifier.
+
 The ones people get wrong:
 
 - **`EmptyState` is in its own module** (`components/ui/empty-state`), not in `data-states`

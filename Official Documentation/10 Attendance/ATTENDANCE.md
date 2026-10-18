@@ -246,6 +246,46 @@ Generated for the full school for a term. Shows:
 
 Both reports are available in PDF and CSV formats from Reports → Attendance.
 
+### Day-by-day trend — BUILT 2026-10-18 (partial)
+
+The *School Attendance Summary* above specifies "day-by-day school attendance rate
+(trend chart)". The **data function and the dashboard chart exist**; the PDF/CSV
+report around them does not.
+
+**`public.school_attendance_trend(p_days INT DEFAULT 14)`** (migration `0274`) returns
+one row per day that has a marked register, within a window clamped to 1–90 days:
+
+| Column | Meaning |
+|---|---|
+| `out_date` | the register date |
+| `out_present` / `out_late` / `out_absent` / `out_excused` / `out_holiday` | one count per status |
+
+Three properties of it are load-bearing:
+
+1. **`SECURITY INVOKER`, with no `school_id` clause of its own.** RLS is the
+   authorisation, exactly as for `search_everything()` (ADR-aligned with `0266`). A
+   class teacher therefore gets their classes and a head teacher gets the school, and
+   **two people at one school legitimately see different numbers**. Flipping it to
+   `SECURITY DEFINER` would return every school's attendance to every caller with no
+   other symptom, because the rows it reads are the same rows —
+   `attendance_register_test` asserts it is INVOKER for that reason.
+2. **`holiday` is returned as its own count and never folded into absence.** A closed
+   day is not a day of total absence. `/api/school/overview` drops days with no
+   non-holiday rows rather than plotting them; plotted, they draw a cliff to 0% across
+   every half-term that reads as a register nobody marked.
+3. **`excused` is returned separately.** Whether an authorised absence counts against
+   an attendance rate is a school's policy, and in some cases a reporting requirement.
+   The function returns facts; the consumer decides.
+
+**Surfaced at:** `GET /api/school/overview` → `attendance.trend[]` (14 days, gated on
+`attendance:read`), rendered on the school dashboard as a single-series rate line —
+`(present + late) ÷ (present + late + absent + excused)`. A late pupil came to school,
+so counting them absent would make punctuality and attendance the same measure. The
+chart renders only with two or more days behind it; one point is not a trend.
+
+**Still outstanding from the specification above:** grade-by-grade rates, top
+absentees, teacher marking compliance, and the PDF/CSV export of any of it.
+
 ---
 
 ## Business Rules
@@ -268,3 +308,4 @@ Both reports are available in PDF and CSV formats from Reports → Attendance.
 | 2026-04-26 | Added timetable integration for class suggestion | Timetable module confirmed |
 | 2026-04-26 | Portal-first model — monthly summaries replace per-absence default | Communication model update |
 | 2026-04-26 | Added holiday bulk marking | Schools need to handle non-school days cleanly |
+| 2026-10-18 | `school_attendance_trend()` (`0274`) and the dashboard trend chart | The day-by-day rate this document has specified since the initial draft had no data function behind it. SECURITY INVOKER so RLS scopes it per role; `holiday` kept as its own count because a closed day is not a day of total absence. Grade-by-grade rates, top absentees, marking compliance and the PDF/CSV export remain unbuilt. |

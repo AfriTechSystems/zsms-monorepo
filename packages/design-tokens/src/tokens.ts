@@ -558,3 +558,83 @@ export function buildDarkTheme(brand: {
 /** The ZSMS default theme — the fallback whenever a school has set nothing. */
 export const ZSMS_LIGHT = buildLightTheme(BRAND)
 export const ZSMS_DARK = buildDarkTheme(BRAND)
+
+/**
+ * Stacking order.
+ *
+ * Added 2026-10-18. The scale is not invented — it is the one the components had
+ * already settled into, read off the tree and named. What was missing was the
+ * naming, and the cost of that was visible: `shortcuts.tsx` had reached for an
+ * arbitrary `z-[60]` escape hatch, and `school-switcher.tsx` used `z-40` for its
+ * panel while `account-menu.tsx` and `notification-bell.tsx` used `z-50` for
+ * theirs — three components doing the same job on two different layers, which is
+ * the kind of disagreement that only shows up when two of them are open at once.
+ *
+ * Layers, lowest first:
+ *
+ * | Token      | Was    | For |
+ * |------------|--------|-----|
+ * | `raised`   | `z-10` | Decoration and sticky cells inside a card — the pinned pupil-name column on the results grid, the public page texture |
+ * | `sticky`   | `z-20` | Bars that stick within a scrolling region: the bulk-action bar, the attendance toolbar |
+ * | `chrome`   | `z-30` | Persistent app chrome — the sidebar, the parent portal's bottom tabs |
+ * | `overlay`  | `z-40` | Scrims, and surfaces drawn over page content |
+ * | `popover`  | `z-50` | Menus, toasts, banners — anything dismissed with Escape |
+ * | `top`      | `z-60` | Deliberately above everything. The keyboard-shortcuts panel, which must be readable while any of the above is open |
+ *
+ * **If something needs a layer that is not here, the answer is usually that it
+ * belongs on one of these.** Add a level only when two things genuinely must
+ * stack and neither can move.
+ */
+export const Z_INDEX = {
+  raised: 10,
+  sticky: 20,
+  chrome: 30,
+  overlay: 40,
+  popover: 50,
+  top: 60,
+} as const
+
+/**
+ * Motion.
+ *
+ * Added 2026-10-18, from the literals already in `globals.css` and
+ * `tailwind.config.ts` rather than from a fresh opinion.
+ *
+ * ## Why only transitions, and not every animation in the stylesheet
+ *
+ * `globals.css` also carries ambient loop timings — a 1.4s sweep on the splash,
+ * a 4s float on the flag, and the aura's 19s/24s/29s drifts, deliberately
+ * co-prime so the three gradients never resynchronise. **Those are scene
+ * timings, not a scale.** Tokenising them would imply they are interchangeable
+ * with each other and with a hover transition, which is exactly wrong, so they
+ * stay where they are.
+ *
+ * What belongs here is the small set of durations a UI transition may choose
+ * from, so that two menus do not open at subtly different speeds.
+ *
+ * ## Reduced motion is not expressed here
+ *
+ * `globals.css` collapses every duration to 0.01ms under
+ * `prefers-reduced-motion: reduce`, and three ambient animations are switched off
+ * outright rather than merely shortened — a looping animation at 0.01ms is a
+ * strobe, which is worse than the thing the preference asks to avoid. That rule
+ * is global and stays global: a token cannot express "and also stop the aura".
+ */
+export const MOTION = {
+  duration: {
+    /** Colour and opacity on hover or focus. Short enough not to feel laggy on a trackpad. */
+    fast: 120,
+    /** The default for anything that moves or resizes — panels, drawers, the splash. */
+    base: 220,
+    /** Deliberate, for something entering from off-screen that the eye should follow. */
+    slow: 400,
+  },
+  easing: {
+    /** Decelerate into place. The default for anything arriving. */
+    standard: 'ease-out',
+    /** Symmetric, for something that leaves the way it came, and for ambient loops. */
+    gentle: 'ease-in-out',
+    /** Strong acceleration both ends. Used by the splash sweep; rarely the right choice. */
+    emphasised: 'cubic-bezier(0.65, 0, 0.35, 1)',
+  },
+} as const

@@ -26,12 +26,13 @@
  */
 
 import type { JSX } from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { Bell } from 'lucide-react'
 
 import { Badge } from './badge'
 import { apiSend, useApi } from '../../lib/use-api'
+import { usePopover } from '../../lib/use-popover'
 
 interface Notice {
   id: string
@@ -52,30 +53,16 @@ export function NotificationBell({
   allHref?: string
 }): JSX.Element {
   const { data, reload } = useApi<{ notices: Notice[]; unread: number }>(endpoint)
-  const [open, setOpen] = useState(false)
   // Marked locally the moment one is opened, so the badge clears immediately rather
   // than after a round trip on a slow link.
   const [locallyRead, setLocallyRead] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<string | null>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  // Close on a click elsewhere or on Escape — a panel that can only be closed by the
-  // button that opened it is a trap on a phone.
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent): void => {
-      if (!panelRef.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  /*
+    `role="dialog"` here rather than `menu` — it holds prose and links, not commands —
+    but it is NOT modal: the page behind it stays live and Tab walks out of it. See
+    `use-popover.ts` for why that is the correct behaviour and not a missing trap.
+  */
+  const { open, setOpen, wrapRef, triggerProps, panelProps } = usePopover('dialog')
 
   const openNotice = useCallback(
     (notice: Notice) => {
@@ -93,15 +80,14 @@ export function NotificationBell({
   const unread = notices.filter((n) => !n.read && !locallyRead.has(n.id)).length
 
   return (
-    <div ref={panelRef} className="relative">
+    <div ref={wrapRef} className="relative">
       <button
         type="button"
+        {...triggerProps}
         onClick={() => {
-          setOpen((o) => !o)
+          triggerProps.onClick()
           if (!open) reload()
         }}
-        aria-expanded={open}
-        aria-haspopup="dialog"
         aria-label={unread > 0 ? `Notices, ${unread} unread` : 'Notices'}
         className="relative inline-flex min-h-tap min-w-tap items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
@@ -121,7 +107,8 @@ export function NotificationBell({
         <div
           role="dialog"
           aria-label="Notices"
-          className="absolute right-0 top-full z-50 mt-1 max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
+          {...panelProps}
+          className="absolute right-0 top-full z-popover mt-1 max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
         >
           <div className="flex items-center justify-between border-b border-border p-stack">
             <p className="font-medium">Notices</p>

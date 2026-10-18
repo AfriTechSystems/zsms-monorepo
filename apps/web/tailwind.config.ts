@@ -13,7 +13,7 @@
 import type { Config } from 'tailwindcss'
 import animate from 'tailwindcss-animate'
 
-import { BREAKPOINT_SM } from '@zsms/design-tokens'
+import { BREAKPOINT_SM, MOTION, Z_INDEX } from '@zsms/design-tokens'
 
 const config: Config = {
   darkMode: ['class', '[data-theme="dark"]'],
@@ -193,6 +193,33 @@ const config: Config = {
         // The one that never changes. Used for min-height/min-width on anything
         // a finger has to hit.
         tap: 'var(--zsms-tap-target)',
+      },
+      zIndex: {
+        /*
+          Named layers, so `z-popover` says what it is and `z-50` stops being a
+          number somebody has to reverse-engineer. The numeric classes still work —
+          this adds names rather than removing them — but new code should use these,
+          and `z-[60]` style escape hatches are the signal that a layer is missing
+          from the token rather than that this one needs a bracket.
+        */
+        raised: `${Z_INDEX.raised}`,
+        sticky: `${Z_INDEX.sticky}`,
+        chrome: `${Z_INDEX.chrome}`,
+        overlay: `${Z_INDEX.overlay}`,
+        popover: `${Z_INDEX.popover}`,
+        top: `${Z_INDEX.top}`,
+      },
+      transitionDuration: {
+        // `duration-fast` / `duration-base` / `duration-slow`. The global
+        // prefers-reduced-motion rule in globals.css overrides all of them.
+        fast: `${MOTION.duration.fast}ms`,
+        base: `${MOTION.duration.base}ms`,
+        slow: `${MOTION.duration.slow}ms`,
+      },
+      transitionTimingFunction: {
+        standard: MOTION.easing.standard,
+        gentle: MOTION.easing.gentle,
+        emphasised: MOTION.easing.emphasised,
       },
       keyframes: {
         shimmer: {

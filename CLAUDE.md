@@ -56,7 +56,7 @@ The tree is:
 
 **`npm run lint` did nothing until 2026-09-27**: the script was `next lint` with no config, which prompts interactively and surfaced under turbo as an opaque non-zero exit. It is now `eslint` with a flat config in `apps/web/eslint.config.mjs`, and the nine dead imports it immediately found are gone.
 
-**Three commands exist because the same mistakes kept recurring. Use them.**
+**Five commands exist because the same mistakes kept recurring. Use them.**
 
 - **`npm run db:cols -- <table>`** prints a table's real columns, nullability, defaults and
   CHECK constraints. **Run it before writing any SQL against a table, including one you
@@ -73,6 +73,20 @@ The tree is:
   receipt had ever been produced. Part of `ci:checks`. Curated exceptions carry a reason.
 - **`npm run clerk:check`** mints a real token and decodes it, which is the artefact SQL
   actually sees.
+- **`npm run db:verify`** (added 2026-10-18) is prohibition 10's word *verified*, made
+  executable: nine read-only catalogue checks against whatever project is linked — RLS
+  enabled **and forced**, a policy with no GRANT (`0213`'s seven tables), `anon` able to
+  execute a DEFINER function (`0272`'s sixty-seven) or read any relation, an unpinned
+  `search_path`, a school-scoped table with no status guard (`0270`'s fourteen), and the
+  migration ledger. It creates, drops, resets and seeds **nothing**, so it is safe to point
+  at production. It does not check the region — confirm `af-south-1` in the dashboard when a
+  project is created, because that cannot be changed afterwards.
+- **`npm run notifications:smoke -- --to-phone … --to-email …`** (added 2026-10-18) sends one
+  real message per configured channel and exercises the WhatsApp → email → SMS chain. It
+  **refuses to run unless `NOTIFICATION_PROVIDER=live`** and has no default recipient, because
+  a green run against `MockChannel` would report delivery that did not happen and a seeded
+  fixture number belongs to a real handset. A channel without credentials reports SKIP, never
+  PASS. Nothing has delivered through it yet; that is the point of having it ready.
 
 Three skills in `.claude/skills/` carry the judgement the scripts cannot: **`zsms-migration`**
 (numbering, introspection, DEFINER and grant patterns, exercising against the real

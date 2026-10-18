@@ -7830,6 +7830,17 @@ export type Database = {
           out_via_whatsapp: boolean
         }[]
       }
+      school_attendance_trend: {
+        Args: { p_days?: number }
+        Returns: {
+          out_absent: number
+          out_date: string
+          out_excused: number
+          out_holiday: number
+          out_late: number
+          out_present: number
+        }[]
+      }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }

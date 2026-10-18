@@ -31,7 +31,7 @@ import { CalendarCheck, ClipboardList, Megaphone, School } from 'lucide-react-na
 import { FEATURES, featureState } from '../../../lib/features'
 import { FeatureGrid } from '../../../components/feature-grid'
 import { StatTile } from '../../../components/stats'
-import { AppHeader, Greeting, ListRow, RowDivider, SectionHeader } from '../../../components/shell'
+import { AppHeader, Greeting, IconTile, ListRow, RowDivider, SectionHeader } from '../../../components/shell'
 import { TodaySchedule, type ScheduleEntry } from '../../../components/today-schedule'
 import { Avatar } from '../../../components/avatar'
 import { Mark } from '../../../components/wordmark'
@@ -201,18 +201,9 @@ export default function Home(): JSX.Element {
         {!error && (data || !loading) && (
         <Card>
           <Row gap={SPACE.md}>
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: RADIUS.md,
-                backgroundColor: linked ? c.primaryTint : c.surfaceSunken,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <School size={20} color={linked ? c.primaryMark : c.textSubtle} strokeWidth={2} />
-            </View>
+            {/* Muted when there is no school, which is a state and not a fault —
+                a standalone teacher is not in a broken account. */}
+            <IconTile icon={School} tone="primary" muted={!linked} />
             <View style={{ flex: 1 }}>
               <Text style={[TYPE.heading, { color: c.text }]} numberOfLines={1}>
                 {data?.school?.name ?? 'No school linked'}

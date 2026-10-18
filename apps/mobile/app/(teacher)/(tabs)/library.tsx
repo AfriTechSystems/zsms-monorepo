@@ -13,9 +13,11 @@
 import type { JSX } from 'react'
 import { Link } from 'expo-router'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
-import { ChevronRight, FolderOpen } from 'lucide-react-native'
+import { BookOpen, ChevronRight, FileText, FolderOpen, WandSparkles } from 'lucide-react-native'
+import type { LucideIcon } from 'lucide-react-native'
 
 import { useApi } from '../../../lib/use-api'
+import { IconTile } from '../../../components/shell'
 import {
   Badge,
   Caption,
@@ -36,6 +38,14 @@ interface Resource {
   subject_name: string | null
   grade_id: string | null
   created_at: string
+}
+
+/** The glyph per resource kind, matching the action grid so one thing means one
+ *  thing wherever a teacher meets it. */
+const TYPE_ICON: Record<string, LucideIcon> = {
+  lesson_plan: WandSparkles,
+  quiz: FileText,
+  homework: BookOpen,
 }
 
 const LABEL: Record<string, string> = {
@@ -74,6 +84,14 @@ export default function LibraryScreen(): JSX.Element {
         {resources.map((r) => (
           <Card key={r.id}>
             <Row gap={SPACE.md}>
+              {/*
+                The kind of resource, as a tinted tile, in the same hues the action
+                grid gives these three. A library of twenty plans and quizzes was
+                twenty identical cards distinguished only by a badge halfway down —
+                the tile is what the eye finds when scrolling for "the quiz".
+              */}
+              <IconTile icon={TYPE_ICON[r.resource_type] ?? FileText} tone="accent" />
+
               <View style={{ flex: 1, gap: 3 }}>
                 <Text style={[TYPE.heading, { color: c.text }]} numberOfLines={2}>
                   {r.title}

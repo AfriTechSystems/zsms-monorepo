@@ -23,6 +23,7 @@ import { ArrowRight, Building2, GraduationCap, Network, ShieldCheck, Users } fro
 import { useApi } from '../lib/use-api'
 import { BASE_URL } from '../lib/api'
 import { Badge, Body, Caption, Loading, Row, Screen, Title, usePalette } from '../components/ui'
+import { IconTile } from '../components/shell'
 import { RADIUS, SPACE, TAP, TYPE } from '../theme'
 
 interface Portal {
@@ -108,18 +109,7 @@ export default function PortalPicker(): JSX.Element {
                 opacity: pressed ? 0.7 : 1,
               })}
             >
-              <View
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: c.primaryTint,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon size={20} color={c.primaryMark} strokeWidth={2} />
-              </View>
+              <IconTile icon={Icon} tone="primary" size={42} />
 
               <View style={{ flex: 1, gap: 2 }}>
                 <Row gap={SPACE.sm}>

@@ -30,6 +30,7 @@
     "db:seed": "node scripts/seed-dev.mjs",
     "db:test": "node scripts/check-test-plans.mjs && supabase test db",
     "db:test:plans": "node scripts/check-test-plans.mjs",
+    "db:verify": "node scripts/verify-environment.mjs",
     "db:types": "supabase gen types typescript --linked > packages/types/src/database.ts",
     "dev": "node scripts/dev-server.mjs",
     "dev:all": "turbo dev",

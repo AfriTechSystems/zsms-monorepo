@@ -280,6 +280,33 @@ R2_PRIVATE_BUCKET_NAME=zsms-private-zm
   browsers and emails. Private holds receipts and report cards, which name a child and an amount.
   A single bucket would put a pupil's report card one guessed URL away from the public internet.
 
+### How to verify a new Supabase project, the moment it exists
+
+`npm run db:verify` — read-only, runs against whatever project is linked, and gives
+prohibition 10's word "verified" a definition it has never had. Nine checks, each one
+an invariant this repository has already paid for:
+
+| Check | What its absence cost |
+|---|---|
+| RLS enabled **and forced** on every table | CONVENTIONS #4 — a table without a policy is a defect |
+| a policy that has no GRANT | `0213`, seven tables where Postgres refused before RLS was consulted; failed closed and read as a permissions bug |
+| `anon` executing a SECURITY DEFINER function | `0272`, sixty-seven of them, one returning parents' device push tokens |
+| `anon` reading any relation | the premise that makes the three public directory functions the entire disclosure boundary |
+| an unpinned `search_path` on a DEFINER function | hijackable by anyone who can create an object in a schema it resolves through |
+| a school-scoped table with no status guard | `0270`, fourteen of them, and the omission has no symptom because the writes simply succeed |
+| every migration applied, none unknown, none timestamp-versioned | `0022`–`0068` were written onto numbers `db push` silently skips; a timestamp version sorts after every four-digit one and reorders the sequence for every environment built afterwards |
+
+It **does not** reset, migrate or seed. A verifier that can destroy the thing it
+verifies is not a verifier, and `supabase db reset --linked` is one careless link away
+from the wrong project.
+
+It also does not check the region, which is project metadata rather than schema.
+**Confirm `af-south-1` in the dashboard when the project is created** — it cannot be
+changed afterwards, and `COMPLIANCE.md` makes it non-negotiable for anything holding
+real school data.
+
+Verified against `zsms-dev` on 2026-10-18: all nine pass.
+
 ### 2.5 Supabase — staging, then production
 
 | Environment | Project | Region | Why the region |

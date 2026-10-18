@@ -24,11 +24,12 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text } from 'react-native'
-import { Megaphone } from 'lucide-react-native'
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { CircleAlert, Megaphone } from 'lucide-react-native'
 
 import { api } from '../../../lib/api'
 import { useApi } from '../../../lib/use-api'
+import { IconTile, Segmented } from '../../../components/shell'
 import { useSession } from '../../../lib/auth'
 import {
   Badge,
@@ -55,6 +56,18 @@ interface Notice {
 export default function ParentNotices(): JSX.Element {
   const c = usePalette()
   const { getToken } = useSession()
+  /*
+    All | Unread | Important.
+
+    The reference design's three tabs are All / Notices / Messages. There is no
+    message category in this data — `/api/parent/notices` returns announcements and
+    nothing else — so a "Messages" tab would be a tab that is always empty, or worse,
+    one that implies a channel a parent might wait on. These three filter what is
+    actually here, and the middle one is the question a parent opening this screen is
+    usually asking.
+  */
+  const [filter, setFilter] = useState<'all' | 'unread' | 'important'>('all')
+
   const { data, loading, error, reload } = useApi<{ notices: Notice[]; unread: number }>(
     '/api/parent/notices',
   )
@@ -85,6 +98,18 @@ export default function ParentNotices(): JSX.Element {
 
   const notices = data?.notices ?? []
 
+  /*
+    Unread counted from the server flag OR this session's taps, so the count in the
+    tab drops as the parent reads rather than only after a refetch.
+  */
+  const unreadCount = notices.filter((n) => !n.read && !locallyRead.has(n.id)).length
+
+  const visible = notices.filter((n) => {
+    if (filter === 'unread') return !n.read && !locallyRead.has(n.id)
+    if (filter === 'important') return n.importance === 'important' || n.importance === 'urgent'
+    return true
+  })
+
   return (
     <Screen>
       <ScrollView
@@ -96,6 +121,28 @@ export default function ParentNotices(): JSX.Element {
         {error && <ErrorNote message={error} onRetry={reload} />}
         {loading && !data && <Loading label="Checking for notices" />}
 
+        {!error && data && notices.length > 0 && (
+          <Segmented
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'unread', label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
+              { value: 'important', label: 'Important' },
+            ]}
+            value={filter}
+            onChange={setFilter}
+          />
+        )}
+
+        {/* A filter that matches nothing is not the same as having no notices, and
+            saying "nothing from your school" here would be false. */}
+        {!error && data && notices.length > 0 && visible.length === 0 && (
+          <Body muted>
+            {filter === 'unread'
+              ? 'You have read everything. Switch to All to see them again.'
+              : 'Nothing marked important. Switch to All to see everything.'}
+          </Body>
+        )}
+
         {!error && data && notices.length === 0 && (
           <Empty
             icon={Megaphone}
@@ -104,16 +151,21 @@ export default function ParentNotices(): JSX.Element {
           />
         )}
 
-        {notices.map((n) => {
+        {visible.map((n) => {
           const isRead = n.read || locallyRead.has(n.id)
           const expanded = open.has(n.id)
+          const urgent = n.importance === 'urgent'
+          const important = n.importance === 'important'
 
           return (
             <Pressable
               key={n.id}
               accessibilityRole="button"
+              accessibilityLabel={`${n.title}${isRead ? '' : ', unread'}`}
               onPress={() => openNotice(n.id, n.read)}
               style={({ pressed }) => ({
+                flexDirection: 'row',
+                gap: SPACE.md,
                 padding: SPACE.card,
                 borderRadius: RADIUS.lg,
                 backgroundColor: c.surface,
@@ -123,30 +175,66 @@ export default function ParentNotices(): JSX.Element {
                 opacity: pressed ? 0.8 : 1,
               })}
             >
-              <Row gap={SPACE.sm}>
+              {/*
+                An icon per notice, as the mockup has it — but keyed to IMPORTANCE,
+                which is what the data carries. The mockup draws a different picture
+                per subject (a chart for results, a wallet for fees), and inferring
+                those from a title string would put a wallet beside a notice about
+                sports day often enough to be worse than one honest symbol.
+              */}
+              <IconTile
+                icon={urgent ? CircleAlert : Megaphone}
+                tone={urgent ? 'danger' : important ? 'warning' : 'primary'}
+              />
+
+              <View style={{ flex: 1, gap: 2 }}>
+                <Row gap={SPACE.sm}>
+                  <Text
+                    style={[
+                      TYPE.heading,
+                      { flex: 1, color: c.text, fontWeight: isRead ? '500' : '700' },
+                    ]}
+                    numberOfLines={expanded ? undefined : 1}
+                  >
+                    {n.title}
+                  </Text>
+                  {/* A dot, not a "New" badge. The mockup uses one, and at this size a
+                      word competes with the title it is meant to annotate. */}
+                  {!isRead && (
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: RADIUS.full,
+                        backgroundColor: c.danger,
+                      }}
+                    />
+                  )}
+                </Row>
+
+                {n.sent_at && (
+                  <Caption>
+                    {new Date(n.sent_at).toLocaleDateString('en-ZM', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </Caption>
+                )}
+
                 <Text
-                  style={[
-                    TYPE.heading,
-                    { flex: 1, color: c.text, fontWeight: isRead ? '500' : '700' },
-                  ]}
-                  numberOfLines={expanded ? undefined : 1}
+                  numberOfLines={expanded ? undefined : 2}
+                  style={[TYPE.body, { color: c.textMuted }]}
                 >
-                  {n.title}
+                  {n.body}
                 </Text>
-                {n.importance === 'important' && <Badge label="Important" tone="warning" />}
-                {!isRead && <Badge label="New" tone="primary" />}
-              </Row>
 
-              <Text
-                numberOfLines={expanded ? undefined : 2}
-                style={[TYPE.body, { color: c.textMuted, marginTop: 4 }]}
-              >
-                {n.body}
-              </Text>
-
-              {n.sent_at && (
-                <Caption>{new Date(n.sent_at).toLocaleDateString('en-ZM')}</Caption>
-              )}
+                {important && !urgent && (
+                  <View style={{ alignSelf: 'flex-start', marginTop: 2 }}>
+                    <Badge label="Important" tone="warning" />
+                  </View>
+                )}
+              </View>
             </Pressable>
           )
         })}

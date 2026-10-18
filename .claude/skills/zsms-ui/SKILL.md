@@ -61,7 +61,16 @@ than warns. Never work around it.
 
 ## 3. Reach for the existing primitive first
 
-28 modules in `apps/web/components/ui/`. The ones people get wrong:
+42 modules in `apps/web/components/ui/` — 40 components, plus `auth-appearance.ts` (the
+Clerk appearance object) and `subject-colour.ts` (`subjectColour()`, `NON_TEACHING`), which
+are not components. This line said 28 until 2026-10-18; **count it before quoting it.**
+
+Six of the 40 are feature components that happen to live in `ui/` rather than primitives —
+`activity-feed`, `settings-history`, `staff-record-sync` (returns `null`, side-effect only),
+`custom-field-input`, `draft-notice`, and `school-logo` (which duplicates
+`brand/school-logo.tsx`). Do not treat everything in this folder as a primitive.
+
+The ones people get wrong:
 
 - **`EmptyState` is in its own module** (`components/ui/empty-state`), not in `data-states`
   with `ErrorState`, `TableSkeleton`, `StatSkeleton` and `PageHeader`. This has caused build
@@ -99,7 +108,14 @@ because a page feels special.
 | **Settings** | Section tabs → one section at a time → explicit save, with a right rail of read-only context | `/school/[code]/settings` |
 | **Dense entry** | Context row → toolbar → the grid → a summary rail | `/school/[code]/results`, `/attendance` |
 | **Auth** | Centred card on the branded `auth-shell` | `/sign-in` |
-| **States** | The eight states side by side | `/design` |
+| **States** | Every interface state, rendered against the live tokens | `/design` |
+
+`/design` has eleven sections, each with an `id` — `#palette`, `#contrast`, `#typography`,
+`#buttons`, `#forms`, `#loading`, `#responsive`, `#dashboard`, `#tints`, `#semantic`,
+`#theming`. There is **no `#states` section**: the state examples live inside `#forms`
+(error, loading, empty, and the three `Alert` variants) and `#loading` (`BrandSplash`
+against skeletons). This row claimed "the eight states side by side" until 2026-10-18 and
+nothing on the page ever matched it.
 
 **Tabs must switch the view, not scroll to a section.** Use `SectionTabs` with its URL state so
 the browser back button works and a link can address a tab.

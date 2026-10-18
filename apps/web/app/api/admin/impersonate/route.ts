@@ -4,41 +4,46 @@
  * Spec: `Official Documentation/02 Authentication and Identity/IMPERSONATION.md`
  *       `Official Documentation/15 Super Admin and Platform/IMPERSONATION_FLOW.md`
  *
- * ## Status: NOT FUNCTIONAL. Read this before relying on it.
+ * ## Status: built and working.
  *
- * Impersonation needs Clerk **actor tokens** — a server-side call that mints a
+ * This block said "NOT FUNCTIONAL … returns a clear 501" until 2026-10-18, and
+ * had done since long after the route was finished. There is no 501 in this
+ * file. It mints a Clerk actor token through `@zsms/auth-provider/impersonation`,
+ * records the session with `begin_impersonation_session()`, revokes the token if
+ * the database refuses, and returns the redemption URL. `DOC_AUDIT_PROGRESS.md`
+ * names this as one of three CLAUDE.md claims that were false — all three found
+ * by building against them rather than by reading them.
+ *
+ * Impersonation works through Clerk **actor tokens**: a server-side call mints a
  * sign-in token carrying an `act` claim naming the real operator. That claim is
  * what `is_impersonation_session()` and `get_actor_id()` read in migration 0001,
  * and it is the only reason an impersonated session is distinguishable from the
  * user simply being signed in.
  *
- * `packages/auth-provider` exposes no method to mint one, and there are no Clerk
- * credentials in this environment, so **this route cannot complete.** It returns
- * a clear 501 rather than a fabricated success.
+ * ## The rules, and where each one actually lives
  *
- * That choice is deliberate and worth stating. The alternative — returning 200
- * with a stub — would make the button work in review, and the first person to
- * discover it does nothing would be an operator who believed they were looking
- * at a parent's fee balance while actually looking at their own empty session.
- * A feature that silently does nothing is worse than one that says it is not
- * built.
+ *  1. **Only an AfriTech admin may start one.** Enforced in
+ *     `begin_impersonation_session()`, which checks the `impersonate` capability
+ *     — a developer and a regional manager are both refused there, per
+ *     ROLES.md. Deliberately not re-checked in this handler: a second copy
+ *     drifts, and the database copy is the one a direct call cannot skip.
+ *  2. **The token is minted first and recorded second** — the opposite of what
+ *     this block used to require, and the reasoning is inline below. Recording
+ *     first means a failed mint leaves a trail claiming a session that never
+ *     happened; this way the only failure mode is a token that exists for a
+ *     moment and is revoked before anybody can redeem it.
+ *  3. **Time-boxed** by the token's own expiry, which is stored alongside the
+ *     session row so the record and the credential cannot disagree.
+ *  4. **Read-only by policy, not by UI** — see IMPERSONATION.md. An impersonated
+ *     session that can write is a session that can move money as somebody else.
  *
- * ## What IS built here
+ * ## Still open
  *
- * The authorisation check, the shape of the request, the validation, and the
- * audit write. When `mintActorToken()` lands in the auth provider, the body of
- * this handler is a few lines; everything around it is done and tested.
- *
- * ## The rules this must satisfy when it is completed
- *
- *  1. Only an AfriTech admin may start one. Checked below.
- *  2. Every session is written to `audit_logs` BEFORE the token is issued, so a
- *     failure to record cannot produce an unrecorded impersonation.
- *  3. The session is time-boxed and read-only by policy, not by UI — see
- *     IMPERSONATION.md. An impersonated session that can write is a session
- *     that can move money as somebody else.
- *  4. The impersonated user is notified. IMPERSONATION.md requires it, and it
- *     is the control that makes 1-3 meaningful rather than merely logged.
+ * Rule 5 of IMPERSONATION.md: **the impersonated user is notified.** Nothing
+ * here sends anything, and it cannot until a delivery channel exists — no Meta,
+ * Resend or Twilio credentials, so no message has ever left this machine. It is
+ * the control that makes the other four meaningful rather than merely logged,
+ * and it belongs on the list of work that unblocks when those credentials land.
  */
 
 import type { NextRequest } from 'next/server'

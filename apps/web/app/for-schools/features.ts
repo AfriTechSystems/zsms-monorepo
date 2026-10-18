@@ -225,6 +225,43 @@ export const FEATURES: readonly Feature[] = [
       '— and where we can calculate a figure from your own records, we calculate it rather than ' +
       'asking you to claim it. We do not rank or score schools.',
   },
+  {
+    /*
+      Moved from `building` to `live` on 2026-10-18. It was marked `building` while the
+      whole chain existed: three tables with clash detection in the database (0197's
+      indexes do the enforcing), a builder with drag-and-drop and guided setup,
+      `/school/[code]/my-timetable` for a teacher's own week, `/parent/timetable` for a
+      child's, and GET/POST/PATCH on `/api/school/timetable`. A clash is surfaced as a
+      question with a Cancel button via `timetable_move_conflicts()` before the drop,
+      which is exactly the promise this entry makes.
+    */
+    icon: 'CalendarRange',
+    title: 'Timetabling',
+    suite: 'classroom',
+    status: 'live',
+    audience: 'Office',
+    body:
+      'Build the week once, see clashes before they happen, and give every teacher and every class ' +
+      'their own view of it.',
+  },
+  {
+    /*
+      Added 2026-10-18. The export existed and this page did not mention it, which is the
+      opposite error from the rest of this file and still a loss: a school evaluating ZSMS
+      could not see a capability it already has. Kept separate from the `planned`
+      "Accounting integrations" entry below, because that one promises two-way QuickBooks
+      and Xero connectors which genuinely do not exist, and `status` is binary.
+    */
+    icon: 'FileSpreadsheet',
+    title: 'Export for your accountant',
+    suite: 'money',
+    status: 'live',
+    audience: 'Office',
+    body:
+      'Verified fee income as a file your accountant can import into Sage 50, for any date range ' +
+      'you choose. Only money that has actually been verified leaves the system, so the books ' +
+      'cannot be made to disagree with the receipts.',
+  },
 
   // ---------------------------------------------------------------------------
   // Being built now.
@@ -261,16 +298,6 @@ export const FEATURES: readonly Feature[] = [
       'The parent portal as an app on the home screen, with a notification when fees fall due, a ' +
       'child is absent, or results are published. Parents should not have to remember a web address ' +
       'to see how their child is doing.',
-  },
-  {
-    icon: 'CalendarRange',
-    title: 'Timetabling',
-    suite: 'classroom',
-    status: 'building',
-    audience: 'Office',
-    body:
-      'Build the week once, see clashes before they happen, and give every teacher and every class ' +
-      'their own view of it.',
   },
   {
     icon: 'CreditCard',
@@ -334,7 +361,9 @@ export const FEATURES: readonly Feature[] = [
     suite: 'money',
     status: 'planned',
     audience: 'Office',
-    body: 'Push verified fee income to QuickBooks or Xero instead of re-entering it.',
+    body:
+      'Push verified fee income straight into QuickBooks or Xero, with no file in the middle. The ' +
+      'Sage 50 export above already saves the re-typing; this removes the step entirely.',
   },
   {
     icon: 'GraduationCap',

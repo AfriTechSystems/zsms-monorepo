@@ -4,6 +4,199 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-10-18 — 64 SECURITY DEFINER functions were executable by `anon`, and four documents reported finished work as missing
+
+Branch `rls/anon-execute-boundary`, PR #3. Migrations `0272` and `0273`, one new pgTAP suite
+(`anon_execute_boundary_test.sql`, 12 assertions) taking the total to **41 suites / 926 assertions**.
+Both CI jobs green twice, including the `database` job replaying all 226 migrations against an empty
+database.
+
+The session began as "analyse where we are and plan what is next". The analysis is what found the
+defect, and it was not found by reading anything — it was found by asking the live database a
+question no document had asked it.
+
+### The defect
+
+`public` holds 299 functions, 216 of them `SECURITY DEFINER`. **67 could be executed by the `anon`
+role** over PostgREST at `/rest/v1/rpc/<name>`. The anon key ships in the browser bundle by design,
+so `anon` means anybody with the URL.
+
+The sharpest two were `worker_parent_push_tokens()` and `worker_retire_push_token()`. A `worker_*`
+function exists precisely to bypass RLS for a Railway worker holding the service role key, so by
+design it carries no tenant clause and no role check — there is nothing inside it to refuse a
+caller:
+
+```
+POST /rest/v1/rpc/worker_parent_push_tokens
+{ "p_parent_user_ids": ["user_...", "user_..."] }
+  -> every matching parent's device push token, platform included
+```
+
+Confirmed exploitable against `zsms-dev` with the real publishable key, and confirmed refused after
+the fix: **HTTP 401, `42501`**.
+
+### Why 914 assertions did not catch it
+
+`parent_push_tokens` has a 22-assertion suite and it passed throughout. It asserts the table's
+**policies** — and a `SECURITY DEFINER` function never consults one. Postgres checks `EXECUTE`
+*before* RLS is reached, so the exposure sat one layer in front of everything 40 suites covered.
+
+This is the same root as `0213`'s seven tables with policies and no GRANT, with the sign flipped:
+there, a missing grant made a policy unreachable and the feature failed closed. Here, a surplus
+grant made a function reachable and nothing failed at all. **The grant layer has now been tested
+twice by accident and never on purpose.** That is what the new suite changes.
+
+### What the fix had to get right, and nearly got wrong
+
+Three things, each of which would have made this worse rather than better:
+
+- **The revoke needs `FROM PUBLIC` *and* `FROM anon`.** The privileges came from two different
+  places and neither statement removes the other: `my_children`, `verify_payment` and
+  `audit_row_change` carry a leading `=X/postgres` in `proacl` — the empty grantee is **PUBLIC**,
+  Postgres's default on every function ever created — while `worker_parent_push_tokens` had no
+  PUBLIC entry and an explicit `anon=X`.
+- **`authenticated` must be granted explicitly FIRST.** On a function whose only source of
+  `EXECUTE` for `authenticated` is that same PUBLIC default, revoking PUBLIC first removes the
+  capability along with the exposure — and *succeeds*. A silent outage across the product, from a
+  migration that applied cleanly. The easy assertion is "anon cannot"; the one that matters is
+  "authenticated still can", and the migration and the suite both assert the second.
+- **Trigger functions keep their `authenticated` grant, deliberately.** All 11 trigger-returning
+  functions lose PUBLIC and `anon`. Whether Postgres re-checks `EXECUTE` when a trigger *fires*, as
+  opposed to when it is created, was **not verified** — and if it does, revoking would break every
+  write in the product. The exposure being closed is `anon`; calling `set_updated_at()` as an RPC
+  with a session token discloses nothing. Recorded as open rather than guessed at.
+
+Three functions stay anon-reachable — `search_schools`, `school_public_profile`,
+`school_branding_by_slug`. That is correct, and the reason is a fact worth keeping: **`anon` can
+`SELECT` 0 of 93 relations in `public`.** Verified, not assumed. The table-grant discipline was
+airtight; only the function grants leaked. So those three functions' `RETURNS TABLE` *is* the entire
+public disclosure boundary, exactly as `lib/supabase.ts` already said.
+
+Catalogue-driven rather than a list of 64 names, so it replays correctly against an empty database.
+The specification ships as `anon_executable_definer_functions()` and the suite asserts it empty —
+the `0270` answer, for the same reason: **a gap whose symptom is nothing at all needs an assertion,
+not a note.** Advisor count went 67 to 3.
+
+`0273` is comments only: five tables report `rls_enabled_no_policy` and in this schema that is
+correct — RLS-forced, zero policies, **no grants at all** (not `anon`, not `authenticated`, not even
+`service_role`), in schemas PostgREST cannot resolve, each reached through a named `public` wrapper.
+The risk was somebody "fixing" the advisor by adding a permissive policy to a table that is
+currently shut. The migration asserts its own premise, so the comment cannot outlive its truth.
+
+### The other half: four documents reported finished work as missing
+
+Checked by running things rather than reading them, and every one of these would have sent somebody
+to rebuild or re-buy something that exists:
+
+| Claim | Reality |
+|---|---|
+| `CREDENTIALS_CHECKLIST.md`: Sentry "**is not installed at all** — no `@sentry/*` dependency" | `@sentry/nextjs ^11.1.0`, both instrumentation files, `lib/report-error.ts`, `global-error.tsx`. Only `NEXT_PUBLIC_SENTRY_DSN` outstanding, by decision |
+| Same file: Redis "**the single highest-value credential**… not one job has ever round-tripped" | `npm run queue:smoke` round-tripped a job again this session |
+| Same file: service role key "**Missing from `.env.local`**" | Present |
+| Same file: Docker Hub needed | `docker/login-action@v3` in CI, authenticating on every run |
+| `CLAUDE.md`: "Teacher Hub: Community Library **is not built**… deliberately scoped out" | Built and reachable: `0217`/`0218`, `community_library()`, `/api/teacher/community`, `/teacher/community`, and a nav entry in `teacher-shell.tsx` |
+| `api/admin/impersonate/route.ts`: "**Status: NOT FUNCTIONAL**… returns a clear 501" | No 501 in the file. Mints a Clerk actor token, records the session, revokes on refusal |
+| `parent/layout.tsx`: a parent with children at two schools "is in two Clerk organisations" | A parent has no organisation. `is_linked_parent_of()` reads `parent_user_id = get_user_id()` and nothing else |
+| `MIGRATIONS.md` x2: "NEXT AVAILABLE: `0092`" | Named `0092` for about 180 migrations |
+
+**A stale blocker costs more than a missing one.** It sends somebody to obtain what they already
+have, and it makes the accurate rows look untrustworthy too. The Community Library entry is the
+fourth false "not built" claim found in `CLAUDE.md` — after the mobile screens, `admin/impersonate`
+and ADR-023's webhooks — and I had carried it into my own plan's "deliberately not in scope" list
+before checking. **The file that warns about this pattern keeps producing it.**
+
+Also corrected: the dates. `BUILD_SEQUENCE.md` schedules the pilot for **September 2026**, which
+passed with no pilot, and launch for January 2027. Neither is live; `CLAUDE.md` now says so, and
+says what actually gates a pilot — staging in `af-south-1`, a paid Clerk plan, and one delivery
+channel, none of it engineering work.
+
+### Carried forward
+
+- **Does Postgres re-check `EXECUTE` when a trigger fires?** Settle it where a failed write costs
+  nothing, then decide whether the 11 trigger functions should lose `authenticated` too.
+- **`private.consent_templates` has no reader.** `submit_loan_application()` stores the template
+  version and a hash of the wording, so what a parent agreed to is provable — the hard half, built —
+  but the wording is never served, so nothing shows a parent the text before they consent to a
+  lender seeing their data. `gaps` cannot see it: the missing link is a read no screen asks for.
+  Loans are post-launch, and when it appears is a product decision.
+- **The 18 `function_search_path_mutable` advisor warnings are all SECURITY INVOKER** —
+  `get_user_id`, `get_school_id`, `is_afritech_admin` among them — so there is no escalation path
+  and they are cosmetic. Every one of the 216 DEFINER functions pins its `search_path`, and the new
+  suite now asserts that too.
+- **`MIGRATIONS.md`'s change log stops at `0218`** while migrations run to `0273`. The
+  next-available number is right; the per-migration narrative is about 55 migrations behind.
+- **This journal was three weeks stale** — see the reconstruction below, and note that the file
+  `CLAUDE.md` tells you to read first was the least current in the repository.
+
+---
+
+## 2026-09-28 to 2026-10-13 — RECONSTRUCTED: the three weeks this journal missed
+
+**Read this with its provenance in mind.** The entry above it and the entry below it were written by
+the sessions that did the work. **This one was not.** It was assembled on 2026-10-18 from the commit
+log (210 commits), `MIGRATIONS.md`'s change log, and `DOC_AUDIT_PROGRESS.md`, because the journal's
+newest entry was 2026-09-27 and `CLAUDE.md` instructs every session to read this file first.
+
+It therefore records **what was done, not what was learned** — the reasoning, the dead ends and the
+defects-found-while-building that make the other entries worth reading are mostly lost. Where a
+session's finding survived, it survived in `MIGRATIONS.md`'s change log, which is unusually detailed
+and is the better source for any specific migration. Treat the dates as commit dates.
+
+### What was built (migrations `0131`–`0271`, 141 migrations)
+
+- **AI, end to end** (28 Sept – 6 Oct). The model chain with failover and a platform-wide incident
+  record; the curriculum store and prompt versioning; syllabus ingestion by document upload with a
+  verification step; PDF and Word export for teaching resources; platform-wide AI credits bought in
+  seats and assigned to named teachers; the role-based assistant; the ADR-029 data-completeness
+  score; live generation made a toggle AfriTech controls rather than an environment variable.
+- **School lifecycle** (29 Sept – 4 Oct). Schools can be created, can register themselves, and
+  school status finally binds. The onboarding task queue with the 24-hour rule derived in SQL;
+  sign-off by a person with a reason; an unverified school cannot enrol a child. School settings —
+  profile, academic structure, term dates — with changes recorded and visible to AfriTech.
+- **The public site** (30 Sept). The directory (verified, not ranked), school profiles, a front door,
+  navigation, and auth entry points for every audience sized for a phone.
+- **Parents and pupils** (1–11 Oct). A parent who signs up finds their own children; a school can
+  link a parent to a pupil; one child switcher on every parent screen; marketing consent and
+  graduated-account access (ADR-015); the pupil and alumni portal, which ADR-046 settles is one
+  portal.
+- **Fees and documents** (2–5 Oct). Fee totals that show what they are made of; revising issued
+  bills; the parent claim flow as `PAYMENTS.md` specifies it; receipts and report cards nobody could
+  previously reach; an object store that actually stores.
+- **The timetable** (4–5 Oct). Three tables with clash detection in the database; builder, teacher
+  week and parent view; guided setup and drag-and-drop.
+- **The mobile app** (3–5 Oct). Both portals, the drawer, marks entry, notices, timetable, push
+  registration, a parent recording a fee payment, and an Android build from GitHub Actions.
+- **Platform and compliance** (3–11 Oct). ZDPA data subject rights — access, portability, erasure —
+  with self-service and requests reaching the people who action them; school-defined staff roles
+  (ADR-012); the six AfriTech roles stopping being one role; the permission grant system made
+  reachable; impersonation minting a real token; HTTP rate limiting; the external integration API;
+  the tier-1 integrations framework; WAF security headers at the origin; the loan module backend and
+  screens; the audit trail nobody could read.
+- **The UI redesign and the mobile redesign** (11–13 Oct). A validated chart palette, charts, stat
+  trends, context rails, global search scoped by RLS, an activity feed, profile photos, forms in
+  modals, a print stylesheet, and a Light/System/Dark choice reaching every mobile screen.
+
+### The two findings worth carrying
+
+Both are in `CLAUDE.md` already, and both are the reason that file now says *never report CI status
+from this file, ask GitHub*:
+
+1. **The branch was red for about twenty commits while `CLAUDE.md` claimed green**, and a session
+   read the claim and repeated it. Nine live defects were sitting behind it — among them
+   `allocate_payment()` selecting a column that does not exist, so **every payment recorded without
+   explicit allocations had failed since `0213`**, and seven tables whose policies had no GRANT,
+   which Postgres refuses before RLS is consulted.
+2. **The 18-folder documentation audit** (10–12 Oct) walked all 119 documents and scored every
+   folder. Seventeen scored Good (73–88%); folder 12 Communication scored Fair (65%), honestly,
+   since no message has ever left this machine. **The dominant finding in eleven of eighteen folders
+   was not bugs — it was work that was finished, correct, tested and unreachable**, with one link
+   missing in the middle of the chain where `npm run gaps` could not see it.
+
+`main` was brought level with `integration` on 12 Oct as PR #2 — 262 commits, the whole of Phase 4
+plus the audit.
+
+---
+
 ## 2026-09-27 — The Teacher Hub: the first owner-scoped tables, and a product whose core is honestly absent
 
 Branch `feature/phase-4-design-foundation`. Migration `0130`, `packages/ai`, five API routes, five screens, and

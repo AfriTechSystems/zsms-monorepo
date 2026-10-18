@@ -232,6 +232,126 @@ export function Ring({
 }
 
 /**
+ * A part-to-whole donut with a legend carrying values and percentages.
+ *
+ * Spec: `Official Documentation/19 Design System/ZSMS Teacher App Dashboard Flow.png`
+ *       — the attendance Summary panel
+ *
+ * The mobile counterpart of the web's `DonutChart`, with the same contract (labelled
+ * slices, value and percentage in the legend) so one register reads the same on a
+ * phone and on a laptop.
+ *
+ * ## Why this is not `Ring` with more colours
+ *
+ * `Ring` answers "what is this one number out of a hundred". This answers "what is
+ * this whole made of", which is a different question and needs every slice present
+ * even at 0%. The two live side by side rather than one growing into the other.
+ *
+ * ## Zero-value slices are kept in the legend and dropped from the ring
+ *
+ * A zero slice drawn as an arc is a hairline somebody squints at; dropped from the
+ * legend it becomes a category the reader cannot tell is zero rather than missing.
+ * "Unmarked 0" is a fact a teacher is specifically looking for, so it stays listed.
+ */
+export function Donut({
+  slices,
+  centreValue,
+  centreLabel,
+  size = 132,
+}: {
+  slices: ReadonlyArray<{ label: string; value: number; colour: string }>
+  /** Drawn in the hole. The mockup puts the class size there, not a percentage. */
+  centreValue: string
+  centreLabel?: string
+  size?: number
+}): JSX.Element {
+  const c = usePalette()
+
+  const total = slices.reduce((sum, s) => sum + s.value, 0)
+  const stroke = 14
+  const r = (size - stroke) / 2
+  const circumference = 2 * Math.PI * r
+
+  /*
+    Arcs are laid end to end by advancing the dash offset, which is how an SVG circle
+    becomes a stacked ring without a path per slice. `rotate(-90)` starts at twelve
+    o'clock — the default three o'clock reads as a ring already part-way round.
+  */
+  let consumed = 0
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.lg }}>
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        <Svg width={size} height={size} style={{ position: 'absolute' }}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={c.surfaceSunken}
+            strokeWidth={stroke}
+            fill="none"
+          />
+          {total > 0 &&
+            slices
+              .filter((slice) => slice.value > 0)
+              .map((slice) => {
+                const fraction = slice.value / total
+                const dash = circumference * fraction
+                const offset = -circumference * consumed
+                consumed += fraction
+                return (
+                  <Circle
+                    key={slice.label}
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke={slice.colour}
+                    strokeWidth={stroke}
+                    fill="none"
+                    // No round cap: a rounded end overlaps the next slice and invents
+                    // a colour at every boundary.
+                    strokeDasharray={`${dash} ${circumference - dash}`}
+                    strokeDashoffset={offset}
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                  />
+                )
+              })}
+        </Svg>
+
+        <Text style={[NUMERIC, { fontSize: 26, fontWeight: '700', color: c.text }]}>
+          {centreValue}
+        </Text>
+        {centreLabel ? <Caption>{centreLabel}</Caption> : null}
+      </View>
+
+      {/* The legend is not optional. The slices are colour alone without it, and two
+          of the four statuses are a red and an amber that a deuteranope reads as one
+          colour. Value and percentage both, because "3" and "11%" answer different
+          questions about the same class. */}
+      <View style={{ flex: 1, gap: SPACE.sm }}>
+        {slices.map((slice) => (
+          <View key={slice.label} style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+            <View
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: RADIUS.full,
+                backgroundColor: slice.value > 0 ? slice.colour : c.border,
+              }}
+            />
+            <Text style={[TYPE.body, { color: c.text, flex: 1 }]}>{slice.label}</Text>
+            <Text style={[NUMERIC, { fontSize: 13, color: c.textMuted }]}>
+              {slice.value}
+              {total > 0 ? ` (${Math.round((slice.value / total) * 100)}%)` : ''}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+/**
  * A heading above a group of cards.
  *
  * The home screens were a flat stack with no grouping, so "how your child is doing"

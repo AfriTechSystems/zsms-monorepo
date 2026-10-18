@@ -2240,6 +2240,7 @@ export type Database = {
           gateway_transaction_id: string | null
           id: string
           is_voided: boolean
+          mobile_money_provider: string | null
           notes: string | null
           paid_at: string
           payment_method: string
@@ -2271,6 +2272,7 @@ export type Database = {
           gateway_transaction_id?: string | null
           id?: string
           is_voided?: boolean
+          mobile_money_provider?: string | null
           notes?: string | null
           paid_at?: string
           payment_method: string
@@ -2302,6 +2304,7 @@ export type Database = {
           gateway_transaction_id?: string | null
           id?: string
           is_voided?: boolean
+          mobile_money_provider?: string | null
           notes?: string | null
           paid_at?: string
           payment_method?: string
@@ -8577,6 +8580,7 @@ export type Database = {
           gateway_transaction_id: string | null
           id: string
           is_voided: boolean
+          mobile_money_provider: string | null
           notes: string | null
           paid_at: string
           payment_method: string

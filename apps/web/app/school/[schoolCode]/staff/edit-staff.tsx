@@ -36,6 +36,7 @@ import { FormGrid } from '../../../../components/ui/form'
 import { Dialog } from '../../../../components/ui/dialog'
 import { apiSend } from '../../../../lib/use-api'
 import { useToast } from '../../../../components/ui/toast'
+import { DateField } from '../../../../components/ui/date-field'
 
 export interface StaffRecord {
   id: string
@@ -203,20 +204,15 @@ export function EditStaff({
           )}
         </Field>
 
-        <Field
+        <DateField
+
           id="st-joined"
           label="Joined"
           hint="Set automatically when they accept an invitation; correct it here if they started earlier."
-        >
-          {(props) => (
-            <Input
-              {...props}
-              type="date"
-              value={form.joinDate}
-              onChange={(e) => set('joinDate', e.target.value)}
-            />
-          )}
-        </Field>
+          value={form.joinDate}
+          onChange={(v) => set('joinDate', v)}
+          notFuture
+        />
 
         <Field id="st-location" label="Location" hint="Town or province.">
           {(props) => (

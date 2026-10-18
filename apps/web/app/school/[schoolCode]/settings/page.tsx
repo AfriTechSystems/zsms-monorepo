@@ -41,6 +41,7 @@ import { Field, Input, Select } from '../../../../components/ui/field'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { SettingsHistory } from '../../../../components/ui/settings-history'
 import { useToast } from '../../../../components/ui/toast'
+import { DateRangeField } from '../../../../components/ui/date-field'
 
 interface Profile {
   id: string
@@ -602,26 +603,18 @@ export default function SchoolSettingsPage(): JSX.Element {
                         />
                       )}
                     </Field>
-                    <Field id="so" label="Starts" required>
-                      {(props) => (
-                        <Input
-                          {...props}
-                          type="date"
-                          value={term.startsOn}
-                          onChange={(e) => setTerm({ ...term, startsOn: e.target.value })}
-                        />
-                      )}
-                    </Field>
-                    <Field id="eo" label="Ends" required>
-                      {(props) => (
-                        <Input
-                          {...props}
-                          type="date"
-                          value={term.endsOn}
-                          onChange={(e) => setTerm({ ...term, endsOn: e.target.value })}
-                        />
-                      )}
-                    </Field>
+                    {/* No `notFuture` here: a term is scheduled before it runs,
+                        so both ends are legitimately in the future. The linked
+                        bounds still stop a term that ends before it starts. */}
+                    <DateRangeField
+                      idPrefix="term"
+                      fromLabel="Starts"
+                      toLabel="Ends"
+                      from={term.startsOn}
+                      to={term.endsOn}
+                      onFromChange={(v) => setTerm({ ...term, startsOn: v })}
+                      onToChange={(v) => setTerm({ ...term, endsOn: v })}
+                    />
                   </div>
                   <div className="flex gap-2">
                     <Button

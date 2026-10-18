@@ -47,6 +47,7 @@ import { CustomFieldsPanel } from './custom-fields-panel'
 import { useToast } from '../../../../../components/ui/toast'
 import { Field, Input, Select } from '../../../../../components/ui/field'
 import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
+import { DateField } from '../../../../../components/ui/date-field'
 import {
   STATUSES_ON_ROLL,
   STUDENT_STATUSES,
@@ -800,16 +801,14 @@ export default function StudentDetailPage({
                     )}
                   </Field>
 
-                  <Field id="dob" label="Date of birth" hint="Optional">
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="date"
-                        value={form.date_of_birth ?? ''}
-                        onChange={(e) => set('date_of_birth', e.target.value)}
-                      />
-                    )}
-                  </Field>
+                  <DateField
+                    id="dob"
+                    label="Date of birth"
+                    hint="Optional"
+                    value={form.date_of_birth ?? ''}
+                    onChange={(v) => set('date_of_birth', v)}
+                    notFuture
+                  />
 
                   <Field id="gender" label="Gender" hint="Optional">
                     {(props) => (
@@ -856,16 +855,14 @@ export default function StudentDetailPage({
                     )}
                   </Field>
 
-                  <Field id="enrolment-date" label="Enrolment date">
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="date"
-                        value={form.enrolment_date ?? ''}
-                        onChange={(e) => set('enrolment_date', e.target.value)}
-                      />
-                    )}
-                  </Field>
+                  {/* No `notFuture`, matching the enrolment form: a school may
+                      record a pupil starting next term. */}
+                  <DateField
+                    id="enrolment-date"
+                    label="Enrolment date"
+                    value={form.enrolment_date ?? ''}
+                    onChange={(v) => set('enrolment_date', v)}
+                  />
 
                   {/* Optional by design — Grades 1–5 and 7–11 never sit a national exam, so
                       most pupils will never have one and the hint says so rather than

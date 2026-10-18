@@ -25,6 +25,7 @@ import { Lock } from 'lucide-react'
 
 import { Field, Input, Select } from './field'
 import type { CustomFieldDef } from '../../lib/custom-fields'
+import { DateField } from './date-field'
 
 export interface CustomFieldState extends CustomFieldDef {
   help_text?: string | null
@@ -155,18 +156,22 @@ export function CustomFieldInput({ field, value, onChange, disabled }: Props): J
       )
 
     case 'date':
+      /*
+        No `notFuture`. A school defines these fields itself and we do not know what
+        the date means — a visa expiry and a date of last medical are both plausible,
+        and one is necessarily in the future. Guessing a bound here would refuse valid
+        data on a field whose meaning only the school knows.
+      */
       return (
-        <Field id={id} label={field.label} hint={hint} required={field.is_required}>
-          {(props) => (
-            <Input
-              {...props}
-              type="date"
-              value={value}
-              disabled={disabled}
-              onChange={(e) => onChange(e.target.value)}
-            />
-          )}
-        </Field>
+        <DateField
+          id={id}
+          label={field.label}
+          hint={hint}
+          required={field.is_required}
+          value={value}
+          disabled={disabled}
+          onChange={onChange}
+        />
       )
 
     case 'text':

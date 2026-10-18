@@ -47,6 +47,8 @@ import { Field, Input, Select } from '../../../../components/ui/field'
 import { FormGrid, FormSection } from '../../../../components/ui/form'
 import { cn } from '../../../../lib/utils'
 import { formatLevel } from '../school-shared'
+import { DateField } from '../../../../components/ui/date-field'
+import { todayIso } from '../../../../lib/dates'
 
 type Status = 'present' | 'absent' | 'late' | 'excused' | 'holiday'
 
@@ -81,11 +83,6 @@ const QUICK: Array<{ value: Status; label: string; tone: string }> = [
   { value: 'absent', label: 'Absent', tone: 'data-[on=true]:bg-danger-fill data-[on=true]:text-white' },
   { value: 'late', label: 'Late', tone: 'data-[on=true]:bg-warning-fill data-[on=true]:text-white' },
 ]
-
-function todayIso(): string {
-  const d = new Date()
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
-}
 
 function Register(): JSX.Element {
   const router = useRouter()
@@ -231,17 +228,16 @@ function Register(): JSX.Element {
             )}
           </Field>
 
-          <Field id="reg-date" label="Date" required hint="Defaults to today.">
-            {(props) => (
-              <Input
-                {...props}
-                type="date"
-                value={date}
-                max={todayIso()}
-                onChange={(e) => setParam({ date: e.target.value })}
-              />
-            )}
-          </Field>
+          {/* A register cannot be marked for a day that has not happened. */}
+          <DateField
+            id="reg-date"
+            label="Date"
+            required
+            hint="Defaults to today."
+            value={date}
+            onChange={(v) => setParam({ date: v })}
+            notFuture
+          />
 
           <Field
             id="reg-term"

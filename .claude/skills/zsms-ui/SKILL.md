@@ -70,6 +70,51 @@ Six of the 40 are feature components that happen to live in `ui/` rather than pr
 `custom-field-input`, `draft-notice`, and `school-logo` (which duplicates
 `brand/school-logo.tsx`). Do not treat everything in this folder as a primitive.
 
+### Mobile: the shared chrome lives in `components/shell` (added 2026-10-18)
+
+Built against the four reference mockups in `Official Documentation/19 Design System/`.
+`ui.tsx` holds what a screen is *made of*; `shell.tsx` holds what every screen
+*repeats*. Reach for these before drawing one:
+
+- **`IconTile`** — the rounded tinted square that fronts almost every row and grid
+  cell. Six screens had each hand-rolled it at a different size and radius (38, 40,
+  42, 44), which is how an app comes to look assembled rather than designed and is
+  invisible in review because each copy looks right on its own. A grep for the
+  hand-rolled pattern should return only `stats.tsx` and `wordmark.tsx`.
+- **`AppHeader`** — mark, school name, bell with a count, avatar. Pinned outside the
+  ScrollView: a notification count that scrolls away is one nobody sees. Both portals
+  put it in the same corner, because a parent who is also a teacher switches between
+  them.
+- **`Greeting`**, **`SectionHeader`** (with the mockups' "View All"), **`ListRow`**,
+  **`RowDivider`**, **`Segmented`**.
+- **`TodaySchedule`** (`components/today-schedule`) — the home timeline with the NOW
+  badge, computed from the device clock against the wall-clock times the API returns.
+  Those carry no timezone, which is correct for a school day and the reason they must
+  never be compared against a UTC instant.
+- **`NoticeList`** (`components/notice-list`) — both portals' notices. The endpoint is
+  a prop; everything else is shared.
+- **`Donut`** (`components/stats`) — the mobile counterpart of the web's `DonutChart`.
+
+**Tones are `primary | success | warning | danger | accent | neutral` and nothing
+else.** `accent` and `anchor` were added to the mobile palette on 2026-10-18; they had
+existed in the token package since the foundation and mobile exposed neither, so the
+action grid drew all twelve tiles in one blue. **Do not add a seventh hue to match a
+mockup pixel-for-pixel** — a colour outside the token package is one no school can
+theme and no contrast check has measured.
+
+Assign a tone by what a thing IS, never by where it sits: colour follows the entity,
+not its rank, so gating or re-ordering a list never repaints what remains.
+
+**`todayIso()` is in `apps/mobile/lib/dates`**, and the UTC form is a real bug here
+too — the register computed `toISOString().slice(0, 10)` and so opened *yesterday's*
+sheet before 02:00, seeding yesterday's marks into one a teacher was about to correct.
+
+**The mockups are suggestion, not specification**, and two departures are recorded in
+code: the notices filter is All/Unread/Important rather than All/Notices/**Messages**
+(no message category exists in the data — that tab would always be empty or imply a
+channel somebody waits on), and a child's result never gets a traffic light, because
+red-amber-green on a mark is ZSMS passing a judgement the school has not.
+
 ### Added 2026-10-18 — reach for these before writing the behaviour again
 
 - **Dates: `DateField` / `DateRangeField`** (`components/ui/date-field`), never a raw

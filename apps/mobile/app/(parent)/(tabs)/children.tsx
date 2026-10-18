@@ -27,6 +27,7 @@ import { Avatar } from '../../../components/avatar'
 import {
   Body,
   Caption,
+  Badge,
   Card,
   Empty,
   ErrorNote,
@@ -76,7 +77,17 @@ export default function ParentChildren(): JSX.Element {
             {kids.map((child) => {
               const selected = childId ? child.id === childId : child === kids[0]
               return (
-                <Card key={child.id}>
+                <Card
+                  key={child.id}
+                  style={{
+                    // The chosen child carries the border, as the reference design's
+                    // selected avatar chip does. Without it, "which child am I looking
+                    // at" was answered only by the ABSENCE of a link on one card —
+                    // a negative signal, and the hardest kind to notice.
+                    borderColor: selected ? c.primary : c.border,
+                    borderWidth: selected ? 1.5 : undefined,
+                  }}
+                >
                   <Row gap={SPACE.md}>
                     {/*
                       A face rather than a generic person icon, which was the same
@@ -98,6 +109,10 @@ export default function ParentChildren(): JSX.Element {
                         {child.studentId ? ` · ${child.studentId}` : ''}
                       </Caption>
                     </View>
+
+                    {/* Stated as well as drawn. The border is a one-pixel difference
+                        and this list is read on a phone at arm's length. */}
+                    {selected && <Badge label="Showing" tone="primary" />}
                   </Row>
 
                   {/* Choosing here is the same choice the switcher makes, because the

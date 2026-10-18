@@ -16,11 +16,13 @@ import type { JSX } from 'react'
 import { useMemo } from 'react'
 import { Link } from 'expo-router'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
-import { CalendarCheck, ChevronRight, GraduationCap } from 'lucide-react-native'
+import { CalendarCheck, CheckCheck, ChevronRight, GraduationCap } from 'lucide-react-native'
 
 import { useApi } from '../../../lib/use-api'
+import { IconTile } from '../../../components/shell'
 import {
   Caption,
+  Badge,
   Card,
   Empty,
   ErrorNote,
@@ -40,6 +42,13 @@ interface Assignment {
 interface Overview {
   school: { name?: string } | null
   assignments: Assignment[]
+  /*
+    Already returned by /api/teacher/overview and simply not declared here until
+    2026-10-18 — so this screen listed every class identically while the server was
+    telling it which ones were done. "Which registers still need me" is the question
+    a teacher opens this screen to answer, and the answer was already in the payload.
+  */
+  classes?: Array<{ classId: string; registerMarkedToday: boolean }>
 }
 
 export default function Attendance(): JSX.Element {
@@ -53,14 +62,30 @@ export default function Attendance(): JSX.Element {
    * register to mark. Listing the rows would offer the same register three times.
    */
   const classes = useMemo(() => {
-    const byClass = new Map<string, { classId: string; subjects: string[] }>()
+    const marked = new Set(
+      (data?.classes ?? []).filter((k) => k.registerMarkedToday).map((k) => k.classId),
+    )
+
+    const byClass = new Map<string, { classId: string; subjects: string[]; marked: boolean }>()
     for (const a of data?.assignments ?? []) {
       if (!a.classId) continue
-      const entry = byClass.get(a.classId) ?? { classId: a.classId, subjects: [] }
+      const entry =
+        byClass.get(a.classId) ?? { classId: a.classId, subjects: [], marked: marked.has(a.classId) }
       if (a.subjectName && !entry.subjects.includes(a.subjectName)) entry.subjects.push(a.subjectName)
       byClass.set(a.classId, entry)
     }
-    return [...byClass.values()].sort((x, y) => x.classId.localeCompare(y.classId))
+
+    /*
+      Unmarked first, then alphabetical.
+
+      A teacher between lessons is looking for what is outstanding, and a list sorted
+      only by class id buries it among the ones already done. Within each group the
+      order stays stable so the list does not reshuffle as registers are marked —
+      only the group boundary moves.
+    */
+    return [...byClass.values()].sort(
+      (x, y) => Number(x.marked) - Number(y.marked) || x.classId.localeCompare(y.classId),
+    )
   }, [data])
 
   return (
@@ -95,19 +120,16 @@ export default function Attendance(): JSX.Element {
             >
               <Card>
                 <Row gap={SPACE.md}>
-                  {/* The shape is what the eye finds down a list, not the glyph. */}
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: RADIUS.md,
-                      backgroundColor: c.primaryTint,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <CalendarCheck size={22} color={c.primaryMark} strokeWidth={2} />
-                  </View>
+                  {/*
+                    Green and ticked once the register is in, blue and waiting while it
+                    is not. The shape is what the eye finds down a list; the colour is
+                    what tells it which half of the list it is in.
+                  */}
+                  <IconTile
+                    icon={entry.marked ? CheckCheck : CalendarCheck}
+                    tone={entry.marked ? 'success' : 'primary'}
+                    size={44}
+                  />
 
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={[TYPE.heading, { color: c.text }]}>
@@ -117,6 +139,13 @@ export default function Attendance(): JSX.Element {
                       {entry.subjects.length > 0 ? entry.subjects.join(' · ') : 'Class teacher'}
                     </Caption>
                   </View>
+
+                  {/* Stated, not implied by the colour alone — the two tints are a
+                      green and a blue, and that pairing is the common one to lose. */}
+                  <Badge
+                    label={entry.marked ? 'Marked' : 'To mark'}
+                    tone={entry.marked ? 'success' : 'warning'}
+                  />
 
                   <ChevronRight size={20} color={c.textSubtle} />
                 </Row>

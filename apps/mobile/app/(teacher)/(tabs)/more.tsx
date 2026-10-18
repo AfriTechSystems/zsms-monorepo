@@ -31,6 +31,7 @@ import { FEATURES, featureState, type Feature } from '../../../lib/features'
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
 import { Badge, Caption, Row, Screen, usePalette } from '../../../components/ui'
+import { IconTile } from '../../../components/shell'
 import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 
 const GROUPS: Array<Feature['group']> = ['Teaching', 'My tools', 'School', 'Account']
@@ -100,10 +101,14 @@ export default function More(): JSX.Element {
                       opacity: available ? (pressed ? 0.6 : 1) : 0.45,
                     })}
                   >
-                    <Icon
-                      size={19}
-                      color={available ? c.primaryMark : c.textSubtle}
-                      strokeWidth={2}
+                    {/* The same tinted tile the grid and every list row uses, in the
+                        feature's own hue. A bare glyph here made this screen the one
+                        place in the app where a feature had no colour. */}
+                    <IconTile
+                      icon={Icon}
+                      tone={feature.tone ?? 'primary'}
+                      size={34}
+                      muted={!available}
                     />
 
                     <View style={{ flex: 1 }}>

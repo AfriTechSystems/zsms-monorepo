@@ -34,7 +34,7 @@
 import type { FormEvent, JSX } from 'react'
 import { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarCheck, CheckCheck, Loader2, Save } from 'lucide-react'
+import { CalendarCheck, CheckCheck, Download, Loader2, Save } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -191,7 +191,30 @@ function Register(): JSX.Element {
         title="Attendance"
         description="Mark today's register, or open a past date to correct one."
         note="A teacher can only mark registers for the classes they are assigned to on the Teaching screen. A pupil left unmarked is recorded as nothing at all — not as present — so an unopened register never reads as a full attendance."
-        actions={classId ? <PrintButton label="Print register" /> : undefined}
+        actions={
+          classId ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {/*
+                A download beside the print button, not instead of it. They are
+                different jobs: print puts the register on the wall or in a file now,
+                the PDF is the copy that goes to the office or into an email.
+
+                A plain anchor rather than a fetch-and-blob: the browser already
+                carries the session, the route sets Content-Disposition, and doing it
+                by hand would mean holding a child's register in memory to hand it
+                straight back to the same browser.
+              */}
+              <a
+                href={`/api/school/attendance/register/export?classId=${encodeURIComponent(classId)}&date=${encodeURIComponent(date)}`}
+                className="inline-flex min-h-tap items-center gap-2 rounded-md border border-border px-3 text-sm transition-colors hover:bg-sunken"
+              >
+                <Download aria-hidden="true" className="size-4" />
+                Download PDF
+              </a>
+              <PrintButton label="Print register" />
+            </div>
+          ) : undefined
+        }
       />
 
       {/*

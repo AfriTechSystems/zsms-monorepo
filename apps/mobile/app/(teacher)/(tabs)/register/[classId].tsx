@@ -51,6 +51,7 @@ import {
 
 import { api } from '../../../../lib/api'
 import { useApi } from '../../../../lib/use-api'
+import { todayIso } from '../../../../lib/dates'
 import { useSession } from '../../../../lib/auth'
 import {
   Badge,
@@ -111,7 +112,12 @@ export default function Register(): JSX.Element {
   const insets = useSafeAreaInsets()
   const { getToken } = useSession()
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  /*
+    Local, not `toISOString()`. That is UTC and Zambia is UTC+2, so before 02:00 this
+    opened YESTERDAY's register — seeding yesterday's marks into a sheet a teacher was
+    about to correct. See lib/dates.
+  */
+  const today = useMemo(() => todayIso(), [])
   const { data, loading, error, reload } = useApi<RegisterPayload>(
     classId ? `/api/school/attendance/register?classId=${encodeURIComponent(classId)}&date=${today}` : null,
   )

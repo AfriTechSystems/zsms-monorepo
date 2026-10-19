@@ -99,7 +99,7 @@ happened here.
 
 ### Carried forward
 
-- **`main` is 54 commits behind `integration`.** A release decision, not engineering.
+- **`main` was levelled with `integration`** by PR #4, later the same day — 55 commits, 224 files, 11 migrations. No deployment follows it; there is nowhere to deploy to yet.
 - **Authenticated screens remain visually unverified.** The icon work is type-checked,
   asserted for agreement, and renders correctly on `/design` (`lucide-triangle-alert`,
   `lucide-circle-check`, `lucide-info` all served) — but nobody has *looked* at a rebuilt

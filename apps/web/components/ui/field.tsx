@@ -36,7 +36,7 @@
 
 import * as React from 'react'
 import type { JSX, ReactNode } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { CircleAlert } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 
@@ -116,7 +116,7 @@ export function Field({
 
       {error && (
         <p id={errorId} role="alert" className="flex items-start gap-1.5 text-sm text-danger-text">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </p>
       )}

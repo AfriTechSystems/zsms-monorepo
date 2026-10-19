@@ -28,6 +28,7 @@ import { Pressable, Text, View } from 'react-native'
 import type { LucideIcon } from 'lucide-react-native'
 
 import { usePalette } from './ui'
+import { IconTile, type Tone } from './shell'
 import { RADIUS, SPACE, TAP, TYPE } from '../theme'
 
 export type GridState = 'ready' | 'locked' | 'coming'
@@ -39,6 +40,17 @@ export interface GridFeature {
   href: string | null
   /** 'ready' | 'coming' | anything else is treated as locked. */
   state: string
+  /**
+   * The tile's hue.
+   *
+   * Every tile was `primaryTint` until 2026-10-18, so the grid read as one blue
+   * block — the reference designs give each action its own pastel, and that is most
+   * of what makes the mockup's grid scannable rather than uniform. Assigned per
+   * feature in `lib/features.ts`, by what the feature IS, never by its position:
+   * colour follows the entity, not its rank, so re-ordering or gating the grid never
+   * repaints the survivors.
+   */
+  tone?: Tone
 }
 
 export function FeatureGrid({
@@ -98,18 +110,7 @@ export function FeatureGrid({
               opacity: available ? (pressed ? 0.7 : 1) : 0.45,
             })}
           >
-            <View
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: RADIUS.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: available ? c.primaryTint : c.surfaceSunken,
-              }}
-            >
-              <Icon size={19} color={available ? c.primaryMark : c.textSubtle} strokeWidth={2} />
-            </View>
+            <IconTile icon={Icon} tone={feature.tone ?? 'primary'} size={38} muted={!available} />
 
             <Text
               numberOfLines={2}

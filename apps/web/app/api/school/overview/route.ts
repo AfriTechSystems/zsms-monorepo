@@ -69,7 +69,7 @@ export async function GET(): Promise<Response> {
     const schoolId = school.id as string
     const role = session.role
 
-    const [capacityRes, rollRes, feesRes, attendanceRes, announcementRes] = await Promise.all([
+    const [capacityRes, rollRes, feesRes, attendanceRes, trendRes, announcementRes] = await Promise.all([
       client.rpc('school_student_capacity', { p_school_id: schoolId }),
 
       // Status breakdown. `head: false` because the counts come from the rows;
@@ -88,6 +88,18 @@ export async function GET(): Promise<Response> {
             .from('attendance_records')
             .select('status')
             .eq('attendance_date', today())
+        : Promise.resolve({ data: null, error: null }),
+
+      /*
+        The last fortnight, aggregated in SQL rather than here.
+
+        `school_attendance_trend()` (0274) is SECURITY INVOKER, so RLS scopes it
+        exactly as it scopes the single-day query above — a class teacher gets their
+        classes, a head teacher gets the school. Doing it in TypeScript would mean
+        shipping roughly `roll × days` rows to reduce them to a dozen numbers.
+      */
+      can(role, 'attendance:read')
+        ? client.rpc('school_attendance_trend', { p_days: 14 })
         : Promise.resolve({ data: null, error: null }),
 
       client
@@ -158,11 +170,55 @@ export async function GET(): Promise<Response> {
     }
 
     // --- Attendance -------------------------------------------------------
-    let attendance: { visible: boolean; date: string; present: number; absent: number; late: number; total: number } | null =
-      null
+    interface TrendDay {
+      date: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+    }
+
+    let attendance: {
+      visible: boolean
+      date: string
+      present: number
+      absent: number
+      late: number
+      total: number
+      trend: TrendDay[]
+    } | null = null
 
     if (can(role, 'attendance:read')) {
       const rows = (attendanceRes.data ?? []) as Array<{ status: string }>
+
+      /*
+        Days the school was closed are dropped here rather than on the screen.
+
+        `status` admits `holiday`, and a closed day is not a day of total absence —
+        plotted, it draws a cliff to 0% across every half-term and reads as a
+        register nobody marked. `0274` returns the count so this layer can decide;
+        this is the decision. A day with nothing BUT holiday rows is not a data
+        point, so it does not become one.
+      */
+      const trend: TrendDay[] = (
+        (trendRes.data ?? []) as Array<{
+          out_date: string
+          out_present: number
+          out_late: number
+          out_absent: number
+          out_excused: number
+          out_holiday: number
+        }>
+      )
+        .filter((d) => d.out_present + d.out_late + d.out_absent + d.out_excused > 0)
+        .map((d) => ({
+          date: d.out_date,
+          present: d.out_present,
+          late: d.out_late,
+          absent: d.out_absent,
+          excused: d.out_excused,
+        }))
+
       attendance = {
         visible: true,
         date: today(),
@@ -170,6 +226,7 @@ export async function GET(): Promise<Response> {
         absent: rows.filter((r) => r.status === 'absent').length,
         late: rows.filter((r) => r.status === 'late').length,
         total: rows.length,
+        trend,
       }
     }
 

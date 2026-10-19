@@ -29,8 +29,8 @@ import { requireSchoolSession } from '../../../lib/school-session'
 import { ROLE_LABEL } from '../../../lib/roles'
 import { NotificationBell } from '../../../components/ui/notification-bell'
 import { AccountMenu } from '../../../components/ui/account-menu'
-import { ThemeToggle } from '../../../components/ui/theme-toggle'
 import { SchoolSwitcher } from '../../../components/ui/school-switcher'
+import { GlobalSearch } from '../../../components/ui/global-search'
 import { SchoolShell } from './school-shell'
 
 export const metadata = {
@@ -88,14 +88,25 @@ export default async function SchoolLayout({
       <SchoolShell
         base={base}
         schoolName={session.school.name}
+        logoUrl={session.school.logoUrl}
+        accentColor={session.school.accentColor}
         roleLabel={`${session.school.schoolCode} · ${ROLE_LABEL[session.role] ?? session.role}`}
         role={session.role}
         headerActions={
           <>
+            {/*
+              Global search (`0266`).
+
+              Mounted per portal rather than in the shell, because not every audience
+              benefits: a parent has one or two children, so a box that searches them is
+              furniture. The function itself is safe for anyone — it is SECURITY INVOKER
+              and RLS scopes every result — so this is a usefulness decision, not a
+              security one.
+            */}
+            <GlobalSearch placeholder="Search pupils, staff…" />
             {/* Renders nothing for the common case of one school, so a single-school head
                 teacher never sees a control implying there is somewhere else to be. */}
             <SchoolSwitcher />
-            <ThemeToggle />
             <NotificationBell endpoint="/api/session/notices" />
             <AccountMenu />
           </>

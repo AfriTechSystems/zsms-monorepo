@@ -4,6 +4,428 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-10-19 (later) — One icon vocabulary, and the register reaches the phone
+
+Branch `integration`, after PR #3 merged. The icon audit and registry, the mobile
+register download, and the documentation brought level. `ci:checks` green;
+`db:verify` 9/9 over 228 migrations; 28 unit tests; the authenticated walk still 0
+broken.
+
+### The drift nobody could see
+
+The icon audit found what the catalogue predicted — 142 distinct glyphs across 155 web
+files, and **22 of 24 core concepts drawn more than one way or differing between web and
+mobile**. That much was expected.
+
+What was not expected is that the worst of it was **invisible**. lucide renamed several
+glyphs and kept the old names as aliases, so `AlertTriangle` (16 files) and
+`TriangleAlert` were the same picture under two names, as were `CheckCircle2` and
+`CircleCheck`. No reviewer would ever have caught that: the screens looked identical
+because they *were* identical. It is the clearest case yet for the rule this repository
+keeps rediscovering — **an invariant nobody can see needs an assertion, not guidance.**
+
+So the guard is `apps/web/lib/icons.test.ts`: both maps complete, inventing nothing,
+agreeing glyph for glyph, and using no deprecated alias. 65 files de-duplicated and zero
+aliases remain.
+
+### One vocabulary, two maps, and why that is forced
+
+`packages/design-tokens/src/icons.ts` holds 98 semantic names and no glyphs. Each app
+maps them to its own lucide package. The split is not architectural tidiness:
+
+- The two lucide packages export the same names as **different component types**, so one
+  map cannot type-check against both.
+- The token package is imported by `@zsms/documents` and `@zsms/notifications`, which
+  render PDFs and email inside a Railway worker. A React icon library there would put
+  React in a worker that draws a receipt.
+
+`IconName` makes a missing concept a compile error. It cannot make the two maps *agree*
+— that is what the test is for.
+
+Every glyph resolved in both packages with **zero substitutions**, so the two apps
+genuinely draw the same picture for every concept.
+
+### Two real inconsistencies, found by looking rather than by the audit
+
+`ErrorState` drew a warning triangle in its body while the `danger` Alert around it drew
+a circled X in its header — the same message, two severities. Reference sheet 01 F
+settles it: circled X is Error, triangle is Warning.
+
+Attendance was `CalendarCheck` in both apps — consistent with each other and wrong
+against the sheets, which draw a clipboard. The sheets are also right on the merits: a
+register is a clipboard, and a calendar glyph competed with Timetable two rows below it
+in the same sidebar.
+
+### A mistake worth recording
+
+The first alias-rename script rewrote string literals and prose inside the registry and
+its own test, and a dedup regex deleted two map values outright — `approved:` and
+`rejected:` were left with no glyph. Caught by reading the file rather than by the gate,
+because it still compiled right up until the values vanished.
+
+The fix was to repair both files and exclude them explicitly from every later rename.
+The lesson is narrower than "be careful": **a mechanical rename must not run over the
+file whose job is to hold those names as data.**
+
+### The register reaches the phone
+
+`expo-file-system` and `expo-sharing` were installed from the repo root, which put them
+in `node_modules` and the lockfile but **not** in `apps/mobile/package.json`. That works
+on this machine and breaks on any clean install or EAS build. Both are now declared.
+
+The v57 file API turned out safer than the one I had planned against. `downloadAsync` is
+gone; `File.downloadFileAsync` **rejects on a non-2xx and creates no file**. The old call
+writes whatever comes back — so an API refusal would have landed on disk as a `.pdf`
+containing `{"error":"Your role does not include attendance."}` and opened as a corrupt
+document. The status is all the new API gives, so it is all the message can explain
+from, but 401/403 and a server fault send a teacher to different places and get
+different sentences.
+
+It shares rather than saves. Neither mobile OS has a folder a teacher can reliably find
+again, and the system sheet lets them send the register to WhatsApp or the office —
+whichever they were going to do next. The file sits in cache, because the register is
+reproducible from the server and a copy on the device would be a second, staler truth.
+
+### What the APK needs, and does not have
+
+`EXPO_PUBLIC_API_URL` is **not set as a repository variable**. A `standalone` APK would
+bake in an unreachable API and fail every request after sign-in. The `development`
+variant does not have that problem — it is a shell, and `npm run mobile` detects the
+machine's LAN address and supplies it through Metro at runtime. A standalone build
+becomes useful once the web app is deployed somewhere a phone can reach.
+
+The APK only needs rebuilding when a **native** package changes, which is exactly what
+happened here.
+
+### Carried forward
+
+- **`main` is 54 commits behind `integration`.** A release decision, not engineering.
+- **Authenticated screens remain visually unverified.** The icon work is type-checked,
+  asserted for agreement, and renders correctly on `/design` (`lucide-triangle-alert`,
+  `lucide-circle-check`, `lucide-info` all served) — but nobody has *looked* at a rebuilt
+  sidebar, because that needs a signed-in browser session this environment cannot make.
+- **Seven of the eight reference sheets are present**, and the work used those plus the
+  catalogue's own tables.
+- **Two glyph choices are judgement calls** worth a designer's eye: `marks` → `Percent`
+  and `results` → `Award`. The sheets distinguish the two concepts; the glyphs are my
+  reading of them.
+
+---
+
+## 2026-10-19 — The chain closes: a real token, spent against the running app
+
+Branch `rls/anon-execute-boundary`. `scripts/e2e-walk.mjs`, the last two mobile screens,
+and the gaps list cleared of its one false positive. `ci:checks` green; `db:verify` 9/9;
+41 pgTAP suites / 926 assertions; the 28-check payment E2E green; `security:audit`
+15 pass / 0 fail.
+
+### The thing nobody had evidence for
+
+Every check in this repository stopped one link short of the whole chain, and the gap
+was in the same place each time:
+
+| Check | What it proves | What it leaves open |
+|---|---|---|
+| `ci:checks` | it compiles, lints, builds | a route that 500s on first contact compiles |
+| `db:verify`, 41 pgTAP suites | the policies are right | the session is synthetic, set by `set_config` |
+| `clerk:check` | the token carries the claims | it is never spent |
+| `gaps` | a route is REFERENCED by a screen | never that it answers |
+
+So the join was unevidenced: a token Clerk actually minted, carried through
+`middleware.ts`, resolved by `getSessionUser()`, spent against PostgREST, filtered by
+RLS, and returned as JSON the envelope admits.
+
+`npm run e2e:walk` closes it. **13 served, 6 refused by role, 0 broken**, stable over
+three consecutive runs, with real rows coming back — `/api/school/structure` returned 12
+grade levels and 4 subjects, `/api/parent/fees` returned a child, two school accounts, a
+statement line and a fee record.
+
+### Why it was impossible until now, and what changed
+
+The 2026-08-23 entry recorded that **no portal screen had ever been seen rendering real
+data**, because every seeded school's `clerk_org_id` was a placeholder (`org_test_d`) and
+no Clerk session could resolve to one. That entry ended: *"That is a two-minute action in
+the Clerk dashboard and it is not mine to take."*
+
+Somebody took it. Three schools now carry real organisation ids — `ZM-LSK-9001`,
+`ZM-LSK-9004`, `ZM-LSK-9005` — so the walk is finally possible. **This is the first
+recorded evidence of a ZSMS portal endpoint serving real rows to a real session.**
+
+### The six refusals are the product working
+
+The session resolves as `staff` at `zm-lsk-9001`, and it is refused the AfriTech
+endpoints, the staff list, teaching assignments, fees and results — each with its own
+message rather than a generic denial. That is `can()` and RLS agreeing, observed rather
+than asserted. A walk that reported those as failures would be measuring the wrong thing,
+so a 403 is counted separately and never as a fault.
+
+What IS counted as broken: a 500, a 404 on a route `gaps` says exists, and a 200 whose
+body is neither `{data}` nor `{error}` — the envelope every screen is written against.
+
+### Two findings, and one of them was mine
+
+**`/api/health` was reported broken, and the rule was wrong.** It returns component-level
+status rather than the envelope, deliberately: `AVAILABILITY.md` has it distinguish "the
+app is down" from "the app is up but cannot reach the database", and a monitor polling it
+wants that shape. Exempted with the reason inline. Worth stating because the instinct on
+a red line is to change the code.
+
+**One route answered 401 on the very first walk and served on every run after.** That is
+the Clerk/Supabase sub-second clock skew this repository already handles —
+`fromPostgrestError` remaps PostgREST's `PGRST303 JWT not yet valid` for exactly this. A
+token whose `nbf` is a fraction of a second ahead is not yet valid when it arrives.
+Recorded in the script rather than smoothed over: one first-run refusal is worth
+repeating before investigating; one that survives a second run is not this.
+
+### The mobile sweep finished
+
+`create` and `marks` were the last two untouched screens.
+
+`create` had three outline Buttons standing in for a segmented control, with a comment
+correctly arguing that a segmented control was right — the control just had to be drawn
+by hand, and an unselected outline button reads as an action rather than an option not
+taken.
+
+`marks` gained a **Spread** tab, mirroring the register's Pupils | Summary and the web
+results screen's distribution, so one question gets one answer on all three surfaces. One
+hue for every slice, not a colour per grade: the slices are one measure split by grade, so
+colouring by grade would be colouring by rank and would put a traffic light on a class's
+results. Saved grades only, with the caption naming the number it is drawn from — a grade
+comes from `grade_from_scale_version()` in the database, never the browser.
+
+A grep for the hand-rolled icon tile now returns only `stats.tsx` and `wordmark.tsx`,
+which legitimately draw their own.
+
+### `gaps` had one false positive and two real ones
+
+`reminder_days_are_sane` is called by a **CHECK constraint** — Postgres is the caller, so
+a source grep can never find it. Accepted with that reason, because listing it every run
+trains people to skim the list, which is how a real one gets missed.
+
+The two that remain are real and pre-existing, now tracked in `CLAUDE.md` rather than
+recurring as a warning nobody actions:
+
+- **`ai_credit_topup()`** is the PERSONAL credit purchase. Schools are fine — they buy
+  through `school_purchase_credits()`, which `/api/school/credits` calls. The gap is that
+  **a standalone Teacher Hub teacher cannot buy credits**; they get their plan's monthly
+  allowance and nothing more. It needs a payment path, and the 2026-10-18 decision was to
+  keep the claim model rather than integrate a gateway, so it waits on that.
+- **`admin_publish_prompt_template()`** versions the AI prompts and has no screen. Low
+  priority while `AI_GENERATOR` is `template` and no model runs.
+
+### Carried forward
+
+- **PR #3 is green and unmerged.** `gh pr merge` was refused by the permission classifier
+  ("Merge Without Review"). It needs a human, from the GitHub UI or by allowing that here.
+- **The register PDF is not reachable from the phone.** The route and renderer work and
+  are wired on the web attendance screen; saving a file on the device needs
+  `expo-file-system` and `expo-sharing`. Given this repository's history with mobile
+  dependencies — two copies of gesture-handler at incompatible majors,
+  `expo-notifications` killing startup — that is not a decision to take without being able
+  to run an Android build.
+- **The walk covers 20 routes of 139.** It is a spine, not a sweep: one or two per surface,
+  chosen so a broken layer shows up somewhere. Widening it is cheap and worth doing before
+  a pilot.
+- **Nothing writes in the walk, by design.** The write paths — enrolling a pupil,
+  recording a payment, marking a register — are still only proven by pgTAP against a
+  synthetic session. Proving those end to end means a walk that writes, which means a
+  database it is safe to write to, which means staging.
+
+---
+
+## 2026-10-18 — 64 SECURITY DEFINER functions were executable by `anon`, and four documents reported finished work as missing
+
+Branch `rls/anon-execute-boundary`, PR #3. Migrations `0272` and `0273`, one new pgTAP suite
+(`anon_execute_boundary_test.sql`, 12 assertions) taking the total to **41 suites / 926 assertions**.
+Both CI jobs green twice, including the `database` job replaying all 226 migrations against an empty
+database.
+
+The session began as "analyse where we are and plan what is next". The analysis is what found the
+defect, and it was not found by reading anything — it was found by asking the live database a
+question no document had asked it.
+
+### The defect
+
+`public` holds 299 functions, 216 of them `SECURITY DEFINER`. **67 could be executed by the `anon`
+role** over PostgREST at `/rest/v1/rpc/<name>`. The anon key ships in the browser bundle by design,
+so `anon` means anybody with the URL.
+
+The sharpest two were `worker_parent_push_tokens()` and `worker_retire_push_token()`. A `worker_*`
+function exists precisely to bypass RLS for a Railway worker holding the service role key, so by
+design it carries no tenant clause and no role check — there is nothing inside it to refuse a
+caller:
+
+```
+POST /rest/v1/rpc/worker_parent_push_tokens
+{ "p_parent_user_ids": ["user_...", "user_..."] }
+  -> every matching parent's device push token, platform included
+```
+
+Confirmed exploitable against `zsms-dev` with the real publishable key, and confirmed refused after
+the fix: **HTTP 401, `42501`**.
+
+### Why 914 assertions did not catch it
+
+`parent_push_tokens` has a 22-assertion suite and it passed throughout. It asserts the table's
+**policies** — and a `SECURITY DEFINER` function never consults one. Postgres checks `EXECUTE`
+*before* RLS is reached, so the exposure sat one layer in front of everything 40 suites covered.
+
+This is the same root as `0213`'s seven tables with policies and no GRANT, with the sign flipped:
+there, a missing grant made a policy unreachable and the feature failed closed. Here, a surplus
+grant made a function reachable and nothing failed at all. **The grant layer has now been tested
+twice by accident and never on purpose.** That is what the new suite changes.
+
+### What the fix had to get right, and nearly got wrong
+
+Three things, each of which would have made this worse rather than better:
+
+- **The revoke needs `FROM PUBLIC` *and* `FROM anon`.** The privileges came from two different
+  places and neither statement removes the other: `my_children`, `verify_payment` and
+  `audit_row_change` carry a leading `=X/postgres` in `proacl` — the empty grantee is **PUBLIC**,
+  Postgres's default on every function ever created — while `worker_parent_push_tokens` had no
+  PUBLIC entry and an explicit `anon=X`.
+- **`authenticated` must be granted explicitly FIRST.** On a function whose only source of
+  `EXECUTE` for `authenticated` is that same PUBLIC default, revoking PUBLIC first removes the
+  capability along with the exposure — and *succeeds*. A silent outage across the product, from a
+  migration that applied cleanly. The easy assertion is "anon cannot"; the one that matters is
+  "authenticated still can", and the migration and the suite both assert the second.
+- **Trigger functions keep their `authenticated` grant, deliberately.** All 11 trigger-returning
+  functions lose PUBLIC and `anon`. Whether Postgres re-checks `EXECUTE` when a trigger *fires*, as
+  opposed to when it is created, was **not verified** — and if it does, revoking would break every
+  write in the product. The exposure being closed is `anon`; calling `set_updated_at()` as an RPC
+  with a session token discloses nothing. Recorded as open rather than guessed at.
+
+Three functions stay anon-reachable — `search_schools`, `school_public_profile`,
+`school_branding_by_slug`. That is correct, and the reason is a fact worth keeping: **`anon` can
+`SELECT` 0 of 93 relations in `public`.** Verified, not assumed. The table-grant discipline was
+airtight; only the function grants leaked. So those three functions' `RETURNS TABLE` *is* the entire
+public disclosure boundary, exactly as `lib/supabase.ts` already said.
+
+Catalogue-driven rather than a list of 64 names, so it replays correctly against an empty database.
+The specification ships as `anon_executable_definer_functions()` and the suite asserts it empty —
+the `0270` answer, for the same reason: **a gap whose symptom is nothing at all needs an assertion,
+not a note.** Advisor count went 67 to 3.
+
+`0273` is comments only: five tables report `rls_enabled_no_policy` and in this schema that is
+correct — RLS-forced, zero policies, **no grants at all** (not `anon`, not `authenticated`, not even
+`service_role`), in schemas PostgREST cannot resolve, each reached through a named `public` wrapper.
+The risk was somebody "fixing" the advisor by adding a permissive policy to a table that is
+currently shut. The migration asserts its own premise, so the comment cannot outlive its truth.
+
+### The other half: four documents reported finished work as missing
+
+Checked by running things rather than reading them, and every one of these would have sent somebody
+to rebuild or re-buy something that exists:
+
+| Claim | Reality |
+|---|---|
+| `CREDENTIALS_CHECKLIST.md`: Sentry "**is not installed at all** — no `@sentry/*` dependency" | `@sentry/nextjs ^11.1.0`, both instrumentation files, `lib/report-error.ts`, `global-error.tsx`. Only `NEXT_PUBLIC_SENTRY_DSN` outstanding, by decision |
+| Same file: Redis "**the single highest-value credential**… not one job has ever round-tripped" | `npm run queue:smoke` round-tripped a job again this session |
+| Same file: service role key "**Missing from `.env.local`**" | Present |
+| Same file: Docker Hub needed | `docker/login-action@v3` in CI, authenticating on every run |
+| `CLAUDE.md`: "Teacher Hub: Community Library **is not built**… deliberately scoped out" | Built and reachable: `0217`/`0218`, `community_library()`, `/api/teacher/community`, `/teacher/community`, and a nav entry in `teacher-shell.tsx` |
+| `api/admin/impersonate/route.ts`: "**Status: NOT FUNCTIONAL**… returns a clear 501" | No 501 in the file. Mints a Clerk actor token, records the session, revokes on refusal |
+| `parent/layout.tsx`: a parent with children at two schools "is in two Clerk organisations" | A parent has no organisation. `is_linked_parent_of()` reads `parent_user_id = get_user_id()` and nothing else |
+| `MIGRATIONS.md` x2: "NEXT AVAILABLE: `0092`" | Named `0092` for about 180 migrations |
+
+**A stale blocker costs more than a missing one.** It sends somebody to obtain what they already
+have, and it makes the accurate rows look untrustworthy too. The Community Library entry is the
+fourth false "not built" claim found in `CLAUDE.md` — after the mobile screens, `admin/impersonate`
+and ADR-023's webhooks — and I had carried it into my own plan's "deliberately not in scope" list
+before checking. **The file that warns about this pattern keeps producing it.**
+
+Also corrected: the dates. `BUILD_SEQUENCE.md` schedules the pilot for **September 2026**, which
+passed with no pilot, and launch for January 2027. Neither is live; `CLAUDE.md` now says so, and
+says what actually gates a pilot — staging in `af-south-1`, a paid Clerk plan, and one delivery
+channel, none of it engineering work.
+
+### Carried forward
+
+- **Does Postgres re-check `EXECUTE` when a trigger fires?** Settle it where a failed write costs
+  nothing, then decide whether the 11 trigger functions should lose `authenticated` too.
+- **`private.consent_templates` has no reader.** `submit_loan_application()` stores the template
+  version and a hash of the wording, so what a parent agreed to is provable — the hard half, built —
+  but the wording is never served, so nothing shows a parent the text before they consent to a
+  lender seeing their data. `gaps` cannot see it: the missing link is a read no screen asks for.
+  Loans are post-launch, and when it appears is a product decision.
+- **The 18 `function_search_path_mutable` advisor warnings are all SECURITY INVOKER** —
+  `get_user_id`, `get_school_id`, `is_afritech_admin` among them — so there is no escalation path
+  and they are cosmetic. Every one of the 216 DEFINER functions pins its `search_path`, and the new
+  suite now asserts that too.
+- **`MIGRATIONS.md`'s change log stops at `0218`** while migrations run to `0273`. The
+  next-available number is right; the per-migration narrative is about 55 migrations behind.
+- **This journal was three weeks stale** — see the reconstruction below, and note that the file
+  `CLAUDE.md` tells you to read first was the least current in the repository.
+
+---
+
+## 2026-09-28 to 2026-10-13 — RECONSTRUCTED: the three weeks this journal missed
+
+**Read this with its provenance in mind.** The entry above it and the entry below it were written by
+the sessions that did the work. **This one was not.** It was assembled on 2026-10-18 from the commit
+log (210 commits), `MIGRATIONS.md`'s change log, and `DOC_AUDIT_PROGRESS.md`, because the journal's
+newest entry was 2026-09-27 and `CLAUDE.md` instructs every session to read this file first.
+
+It therefore records **what was done, not what was learned** — the reasoning, the dead ends and the
+defects-found-while-building that make the other entries worth reading are mostly lost. Where a
+session's finding survived, it survived in `MIGRATIONS.md`'s change log, which is unusually detailed
+and is the better source for any specific migration. Treat the dates as commit dates.
+
+### What was built (migrations `0131`–`0271`, 141 migrations)
+
+- **AI, end to end** (28 Sept – 6 Oct). The model chain with failover and a platform-wide incident
+  record; the curriculum store and prompt versioning; syllabus ingestion by document upload with a
+  verification step; PDF and Word export for teaching resources; platform-wide AI credits bought in
+  seats and assigned to named teachers; the role-based assistant; the ADR-029 data-completeness
+  score; live generation made a toggle AfriTech controls rather than an environment variable.
+- **School lifecycle** (29 Sept – 4 Oct). Schools can be created, can register themselves, and
+  school status finally binds. The onboarding task queue with the 24-hour rule derived in SQL;
+  sign-off by a person with a reason; an unverified school cannot enrol a child. School settings —
+  profile, academic structure, term dates — with changes recorded and visible to AfriTech.
+- **The public site** (30 Sept). The directory (verified, not ranked), school profiles, a front door,
+  navigation, and auth entry points for every audience sized for a phone.
+- **Parents and pupils** (1–11 Oct). A parent who signs up finds their own children; a school can
+  link a parent to a pupil; one child switcher on every parent screen; marketing consent and
+  graduated-account access (ADR-015); the pupil and alumni portal, which ADR-046 settles is one
+  portal.
+- **Fees and documents** (2–5 Oct). Fee totals that show what they are made of; revising issued
+  bills; the parent claim flow as `PAYMENTS.md` specifies it; receipts and report cards nobody could
+  previously reach; an object store that actually stores.
+- **The timetable** (4–5 Oct). Three tables with clash detection in the database; builder, teacher
+  week and parent view; guided setup and drag-and-drop.
+- **The mobile app** (3–5 Oct). Both portals, the drawer, marks entry, notices, timetable, push
+  registration, a parent recording a fee payment, and an Android build from GitHub Actions.
+- **Platform and compliance** (3–11 Oct). ZDPA data subject rights — access, portability, erasure —
+  with self-service and requests reaching the people who action them; school-defined staff roles
+  (ADR-012); the six AfriTech roles stopping being one role; the permission grant system made
+  reachable; impersonation minting a real token; HTTP rate limiting; the external integration API;
+  the tier-1 integrations framework; WAF security headers at the origin; the loan module backend and
+  screens; the audit trail nobody could read.
+- **The UI redesign and the mobile redesign** (11–13 Oct). A validated chart palette, charts, stat
+  trends, context rails, global search scoped by RLS, an activity feed, profile photos, forms in
+  modals, a print stylesheet, and a Light/System/Dark choice reaching every mobile screen.
+
+### The two findings worth carrying
+
+Both are in `CLAUDE.md` already, and both are the reason that file now says *never report CI status
+from this file, ask GitHub*:
+
+1. **The branch was red for about twenty commits while `CLAUDE.md` claimed green**, and a session
+   read the claim and repeated it. Nine live defects were sitting behind it — among them
+   `allocate_payment()` selecting a column that does not exist, so **every payment recorded without
+   explicit allocations had failed since `0213`**, and seven tables whose policies had no GRANT,
+   which Postgres refuses before RLS is consulted.
+2. **The 18-folder documentation audit** (10–12 Oct) walked all 119 documents and scored every
+   folder. Seventeen scored Good (73–88%); folder 12 Communication scored Fair (65%), honestly,
+   since no message has ever left this machine. **The dominant finding in eleven of eighteen folders
+   was not bugs — it was work that was finished, correct, tested and unreachable**, with one link
+   missing in the middle of the chain where `npm run gaps` could not see it.
+
+`main` was brought level with `integration` on 12 Oct as PR #2 — 262 commits, the whole of Phase 4
+plus the audit.
+
+---
+
 ## 2026-09-27 — The Teacher Hub: the first owner-scoped tables, and a product whose core is honestly absent
 
 Branch `feature/phase-4-design-foundation`. Migration `0130`, `packages/ai`, five API routes, five screens, and

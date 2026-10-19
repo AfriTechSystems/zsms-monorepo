@@ -49,7 +49,7 @@ export async function GET(): Promise<Response> {
     const { data, error } = await client
       .from('parents')
       .select(
-        'id, full_name, email, phone_e164, preferred_contact, whatsapp_opted_in, marketing_opt_in, marketing_opt_in_at',
+        'id, full_name, email, phone_e164, preferred_contact, whatsapp_opted_in, marketing_opt_in, marketing_opt_in_at, photo_url',
       )
       .maybeSingle()
 
@@ -70,6 +70,12 @@ export async function GET(): Promise<Response> {
     return ok({
       linked: true,
       fullName: data.full_name,
+      /*
+        The parent's OWN picture (`0265`). Theirs to set, unlike their child's, which
+        the school sets and a parent sees without being able to change — a school's
+        record of a pupil is the school's.
+      */
+      photoUrl: data.photo_url,
       email: data.email,
       phone: data.phone_e164,
       preferredContact: data.preferred_contact,

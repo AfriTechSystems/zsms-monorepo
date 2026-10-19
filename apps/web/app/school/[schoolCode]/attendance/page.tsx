@@ -34,7 +34,7 @@
 import type { FormEvent, JSX } from 'react'
 import { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarCheck, CheckCheck, Loader2, Save } from 'lucide-react'
+import { CalendarCheck, CheckCheck, Download, LoaderCircle, Save } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -42,10 +42,13 @@ import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
+import { PrintButton, PrintHeading } from '../../../../components/ui/print-button'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { FormGrid, FormSection } from '../../../../components/ui/form'
 import { cn } from '../../../../lib/utils'
 import { formatLevel } from '../school-shared'
+import { DateField } from '../../../../components/ui/date-field'
+import { todayIso } from '../../../../lib/dates'
 
 type Status = 'present' | 'absent' | 'late' | 'excused' | 'holiday'
 
@@ -80,11 +83,6 @@ const QUICK: Array<{ value: Status; label: string; tone: string }> = [
   { value: 'absent', label: 'Absent', tone: 'data-[on=true]:bg-danger-fill data-[on=true]:text-white' },
   { value: 'late', label: 'Late', tone: 'data-[on=true]:bg-warning-fill data-[on=true]:text-white' },
 ]
-
-function todayIso(): string {
-  const d = new Date()
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
-}
 
 function Register(): JSX.Element {
   const router = useRouter()
@@ -193,7 +191,50 @@ function Register(): JSX.Element {
         title="Attendance"
         description="Mark today's register, or open a past date to correct one."
         note="A teacher can only mark registers for the classes they are assigned to on the Teaching screen. A pupil left unmarked is recorded as nothing at all — not as present — so an unopened register never reads as a full attendance."
+        actions={
+          classId ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {/*
+                A download beside the print button, not instead of it. They are
+                different jobs: print puts the register on the wall or in a file now,
+                the PDF is the copy that goes to the office or into an email.
+
+                A plain anchor rather than a fetch-and-blob: the browser already
+                carries the session, the route sets Content-Disposition, and doing it
+                by hand would mean holding a child's register in memory to hand it
+                straight back to the same browser.
+              */}
+              <a
+                href={`/api/school/attendance/register/export?classId=${encodeURIComponent(classId)}&date=${encodeURIComponent(date)}`}
+                className="inline-flex min-h-tap items-center gap-2 rounded-md border border-border px-3 text-sm transition-colors hover:bg-sunken"
+              >
+                <Download aria-hidden="true" className="size-4" />
+                Download PDF
+              </a>
+              <PrintButton label="Print register" />
+            </div>
+          ) : undefined
+        }
       />
+
+      {/*
+        The printed sheet's own heading.
+
+        Invisible on screen; on paper it is the only thing identifying what the sheet
+        is, because the print rules have removed the header that says so. A register
+        with no class and no date is not a record of anything.
+      */}
+      {classId && (
+        <PrintHeading
+          title={`Attendance register — ${classId}`}
+          subtitle={`For ${new Date(date).toLocaleDateString('en-GB', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}`}
+        />
+      )}
 
       <FormSection className="mb-cards">
         <FormGrid columns={3}>
@@ -210,17 +251,16 @@ function Register(): JSX.Element {
             )}
           </Field>
 
-          <Field id="reg-date" label="Date" required hint="Defaults to today.">
-            {(props) => (
-              <Input
-                {...props}
-                type="date"
-                value={date}
-                max={todayIso()}
-                onChange={(e) => setParam({ date: e.target.value })}
-              />
-            )}
-          </Field>
+          {/* A register cannot be marked for a day that has not happened. */}
+          <DateField
+            id="reg-date"
+            label="Date"
+            required
+            hint="Defaults to today."
+            value={date}
+            onChange={(v) => setParam({ date: v })}
+            notFuture
+          />
 
           <Field
             id="reg-term"
@@ -358,7 +398,7 @@ function Register(): JSX.Element {
                   <div className="flex flex-wrap items-center gap-3">
                     <Button type="submit" disabled={saving || marked === 0}>
                       {saving ? (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       ) : (
                         <Save aria-hidden="true" />
                       )}

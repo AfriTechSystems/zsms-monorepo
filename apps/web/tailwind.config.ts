@@ -13,11 +13,33 @@
 import type { Config } from 'tailwindcss'
 import animate from 'tailwindcss-animate'
 
+import { BREAKPOINT_SM, MOTION, Z_INDEX } from '@zsms/design-tokens'
+
 const config: Config = {
   darkMode: ['class', '[data-theme="dark"]'],
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        /*
+          `sm` is declared rather than inherited, and it is read from the token
+          package rather than typed here.
+
+          Until 2026-10-18 this file declared no breakpoint at all, so `sm` was
+          Tailwind's stock 640px while `MOBILE_MAX_WIDTH` in the token package was
+          480px. Nothing reconciled them, and **between 480px and 640px a screen got
+          desktop type and padding inside a mobile layout** — `data-table.tsx` goes
+          to one card per row below `sm`, `app-shell.tsx` switches to its drawer
+          there, and the token layer had already restored the desktop values at
+          481px. Most phones in landscape sit in that band.
+
+          Importing the constant makes the agreement structural: there is one number
+          and both systems read it. `lib/breakpoints.test.ts` still asserts it,
+          because this import could be replaced by a literal in a hurry and the
+          symptom would be invisible.
+        */
+        sm: `${BREAKPOINT_SM}px`,
+      },
       colors: {
         border: 'var(--border)',
         input: 'var(--input)',
@@ -107,6 +129,23 @@ const config: Config = {
           fill: 'var(--zsms-neutral-fill)',
           text: 'var(--zsms-neutral-text)',
         },
+        /*
+          `surface` — a raised surface: a card, a header, a panel.
+
+          **This was missing, and `bg-surface` was used in 33 files and emitted
+          nothing.** Every one of them had no background colour at all. It went
+          unnoticed because almost all of them sit directly on `bg-background`, which
+          is the same colour in both themes — so the page looked right.
+
+          The Ask AI panel is where it finally showed: a panel that OVERLAYS the
+          dashboard and has no background is simply see-through, which is exactly what
+          it looked like.
+
+          Mapped to `--card`, which is what `bg-card` already resolves to and what
+          every Card on every screen has been painting with. One variable, two names,
+          and now both of them work.
+        */
+        surface: 'var(--card)',
         sunken: 'var(--zsms-surface-sunken)',
         subtle: 'var(--zsms-text-subtle)',
       },
@@ -154,6 +193,33 @@ const config: Config = {
         // The one that never changes. Used for min-height/min-width on anything
         // a finger has to hit.
         tap: 'var(--zsms-tap-target)',
+      },
+      zIndex: {
+        /*
+          Named layers, so `z-popover` says what it is and `z-50` stops being a
+          number somebody has to reverse-engineer. The numeric classes still work —
+          this adds names rather than removing them — but new code should use these,
+          and `z-[60]` style escape hatches are the signal that a layer is missing
+          from the token rather than that this one needs a bracket.
+        */
+        raised: `${Z_INDEX.raised}`,
+        sticky: `${Z_INDEX.sticky}`,
+        chrome: `${Z_INDEX.chrome}`,
+        overlay: `${Z_INDEX.overlay}`,
+        popover: `${Z_INDEX.popover}`,
+        top: `${Z_INDEX.top}`,
+      },
+      transitionDuration: {
+        // `duration-fast` / `duration-base` / `duration-slow`. The global
+        // prefers-reduced-motion rule in globals.css overrides all of them.
+        fast: `${MOTION.duration.fast}ms`,
+        base: `${MOTION.duration.base}ms`,
+        slow: `${MOTION.duration.slow}ms`,
+      },
+      transitionTimingFunction: {
+        standard: MOTION.easing.standard,
+        gentle: MOTION.easing.gentle,
+        emphasised: MOTION.easing.emphasised,
       },
       keyframes: {
         shimmer: {

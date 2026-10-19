@@ -58,6 +58,18 @@ export interface Feature {
   group: 'Teaching' | 'My tools' | 'School' | 'Account'
   /** Shown under the label on the More screen, never on the grid. */
   hint?: string
+  /**
+   * The tile's hue on the action grid.
+   *
+   * Assigned by what the feature IS, not by where it sits: colour follows the
+   * entity, never its rank, so gating or re-ordering the grid never repaints the
+   * tiles that remain. Register-shaped things are green, marks and results amber,
+   * people blue, AI tools teal, communication coral.
+   *
+   * Only the token package's hue roles appear here. A sixth colour matched off a
+   * mockup would be one no school can theme and no contrast check has measured.
+   */
+  tone?: 'primary' | 'success' | 'warning' | 'danger' | 'accent'
 }
 
 export const FEATURES: Feature[] = [
@@ -65,6 +77,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'attendance',
     label: 'Attendance',
+    tone: 'success',
     icon: CalendarCheck,
     href: '/(teacher)/(tabs)/attendance',
     schoolOnly: true,
@@ -75,6 +88,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'marks',
     label: 'Marks',
+    tone: 'warning',
     icon: ClipboardList,
     href: '/(teacher)/(tabs)/marks',
     schoolOnly: true,
@@ -85,6 +99,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'results',
     label: 'Results',
+    tone: 'warning',
     icon: GraduationCap,
     href: null,
     schoolOnly: true,
@@ -95,6 +110,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'pupils',
     label: 'Pupils',
+    tone: 'primary',
     icon: Users,
     href: '/(teacher)/(tabs)/pupils',
     schoolOnly: true,
@@ -105,6 +121,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'timetable',
     label: 'Timetable',
+    tone: 'primary',
     icon: CalendarDays,
     href: '/(teacher)/(tabs)/timetable',
     schoolOnly: true,
@@ -117,6 +134,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'lesson-plan',
     label: 'Lesson plan',
+    tone: 'accent',
     icon: WandSparkles,
     href: '/(teacher)/(tabs)/create?kind=lesson_plan',
     schoolOnly: false,
@@ -127,6 +145,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'quiz',
     label: 'Quiz',
+    tone: 'accent',
     icon: FileText,
     href: '/(teacher)/(tabs)/create?kind=quiz',
     schoolOnly: false,
@@ -137,6 +156,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'homework',
     label: 'Homework',
+    tone: 'accent',
     icon: BookOpen,
     href: '/(teacher)/(tabs)/create?kind=homework',
     schoolOnly: false,
@@ -147,6 +167,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'library',
     label: 'My library',
+    tone: 'primary',
     icon: FolderOpen,
     href: '/(teacher)/(tabs)/library',
     schoolOnly: false,
@@ -157,6 +178,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'community',
     label: 'Community',
+    tone: 'success',
     icon: Library,
     href: null,
     schoolOnly: false,
@@ -169,6 +191,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'notices',
     label: 'Notices',
+    tone: 'danger',
     icon: MessageSquare,
     href: '/(teacher)/(tabs)/notices',
     schoolOnly: true,
@@ -181,6 +204,7 @@ export const FEATURES: Feature[] = [
   {
     key: 'credits',
     label: 'AI credits',
+    tone: 'warning',
     icon: CreditCard,
     href: '/(teacher)/(tabs)/account',
     schoolOnly: false,

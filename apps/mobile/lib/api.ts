@@ -29,10 +29,38 @@ import Constants from 'expo-constants'
  * LAN address, never `localhost`, because on a phone `localhost` is the phone. `npm run
  * dev` prints the address to use.
  */
-const BASE_URL =
-  (Constants.expoConfig?.extra?.['apiUrl'] as string | undefined) ??
-  process.env['EXPO_PUBLIC_API_URL'] ??
-  'http://localhost:3000'
+/*
+  An EMPTY value is a missing value.
+
+  `??` only catches null and undefined, and the CI build writes
+  `EXPO_PUBLIC_API_URL=` into `.env` whenever the repository variable is unset — so
+  the empty string won, and `BASE_URL` became `''`. Every request then went to a
+  relative path with no host, which on a phone fails in a way that reads as "the
+  server is down" rather than "this build was never told where the server is".
+
+  Trimmed too, because a trailing space in a CI variable is invisible in the UI and
+  produces a URL that looks correct in a log and resolves to nothing.
+*/
+const configured = [
+  Constants.expoConfig?.extra?.['apiUrl'] as string | undefined,
+  process.env['EXPO_PUBLIC_API_URL'],
+]
+  .map((v) => v?.trim())
+  .find((v) => Boolean(v))
+
+const BASE_URL = configured ?? 'http://localhost:3000'
+
+/**
+ * The API origin, for callers that cannot go through `apiCall`.
+ *
+ * `lib/download.ts` fetches a PDF, which is bytes rather than the JSON envelope every
+ * helper below parses — so it needs the base URL but not the rest. Exported rather than
+ * duplicating the resolution order, which has already been got wrong once: an unset
+ * variable became the empty string and every request went to the app's own origin.
+ */
+export function apiBaseUrl(): string {
+  return BASE_URL
+}
 
 export interface ApiResult<T> {
   data: T | null

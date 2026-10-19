@@ -18,7 +18,7 @@
 import type { JSX } from 'react'
 import { useState } from 'react'
 import { RefreshControl, ScrollView, Text, View } from 'react-native'
-import { Receipt } from 'lucide-react-native'
+import { Receipt, Wallet } from 'lucide-react-native'
 
 import { ChildSwitcher } from '../../../components/child-switcher'
 import {
@@ -39,6 +39,8 @@ import {
   Screen,
   usePalette,
 } from '../../../components/ui'
+import { ProgressBar } from '../../../components/stats'
+import { IconTile } from '../../../components/shell'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { useApi } from '../../../lib/use-api'
 import { NUMERIC, SPACE, TYPE } from '../../../theme'
@@ -98,6 +100,15 @@ export default function ParentFees(): JSX.Element {
 
   const outstanding = data?.balance?.outstanding ?? 0
 
+  /*
+    Verified payments only — that is what the balance nets. A parent who uploaded
+    proof this morning sees it below as a claim and not in this bar, which is the same
+    distinction the school side draws and the reason the two never disagree.
+  */
+  const billed = data?.balance?.total_billed ?? 0
+  const paidPercent =
+    billed > 0 ? ((data?.balance?.total_paid ?? 0) / billed) * 100 : undefined
+
   return (
     <Screen>
       <ChildSwitcher children={data?.children ?? []} selectedId={childId} onSelect={setChildId} />
@@ -126,13 +137,68 @@ export default function ParentFees(): JSX.Element {
 
         {data && (
           <>
-            <Card>
-              <Caption>Outstanding</Caption>
+            {/*
+              The balance card is tinted by its own state, as the reference design
+              draws it: a pink ground when something is owed, green when nothing is.
+
+              The colour is not decoration. This is the one number a parent opens the
+              app for, and on a phone glanced at in a queue the ground does the work
+              the label would otherwise have to — "do I owe anything" answered before
+              the figure is read. It stays a tint rather than a fill because the
+              button inside it must remain the most saturated thing in the card.
+            */}
+            <Card
+              style={{
+                backgroundColor: outstanding > 0 ? c.dangerTint : c.successTint,
+                borderColor: 'transparent',
+              }}
+            >
+              <Row gap={SPACE.md} style={{ marginBottom: SPACE.sm }}>
+                <IconTile icon={Wallet} tone={outstanding > 0 ? 'danger' : 'success'} />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      TYPE.label,
+                      { color: outstanding > 0 ? c.dangerText : c.successText },
+                    ]}
+                  >
+                    {outstanding > 0 ? 'Outstanding balance' : 'Fully paid'}
+                  </Text>
+                  {billed > 0 && (
+                    <Text style={[TYPE.caption, { color: c.textMuted }]}>
+                      {`Out of ${kwacha(billed)}`}
+                    </Text>
+                  )}
+                </View>
+              </Row>
               <Text
-                style={[TYPE.display, NUMERIC, { color: outstanding > 0 ? c.danger : c.success }]}
+                style={[TYPE.display, NUMERIC, { color: outstanding > 0 ? c.dangerText : c.successText }]}
+                // One line. Zambian school fees reach six figures and a wrapped
+                // figure makes the card taller than the one beside it.
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
               >
                 {kwacha(outstanding)}
               </Text>
+
+              {/*
+                How far through the term's fees this parent is.
+
+                The outstanding figure alone does not say whether they are nearly done
+                or have barely started, which is the thing somebody actually wants to
+                know before deciding what to pay today. Shown only when there is a
+                billed total to be a proportion of — otherwise a school that has not
+                billed yet would show a full bar reading as "paid up".
+              */}
+              {paidPercent !== undefined && (
+                <View style={{ gap: 4, marginTop: SPACE.sm }}>
+                  <ProgressBar value={paidPercent} tone="success" />
+                  <Caption>
+                    {`${Math.round(paidPercent)}% of ${kwacha(billed)} paid`}
+                  </Caption>
+                </View>
+              )}
               {/*
                 The action, immediately under the number it acts on.
 
@@ -173,27 +239,59 @@ export default function ParentFees(): JSX.Element {
             {data.statement.length > 0 && (
               <View style={{ gap: SPACE.sm }}>
                 <Caption>What has been charged</Caption>
-                {data.statement.map((row, i) => (
-                  <Card key={row.id ?? i}>
-                    <Row gap={SPACE.sm}>
-                      <Text style={[TYPE.body, { flex: 1, color: c.text, fontWeight: '600' }]}>
-                        {row.fee_name ?? 'Fee'}
-                      </Text>
-                      <Text style={[TYPE.body, NUMERIC, { color: c.text }]}>
-                        {kwacha(Number(row.amount ?? 0))}
-                      </Text>
-                    </Row>
-                    <Row gap={SPACE.sm}>
-                      {row.due_date && <Caption>Due {shortDate(row.due_date)}</Caption>}
-                      {row.status && (
-                        <Badge
-                          label={row.status}
-                          tone={row.status === 'paid' ? 'success' : 'warning'}
+                {/*
+                  One card holding rows, not a card per fee.
+
+                  The reference design draws the breakdown as a single list, and it is
+                  right: five separate cards for five lines of one bill make the bill
+                  look like five unrelated things. The icon tile carries the kind of
+                  fee and the pill carries its state, so the eye can find what is still
+                  owed without reading every amount.
+                */}
+                <Card style={{ gap: SPACE.md }}>
+                  {data.statement.map((row, i) => {
+                    const paid = row.status === 'paid'
+                    const amount = Number(row.amount ?? 0)
+                    const settled = Number(row.amount_paid ?? 0)
+                    /*
+                      Partly paid is its own state and the mockup has no pill for it.
+                      Showing "Outstanding" against a bill that is three-quarters
+                      settled is true but reads as no progress at all, so the amount
+                      line carries what is left and the pill says Part paid.
+                    */
+                    const partly = !paid && settled > 0 && settled < amount
+
+                    return (
+                      <View
+                        key={row.id ?? i}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}
+                      >
+                        <IconTile
+                          icon={Receipt}
+                          tone={paid ? 'success' : partly ? 'warning' : 'danger'}
                         />
-                      )}
-                    </Row>
-                  </Card>
-                ))}
+                        <View style={{ flex: 1, gap: 1 }}>
+                          <Text
+                            numberOfLines={1}
+                            style={[TYPE.body, { color: c.text, fontWeight: '600' }]}
+                          >
+                            {row.fee_name ?? 'Fee'}
+                          </Text>
+                          <Text style={[TYPE.caption, NUMERIC, { color: c.textMuted }]}>
+                            {partly
+                              ? `${kwacha(amount - settled)} left of ${kwacha(amount)}`
+                              : kwacha(amount)}
+                            {row.due_date && !paid ? ` · due ${shortDate(row.due_date)}` : ''}
+                          </Text>
+                        </View>
+                        <Badge
+                          label={paid ? 'Paid' : partly ? 'Part paid' : 'Outstanding'}
+                          tone={paid ? 'success' : partly ? 'warning' : 'danger'}
+                        />
+                      </View>
+                    )
+                  })}
+                </Card>
               </View>
             )}
 

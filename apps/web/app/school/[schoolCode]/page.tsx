@@ -44,7 +44,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, StatSkeleton } from '../../../components/ui/data-states'
 import { StatCard } from '../../../components/ui/stat-card'
+import { ActivityFeed } from '../../../components/ui/activity-feed'
+import { RailPanel } from '../../../components/ui/context-rail'
+import { SectionLink } from '../../../components/ui/section-link'
 import { formatCount, formatDate, formatKwacha } from './school-shared'
+import { ChartFrame, TrendChart } from '../../../components/ui/chart'
 
 interface Capacity {
   studentLimit: number | null
@@ -53,6 +57,57 @@ interface Capacity {
   currentCount: number
   remaining: number | null
   atCapacity: boolean
+}
+
+/**
+ * Attendance over the last fortnight, as a rate.
+ *
+ * ## Why a rate and not four counts
+ *
+ * The question a head teacher asks of a fortnight is "is attendance holding up",
+ * which is one number per day. Four stacked series would answer "what was the
+ * composition of each day", which nobody asked, and would need a legend, four hues
+ * and a stacking order to argue about. One series, so no legend — the title names
+ * it, and the tooltip carries the day's actual counts.
+ *
+ * ## What counts as attending
+ *
+ * `present + late`. A late pupil came to school; counting them absent would make
+ * punctuality and attendance the same measure, and the register already separates
+ * them. `excused` sits in the denominator but not the numerator — an authorised
+ * absence is still an absence from the room, and a school that wants it counted
+ * differently needs a policy setting rather than a different chart.
+ */
+function AttendanceTrend({
+  trend,
+}: {
+  trend: Array<{ date: string; present: number; late: number; absent: number; excused: number }>
+}): JSX.Element {
+  const rates = trend.map((d) => {
+    const assessed = d.present + d.late + d.absent + d.excused
+    return assessed === 0 ? 0 : Math.round(((d.present + d.late) / assessed) * 100)
+  })
+
+  // Day and month only. A fortnight of `2026-10-14` labels collides at any width,
+  // and the year is the same on every point.
+  const labels = trend.map((d) => {
+    const [, month, day] = d.date.split('-')
+    return `${day}/${month}`
+  })
+
+  return (
+    <ChartFrame
+      title="Attendance, last fortnight"
+      description="Present or late, as a share of the pupils whose register was marked that day. Days the school was closed are not shown."
+    >
+      <TrendChart
+        series={[{ label: 'Attending', points: rates }]}
+        labels={labels}
+        format={(n) => `${n}%`}
+        emptyMessage="No registers marked in the last fortnight."
+      />
+    </ChartFrame>
+  )
 }
 
 interface Overview {
@@ -83,6 +138,18 @@ interface Overview {
     absent: number
     late: number
     total: number
+    /**
+     * The last fortnight, days the school was closed already removed by the route.
+     * A `holiday` day is not a day of total absence, and plotted as one it draws a
+     * cliff to 0% that reads as a register nobody marked.
+     */
+    trend: Array<{
+      date: string
+      present: number
+      late: number
+      absent: number
+      excused: number
+    }>
   } | null
   announcements: Array<{
     id: string
@@ -264,6 +331,18 @@ export default function SchoolDashboardPage({
             />
           </div>
 
+          {/*
+            Stat row, then the chart, then the lists — the dashboard archetype in
+            zsms-ui, in that order.
+
+            Rendered only with two or more days behind it. One point is not a trend,
+            and a line chart with a single dot on it is furniture pretending to be
+            information; the stat card above already says what today looks like.
+          */}
+          {data.attendance && data.attendance.trend.length >= 2 && (
+            <AttendanceTrend trend={data.attendance.trend} />
+          )}
+
           <div className="grid gap-cards lg:grid-cols-2">
             <Card>
               <CardHeader>
@@ -354,6 +433,23 @@ export default function SchoolDashboardPage({
                 )}
               </CardContent>
             </Card>
+
+            {/*
+              What other people have been doing (reference W1; `0268`).
+
+              Beside the roll rather than below everything: on a school dashboard the
+              question "has anything changed since I last looked" is asked at the same
+              moment as "how many pupils do we have", not after scrolling past it.
+
+              `recent_activity()` excludes the reader's OWN actions, so a head teacher
+              who has just marked a register does not see themselves reported back.
+            */}
+            <RailPanel
+              title="Recent activity"
+              action={<SectionLink href={`${base}/settings/audit`}>Audit trail</SectionLink>}
+            >
+              <ActivityFeed limit={6} />
+            </RailPanel>
           </div>
         </div>
       )}

@@ -246,6 +246,79 @@ Generated for the full school for a term. Shows:
 
 Both reports are available in PDF and CSV formats from Reports → Attendance.
 
+### Day-by-day trend — BUILT 2026-10-18 (partial)
+
+The *School Attendance Summary* above specifies "day-by-day school attendance rate
+(trend chart)". The **data function and the dashboard chart exist**; the PDF/CSV
+report around them does not.
+
+**`public.school_attendance_trend(p_days INT DEFAULT 14)`** (migration `0274`) returns
+one row per day that has a marked register, within a window clamped to 1–90 days:
+
+| Column | Meaning |
+|---|---|
+| `out_date` | the register date |
+| `out_present` / `out_late` / `out_absent` / `out_excused` / `out_holiday` | one count per status |
+
+Three properties of it are load-bearing:
+
+1. **`SECURITY INVOKER`, with no `school_id` clause of its own.** RLS is the
+   authorisation, exactly as for `search_everything()` (ADR-aligned with `0266`). A
+   class teacher therefore gets their classes and a head teacher gets the school, and
+   **two people at one school legitimately see different numbers**. Flipping it to
+   `SECURITY DEFINER` would return every school's attendance to every caller with no
+   other symptom, because the rows it reads are the same rows —
+   `attendance_register_test` asserts it is INVOKER for that reason.
+2. **`holiday` is returned as its own count and never folded into absence.** A closed
+   day is not a day of total absence. `/api/school/overview` drops days with no
+   non-holiday rows rather than plotting them; plotted, they draw a cliff to 0% across
+   every half-term that reads as a register nobody marked.
+3. **`excused` is returned separately.** Whether an authorised absence counts against
+   an attendance rate is a school's policy, and in some cases a reporting requirement.
+   The function returns facts; the consumer decides.
+
+**Surfaced at:** `GET /api/school/overview` → `attendance.trend[]` (14 days, gated on
+`attendance:read`), rendered on the school dashboard as a single-series rate line —
+`(present + late) ÷ (present + late + absent + excused)`. A late pupil came to school,
+so counting them absent would make punctuality and attendance the same measure. The
+chart renders only with two or more days behind it; one point is not a trend.
+
+### The register as a PDF — BUILT 2026-10-18
+
+`GET /api/school/attendance/register/export?classId=…&date=YYYY-MM-DD` renders one
+class's register for one day and returns it as an attachment.
+`renderAttendanceRegister()` in `@zsms/documents` draws it: the roll, each pupil's
+status, any note, a summary line, and a signature line — because a register printed
+for the office is evidence and is usually countersigned.
+
+**Synchronous, and nothing is stored.** Report cards are queued because it is four
+hundred at once; this is one document a teacher is waiting for, and queuing it would
+make a download depend on Redis. It writes no `generated_documents` row and puts
+nothing in R2 either: a register is reproducible from the attendance rows at any time,
+so storing the rendering would keep a second copy of a fact the database already holds
+— one that goes stale the moment a mark is corrected.
+
+**An unmarked pupil prints as an em dash and the footer says so.** On screen an
+unmarked pupil is a gap a teacher can still fill; on paper it would become a record of
+absence that outlives the correction, and this is a document that gets filed.
+
+Reachable from **both** surfaces as of 2026-10-19: the web attendance screen beside
+*Print register*, and the phone's register Summary tab. `expo-file-system` and
+`expo-sharing` were added for the latter.
+
+On the phone it **shares rather than saves**. Android and iOS disagree about what
+"download" means and neither has a folder a teacher can reliably find afterwards, so
+the system sheet lets them send the register to WhatsApp, email it to the office, or
+save it to Files. The file lands in the cache directory, because the register is
+reproducible from the server at any time and a copy kept on the device would be a
+second and staler truth — the same reasoning the route uses for storing nothing in R2.
+
+The button appears only once something is marked. A register of em dashes is not a
+document anybody wants filed.
+
+**Still outstanding from the specification above:** grade-by-grade rates, top
+absentees, teacher marking compliance, and the CSV form of any of it.
+
 ---
 
 ## Business Rules
@@ -268,3 +341,6 @@ Both reports are available in PDF and CSV formats from Reports → Attendance.
 | 2026-04-26 | Added timetable integration for class suggestion | Timetable module confirmed |
 | 2026-04-26 | Portal-first model — monthly summaries replace per-absence default | Communication model update |
 | 2026-04-26 | Added holiday bulk marking | Schools need to handle non-school days cleanly |
+| 2026-10-19 | The register PDF is now reachable from the phone as well as the web | `expo-file-system` and `expo-sharing` added. The v57 file API is safer than the one it replaced: `File.downloadFileAsync` rejects on a non-2xx and creates no file, where the old `downloadAsync` would have written an API refusal to disk as a `.pdf` containing the error envelope and opened it as a corrupt document. Shares rather than saves, because neither mobile OS has a folder a teacher can find again. |
+| 2026-10-18 | The register as a PDF — `renderAttendanceRegister()` and `GET /api/school/attendance/register/export` | The *Attendance Reports* section has specified a downloadable register since the initial draft and nothing rendered one. Scoped to ONE DAY, which is narrower than the two reports specified: the button it serves sits on a register a teacher has just marked, and that is what goes to the office. Synchronous and stored nowhere — a register is reproducible from the rows, so a saved rendering is a second copy that goes stale on the first correction. An unmarked pupil prints as an em dash, with the footer stating it is not a record of absence. Reachable from the web screen; the phone needs `expo-file-system` and `expo-sharing`, deliberately not added mid-session. |
+| 2026-10-18 | `school_attendance_trend()` (`0274`) and the dashboard trend chart | The day-by-day rate this document has specified since the initial draft had no data function behind it. SECURITY INVOKER so RLS scopes it per role; `holiday` kept as its own count because a closed day is not a day of total absence. Grade-by-grade rates, top absentees, marking compliance and the PDF/CSV export remain unbuilt. |

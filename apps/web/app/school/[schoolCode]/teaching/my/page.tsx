@@ -33,6 +33,7 @@ import { CalendarCheck, ClipboardList, GraduationCap } from 'lucide-react'
 
 import { useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
+import { SectionLink } from '../../../../../components/ui/section-link'
 import { Badge } from '../../../../../components/ui/badge'
 import { Button } from '../../../../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../../components/ui/card'
@@ -78,6 +79,37 @@ export default function MyTeachingPage({
         description="Your classes, today's registers, and marks still to publish."
         note="A register that has not been marked shows below as unmarked — there is no record for it at all, which is different from every pupil being present. Marks you have entered stay editable until the head publishes them."
       />
+
+      {/*
+        What is outstanding today, above everything else.
+
+        Built from data this screen already had — `registerMarkedToday` per class and
+        `unpublishedSheets` — so it needed no endpoint. It was simply never stated as a
+        summary: a teacher had to count the unmarked classes themselves by reading the
+        list below.
+
+        Absent entirely when nothing is outstanding. A strip reading "0 registers to
+        mark" is a line of furniture on the days it is right, and this is a screen
+        opened between lessons.
+      */}
+      {data && (unmarked.length > 0 || data.unpublishedSheets.length > 0) && (
+        <div className="mb-cards flex flex-wrap gap-3">
+          {unmarked.length > 0 && (
+            <SectionLink href={`${base}/attendance`} variant="outline">
+              {unmarked.length === 1
+                ? '1 register still to mark'
+                : `${unmarked.length} registers still to mark`}
+            </SectionLink>
+          )}
+          {data.unpublishedSheets.length > 0 && (
+            <SectionLink href={`${base}/results`} variant="outline">
+              {data.unpublishedSheets.length === 1
+                ? '1 mark sheet not published'
+                : `${data.unpublishedSheets.length} mark sheets not published`}
+            </SectionLink>
+          )}
+        </div>
+      )}
 
       {(data?.assignments.length ?? 0) === 0 ? (
         <Card>

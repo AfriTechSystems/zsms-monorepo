@@ -43,7 +43,7 @@
 
 import type { JSX } from 'react'
 import { useState } from 'react'
-import { Building2, Loader2, ShieldCheck } from 'lucide-react'
+import { Building2, LoaderCircle, ShieldCheck } from 'lucide-react'
 
 import { useOrganizationList } from '@zsms/auth-provider/react'
 
@@ -112,7 +112,7 @@ export function OrganisationPicker(): JSX.Element | null {
                   </span>
                 </span>
                 {busy === org.id && (
-                  <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="size-4 shrink-0 animate-spin" />
                 )}
               </button>
             </li>

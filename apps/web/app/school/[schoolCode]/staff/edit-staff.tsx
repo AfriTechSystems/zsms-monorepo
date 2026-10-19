@@ -28,13 +28,15 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Loader2, Save, X } from 'lucide-react'
+import { LoaderCircle, Save, X } from 'lucide-react'
 
 import { Button } from '../../../../components/ui/button'
 import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
 import { FormGrid } from '../../../../components/ui/form'
+import { Dialog } from '../../../../components/ui/dialog'
 import { apiSend } from '../../../../lib/use-api'
 import { useToast } from '../../../../components/ui/toast'
+import { DateField } from '../../../../components/ui/date-field'
 
 export interface StaffRecord {
   id: string
@@ -111,14 +113,21 @@ export function EditStaff({
   )
 
   return (
-    <form
-      onSubmit={save}
-      className="flex flex-col gap-cards rounded-lg border border-border bg-surface p-card"
+    /*
+      A modal, not a panel above the table.
+
+      Nine fields rendered inline pushed the row being edited off screen, so the
+      person filling the form could no longer see who they were editing — and on a
+      phone the table scrolled away entirely. `Dialog` uses `showModal()`, so the rest
+      of the page is inert and focus cannot wander back into a table behind the form.
+    */
+    <Dialog
+      open
+      title={`${staff.first_name} ${staff.last_name}`}
+      onClose={onCancel}
     >
+      <form id="edit-staff" onSubmit={save} className="flex flex-col gap-cards">
       <div>
-        <h3 className="font-semibold">
-          {staff.first_name} {staff.last_name}
-        </h3>
         {/* The Clerk identity. Shown for recognition, not editable — changing it here
             would desynchronise the record from the account they sign in with. */}
         <p className="text-sm text-muted-foreground">
@@ -195,20 +204,15 @@ export function EditStaff({
           )}
         </Field>
 
-        <Field
+        <DateField
+
           id="st-joined"
           label="Joined"
           hint="Set automatically when they accept an invitation; correct it here if they started earlier."
-        >
-          {(props) => (
-            <Input
-              {...props}
-              type="date"
-              value={form.joinDate}
-              onChange={(e) => set('joinDate', e.target.value)}
-            />
-          )}
-        </Field>
+          value={form.joinDate}
+          onChange={(v) => set('joinDate', v)}
+          notFuture
+        />
 
         <Field id="st-location" label="Location" hint="Town or province.">
           {(props) => (
@@ -239,7 +243,7 @@ export function EditStaff({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={busy}>
-          {busy ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Save aria-hidden="true" />}
+          {busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Save aria-hidden="true" />}
           Save record
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel}>
@@ -250,6 +254,7 @@ export function EditStaff({
           Changing what they can <em>do</em> is the access control on their row.
         </p>
       </div>
-    </form>
+      </form>
+    </Dialog>
   )
 }

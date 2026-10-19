@@ -30,18 +30,24 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useEffect, useState } from 'react'
-import { Loader2, Mail, Phone, Plus, Save, UserMinus, Users } from 'lucide-react'
+import { LoaderCircle, Mail, Phone, Plus, Save, UserMinus, Users } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
+import { can } from '../../../../../lib/roles'
+import type { Role } from '@zsms/auth-provider'
 import { Alert } from '../../../../../components/ui/alert'
 import { Badge } from '../../../../../components/ui/badge'
 import { Button } from '../../../../../components/ui/button'
 import { Card, CardContent } from '../../../../../components/ui/card'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../../components/ui/data-states'
+import { Avatar } from '../../../../../components/ui/avatar'
+import { RailPanel, WithRail } from '../../../../../components/ui/context-rail'
+import { SectionLink } from '../../../../../components/ui/section-link'
 import { CustomFieldsPanel } from './custom-fields-panel'
 import { useToast } from '../../../../../components/ui/toast'
 import { Field, Input, Select } from '../../../../../components/ui/field'
 import { CheckboxField, FormActions, FormGrid, FormSection } from '../../../../../components/ui/form'
+import { DateField } from '../../../../../components/ui/date-field'
 import {
   STATUSES_ON_ROLL,
   STUDENT_STATUSES,
@@ -70,6 +76,8 @@ interface Student {
   id: string
   student_id: string
   school_id: string
+  /** Set by the school, never by a parent — see `0265`. */
+  photo_url?: string | null
   first_name: string
   last_name: string
   grade_id: string
@@ -88,6 +96,8 @@ interface Student {
 }
 
 interface Structure {
+  /** The caller's role at this school, as the students list already reads it. */
+  role?: string
   gradeLevels: Array<{ level_id: string; display_name: string }>
   classesByGrade: Record<string, string[]>
 }
@@ -105,6 +115,35 @@ export default function StudentDetailPage({
   const { toast } = useToast()
   const { data, loading, error, code, reload } = useApi<Student>(`/api/students/${id}`)
   const { data: structure } = useApi<Structure>('/api/school/structure')
+
+  /*
+    Who may change a pupil's picture.
+
+    `set_student_photo()` (`0265`) admits the owner, principal and administrator and
+    refuses a teacher and a parent — because this photo identifies the child at a gate
+    and on a register, so it is the school's record rather than the family's choice.
+
+    Gated here as well so the camera affordance simply does not appear for a teacher.
+    The function is the enforcement; this is the courtesy. Offering a control that is
+    going to be refused is worse than offering none.
+  */
+  const maySetPhoto = can(structure?.role as Role | undefined, 'students:write')
+
+  const setPhoto = useCallback(
+    async (url: string): Promise<void> => {
+      const result = await apiSend<{ message?: string }>(
+        `/api/students/${id}/photo`,
+        'PUT',
+        { photoUrl: url },
+      )
+      if (result.error) {
+        toast(result.error, 'danger')
+        return
+      }
+      reload()
+    },
+    [id, reload, toast],
+  )
 
   const [form, setForm] = useState<Partial<Student>>({})
   /**
@@ -321,6 +360,18 @@ export default function StudentDetailPage({
             backLabel="All pupils"
             title={`${data.first_name} ${data.last_name}`}
             description={data.student_id}
+            /*
+              The picture beside the name, as every reference record does. Editable only
+              for the roles the database would actually accept.
+            */
+            leading={
+              <Avatar
+                name={`${data.first_name} ${data.last_name}`}
+                src={data.photo_url}
+                size="xl"
+                onChange={maySetPhoto ? setPhoto : undefined}
+              />
+            }
             note="Changes here take effect immediately for every teacher and parent who can see this pupil. Moving a pupil off the roll frees a place against the school's limit; it never deletes anything."
             actions={
               <div className="flex flex-wrap items-center gap-2">
@@ -330,6 +381,81 @@ export default function StudentDetailPage({
             }
           />
 
+          <WithRail
+            rail={
+              <>
+                {/*
+                  The identity facts, read-only and always visible.
+
+                  They are editable in the form below, but a reader scrolling through
+                  the edit fields loses sight of who they are editing — which on a
+                  screen that can withdraw a pupil is the detail worth keeping on
+                  screen.
+                */}
+                <RailPanel title="Key information">
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Pupil number</dt>
+                      <dd data-numeric className="font-medium">{data.student_id}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Year group</dt>
+                      <dd className="font-medium">{data.grade_id}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Class</dt>
+                      <dd className="font-medium">{data.class_id}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Enrolled</dt>
+                      <dd data-numeric className="font-medium">
+                        {formatDate(data.enrolment_date)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Type</dt>
+                      <dd className="font-medium">
+                        {data.is_boarding ? 'Boarder' : 'Day scholar'}
+                      </dd>
+                    </div>
+                    {/*
+                      Absent rather than "Not recorded" guessed at: date of birth and
+                      gender are optional at enrolment, and an em dash says the school
+                      has not supplied it rather than implying a default.
+                    */}
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Date of birth</dt>
+                      <dd data-numeric className="font-medium">
+                        {data.date_of_birth ? formatDate(data.date_of_birth) : '\u2014'}
+                      </dd>
+                    </div>
+                  </dl>
+                </RailPanel>
+
+                {/*
+                  Only destinations that actually exist per pupil.
+
+                  The reference image offers Academic Record, Behaviour, Documents and
+                  Notes alongside Fees; none of those is a route in this application,
+                  and a link to a page that does not exist is worse than no link.
+                  Raised as a suggestion rather than invented here.
+                */}
+                <RailPanel title="Go to">
+                  <div className="flex flex-col items-start gap-1">
+                    <SectionLink href={`${base}/fees/${data.id}`} variant="ghost">
+                      Fees &amp; payments
+                    </SectionLink>
+                    <SectionLink href={`${base}/attendance`} variant="ghost">
+                      Class attendance
+                    </SectionLink>
+                    <SectionLink href={`${base}/results`} variant="ghost">
+                      Class results
+                    </SectionLink>
+                  </div>
+                </RailPanel>
+              </>
+            }
+          >
           <div className="space-y-cards">
             <Card>
               <CardContent className="pt-card">
@@ -590,7 +716,7 @@ export default function StudentDetailPage({
 
                     <div className="flex flex-wrap items-center gap-2">
                       <Button type="submit" disabled={gBusy}>
-                        {gBusy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                        {gBusy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                         Link guardian
                       </Button>
                       <Button type="button" variant="ghost" onClick={() => setGOpen(false)}>
@@ -675,16 +801,14 @@ export default function StudentDetailPage({
                     )}
                   </Field>
 
-                  <Field id="dob" label="Date of birth" hint="Optional">
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="date"
-                        value={form.date_of_birth ?? ''}
-                        onChange={(e) => set('date_of_birth', e.target.value)}
-                      />
-                    )}
-                  </Field>
+                  <DateField
+                    id="dob"
+                    label="Date of birth"
+                    hint="Optional"
+                    value={form.date_of_birth ?? ''}
+                    onChange={(v) => set('date_of_birth', v)}
+                    notFuture
+                  />
 
                   <Field id="gender" label="Gender" hint="Optional">
                     {(props) => (
@@ -731,16 +855,14 @@ export default function StudentDetailPage({
                     )}
                   </Field>
 
-                  <Field id="enrolment-date" label="Enrolment date">
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="date"
-                        value={form.enrolment_date ?? ''}
-                        onChange={(e) => set('enrolment_date', e.target.value)}
-                      />
-                    )}
-                  </Field>
+                  {/* No `notFuture`, matching the enrolment form: a school may
+                      record a pupil starting next term. */}
+                  <DateField
+                    id="enrolment-date"
+                    label="Enrolment date"
+                    value={form.enrolment_date ?? ''}
+                    onChange={(v) => set('enrolment_date', v)}
+                  />
 
                   {/* Optional by design — Grades 1–5 and 7–11 never sit a national exam, so
                       most pupils will never have one and the hint says so rather than
@@ -776,7 +898,7 @@ export default function StudentDetailPage({
                 <FormActions>
                   <Button type="submit" disabled={saving || !dirty}>
                     {saving ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : form.status && data.status !== form.status && !onRoll(form.status) ? (
                       <UserMinus aria-hidden="true" />
                     ) : (
@@ -887,7 +1009,7 @@ export default function StudentDetailPage({
 
                       <div className="flex flex-wrap items-center gap-2">
                         <Button type="submit" disabled={leaving || leaveReason.trim().length < 4}>
-                          {leaving && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                          {leaving && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                           Record it
                         </Button>
                         <Button type="button" variant="ghost" onClick={() => setLeaveOpen(false)}>
@@ -910,6 +1032,7 @@ export default function StudentDetailPage({
               released. There is no way to delete a pupil, for anyone, including the school owner.
             </Alert>
           </div>
+          </WithRail>
         </>
       )}
     </>

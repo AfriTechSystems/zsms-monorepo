@@ -8,7 +8,31 @@
  * Everything on this page reads from `@zsms/design-tokens`. Nothing is
  * hardcoded, so the page is also the proof that the token pipeline works
  * end-to-end: change a token, reload, see it here.
+ *
+ * ## Not public, as of 2026-10-18
+ *
+ * This said "not shipped to users" for two months while being **publicly
+ * routable**: `middleware.ts` authenticates a request but does not authorise one
+ * — route protection is each page's own job, and this page had none. It was
+ * confirmed by loading it with no session at all.
+ *
+ * Nothing here is a tenant's data; it is swatches, type and a synthetic school
+ * theme, so this was never a disclosure. It is internal design tooling on a
+ * commercial domain, which is a different problem and still one worth not
+ * having.
+ *
+ * So: available in development to anybody, and in production only to a signed-in
+ * AfriTech admin. **404, not 403** — consistent with the school portal, where a
+ * segment/session mismatch is a 404 so the existence of a route is not itself a
+ * disclosure. The team keeps the reference in production; nobody else learns it
+ * is there.
  */
+
+import { notFound } from 'next/navigation'
+
+import { getAuthProvider } from '@zsms/auth-provider'
+
+import { AFRITECH_ORG_SLUG } from '../../lib/admin-context'
 
 import {
   auditTheme,
@@ -21,6 +45,7 @@ import {
 } from '@zsms/design-tokens'
 import {
   BookOpen,
+  Building2,
   CalendarCheck,
   Clock,
   Download,
@@ -40,6 +65,7 @@ import { EmptyState } from '../../components/ui/empty-state'
 import { Field, Input, Select } from '../../components/ui/field'
 import { Skeleton, LoadingRegion } from '../../components/ui/skeleton'
 import { StatCard, type StatTone } from '../../components/ui/stat-card'
+import { BarChart, ChartFrame, DonutChart, TrendChart } from '../../components/ui/chart'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { BrandSplash } from '../../components/brand/brand-splash'
 import { SchoolLogo } from '../../components/brand/school-logo'
@@ -160,7 +186,121 @@ function TintRow({ tone }: { tone: 'light' | 'dark' }): JSX.Element {
   )
 }
 
-export default function DesignFoundationPage(): JSX.Element {
+
+/**
+ * The dashboard pieces added for the 2026-10 redesign.
+ *
+ * Here rather than only on a real dashboard because this is where a reviewer can see
+ * every variant at once, in both themes, against the contrast audit above.
+ */
+function DashboardPieces(): JSX.Element {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct']
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Total schools"
+          value="248"
+          tone="primary"
+          icon={<Building2 />}
+          trend={12}
+          trendLabel="vs last month"
+        />
+        <StatCard
+          label="Open incidents"
+          value="5"
+          tone="danger"
+          icon={<TriangleAlert />}
+          trend={50}
+          trendLabel="vs last month"
+          /* Up is BAD here — the arrow follows the sign, the colour follows the meaning. */
+          trendUp="bad"
+        />
+        <StatCard
+          label="Trial conversion"
+          value="—"
+          tone="neutral"
+          icon={<Clock />}
+          /* null, not 0: no trial has finished, which is not the same as none converting. */
+          trend={null}
+        />
+        <StatCard
+          label="Storage used"
+          value="2.4 GB"
+          hint="of 50 GB"
+          tone="info"
+          icon={<Receipt />}
+          progress={5}
+        />
+      </div>
+
+      <div className="grid gap-cards lg:grid-cols-2">
+        <ChartFrame title="School growth" description="Total and active schools over time">
+          <TrendChart
+            labels={months}
+            series={[
+              { label: 'Total schools', points: [112, 140, 151, 128, 136, 141, 150, 155, 172, 180] },
+              { label: 'Active schools', points: [82, 101, 112, 120, 128, 134, 140, 151, 166, 174] },
+            ]}
+          />
+        </ChartFrame>
+
+        <ChartFrame title="Schools by health score" description="Overall platform distribution">
+          <DonutChart
+            centreValue="248"
+            centreLabel="Schools"
+            slices={[
+              { label: 'Excellent (80–100)', value: 142 },
+              { label: 'Good (60–79)', value: 68 },
+              { label: 'Fair (40–59)', value: 26 },
+              { label: 'Poor (0–39)', value: 12 },
+            ]}
+          />
+        </ChartFrame>
+      </div>
+
+      <ChartFrame title="Average by subject" description="Current academic year">
+        <BarChart
+          suffix="%"
+          data={[
+            { label: 'English', value: 82 },
+            { label: 'Mathematics', value: 76 },
+            { label: 'Science', value: 71 },
+            { label: 'Social Studies', value: 85 },
+            { label: 'ICT', value: 79 },
+            { label: 'French', value: 68 },
+          ]}
+        />
+      </ChartFrame>
+
+      <div className="grid gap-cards lg:grid-cols-2">
+        <ChartFrame title="Empty trend" description="What a chart shows with no data">
+          <TrendChart labels={[]} series={[]} />
+        </ChartFrame>
+        <ChartFrame title="Empty breakdown" description="Never an empty axis">
+          <DonutChart slices={[]} />
+        </ChartFrame>
+      </div>
+    </div>
+  )
+}
+
+export default async function DesignFoundationPage(): Promise<JSX.Element> {
+  /*
+    Development is open: this is the reference a session reloads constantly while
+    changing a token, and requiring a session for that would mean signing in to see
+    whether a colour moved.
+
+    Production is AfriTech only, and the refusal is `notFound()` rather than a
+    redirect or a 403 — a 403 confirms the route exists, which is the one thing a
+    page that is "not shipped to users" should not do.
+  */
+  if (process.env.NODE_ENV === 'production') {
+    const session = await getAuthProvider().getSessionUser()
+    if (session?.organisationSlug !== AFRITECH_ORG_SLUG) notFound()
+  }
+
   const zsms = resolveTheme(null)
   // A plausible school theme — deep maroon and forest green, nothing like the
   // ZSMS defaults, to show the derivation holding up on unfamiliar input.
@@ -595,6 +735,14 @@ export default function DesignFoundationPage(): JSX.Element {
         </Section>
 
         {/* ---------------------------------------------------------------- */}
+        <Section
+          id="dashboard"
+          title="Dashboard pieces"
+          description="The stat card's trend and progress variants, and the three charts a dashboard is built from. The chart palette is NOT the brand palette: brand amber reaches only 1.97:1 against this surface and sits outside the lightness band a series fill may occupy, so chart amber is a darker step — and the series ORDER keeps a cool hue between green and both warms, because green beside a warm fails protanopia separation. Validated in light and dark against all six colour checks."
+        >
+          <DashboardPieces />
+        </Section>
+
         <Section
           id="tints"
           title="Soft tints"

@@ -122,6 +122,9 @@ export async function GET(request: NextRequest): Promise<Response> {
           firstName: c.first_name,
           lastName: c.last_name,
           schoolId: c.school_id,
+          // The school's photograph, so the children list and the switcher show a
+          // face rather than the same person glyph on every row.
+          photoUrl: c.photo_url ?? null,
           // Used to group the picker. Only shown when a family spans schools —
           // a single-school parent does not need to be told which school.
           schoolName: s?.name ?? null,
@@ -132,6 +135,9 @@ export async function GET(request: NextRequest): Promise<Response> {
         studentId: child.student_id,
         firstName: child.first_name,
         lastName: child.last_name,
+        // The school's photograph of the pupil. A parent sees it; only the school
+        // sets it, which is why there is no write path from this portal.
+        photoUrl: child.photo_url ?? null,
         gradeId: child.grade_id,
         classId: child.class_id,
         status: child.status,

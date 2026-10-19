@@ -62,6 +62,43 @@ export interface StatCardProps {
   href?: string
   /** Overrides the default "View <label>" screen-reader label on the link. */
   hrefLabel?: string
+  /**
+   * A period-on-period movement, as a signed percentage.
+   *
+   * Spec: reference images W1 and W2, where every card carries "+12% vs last month".
+   *
+   * `null` is meaningful and is NOT zero: it means no prior period exists to compare
+   * against. A school in its first month has no trend, and rendering 0% would state
+   * that nothing changed — a claim the data does not support.
+   */
+  trend?: number | null
+  /** What the trend is measured against. Required whenever `trend` is a number. */
+  trendLabel?: string
+  /**
+   * Whether a rise is good.
+   *
+   * Defaults to true. Set false for a figure where up is bad — open incidents,
+   * arrears, the onboarding backlog — so the arrow and the colour agree with the
+   * meaning rather than with the sign.
+   */
+  trendUp?: 'good' | 'bad'
+  /**
+   * A 0-100 completion bar under the figure, for a card that reports progress
+   * rather than a quantity (storage used, marks entered, staff seats).
+   */
+  progress?: number
+  /**
+   * A tiny trend line behind the figure (reference W1).
+   *
+   * Needs at least **three** points. Two draw a straight line, which says "steady"
+   * regardless of what happened — a shape that reads as information while carrying
+   * none. Fewer than three and nothing is drawn.
+   *
+   * It is deliberately unlabelled and unreadable in detail: it answers "which way,
+   * roughly" at a glance, and `trend` beside it carries the number. Anybody needing
+   * the values opens the chart the card links to.
+   */
+  spark?: number[]
   className?: string
 }
 
@@ -73,9 +110,26 @@ export function StatCard({
   icon,
   href,
   hrefLabel,
+  trend,
+  trendLabel,
+  spark,
+  trendUp = 'good',
+  progress,
   className,
 }: StatCardProps): JSX.Element {
   const t = TONE[tone]
+
+  /*
+    The arrow follows the SIGN; the colour follows the MEANING.
+
+    A rise in open incidents gets an up arrow and a danger colour, because the number
+    did go up and that is bad. Tying the colour to the sign would paint a growing
+    backlog green.
+  */
+  const hasTrend = typeof trend === 'number'
+  const rising = hasTrend && trend > 0
+  const flat = hasTrend && trend === 0
+  const favourable = flat || (trendUp === 'good' ? rising : !rising)
 
   const body = (
     // `p-card` rather than a fixed `p-4`: the token already tightens below
@@ -96,13 +150,100 @@ export function StatCard({
         )}
       </div>
 
-      {/* Tabular figures so a row of stat cards aligns rather than jitters.
-          `text-2xl` on a phone and `text-3xl` from `sm` up: at two cards per row
-          on a 390px screen a 3xl figure is what pushes a long one — "K 588,000"
-          — onto a second line and makes the card grow. */}
-      <p data-numeric className={cn('mt-1.5 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-3xl', t.label)}>
+      {/*
+        Tabular figures so a row of stat cards aligns rather than jitters, and the
+        size STEPS DOWN as the figure gets longer.
+
+        A fixed `text-3xl` was wrapping "K 1,284,350.00" onto a second line and
+        clipping it — observed on the school dashboard's Outstanding fees card. The
+        amounts only grow: a secondary school deals in millions, and a platform-wide
+        total for AfriTech reaches billions. A card whose layout depends on the number
+        being small is a card that breaks exactly when the school is doing well.
+
+        So the figure is measured and sized to fit rather than assumed to be short.
+        The steps are deliberately coarse — three buckets, not a continuous scale —
+        because a row of cards whose figures are all slightly different sizes reads as
+        sloppy, while a row where one long figure is visibly a step smaller reads as
+        considered.
+      */}
+      <p
+        data-numeric
+        className={cn(
+          'mt-1.5 font-semibold tracking-tight sm:mt-2',
+          // Breakpoints chosen against the real worst cases: "K 1,284,350.00" is 14,
+          // "248" is 3. Below 9 keeps the generous size the design wants.
+          value.length <= 8
+            ? 'text-2xl sm:text-3xl'
+            : value.length <= 12
+              ? 'text-xl sm:text-2xl'
+              : 'text-lg sm:text-xl',
+          // The last line of defence. If a figure still overruns — an unexpected
+          // currency, a longer locale separator — it shrinks rather than clipping,
+          // and `break-words` lets it wrap as a last resort instead of overflowing
+          // the card and pushing the row sideways.
+          'break-words [overflow-wrap:anywhere]',
+          t.label,
+        )}
+        title={value}
+      >
         {value}
       </p>
+
+      {/*
+        The trend line. Arrow + sign + what it is measured against — three pieces,
+        because "+12%" alone does not say since when.
+      */}
+      {hasTrend && (
+        <p className={cn('mt-1 flex flex-wrap items-center gap-1 text-xs sm:text-sm', t.label)}>
+          <span
+            aria-hidden
+            className={cn(
+              'inline-flex items-center font-medium',
+              favourable ? 'text-success-text' : 'text-danger-text',
+            )}
+          >
+            {flat ? '\u2192' : rising ? '\u2197' : '\u2198'}
+          </span>
+          <span
+            data-numeric
+            className={cn('font-medium', favourable ? 'text-success-text' : 'text-danger-text')}
+          >
+            {trend > 0 ? '+' : ''}
+            {trend}%
+          </span>
+          {trendLabel && <span className="opacity-80">{trendLabel}</span>}
+        </p>
+      )}
+
+      {/*
+        Explicitly absent rather than silently missing. "No comparison yet" is a fact
+        a reader can act on; a blank space reads as an oversight.
+      */}
+      {trend === null && (
+        <p className={cn('mt-1 text-xs opacity-70 sm:text-sm', t.label)}>
+          No earlier period to compare
+        </p>
+      )}
+
+      {/*
+        The sparkline. Under the figure and the trend, not behind them: behind would
+        put a coloured line through the one number the card exists to show, and a
+        figure is harder to read over a shape than over nothing.
+      */}
+      {Array.isArray(spark) && spark.length >= 3 && (
+        <Sparkline points={spark} className={t.mark} />
+      )}
+
+      {typeof progress === 'number' && (
+        <div className="mt-2">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-current/15">
+            <div
+              className="h-full rounded-full bg-current transition-[width]"
+              style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {hint && <p className={cn('mt-1 text-xs leading-snug opacity-80 sm:text-sm', t.label)}>{hint}</p>}
 
@@ -131,5 +272,55 @@ export function StatCard({
     >
       {body}
     </Link>
+  )
+}
+
+/**
+ * A sparkline: the shape of a series, with no axes, labels or values.
+ *
+ * Normalised to its own minimum and maximum, so a flat-ish series still shows its
+ * shape rather than a dead horizontal line — the card is answering "which way", and
+ * a series that moved from 400 to 404 did move. The trade is that two sparklines are
+ * NOT comparable to each other, which is why neither carries a number.
+ */
+function Sparkline({ points, className }: { points: number[]; className?: string }): JSX.Element {
+  const width = 100
+  const height = 24
+
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  // A perfectly flat series has no range to divide by; draw it down the middle
+  // rather than dividing by zero.
+  const span = max - min || 1
+
+  const d = points
+    .map((p, i) => {
+      const x = (i / (points.length - 1)) * width
+      const y = height - ((p - min) / span) * height
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      role="presentation"
+      aria-hidden="true"
+      className={cn('mt-2 h-6 w-full', className)}
+    >
+      <path
+        d={d}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        /* Scaling a stroke with the viewBox would make it thick on a wide card and
+           hairline on a narrow one. */
+        vectorEffect="non-scaling-stroke"
+        opacity={0.85}
+      />
+    </svg>
   )
 }

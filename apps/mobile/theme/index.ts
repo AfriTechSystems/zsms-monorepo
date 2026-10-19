@@ -56,6 +56,25 @@ export interface Palette {
   danger: string
   dangerTint: string
   dangerText: string
+
+  /*
+    Added 2026-10-18, closing a gap the design audit flagged: the token package has
+    carried `accent` (teal) and `anchor` (the near-charcoal ink) since the foundation,
+    and this palette exposed neither — so mobile had four tints where the web has six.
+
+    The reference designs in `19 Design System` lean on exactly that breadth: the
+    teacher's action grid draws nine tiles, each in its own pastel, and with four roles
+    they either repeat or all collapse to blue. These are the two that were missing, and
+    no sixth hue is invented here — a colour outside the token package is a colour no
+    school can theme and no contrast check has ever measured.
+  */
+  accent: string
+  accentTint: string
+  accentText: string
+
+  anchor: string
+  anchorTint: string
+  anchorText: string
 }
 
 /**
@@ -103,6 +122,14 @@ function paletteFor(scheme: Scheme): Palette {
     danger: t.colors.danger.mark,
     dangerTint: t.colors.danger[100],
     dangerText: t.colors.danger[700],
+
+    accent: t.colors.accent.mark,
+    accentTint: t.colors.accent[100],
+    accentText: t.colors.accent[700],
+
+    anchor: t.colors.anchor.mark,
+    anchorTint: t.colors.anchor[100],
+    anchorText: t.colors.anchor[700],
   }
 }
 

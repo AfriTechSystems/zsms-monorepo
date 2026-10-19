@@ -28,6 +28,8 @@ export interface Child {
   lastName: string
   schoolId: string
   schoolName: string | null
+  /** Set by the SCHOOL. A parent sees it and cannot change it (`0265`). */
+  photoUrl?: string | null
 }
 
 interface ChildContext {

@@ -27,6 +27,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import { CalendarRange, Lock, Plus } from 'lucide-react'
 
 import { Alert } from '../../../../components/ui/alert'
@@ -34,10 +35,13 @@ import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
+import { SettingsHub } from './settings-hub'
+import { SchoolLogo } from '../../../../components/ui/school-logo'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { SettingsHistory } from '../../../../components/ui/settings-history'
 import { useToast } from '../../../../components/ui/toast'
+import { DateRangeField } from '../../../../components/ui/date-field'
 
 interface Profile {
   id: string
@@ -95,6 +99,15 @@ const shortDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function SchoolSettingsPage(): JSX.Element {
+  /*
+    The school's own path prefix, for the hub's tile links.
+
+    Read from the route rather than threaded through props: this screen is always
+    at `/school/<code>/settings`, and `useParams` is how every sibling resolves it.
+  */
+  const routeParams = useParams<{ schoolCode: string }>()
+  const base = `/school/${routeParams.schoolCode}`
+
   const { toast } = useToast()
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -193,6 +206,17 @@ export default function SchoolSettingsPage(): JSX.Element {
         description="Your school's details, academic structure and term calendar."
         note="Your subscription tier and school identifier are shown but cannot be changed here — AfriTech sets the first, and the second appears inside every pupil number and receipt ever issued."
       />
+
+      {/*
+        Every settings area as a tile (reference W4).
+
+        The image uses tiles as TABS across one page; ZSMS has fourteen settings areas
+        that are already separate routes with their own permissions and deep links, so
+        collapsing them into tabs would lose all three. As a hub the tiles solve the
+        problem the image is actually solving — finding a setting without reading a
+        sidebar of fourteen similar-sounding entries.
+      */}
+      <SettingsHub base={base} role={data.role} />
 
       {/* Three sections on one screen. Switched rather than scrolled past: term dates
           sat below two long forms, and nothing told anybody the screen had them. */}
@@ -318,15 +342,25 @@ export default function SchoolSettingsPage(): JSX.Element {
                   )}
                 </Field>
 
-                <Field id="logo" label="Logo URL" hint="Appears on PDFs and in the portal header.">
-                  {(props) => (
-                    <Input
-                      {...props}
-                      value={profile.logo_url ?? ''}
-                      onChange={(e) => setProfile({ ...profile, logo_url: e.target.value })}
-                    />
-                  )}
-                </Field>
+                {/*
+                  An upload with a preview, not a URL field.
+
+                  "Logo URL" asked a head teacher to host an image somewhere and paste
+                  an address — which is why no school had a logo. There was also no
+                  preview anywhere in the product, so an empty logo was indistinguishable
+                  from one that had been set and failed to load.
+
+                  Spans the grid because a control with a picture and two lines of
+                  explanation does not belong in a column sized for a text input.
+                */}
+                <div className="sm:col-span-2">
+                  <SchoolLogo
+                    name={profile.name ?? "This school"}
+                    src={profile.logo_url}
+                    size="lg"
+                    onChange={(url) => setProfile({ ...profile, logo_url: url })}
+                  />
+                </div>
               </div>
 
               {/*
@@ -569,26 +603,18 @@ export default function SchoolSettingsPage(): JSX.Element {
                         />
                       )}
                     </Field>
-                    <Field id="so" label="Starts" required>
-                      {(props) => (
-                        <Input
-                          {...props}
-                          type="date"
-                          value={term.startsOn}
-                          onChange={(e) => setTerm({ ...term, startsOn: e.target.value })}
-                        />
-                      )}
-                    </Field>
-                    <Field id="eo" label="Ends" required>
-                      {(props) => (
-                        <Input
-                          {...props}
-                          type="date"
-                          value={term.endsOn}
-                          onChange={(e) => setTerm({ ...term, endsOn: e.target.value })}
-                        />
-                      )}
-                    </Field>
+                    {/* No `notFuture` here: a term is scheduled before it runs,
+                        so both ends are legitimately in the future. The linked
+                        bounds still stop a term that ends before it starts. */}
+                    <DateRangeField
+                      idPrefix="term"
+                      fromLabel="Starts"
+                      toLabel="Ends"
+                      from={term.startsOn}
+                      to={term.endsOn}
+                      onFromChange={(v) => setTerm({ ...term, startsOn: v })}
+                      onToChange={(v) => setTerm({ ...term, endsOn: v })}
+                    />
                   </div>
                   <div className="flex gap-2">
                     <Button

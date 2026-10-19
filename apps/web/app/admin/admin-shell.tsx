@@ -29,19 +29,20 @@ import {
   HeartPulse,
   Network,
   PhoneCall,
-  Receipt,
   ScrollText,
   ShieldAlert,
-  ShieldCheck,
   Siren,
   SlidersHorizontal,
   Sparkles,
   ToggleRight,
-  Wallet,
 } from 'lucide-react'
 
 import { AppShell } from '../../components/layout/app-shell'
 import type { NavGroup } from '../../components/layout/nav-config'
+
+// Navigation destinations take their glyph from the canonical registry, so the
+// sidebar and the phone's tab bar cannot drift apart on what Attendance looks like.
+import { ICONS } from '../../components/ui/icon'
 
 export function AdminShell({
   children,
@@ -138,13 +139,13 @@ export function AdminShell({
           only the scope form at the bottom is a super admin's to use — which the page
           itself hides for everybody else.
         */
-        { path: '/team', label: 'Team & roles', icon: ShieldCheck },
+        { path: '/team', label: 'Team & roles', icon: ICONS.admin },
       ],
     },
     {
       label: 'Revenue',
       items: [
-        { path: '/billing', label: 'Invoices & billing', icon: Receipt },
+        { path: '/billing', label: 'Invoices & billing', icon: ICONS.receipt },
         /*
           Unit economics (COST_MANAGEMENT.md).
 
@@ -154,7 +155,7 @@ export function AdminShell({
           refused.
         */
         { path: '/costs', label: 'Unit economics', icon: Coins },
-        { path: '/pricing', label: 'Plans & pricing', icon: Wallet },
+        { path: '/pricing', label: 'Plans & pricing', icon: ICONS.fees },
         /*
           The loan queue and its partners, under Revenue because that is what they are
           to AfriTech: origination commission, not a school feature.

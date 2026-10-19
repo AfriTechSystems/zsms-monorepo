@@ -31,10 +31,10 @@ import type { JSX } from 'react'
 import { SectionTabs, useSectionTabs } from '../../../../../components/ui/section-tabs'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  AlertTriangle,
+  TriangleAlert,
   Check,
   Coins,
-  Loader2,
+  LoaderCircle,
   Users,
 } from 'lucide-react'
 
@@ -262,7 +262,7 @@ function CreditsScreen(): JSX.Element {
       ) : (
         <Card>
           <CardContent className="flex items-start gap-3 pt-card">
-            <AlertTriangle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-warning" />
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-warning" />
             <div>
               <p className="font-medium">No credits in force</p>
               <p className="text-sm text-muted-foreground">
@@ -347,7 +347,7 @@ function CreditsScreen(): JSX.Element {
                   post({ action: 'buy', planCode, seats }, 'Credits bought. An invoice has been raised.')
                 }
               >
-                {busy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                {busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                 Buy {quote ? money(quote.out_total_amount, quote.out_currency_code) : ''}
               </Button>
               <p className="text-sm text-muted-foreground">

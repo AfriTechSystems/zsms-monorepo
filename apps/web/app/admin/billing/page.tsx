@@ -31,7 +31,7 @@
 import type { JSX } from 'react'
 import { SectionTabs, useSectionTabs } from '../../../components/ui/section-tabs'
 import { useCallback, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, Play, Receipt, Send, Wallet, X } from 'lucide-react'
+import { TriangleAlert, LoaderCircle, Play, Receipt, Send, Wallet, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
@@ -44,6 +44,7 @@ import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/da
 import { Field, Input, PrefixedInput, Select } from '../../../components/ui/field'
 import { FormActions, FormGrid, FormSection } from '../../../components/ui/form'
 import { useToast } from '../../../components/ui/toast'
+import { DateRangeField } from '../../../components/ui/date-field'
 
 interface Invoice {
   id: string
@@ -271,26 +272,18 @@ export default function AdminBillingPage(): JSX.Element {
             description="Creates one draft invoice per active school for the period. Safe to repeat — schools already invoiced are skipped."
           >
             <FormGrid columns={3}>
-              <Field id="b-start" label="Period from" required>
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="date"
-                    value={periodStart}
-                    onChange={(e) => setPeriodStart(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field id="b-end" label="Period to" required>
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="date"
-                    value={periodEnd}
-                    onChange={(e) => setPeriodEnd(e.target.value)}
-                  />
-                )}
-              </Field>
+              {/* Linked bounds: the browser will not offer a period that ends
+                  before it starts, which used to produce an empty run that read
+                  as "no schools to invoice". */}
+              <DateRangeField
+                idPrefix="b-period"
+                fromLabel="Period from"
+                toLabel="Period to"
+                from={periodStart}
+                to={periodEnd}
+                onFromChange={setPeriodStart}
+                onToChange={setPeriodEnd}
+              />
               <Field id="b-tax" label="VAT %" hint="Stored on each invoice, so a later change never rewrites it.">
                 {(props) => (
                   <Input
@@ -309,7 +302,7 @@ export default function AdminBillingPage(): JSX.Element {
             <FormActions>
               <Button disabled={busy !== null} onClick={() => void runBilling()}>
                 {busy === 'run' ? (
-                  <Loader2 aria-hidden="true" className="animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" />
                 ) : (
                   <Play aria-hidden="true" />
                 )}
@@ -398,7 +391,7 @@ export default function AdminBillingPage(): JSX.Element {
                 }}
               >
                 {busy === 'pay' ? (
-                  <Loader2 aria-hidden="true" className="animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" />
                 ) : (
                   <Wallet aria-hidden="true" />
                 )}
@@ -468,7 +461,7 @@ export default function AdminBillingPage(): JSX.Element {
                           i.due_at &&
                           new Date(i.due_at) < new Date() && (
                             <span className="ml-1 inline-flex items-center text-xs text-danger-text">
-                              <AlertTriangle aria-hidden="true" className="mr-0.5 size-3" />
+                              <TriangleAlert aria-hidden="true" className="mr-0.5 size-3" />
                               overdue
                             </span>
                           )}

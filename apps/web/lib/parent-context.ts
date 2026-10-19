@@ -89,6 +89,8 @@ export interface ParentChild {
   id: string
   student_id: string
   first_name: string
+  /** Set by the SCHOOL. A parent sees it and cannot change it (`0265`). */
+  photo_url?: string | null
   last_name: string
   grade_id: string
   class_id: string
@@ -107,7 +109,7 @@ export interface ParentChild {
 export async function listParentChildren(client: SupabaseClient): Promise<ParentChild[]> {
   const { data, error } = await client
     .from('students')
-    .select('id, student_id, first_name, last_name, grade_id, class_id, status, school_id')
+    .select('id, student_id, first_name, last_name, grade_id, class_id, status, school_id, photo_url')
     .eq('is_deleted', false)
     .order('first_name', { ascending: true })
 

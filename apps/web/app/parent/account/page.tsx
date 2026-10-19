@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { BellRing, Mail, MessageSquare, Phone } from 'lucide-react'
 
 import { Card } from '../../../components/ui/card'
+import { Avatar } from '../../../components/ui/avatar'
 import {
   DeparturePromptCard,
   type DeparturePrompt,
@@ -30,6 +31,7 @@ import { useToast } from '../../../components/ui/toast'
 interface Prefs {
   linked: boolean
   fullName?: string | null
+  photoUrl?: string | null
   email?: string | null
   phone?: string | null
   preferredContact?: string
@@ -127,6 +129,40 @@ export default function ParentAccountPage(): JSX.Element {
 
       <Card className="p-card">
         <h2 className="font-medium">Your details</h2>
+
+        {/*
+          The parent's own photograph (`0265`).
+
+          Editable, unlike their child's: a school's record of a pupil is the school's,
+          and a parent sees that picture without being able to change it. Their own is
+          theirs. The camera overlay shows whenever there is no picture rather than on
+          hover — a phone has no hover, and this portal is phone-first.
+        */}
+        <div className="mt-stack flex items-center gap-3">
+          <Avatar
+            name={prefs.fullName ?? 'You'}
+            src={prefs.photoUrl ?? null}
+            size="lg"
+            onChange={async (url) => {
+              const response = await fetch('/api/parent/photo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ photoUrl: url }),
+              })
+              if (!response.ok) {
+                const body = await response.json().catch(() => null)
+                toast(body?.error ?? 'That photograph could not be saved.', 'danger')
+                return
+              }
+              setPrefs((pr) => (pr ? { ...pr, photoUrl: url } : pr))
+              toast('Photograph updated.', 'success')
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Only you and your school see this. JPG, PNG or WebP, up to 2MB.
+          </p>
+        </div>
+
         <dl className="mt-stack space-y-2 text-sm">
           <Row label="Name" value={prefs.fullName} />
           <Row label="Email" value={prefs.email} />

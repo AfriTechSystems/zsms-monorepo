@@ -29,7 +29,7 @@
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
 import { useUser } from '@zsms/auth-provider/react'
-import { AlertTriangle, ArrowLeft, Download, ShieldCheck, Trash2, Undo2 } from 'lucide-react'
+import { TriangleAlert, ArrowLeft, Download, ShieldCheck, Trash2, Undo2 } from 'lucide-react'
 import Link from 'next/link'
 
 import { Alert } from '../../components/ui/alert'
@@ -40,6 +40,7 @@ import { Field, Input } from '../../components/ui/field'
 import { useToast } from '../../components/ui/toast'
 import { apiSend, useApi } from '../../lib/use-api'
 import { StaffProfileSection } from '../../components/account/staff-profile'
+import { SectionTabs, useSectionTabs } from '../../components/ui/section-tabs'
 
 interface Erasure {
   pending: boolean
@@ -125,6 +126,18 @@ export default function AccountPage(): JSX.Element {
     }
   }, [toast, reload])
 
+  /*
+    Which section is showing. `useSectionTabs` reads a `?section=` hint and ignores
+    anything not in the list, so the account menu's "Privacy & your data" link opens
+    the right one and a hand-edited URL cannot land on a tab that does not exist.
+  */
+  const [section, setSection] = useSectionTabs<'profile' | 'details' | 'privacy'>(
+    'profile',
+    ['profile', 'details', 'privacy'],
+  )
+
+  // After the hooks, never before: a hook below an early return changes the hook
+  // order between a loading and a loaded render.
   if (loading) return <TableSkeleton rows={6} columns={2} />
   if (error) return <ErrorState message={error} code={code} onRetry={reload} />
 
@@ -151,10 +164,35 @@ export default function AccountPage(): JSX.Element {
         the sections below are rights (export, erasure) exercised rarely. Renders
         nothing at all for an account that is not staff anywhere.
       */}
+      {/*
+        Four sections, switched rather than scrolled past.
+
+        This page was one column roughly 180 lines tall, and "Download your data" sat
+        between a profile form and an erasure request — so the two most consequential
+        controls in the product were separated by a form somebody was mid-way through
+        filling in. Switching also means the erasure section is reached deliberately
+        rather than met by accident while scrolling.
+
+        `privacy` is linked directly from the account menu, which is why the hint is
+        read from the query string.
+      */}
+      <SectionTabs
+        tabs={[
+          { key: 'profile', label: 'Profile' },
+          { key: 'details', label: 'Your details' },
+          { key: 'privacy', label: 'Privacy & your data' },
+        ]}
+        active={section}
+        onChange={setSection}
+      />
+
+      {section === 'profile' && (
       <div className="mb-cards">
         <StaffProfileSection />
       </div>
+      )}
 
+      {section === 'details' && (
       <Card className="mb-cards">
         <CardHeader>
           <CardTitle>Your details</CardTitle>
@@ -178,8 +216,10 @@ export default function AccountPage(): JSX.Element {
           </dl>
         </CardContent>
       </Card>
+      )}
 
-      {/* ---------------- Download ---------------- */}
+      {section === 'privacy' && (
+        <>
       <Card className="mb-cards">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -317,7 +357,7 @@ export default function AccountPage(): JSX.Element {
                       disabled={busy || typed !== 'DELETE'}
                       onClick={() => void requestErasure()}
                     >
-                      <AlertTriangle aria-hidden="true" />
+                      <TriangleAlert aria-hidden="true" />
                       {busy ? 'Recording…' : 'Request deletion'}
                     </Button>
                     <Button variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>
@@ -335,6 +375,8 @@ export default function AccountPage(): JSX.Element {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   )
 }

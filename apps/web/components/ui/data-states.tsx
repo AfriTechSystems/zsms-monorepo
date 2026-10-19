@@ -12,7 +12,12 @@
 
 import type { JSX, ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { ShieldAlert } from 'lucide-react'
+
+// The error and refresh glyphs come from the canonical registry; ShieldAlert stays
+// local because "permission denied" is this component's own concept and appears
+// nowhere else — the registry owns what is reused, not every glyph in the app.
+import { ICONS } from './icon'
 
 import { Alert } from './alert'
 import { Button } from './button'
@@ -45,10 +50,20 @@ export function ErrorState({
     >
       <div className="space-y-3">
         <p className="flex items-start gap-2">
+          {/*
+            `ICONS.error` is a circled X, and it used to be a warning triangle here.
+
+            That was a real inconsistency rather than a style choice: this branch is the
+            `danger` variant, so the Alert's own header already drew a circled X while
+            the body beside it drew an amber-shaped warning glyph for the same message.
+            Reference sheet 01 section F is explicit — a circled X is Error, a triangle
+            is Warning — and the forbidden branch keeps ShieldAlert because "you do not
+            have access" is neither.
+          */}
           {forbidden ? (
             <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           ) : (
-            <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <ICONS.error aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           )}
           <span>{message}</span>
         </p>
@@ -61,7 +76,7 @@ export function ErrorState({
         ) : (
           onRetry && (
             <Button variant="outline" size="sm" onClick={onRetry}>
-              <RefreshCw aria-hidden="true" />
+              <ICONS.refresh aria-hidden="true" />
               Try again
             </Button>
           )
@@ -123,10 +138,19 @@ export function PageHeader({
   backTo,
   backLabel,
   note,
+  leading,
 }: {
   title: string
   description?: string
   actions?: ReactNode
+  /**
+   * Something that sits to the LEFT of the heading — a pupil's photo, a school crest.
+   *
+   * A slot rather than a `photoUrl` prop: the header should not know what an avatar
+   * is, who may change one, or how an upload works. The caller already knows all
+   * three.
+   */
+  leading?: ReactNode
   /** Where "back" goes. Always a real destination, never `history.back()`. */
   backTo?: string
   /** What that destination is called. Required whenever `backTo` is given. */
@@ -144,7 +168,7 @@ export function PageHeader({
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
         >
-          <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
+          <ICONS.back aria-hidden="true" className="size-4 shrink-0" />
           {backLabel ?? 'Back'}
         </Link>
       )}
@@ -160,15 +184,20 @@ export function PageHeader({
     // against the gutter, and a long title pushed a button off the edge before
     // the wrap took effect.
     <div className="mb-cards flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
-      <div className="min-w-0">
-        {/* `break-words` because a school name is user data and can be one long
-            token; without it the h1 sets the page's minimum width. */}
-        <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          {title}
-        </h1>
-        {description && (
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">{description}</p>
-        )}
+      <div className="flex min-w-0 items-start gap-4">
+        {leading && <div className="shrink-0">{leading}</div>}
+        <div className="min-w-0">
+          {/* `break-words` because a school name is user data and can be one long
+              token; without it the h1 sets the page's minimum width. */}
+          <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">
+              {description}
+            </p>
+          )}
+        </div>
       </div>
       {actions && <div className="flex flex-wrap gap-2 sm:shrink-0">{actions}</div>}
     </div>

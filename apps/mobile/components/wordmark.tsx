@@ -16,6 +16,44 @@ import Svg, { Path, Rect } from 'react-native-svg'
 import { RADIUS, SPACE, TYPE } from '../theme'
 import { usePalette } from './ui'
 
+/**
+ * Just the mark, no wordmark under it.
+ *
+ * Extracted 2026-10-18 for the app header, which the reference designs give a small
+ * mark beside the school name. `Wordmark` centres itself and stacks a 28px "ZSMS"
+ * underneath, which is right for a launch screen and wrong inside a 44px header row.
+ * One drawing, two framings, rather than a second copy of the cap that drifts.
+ */
+export function Mark({ size = 32 }: { size?: number }): JSX.Element {
+  const c = usePalette()
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: RADIUS.md,
+        backgroundColor: c.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Svg width={size * 0.56} height={size * 0.56} viewBox="0 0 24 24" fill="none">
+        <Path d="M2 8.5 L12 4 L22 8.5 L12 13 Z" fill={c.onPrimary} />
+        <Path
+          d="M6 10.6 V15.2 C6 15.2 8.4 17 12 17 C15.6 17 18 15.2 18 15.2 V10.6"
+          stroke={c.onPrimary}
+          strokeWidth={1.9}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Rect x="20.3" y="8.8" width="1.5" height="6.4" rx="0.75" fill={c.onPrimary} />
+      </Svg>
+    </View>
+  )
+}
+
 export function Wordmark({ size = 56 }: { size?: number }): JSX.Element {
   const c = usePalette()
 

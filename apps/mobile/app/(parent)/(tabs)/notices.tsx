@@ -20,37 +20,22 @@
  * A notice is addressed to a parent, not to a pupil, so the child switcher is absent
  * here on purpose. Showing one would imply notices differ per child, and a parent who
  * believed that would stop checking after switching.
+ *
+ * ## The list itself lives in `components/notice-list`
+ *
+ * This screen and its counterpart in the other portal were about a hundred and sixty
+ * lines each doing the same thing against the same shape. Extracted 2026-10-18, so a
+ * change to how a notice reads lands on both portals at once rather than one.
  */
 
 import type { JSX } from 'react'
-import { useCallback, useState } from 'react'
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text } from 'react-native'
-import { Megaphone } from 'lucide-react-native'
+import { RefreshControl, ScrollView } from 'react-native'
 
-import { api } from '../../../lib/api'
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
-import {
-  Badge,
-  Body,
-  Caption,
-  Empty,
-  ErrorNote,
-  Loading,
-  Row,
-  Screen,
-  usePalette,
-} from '../../../components/ui'
-import { RADIUS, SPACE, TYPE } from '../../../theme'
-
-interface Notice {
-  id: string
-  title: string
-  body: string
-  importance: string
-  sent_at: string | null
-  read: boolean
-}
+import { NoticeList, type Notice } from '../../../components/notice-list'
+import { Body, ErrorNote, Loading, Screen, usePalette } from '../../../components/ui'
+import { SPACE } from '../../../theme'
 
 export default function ParentNotices(): JSX.Element {
   const c = usePalette()
@@ -59,36 +44,14 @@ export default function ParentNotices(): JSX.Element {
     '/api/parent/notices',
   )
 
-  const [open, setOpen] = useState<Set<string>>(new Set())
-  // Marked locally the moment one is opened, so the badge clears immediately rather
-  // than after a round trip on a slow link.
-  const [locallyRead, setLocallyRead] = useState<Set<string>>(new Set())
-
-  const openNotice = useCallback(
-    (id: string, alreadyRead: boolean) => {
-      setOpen((s) => {
-        const next = new Set(s)
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
-        return next
-      })
-
-      if (alreadyRead || locallyRead.has(id)) return
-      setLocallyRead((s) => new Set(s).add(id))
-
-      // Fire and forget. A failed receipt is not worth interrupting somebody reading a
-      // notice — the worst case is one unnecessary reminder later.
-      void api.post('/api/parent/notices', getToken, { announcementId: id }).catch(() => {})
-    },
-    [getToken, locallyRead],
-  )
-
-  const notices = data?.notices ?? []
-
   return (
     <Screen>
       <ScrollView
-        contentContainerStyle={{ padding: SPACE.gutter, gap: SPACE.sm, paddingBottom: SPACE.xxl }}
+        contentContainerStyle={{
+          padding: SPACE.gutter,
+          gap: SPACE.md,
+          paddingBottom: SPACE.xxl,
+        }}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={reload} tintColor={c.primary} />
         }
@@ -96,66 +59,18 @@ export default function ParentNotices(): JSX.Element {
         {error && <ErrorNote message={error} onRetry={reload} />}
         {loading && !data && <Loading label="Checking for notices" />}
 
-        {!error && data && notices.length === 0 && (
-          <Empty
-            icon={Megaphone}
-            title="Nothing from your school"
-            body="Notices your school sends will appear here."
+        {!error && data && (
+          <NoticeList
+            notices={data.notices ?? []}
+            endpoint="/api/parent/notices"
+            getToken={getToken}
+            emptyTitle="Nothing from your school"
+            emptyBody="Notices your school sends will appear here."
           />
         )}
 
-        {notices.map((n) => {
-          const isRead = n.read || locallyRead.has(n.id)
-          const expanded = open.has(n.id)
-
-          return (
-            <Pressable
-              key={n.id}
-              accessibilityRole="button"
-              onPress={() => openNotice(n.id, n.read)}
-              style={({ pressed }) => ({
-                padding: SPACE.card,
-                borderRadius: RADIUS.lg,
-                backgroundColor: c.surface,
-                borderWidth: StyleSheet.hairlineWidth,
-                // Unread carries weight, so a glance down the list finds it.
-                borderColor: isRead ? c.border : c.primary,
-                opacity: pressed ? 0.8 : 1,
-              })}
-            >
-              <Row gap={SPACE.sm}>
-                <Text
-                  style={[
-                    TYPE.heading,
-                    { flex: 1, color: c.text, fontWeight: isRead ? '500' : '700' },
-                  ]}
-                  numberOfLines={expanded ? undefined : 1}
-                >
-                  {n.title}
-                </Text>
-                {n.importance === 'important' && <Badge label="Important" tone="warning" />}
-                {!isRead && <Badge label="New" tone="primary" />}
-              </Row>
-
-              <Text
-                numberOfLines={expanded ? undefined : 2}
-                style={[TYPE.body, { color: c.textMuted, marginTop: 4 }]}
-              >
-                {n.body}
-              </Text>
-
-              {n.sent_at && (
-                <Caption>{new Date(n.sent_at).toLocaleDateString('en-ZM')}</Caption>
-              )}
-            </Pressable>
-          )
-        })}
-
-        {data && notices.length > 0 && (
-          <Body muted>
-            These appear in the app as soon as your school sends them. WhatsApp and SMS
-            delivery are not switched on yet.
-          </Body>
+        {data && (data.notices ?? []).length > 0 && (
+          <Body muted>These appear in the app as soon as your school sends them. WhatsApp and SMS delivery are not switched on yet.</Body>
         )}
       </ScrollView>
     </Screen>

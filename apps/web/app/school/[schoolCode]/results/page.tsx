@@ -35,21 +35,25 @@
 import type { FormEvent, JSX } from 'react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ClipboardList, Loader2, Lock, Save, Send } from 'lucide-react'
+import { ClipboardList, LoaderCircle, Lock, Save, Send } from 'lucide-react'
+
+import { CHART_SERIES } from '@zsms/design-tokens'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
-import { Card, CardContent } from '../../../../components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
+import { PrintButton, PrintHeading } from '../../../../components/ui/print-button'
 import { Field, Input, Select } from '../../../../components/ui/field'
 import { formatLevel } from '../school-shared'
 import { ReportCards } from './report-cards'
 import { FormGrid, FormSection } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { useToast } from '../../../../components/ui/toast'
+import { BarChart } from '../../../../components/ui/chart'
 
 interface Row {
   studentId: string
@@ -67,6 +71,13 @@ interface Row {
   gradePoints: number | null
   published: boolean
   hasScaleVersion: boolean
+  /**
+   * The teacher's remark for this pupil in this subject.
+   *
+   * On `exam_results` since `0071`, read and accepted by the route the whole time —
+   * nothing ever rendered a field, so no teacher could write one.
+   */
+  comments: string | null
 }
 
 interface Payload {
@@ -134,6 +145,29 @@ function MarkSheet(): JSX.Element {
 
   const [marksTotal, setMarksTotal] = useState('100')
   const [entries, setEntries] = useState<Record<string, string>>({})
+
+  /*
+    A comment per pupil per subject.
+
+    The column has existed on `exam_results` since `0071` and the route has read it
+    and accepted it in its POST schema the whole time — nothing ever rendered a field
+    for it, so no teacher could write one.
+
+    Kept in its own map rather than folded into `entries`: a mark is a number that
+    drives a grade and a position, a comment is prose that drives nothing. Merging
+    them would mean every mark-validation path having to know which strings are
+    numbers.
+  */
+  const [notes, setNotes] = useState<Record<string, string>>({})
+
+  /*
+    The order Enter walks, in the order the rows are RENDERED.
+
+    Derived from `data.rows` rather than from the DOM so the sequence is decided by
+    the same list the table is built from — reading the DOM would work until a row
+    was conditionally hidden, and then skip silently.
+  */
+  const marksOrder = useMemo(() => (data?.rows ?? []).map((r) => r.studentId), [data?.rows])
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   /**
@@ -164,6 +198,11 @@ function MarkSheet(): JSX.Element {
       seeded[r.studentId] = r.marksObtained === null ? '' : String(r.marksObtained)
     }
     setEntries(seeded)
+    setNotes(
+      Object.fromEntries(
+        (data?.rows ?? []).map((r) => [r.studentId, r.comments ?? '']),
+      ),
+    )
     const total = data.rows.find((r) => r.marksTotal !== null)?.marksTotal
     if (total) setMarksTotal(String(total))
   }, [data])
@@ -191,6 +230,65 @@ function MarkSheet(): JSX.Element {
     [entries, total],
   )
 
+  /**
+   * The grade distribution, for the chart below the sheet.
+   *
+   * ## Saved grades only, and the caption says so
+   *
+   * A grade is produced by `grade_from_scale_version()` in the database, never in the
+   * browser — the boundary is implemented once, which is the whole reason this screen
+   * shows a grade and never lets anybody type one. So a mark typed and not yet saved
+   * has no grade to count, and this chart cannot include it. Silently leaving those
+   * out would make the chart quietly wrong after a round of edits, so the caption
+   * states the count it is drawn from rather than letting the reader assume it is all
+   * of them.
+   *
+   * An overridden grade counts as the override — that is the grade on the report
+   * card, and a distribution that disagreed with the sheet above it would be worse
+   * than no distribution.
+   *
+   * ## Ordering
+   *
+   * By `gradePoints` where the scale supplies them, because that is the scale's own
+   * ordering and ZSMS supports four of them — ECZ Traditional runs 1–9, Cambridge
+   * runs A*–U, and a school-defined scale may do anything. Sorting alphabetically
+   * would put `A*` after `A` in one scale and scramble `10` before `9` in another.
+   * No direction is claimed in the UI, because ascending points mean "best" in some
+   * scales and "worst" in others, and the axis labels carry the meaning anyway.
+   */
+  const distribution = useMemo(() => {
+    const counts = new Map<string, { count: number; points: number | null }>()
+    let graded = 0
+
+    for (const r of data?.rows ?? []) {
+      const grade = r.gradeOverride ?? r.gradeLetter
+      if (!grade) continue
+      graded += 1
+      const seen = counts.get(grade)
+      if (seen) seen.count += 1
+      else counts.set(grade, { count: 1, points: r.gradePoints })
+    }
+
+    const bars = [...counts.entries()]
+      .sort((a, b) => {
+        const ap = a[1].points
+        const bp = b[1].points
+        if (ap !== null && bp !== null && ap !== bp) return ap - bp
+        return a[0].localeCompare(b[0], undefined, { numeric: true })
+      })
+      /*
+        One colour for every bar, NOT `seriesColour(i)`.
+
+        The bars are one measure — a count of pupils — split by grade. Giving each
+        bar its own hue would be colouring by rank, which reads as six different
+        things being compared and makes the eye look for a meaning the data does not
+        have. The grade letter under each bar is the identity; the colour is not.
+      */
+      .map((entry) => ({ label: entry[0], value: entry[1].count, colour: CHART_SERIES[1] }))
+
+    return { bars, graded }
+  }, [data?.rows])
+
   const save = useCallback(
     async (event: FormEvent) => {
       event.preventDefault()
@@ -215,6 +313,12 @@ function MarkSheet(): JSX.Element {
             studentId: r.studentId,
             // The empty string becomes null, not 0 — the whole point.
             marksObtained: entries[r.studentId]?.trim() ? Number(entries[r.studentId]) : null,
+            /*
+              `undefined` when empty, never `''`. The route's schema treats the field
+              as optional, so omitting it leaves whatever is stored — and an empty
+              string would overwrite a comment the teacher simply did not scroll to.
+            */
+            comments: notes[r.studentId]?.trim() || undefined,
           })),
         },
       )
@@ -233,7 +337,16 @@ function MarkSheet(): JSX.Element {
       )
       reload()
     },
-    [data, entries, classId, subjectCode, academicYear, termNumber, total, structure.data, toast, reload],
+    /*
+      `notes` belongs here, and lint caught it.
+
+      Without it the callback closes over the comments as they were on first render —
+      empty — so every save would have sent `undefined` for every comment and a
+      teacher's remarks would have silently gone nowhere. Worth noting as the exact
+      class of defect `npm run lint` existed to find and could not, before the script
+      was actually wired up.
+    */
+    [data, entries, notes, classId, subjectCode, academicYear, termNumber, total, structure.data, toast, reload],
   )
 
   const unlock = useCallback(
@@ -320,7 +433,22 @@ function MarkSheet(): JSX.Element {
         title="Results"
         description="Enter marks for a class and subject, then publish the term."
         note="An empty box is not a zero. A zero is a pupil who sat the paper and scored nothing; an empty box is a pupil who was not examined, and the two mean opposite things on a report card. Grades are worked out by the school's grading scale and shown here — you enter marks, never letters. Publishing is one-way: a result a parent has seen can be corrected, but not withdrawn."
+        actions={
+          classId && subjectCode ? <PrintButton label="Print mark sheet" /> : undefined
+        }
       />
+
+      {/*
+        What the printed mark sheet is. On paper there is no header saying which class
+        or subject these marks belong to, and a sheet of numbers with no subject on it
+        cannot be filed.
+      */}
+      {classId && subjectCode && (
+        <PrintHeading
+          title={`Marks — ${subjectCode}, ${classId}`}
+          subtitle={`${academicYear}, term ${termNumber}`}
+        />
+      )}
 
       <div className="space-y-cards">
         <FormSection>
@@ -509,6 +637,38 @@ function MarkSheet(): JSX.Element {
                           <Input
                             id={`mark-${r.studentId}`}
                             type="number"
+                            /*
+                              A stable handle for the row below, so Enter can move
+                              there. Keyed by pupil rather than by index: the list
+                              re-sorts when a filter changes, and an index would then
+                              send the teacher to a different pupil than the one under
+                              their eyes.
+                            */
+                            data-mark-for={r.studentId}
+                            onKeyDown={(e) => {
+                              if (e.key !== 'Enter') return
+                              /*
+                                Enter moves DOWN, as it does in a mark book and in
+                                every spreadsheet. Without this it submits the form —
+                                so a teacher entering forty marks either reaches for
+                                the mouse forty times, or saves the sheet by accident
+                                on the first one.
+
+                                Tab is left alone: it already moves to the next
+                                control, and taking it over would break the way
+                                somebody reaches the comment field beside the mark.
+                              */
+                              e.preventDefault()
+                              const next = marksOrder[marksOrder.indexOf(r.studentId) + 1]
+                              if (!next) return
+                              const el = document.querySelector<HTMLInputElement>(
+                                `[data-mark-for="${next}"]`,
+                              )
+                              el?.focus()
+                              // Select, so typing replaces rather than appends to a
+                              // mark that is already there.
+                              el?.select()
+                            }}
                             min={0}
                             max={total}
                             step="0.5"
@@ -574,6 +734,51 @@ function MarkSheet(): JSX.Element {
                             <span className="text-sm text-muted-foreground">—</span>
                           )}
                         </div>
+
+                        {/*
+                          The subject comment.
+
+                          Full width on its own line rather than a column: a remark is
+                          prose, and a 120px cell makes a teacher write "gd prgrs". Six
+                          words of useful comment need the room to be six words.
+
+                          Hidden once published, by the same per-ROW rule as the mark —
+                          `data.published` is `rows.some(...)`, so a sheet-level flag
+                          would lock a row a principal had just unlocked for correction.
+                        */}
+                        {data.canWrite && !r.published && (
+                          <div className="w-full basis-full">
+                            <label
+                              htmlFor={`note-${r.studentId}`}
+                              className="text-xs text-muted-foreground"
+                            >
+                              Comment for {r.firstName}{' '}
+                              <span className="text-muted-foreground">(optional)</span>
+                            </label>
+                            <Input
+                              id={`note-${r.studentId}`}
+                              value={notes[r.studentId] ?? ''}
+                              onChange={(e) =>
+                                setNotes((n) => ({ ...n, [r.studentId]: e.target.value }))
+                              }
+                              maxLength={500}
+                              placeholder="Appears on the report card"
+                              className="mt-1"
+                            />
+                          </div>
+                        )}
+
+                        {/*
+                          A published comment, read-only. Shown rather than dropped: it is
+                          what the parent will read, and a teacher checking a report card
+                          needs to see what it says.
+                        */}
+                        {r.published && r.comments ? (
+                          <div className="w-full basis-full">
+                            <p className="text-xs text-muted-foreground">Comment</p>
+                            <p className="text-sm">{r.comments}</p>
+                          </div>
+                        ) : null}
 
                         {/*
                           Awarding a grade, inline under the pupil it concerns.
@@ -739,6 +944,36 @@ function MarkSheet(): JSX.Element {
                 </CardContent>
               </Card>
 
+              {/*
+                Below the sheet, not above it: this is what the marks turned out to
+                be, which is only worth reading once they are entered. A teacher
+                scrolling a column of forty numbers cannot see the shape of the class
+                from the numbers themselves, and that shape is the one thing a mark
+                sheet does not already say.
+
+                A bar chart rather than a donut — the categories are ordered and
+                there are more than three of them, and a donut over an ordered scale
+                throws the order away. One series, so no legend: the title names it
+                and every bar carries its own count.
+              */}
+              {distribution.bars.length > 0 && (
+                <Card className="mt-stack">
+                  <CardHeader>
+                    <CardTitle>How the class did</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {distribution.graded} of {data.rows.length} pupils have a saved grade.
+                      {distribution.graded < entered && ' Marks you have typed but not saved are not counted yet.'}
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <BarChart
+                      data={distribution.bars}
+                      emptyMessage="No grades yet. Save the sheet to see the spread."
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
               {/* `hasEditableRow`, not `!data.published`: after unlocking one mark for
                   correction the sheet is still "published" overall, and gating on that
                   hid the only button that could save the correction. */}
@@ -749,7 +984,7 @@ function MarkSheet(): JSX.Element {
                 <div className="sticky bottom-0 z-10 mt-stack flex flex-wrap gap-2 border-t border-border bg-background/95 p-gutter backdrop-blur">
                   <Button type="submit" disabled={saving || overMax > 0}>
                     {saving ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : (
                       <Save aria-hidden="true" />
                     )}
@@ -764,7 +999,7 @@ function MarkSheet(): JSX.Element {
                       onClick={publish}
                     >
                       {publishing ? (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       ) : (
                         <Send aria-hidden="true" />
                       )}

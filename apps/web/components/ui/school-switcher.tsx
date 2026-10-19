@@ -31,13 +31,14 @@
 import type { JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, Check, Loader2 } from 'lucide-react'
+import { Building2, Check, LoaderCircle } from 'lucide-react'
 
 import { useOrganizationList } from '@zsms/auth-provider/react'
 
 import { useApi } from '../../lib/use-api'
 import { Button } from './button'
 import { cn } from '../../lib/utils'
+import { usePopover } from '../../lib/use-popover'
 
 interface SchoolOption {
   uuid: string
@@ -67,7 +68,7 @@ export function SchoolSwitcher(): JSX.Element | null {
   })
 
   const [switching, setSwitching] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, wrapRef, triggerProps, panelProps } = usePopover('listbox')
 
   const memberOf = useMemo(() => {
     const ids = new Set<string>()
@@ -97,7 +98,9 @@ export function SchoolSwitcher(): JSX.Element | null {
         setOpen(false)
       }
     },
-    [setActive, router],
+    // `setOpen` comes from `usePopover` and is stable, but it is a dependency all
+    // the same — a lint exception here would be the first of several.
+    [setActive, router, setOpen],
   )
 
   // One school is not a choice. Rendering a switcher for it would imply there is
@@ -105,14 +108,8 @@ export function SchoolSwitcher(): JSX.Element | null {
   if (schools.length <= 1) return null
 
   return (
-    <div className="relative">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-      >
+    <div ref={wrapRef} className="relative">
+      <Button variant="outline" size="sm" {...triggerProps}>
         <Building2 aria-hidden="true" />
         <span className="max-w-40 truncate">{current?.name ?? 'Choose a school'}</span>
         <span className="text-xs text-muted-foreground">({schools.length})</span>
@@ -120,17 +117,17 @@ export function SchoolSwitcher(): JSX.Element | null {
 
       {open && (
         <>
-          {/* A click-away layer rather than a document listener: it cannot leak,
-              and it cannot fight the button's own click. */}
-          <button
-            type="button"
-            aria-label="Close school list"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setOpen(false)}
-          />
+          {/*
+            The full-screen click-away <button> that used to sit here is gone.
+            `usePopover` closes on an outside mousedown, which does the same job
+            without putting a focusable, viewport-sized control into the
+            accessibility tree — and it adds the Escape key, which this switcher
+            never had at all.
+          */}
           <ul
             role="listbox"
-            className="absolute right-0 z-50 mt-1 max-h-80 w-72 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg"
+            {...panelProps}
+            className="absolute right-0 z-popover mt-1 max-h-80 w-72 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg"
           >
             {schools.map((s) => {
               const canEnter = memberOf.has(s.organisationId) || s.current
@@ -154,7 +151,7 @@ export function SchoolSwitcher(): JSX.Element | null {
                     )}
                   >
                     {busy ? (
-                      <Loader2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />
                     ) : s.current ? (
                       <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                     ) : (

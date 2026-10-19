@@ -16,6 +16,7 @@ import { Bell, BellOff, CreditCard } from 'lucide-react-native'
 
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
+import { IconTile } from '../../../components/shell'
 import {
   enablePush,
   pushState,
@@ -34,6 +35,7 @@ import {
   Title,
   usePalette,
 } from '../../../components/ui'
+import { ThemeChoiceRow } from '../../../components/theme-choice'
 import { NUMERIC, RADIUS, SPACE, TYPE } from '../../../theme'
 
 interface Hub {
@@ -93,18 +95,10 @@ export default function Account(): JSX.Element {
         {data && (
           <Card>
             <Row gap={SPACE.md}>
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: c.primaryTint,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <CreditCard size={21} color={c.primaryMark} strokeWidth={2} />
-              </View>
+              {/* Amber, because credits are a quantity that runs out — the same
+                  hue the action grid gives AI credits, so one thing reads one way
+                  wherever a teacher meets it. */}
+              <IconTile icon={CreditCard} tone="warning" size={44} />
               <View style={{ flex: 1 }}>
                 <Text style={[NUMERIC, { color: c.text, fontSize: 22 }]}>
                   {data.credits?.remaining ?? 0}
@@ -128,13 +122,23 @@ export default function Account(): JSX.Element {
         )}
 
         {/* ---- Notifications ---- */}
+        {/*
+          Light / System / Dark, here rather than in a settings screen the app does
+          not have. The web portals put it in the account menu for the same reason:
+          it is a setting about the person, and this is the person's screen.
+        */}
         <Card>
-          <Row gap={SPACE.sm}>
-            {push === 'on' ? (
-              <Bell size={21} color={c.primaryMark} strokeWidth={2} />
-            ) : (
-              <BellOff size={21} color={c.textSubtle} strokeWidth={2} />
-            )}
+          <ThemeChoiceRow />
+        </Card>
+        <Card>
+          <Row gap={SPACE.md}>
+            {/* The tinted tile every other row in the app uses. Green when notices
+                will actually arrive, neutral when they will not — the state is the
+                point of the row and it was carried by a 21px glyph. */}
+            <IconTile
+              icon={push === 'on' ? Bell : BellOff}
+              tone={push === 'on' ? 'success' : 'neutral'}
+            />
             <View style={{ flex: 1 }}>
               <Body>Notifications</Body>
               <Caption>

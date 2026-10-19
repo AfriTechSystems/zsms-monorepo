@@ -32,8 +32,10 @@ import {
   Screen,
   usePalette,
 } from '../../../components/ui'
+import { ProgressBar } from '../../../components/stats'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { useApi } from '../../../lib/use-api'
+import { SectionHeader } from '../../../components/shell'
 import { NUMERIC, SPACE, TYPE } from '../../../theme'
 
 interface Result {
@@ -98,7 +100,9 @@ export default function ParentResults(): JSX.Element {
 
         {terms.map(([term, rows]) => (
           <View key={term} style={{ gap: SPACE.sm }}>
-            <Caption>{term}</Caption>
+            {/* A heading, not a caption. These group the whole screen and a 12px
+                muted line was doing a section heading's job at a label's weight. */}
+            <SectionHeader title={term} />
             {rows.map((r) => (
               <Card key={r.id}>
                 <Row gap={SPACE.sm}>
@@ -107,6 +111,24 @@ export default function ParentResults(): JSX.Element {
                   </Text>
                   {r.grade_letter && <Badge label={r.grade_letter} tone="primary" />}
                 </Row>
+
+                {/*
+                  The mark as a bar, in the primary tone and NEVER as a traffic light.
+
+                  Red-amber-green on a child's result would be ZSMS passing judgement a
+                  school has not passed — the grade letter beside it is the school's
+                  verdict and the only one that belongs here. The bar just makes
+                  "67 / 100" quicker to read than the numbers alone.
+
+                  Only drawn when there is a total to divide by; a mark recorded
+                  without one cannot be a proportion of anything.
+                */}
+                {r.marks_obtained !== null && r.marks_total ? (
+                  <ProgressBar
+                    value={(Number(r.marks_obtained) / Number(r.marks_total)) * 100}
+                    tone="primary"
+                  />
+                ) : null}
 
                 <Row gap={SPACE.md}>
                   {r.marks_obtained !== null && (

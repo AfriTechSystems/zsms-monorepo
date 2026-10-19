@@ -17,7 +17,7 @@
 
 import type { JSX } from 'react'
 import { RefreshControl, ScrollView, Text, View } from 'react-native'
-import { CalendarCheck } from 'lucide-react-native'
+import { CalendarCheck, CircleSlash, Clock, FileText } from 'lucide-react-native'
 
 import { ChildSwitcher } from '../../../components/child-switcher'
 import {
@@ -32,6 +32,7 @@ import {
   Screen,
   usePalette,
 } from '../../../components/ui'
+import { Ring, StatTile } from '../../../components/stats'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { useApi } from '../../../lib/use-api'
 import { NUMERIC, SPACE, TYPE } from '../../../theme'
@@ -91,31 +92,76 @@ export default function ParentAttendance(): JSX.Element {
 
         {data && a && (
           <>
+            {/*
+              The rate as a ring, matching the home screen so the same number looks
+              the same in both places.
+
+              The colour carries the same bands the school side uses — 90 and 80 — and
+              a null rate draws an empty track rather than a red ring at zero, which
+              for a pupil with nothing marked would read as total absence.
+            */}
             <Card>
-              <Caption>Attendance over the last 30 days</Caption>
-              <Text style={[TYPE.display, NUMERIC, { color: c.text }]}>
-                {a.rate === null || a.rate === undefined ? '—' : `${a.rate}%`}
-              </Text>
-              <Body muted>
-                {a.days > 0
-                  ? `${a.present ?? 0} of ${a.days} school days marked present.`
-                  : 'Your school has not marked a register for this period yet.'}
-              </Body>
+              <Row gap={SPACE.lg}>
+                <Ring
+                  value={a.rate ?? null}
+                  size={84}
+                  tone={
+                    a.rate === null || a.rate === undefined
+                      ? 'neutral'
+                      : a.rate >= 90
+                        ? 'success'
+                        : a.rate >= 80
+                          ? 'warning'
+                          : 'danger'
+                  }
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Caption>Attendance over the last 30 days</Caption>
+                  <Body muted>
+                    {a.days > 0
+                      ? `${a.present ?? 0} of ${a.days} school days marked present.`
+                      : 'Your school has not marked a register for this period yet.'}
+                  </Body>
+                </View>
+              </Row>
             </Card>
 
-            <Row gap={SPACE.sm}>
-              <Card style={{ flex: 1 }}>
-                <Caption>Late</Caption>
-                <Text style={[TYPE.heading, NUMERIC, { color: c.text }]}>{a.late ?? 0}</Text>
-              </Card>
-              <Card style={{ flex: 1 }}>
-                <Caption>Absent</Caption>
-                <Text style={[TYPE.heading, NUMERIC, { color: c.text }]}>{a.absent ?? 0}</Text>
-              </Card>
-              <Card style={{ flex: 1 }}>
-                <Caption>Excused</Caption>
-                <Text style={[TYPE.heading, NUMERIC, { color: c.text }]}>{a.excused ?? 0}</Text>
-              </Card>
+            {/*
+              Three tiles rather than three bare cards, as the reference design draws
+              them: the icon and the tint do the labelling a caption alone was doing,
+              and a parent scanning for "was my child absent" finds the red one
+              without reading three headings.
+
+              Amber for late and red for absent; excused stays neutral on purpose. An
+              authorised absence is not a mark against a child, and colouring it like
+              one would make a doctor's appointment look like truancy on their own
+              parent's screen.
+            */}
+            <Row gap={SPACE.sm} style={{ alignItems: 'stretch' }}>
+              <View style={{ flex: 1 }}>
+                <StatTile
+                  label="Late"
+                  value={String(a.late ?? 0)}
+                  icon={Clock}
+                  tone={(a.late ?? 0) > 0 ? 'warning' : 'neutral'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <StatTile
+                  label="Absent"
+                  value={String(a.absent ?? 0)}
+                  icon={CircleSlash}
+                  tone={(a.absent ?? 0) > 0 ? 'danger' : 'neutral'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <StatTile
+                  label="Excused"
+                  value={String(a.excused ?? 0)}
+                  icon={FileText}
+                  tone="neutral"
+                />
+              </View>
             </Row>
 
             {marks.length === 0 ? (

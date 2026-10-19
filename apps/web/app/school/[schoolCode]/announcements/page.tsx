@@ -31,10 +31,12 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Check, FileText, Gauge, Loader2, Send, X } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Check, FileText, Gauge, LoaderCircle, Megaphone, Send, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
+import { Dialog } from '../../../../components/ui/dialog'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
 import { Card, CardContent } from '../../../../components/ui/card'
@@ -45,7 +47,7 @@ import { DraftNotice } from '../../../../components/ui/draft-notice'
 import { draftAge, useFormDraft } from '../../../../lib/use-form-draft'
 import { useAuth } from '@zsms/auth-provider/react'
 import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
-import { FormActions, FormGrid, FormSection } from '../../../../components/ui/form'
+import { FormActions, FormGrid } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { useToast } from '../../../../components/ui/toast'
 import { RecipientPicker } from './recipient-picker'
@@ -167,11 +169,44 @@ export default function AnnouncementsPage(): JSX.Element {
     These are the extras, and most are not switched on yet; the form says which.
   */
   const [extraChannels, setExtraChannels] = useState<string[]>([])
-  const [targetAudience, setTargetAudience] = useState('parents')
-  const [targetScope, setTargetScope] = useState('school')
-  const [targetIds, setTargetIds] = useState<string[]>([])
+  /*
+    The audience can arrive prefilled from the pupil list's bulk bar: a reader selects
+    pupils there and lands here addressing their parents.
+
+    Read ONCE, as the initial state, not synced to the URL. A composer that re-read
+    the query string would throw away an audience the writer then changed by hand —
+    and the back button is how they would get here a second time.
+  */
+  const prefilled = useSearchParams().get('to')
+  const prefilledIds = useMemo(
+    () =>
+      (prefilled ?? '')
+        .split(',')
+        .map((x) => x.trim())
+        // Only well-formed ids. A hand-edited query string should degrade to an
+        // empty audience rather than sending a malformed one to the route.
+        .filter((x) => /^[0-9a-f-]{36}$/i.test(x)),
+    [prefilled],
+  )
+
+  const [targetAudience, setTargetAudience] = useState(
+    prefilledIds.length > 0 ? 'individuals' : 'parents',
+  )
+  const [targetScope, setTargetScope] = useState(
+    // The route's own refine: addressing named people means BOTH must agree.
+    prefilledIds.length > 0 ? 'individual' : 'school',
+  )
+  const [targetIds, setTargetIds] = useState<string[]>(prefilledIds)
   const [scheduledAt, setScheduledAt] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  /*
+    Whether the composer is open. Not persisted: a draft IS persisted, by
+    `useFormDraft`, so reopening restores the words — but reopening the DIALOG on
+    every visit would put the form back in front of a reader who came to check a
+    sent notice.
+  */
+  const [composerOpen, setComposerOpen] = useState(false)
+
   const [formError, setFormError] = useState<string | null>(null)
 
   /**
@@ -412,8 +447,24 @@ export default function AnnouncementsPage(): JSX.Element {
             </Alert>
           )}
 
+          {/*
+            The composer is a modal now, not a permanent section above the list.
+
+            An eight-field form sat above every visit to this screen, including the
+            many that are only to check whether yesterday's notice went out — so the
+            list it exists beside started below the fold. A button opens it; the list
+            is what the screen is.
+
+            State stays in the page, so a half-written message survives closing the
+            dialog, and `useFormDraft` still has it if the tab is closed.
+          */}
           {data.canWrite ? (
-            <FormSection title="Write an announcement">
+            <Dialog
+              open={composerOpen}
+              title="Write an announcement"
+              onClose={() => setComposerOpen(false)}
+            >
+
               <form onSubmit={(e) => void submit('draft', e)} noValidate>
                 {/* A starting point, not a finished message. The bracketed parts are
                     deliberately obvious so nobody sends one unedited. */}
@@ -701,7 +752,7 @@ export default function AnnouncementsPage(): JSX.Element {
                     onClick={() => void submit('now')}
                   >
                     {busy === 'now' ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : (
                       <Send aria-hidden="true" />
                     )}
@@ -716,7 +767,7 @@ export default function AnnouncementsPage(): JSX.Element {
                       onClick={() => void submit('schedule')}
                     >
                       {busy === 'schedule' && (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       )}
                       Schedule
                     </Button>
@@ -727,16 +778,25 @@ export default function AnnouncementsPage(): JSX.Element {
                     variant="ghost"
                     disabled={busy !== null || !title || !bodyText}
                   >
-                    {busy === 'draft' && <Loader2 aria-hidden="true" className="animate-spin" />}
+                    {busy === 'draft' && <LoaderCircle aria-hidden="true" className="animate-spin" />}
                     Save as draft
                   </Button>
                 </FormActions>
               </form>
-            </FormSection>
+            </Dialog>
           ) : (
             <Alert variant="info" title="Announcements are written by the school office">
               You can see what has been sent. The owner, principal and administrator write them.
             </Alert>
+          )}
+
+          {data.canWrite && (
+            <div className="mb-cards">
+              <Button onClick={() => setComposerOpen(true)}>
+                <Megaphone aria-hidden="true" className="size-4" />
+                Write an announcement
+              </Button>
+            </div>
           )}
 
           <Card>

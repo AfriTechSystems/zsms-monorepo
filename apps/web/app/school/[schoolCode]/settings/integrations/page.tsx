@@ -18,13 +18,15 @@
 
 import type { ChangeEvent, JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Download, Plug, PauseCircle } from 'lucide-react'
+import { TriangleAlert, Download, Plug, PauseCircle } from 'lucide-react'
 
 import { Button } from '../../../../../components/ui/button'
 import { Card } from '../../../../../components/ui/card'
 import { Badge } from '../../../../../components/ui/badge'
 import { Input, Select } from '../../../../../components/ui/field'
 import { useToast } from '../../../../../components/ui/toast'
+import { DateRangeField } from '../../../../../components/ui/date-field'
+import { todayIso } from '../../../../../lib/dates'
 
 interface Integration {
   id: string
@@ -75,10 +77,14 @@ export default function IntegrationsPage(): JSX.Element {
     one year so a mis-click cannot produce a file nobody can check.
   */
   const [sageFrom, setSageFrom] = useState(() => {
+    /*
+      Local, not `toISOString()`. That is UTC, and Zambia is UTC+2 — before 02:00
+      this returned the previous month's last day as the start of "this month".
+    */
     const d = new Date()
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), '01'].join('-')
   })
-  const [sageTo, setSageTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [sageTo, setSageTo] = useState(todayIso)
   const [sageBusy, setSageBusy] = useState(false)
 
   /**
@@ -204,7 +210,7 @@ export default function IntegrationsPage(): JSX.Element {
       {!data.dispatchReady ? (
         <Card className="border-warning/40 bg-warning/5 p-card">
           <p className="flex items-start gap-2 text-sm">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span>
               <span className="font-medium">Nothing is being sent yet.</span> You can set a
               connection up here and ZSMS will keep the configuration, but delivery is not
@@ -337,24 +343,17 @@ export default function IntegrationsPage(): JSX.Element {
         </p>
 
         <div className="mt-stack flex flex-wrap items-end gap-stack">
-          <label className="block">
-            <span className="text-sm font-medium">From</span>
-            <Input
-              type="date"
-              value={sageFrom}
-              onChange={(e) => setSageFrom(e.target.value)}
-              className="mt-1"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">To</span>
-            <Input
-              type="date"
-              value={sageTo}
-              onChange={(e) => setSageTo(e.target.value)}
-              className="mt-1"
-            />
-          </label>
+          {/* Was two bare <label> wrappers with no Field, so neither carried a
+              hint, an error slot or the shared control styling. Verified payments
+              cannot be in the future, hence `notFuture`. */}
+          <DateRangeField
+            idPrefix="sage"
+            from={sageFrom}
+            to={sageTo}
+            onFromChange={setSageFrom}
+            onToChange={setSageTo}
+            notFuture
+          />
           <Button
             type="button"
             variant="outline"

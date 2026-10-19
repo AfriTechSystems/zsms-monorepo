@@ -36,7 +36,7 @@ BEGIN;
 -- `extensions` is appended only so the assertion functions are found.
 SET search_path TO public, extensions;
 
-SELECT plan(10);
+SELECT plan(12);
 
 INSERT INTO public.schools (id, school_id, clerk_org_id, name, type, level, city_code, status)
 VALUES
@@ -157,6 +157,36 @@ SELECT throws_ok(
   'ATTACK school B cannot mark a register at school A');
 
 RESET ROLE;
+
+-- ---------------------------------------------------------------------------
+-- `school_attendance_trend()` (0274) — the two properties its safety rests on.
+--
+-- It has no `school_id` clause of its own, deliberately: it is SECURITY INVOKER so
+-- RLS scopes it, exactly as RLS scopes the single-day query the dashboard already
+-- runs. A class teacher gets their classes and a head teacher gets the school,
+-- without the function knowing what a teaching assignment is.
+--
+-- That makes `prosecdef = false` load-bearing rather than incidental. Flipped to
+-- DEFINER — by somebody "optimising" it, or by a careless CREATE OR REPLACE — it
+-- would return **every school's attendance to every caller**, and nothing else here
+-- would notice, because the rows it reads are the same rows. This is the same guard
+-- `0096` puts on the platform metrics functions and for the same reason.
+-- ---------------------------------------------------------------------------
+
+SELECT is(
+  (SELECT p.prosecdef
+     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'school_attendance_trend'),
+  FALSE,
+  'school_attendance_trend() is SECURITY INVOKER, so RLS still scopes it'
+);
+
+SELECT ok(
+  NOT (SELECT has_function_privilege('anon', p.oid, 'EXECUTE')
+         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND p.proname = 'school_attendance_trend'),
+  'and anon cannot call it'
+);
 
 SELECT * FROM finish();
 

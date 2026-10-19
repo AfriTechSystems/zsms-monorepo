@@ -29,10 +29,9 @@ import { ClerkProvider } from '@clerk/clerk-expo'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SecureStore from 'expo-secure-store'
-import { useColorScheme } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
-import { DARK, LIGHT } from '../theme'
+import { ThemeProvider, useThemePreference } from '../theme/preference'
 
 const PUBLISHABLE_KEY = process.env['EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY'] ?? ''
 
@@ -61,11 +60,26 @@ const tokenCache = {
 }
 
 export default function RootLayout(): JSX.Element {
-  const scheme = useColorScheme()
-  const c = scheme === 'dark' ? DARK : LIGHT
-
   return (
     <ClerkProvider publishableKey={PUBLISHABLE_KEY} tokenCache={tokenCache}>
+      {/*
+        Outside Clerk's provider would be fine too, but inside keeps one tree. The
+        theme has to wrap the Stack, because the Stack's `screenOptions` are where the
+        header and background colours are set — a provider below it would leave the
+        chrome on the system scheme while the screens changed.
+      */}
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
+    </ClerkProvider>
+  )
+}
+
+function ThemedApp(): JSX.Element {
+  const { scheme, palette: c } = useThemePreference()
+
+  return (
+    <>
       <SafeAreaProvider>
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         <Stack
@@ -84,6 +98,6 @@ export default function RootLayout(): JSX.Element {
           <Stack.Screen name="(teacher)" options={{ headerShown: false }} />
         </Stack>
       </SafeAreaProvider>
-    </ClerkProvider>
+    </>
   )
 }

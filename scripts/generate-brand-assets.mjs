@@ -31,6 +31,7 @@ const SRC = 'apps/web/public/brand/zsms-logo.png'
 const BRAND = 'apps/web/public/brand'
 const APP = 'apps/web/app'
 const DOCS = 'packages/documents/src/assets'
+const MOBILE = 'apps/mobile/assets'
 
 /**
  * Measured content geometry of the source file, in source pixels.
@@ -77,7 +78,15 @@ function out(path, buffer) {
 
 /** The emblem, centred on a transparent square. */
 async function squareMark(size, options = WEB_PNG) {
-  const inner = Math.round(size * (1 - ICON_PADDING * 2))
+  /*
+    `padding` overrides the default inset, and `flatten` paints an opaque background.
+
+    Both exist for the Expo icons: Android masks its adaptive foreground to a circle,
+    so that one needs more inset than a web favicon, and iOS composites nothing behind
+    an icon, so a transparent one renders black on a dark home screen.
+  */
+  const pad = options.padding ?? ICON_PADDING
+  const inner = Math.round(size * (1 - pad * 2))
   const mark = await sharp(SRC)
     .extract(GEOMETRY.mark)
     .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -93,8 +102,22 @@ async function squareMark(size, options = WEB_PNG) {
     },
   })
     .composite([{ input: mark, gravity: 'center' }])
-    .png(options)
+    /*
+      `flatten` before `png`, not after: flattening replaces the alpha channel with a
+      solid colour, and doing it the other way round encodes the transparency first
+      and then has nothing left to flatten.
+
+      `padding` and `flatten` are this function's own options, so they are stripped
+      before the rest reaches sharp — passing an unknown key to `.png()` throws.
+    */
+    .flatten(options.flatten ? { background: options.flatten } : false)
+    .png(pngOptions(options))
     .toBuffer()
+}
+
+/** sharp's `.png()` options only — ours are removed. */
+function pngOptions({ padding: _p, flatten: _f, ...rest }) {
+  return rest
 }
 
 /** The full stacked lockup, trimmed of dead margin, at a given width. */
@@ -136,6 +159,33 @@ async function main() {
   // fetched on every cold page load.
   out(join(APP, 'icon.png'), await squareMark(256))
   out(join(APP, 'apple-icon.png'), await squareMark(180))
+
+  /*
+    The Expo app's icons.
+
+    Generated here rather than hand-copied for the reason this whole script exists:
+    the source logo will be redrawn one day, and a PNG somebody dragged into
+    `apps/mobile/assets` once would silently keep showing the old mark on every
+    installed phone.
+
+    Three files, because Android and iOS want different things:
+
+      * `icon.png`      — 1024, the iOS icon and the Expo fallback. Opaque, because
+                          iOS composites nothing behind it and a transparent icon
+                          renders black on a dark home screen.
+      * `adaptive-icon.png` — 1024 foreground for Android's adaptive icon, which is
+                          masked to whatever shape the launcher uses. Transparent,
+                          and the mark is drawn SMALLER: Android crops to a circle on
+                          most launchers, so artwork near the corners is cut off.
+      * `splash.png`    — the mark on its own, shown while the JS bundle loads.
+  */
+  console.log('')
+  console.log('Expo app icons:')
+  // Opaque white behind the mark. The brand blue would fight every school's own
+  // colour on a home screen full of other apps.
+  out(join(MOBILE, 'icon.png'), await squareMark(1024, { ...WEB_PNG, flatten: '#FFFFFF' }))
+  out(join(MOBILE, 'adaptive-icon.png'), await squareMark(1024, { ...WEB_PNG, padding: 0.28 }))
+  out(join(MOBILE, 'splash.png'), await squareMark(512))
 
   // Verify: the icon crop must not have clipped ink at the edges, which is what
   // a stale GEOMETRY looks like in practice.

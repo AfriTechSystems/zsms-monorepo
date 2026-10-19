@@ -22,13 +22,11 @@
  */
 
 import type { JSX, ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BellRing,
-  CalendarCheck,
   CalendarDays,
-  CalendarRange,
   ClipboardList,
-  Cog,
   Coins,
   FileSpreadsheet,
   Globe,
@@ -36,17 +34,10 @@ import {
   GraduationCap,
   Inbox,
   KeyRound,
-  LayoutDashboard,
   ListChecks,
-  Megaphone,
   Plug,
-  Receipt,
   ScrollText,
-  ShieldCheck,
   SlidersHorizontal,
-  UserCog,
-  Users,
-  Wallet,
 } from 'lucide-react'
 
 import type { Role } from '@zsms/auth-provider'
@@ -56,9 +47,15 @@ import { AppShell } from '../../../components/layout/app-shell'
 import type { NavGroup } from '../../../components/layout/nav-config'
 import { can } from '../../../lib/roles'
 
+// Navigation destinations take their glyph from the canonical registry, so the
+// sidebar and the phone's tab bar cannot drift apart on what Attendance looks like.
+import { ICONS } from '../../../components/ui/icon'
+
 export function SchoolShell({
   base,
   schoolName,
+  logoUrl,
+  accentColor,
   roleLabel,
   role,
   children,
@@ -66,11 +63,53 @@ export function SchoolShell({
 }: {
   base: string
   schoolName: string
+  /** The school's logo, beside its name in the sidebar. Null renders nothing. */
+  logoUrl?: string | null
+  /** A decorative stripe at the top of the sidebar. Never behind text. */
+  accentColor?: string | null
   roleLabel: string
   role: Role
   children: ReactNode
   headerActions?: ReactNode
 }): JSX.Element {
+  /*
+    Counts of work waiting, shown on the nav rows that lead to it (reference W1/W2).
+
+    Fetched here rather than on each screen because the point of a badge is to be seen
+    from ANYWHERE in the portal — a payment sitting unverified while somebody is
+    reading the attendance register is exactly the case it exists for.
+
+    Null on failure, which renders nothing. A nav that breaks because a count did is
+    worse than a nav with no count, and the same rule the admin shell already follows.
+
+    Gated by capability before the request is made: asking for the verification queue
+    as a teacher would be a guaranteed 403 on every page load, and a badge nobody is
+    allowed to act on is noise.
+  */
+  const [unverifiedPayments, setUnverifiedPayments] = useState<number | null>(null)
+
+  const mayVerify = can(role, 'fees:write')
+
+  useEffect(() => {
+    if (!mayVerify) return undefined
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const response = await fetch('/api/school/fees/verify')
+        if (!response.ok) return
+        const body = (await response.json()) as { data?: { pending?: unknown[] } }
+        if (!cancelled) setUnverifiedPayments(body.data?.pending?.length ?? 0)
+      } catch {
+        // Left null, which renders nothing.
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [mayVerify])
+
   /**
    * Grouped by the JOB, not by the data type — which is the correction this file is on its second
    * attempt at.
@@ -91,19 +130,19 @@ export function SchoolShell({
   const groups: NavGroup[] = [
     {
       label: null,
-      items: [{ path: '', label: 'Dashboard', icon: LayoutDashboard, exact: true }],
+      items: [{ path: '', label: 'Dashboard', icon: ICONS.dashboard, exact: true }],
     },
     {
       label: 'Students',
       items: [
-        { path: '/students', label: 'Pupils', icon: Users, needs: 'students:read' },
+        { path: '/students', label: 'Pupils', icon: ICONS.students, needs: 'students:read' },
         { path: '/students/import', label: 'Bulk import', icon: FileSpreadsheet, needs: 'students:write' },
       ],
     },
     {
       label: 'Staff',
       items: [
-        { path: '/staff', label: 'Staff', icon: UserCog, needs: 'staff:read' },
+        { path: '/staff', label: 'Staff', icon: ICONS.teacher, needs: 'staff:read' },
         {
           path: '/teaching',
           label: 'Teaching assignments',
@@ -127,8 +166,8 @@ export function SchoolShell({
           is useful even when editing it is not yours to do.
         */
         { path: '/my-timetable', label: 'My timetable', icon: CalendarDays, needs: 'teaching:own' },
-        { path: '/timetable', label: 'Timetable', icon: CalendarRange },
-        { path: '/attendance', label: 'Attendance', icon: CalendarCheck, needs: 'attendance:read' },
+        { path: '/timetable', label: 'Timetable', icon: ICONS.timetable },
+        { path: '/attendance', label: 'Attendance', icon: ICONS.attendance, needs: 'attendance:read' },
         { path: '/results', label: 'Results', icon: ClipboardList, needs: 'results:read' },
       ],
     },
@@ -136,13 +175,13 @@ export function SchoolShell({
       // Student money. Nothing else belongs here.
       label: 'Finance',
       items: [
-        { path: '/fees', label: 'Fees & payments', icon: Wallet, needs: 'fees:read' },
+        { path: '/fees', label: 'Fees & payments', icon: ICONS.fees, needs: 'fees:read', badge: unverifiedPayments },
       ],
     },
     {
       label: 'Communication',
       items: [
-        { path: '/announcements', label: 'Announcements', icon: Megaphone },
+        { path: '/announcements', label: 'Announcements', icon: ICONS.announcement },
         /*
           Message log (MESSAGE_LOG.md).
 
@@ -173,7 +212,7 @@ export function SchoolShell({
          * hiding it — a teacher seeing the term dates is useful, and seeing that leadership sets
          * them is informative rather than a dead end.
          */
-        { path: '/settings', label: 'School settings', icon: Cog, exact: true },
+        { path: '/settings', label: 'School settings', icon: ICONS.settings, exact: true },
         /*
           The setup checklist, beside the settings it sends people to.
 
@@ -230,7 +269,7 @@ export function SchoolShell({
           because what a report card says about a child is the head's responsibility.
         */
         { path: '/settings/documents', label: 'Report cards & documents', icon: FileText, needs: 'settings:write' },
-        { path: '/settings/roles', label: 'Staff roles', icon: ShieldCheck, needs: 'settings:write' },
+        { path: '/settings/roles', label: 'Staff roles', icon: ICONS.admin, needs: 'settings:write' },
         /*
           Permission grants (PERMISSIONS.md).
 
@@ -286,8 +325,8 @@ export function SchoolShell({
           but turning this on commits the school's quota for the term, and
           `set_attendance_alerts()` admits only the owner and principal.
         */
-        { path: '/settings/attendance-alerts', label: 'Attendance alerts', icon: CalendarCheck, needs: 'settings:write' },
-        { path: '/settings/subscription', label: 'Subscription & billing', icon: Receipt, needs: 'fees:read' },
+        { path: '/settings/attendance-alerts', label: 'Attendance alerts', icon: ICONS.attendance, needs: 'settings:write' },
+        { path: '/settings/subscription', label: 'Subscription & billing', icon: ICONS.receipt, needs: 'fees:read' },
         // `fees:read` to see, `fees:write` to buy — gated in the route, not here. Buying
         // credits spends the school's money, so it sits with the bursar's permissions
         // rather than with the ones for editing a timetable.
@@ -305,6 +344,8 @@ export function SchoolShell({
     <AppShell
       base={base}
       title={schoolName}
+      logoUrl={logoUrl}
+      accentColor={accentColor}
       subtitle={roleLabel}
       groups={visible}
       headerActions={

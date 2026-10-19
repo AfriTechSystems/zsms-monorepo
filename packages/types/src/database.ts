@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -2109,6 +2109,7 @@ export type Database = {
           marketing_prompted_at: string | null
           national_id: string | null
           phone_e164: string | null
+          photo_url: string | null
           preferred_contact: string
           updated_at: string
           whatsapp_opted_in: boolean
@@ -2125,6 +2126,7 @@ export type Database = {
           marketing_prompted_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
+          photo_url?: string | null
           preferred_contact?: string
           updated_at?: string
           whatsapp_opted_in?: boolean
@@ -2141,6 +2143,7 @@ export type Database = {
           marketing_prompted_at?: string | null
           national_id?: string | null
           phone_e164?: string | null
+          photo_url?: string | null
           preferred_contact?: string
           updated_at?: string
           whatsapp_opted_in?: boolean
@@ -2237,6 +2240,7 @@ export type Database = {
           gateway_transaction_id: string | null
           id: string
           is_voided: boolean
+          mobile_money_provider: string | null
           notes: string | null
           paid_at: string
           payment_method: string
@@ -2268,6 +2272,7 @@ export type Database = {
           gateway_transaction_id?: string | null
           id?: string
           is_voided?: boolean
+          mobile_money_provider?: string | null
           notes?: string | null
           paid_at?: string
           payment_method: string
@@ -2299,6 +2304,7 @@ export type Database = {
           gateway_transaction_id?: string | null
           id?: string
           is_voided?: boolean
+          mobile_money_provider?: string | null
           notes?: string | null
           paid_at?: string
           payment_method?: string
@@ -2569,6 +2575,58 @@ export type Database = {
           },
           {
             foreignKeyName: "report_generation_jobs_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_views: {
+        Row: {
+          created_at: string
+          created_by: string
+          filters: Json
+          id: string
+          name: string
+          school_id: string
+          surface: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          filters?: Json
+          id?: string
+          name: string
+          school_id: string
+          surface: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          filters?: Json
+          id?: string
+          name?: string
+          school_id?: string
+          surface?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_views_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_queue"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "saved_views_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_capacity"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "saved_views_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -6295,6 +6353,16 @@ export type Database = {
           out_school_names: string[]
         }[]
       }
+      admin_platform_history: {
+        Args: { p_days?: number }
+        Returns: {
+          out_captured_on: string
+          out_mrr_zmw: number
+          out_schools_active: number
+          out_schools_total: number
+          out_students_total: number
+        }[]
+      }
       admin_platform_settings: {
         Args: never
         Returns: {
@@ -6428,6 +6496,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_set_tier_ai_allowance: {
+        Args: { p_monthly_credits: number; p_tier_name: string }
+        Returns: boolean
+      }
       admin_set_tier_feature: {
         Args: {
           p_actor: string
@@ -6459,6 +6531,17 @@ export type Database = {
           out_price: number
           out_sort_order: number
           out_subscribers: number
+        }[]
+      }
+      admin_tier_ai_allowances: {
+        Args: never
+        Returns: {
+          out_display_name: string
+          out_is_set: boolean
+          out_monthly_credits: number
+          out_monthly_price: number
+          out_tier_name: string
+          out_updated_at: string
         }[]
       }
       admin_trial_status: {
@@ -6664,6 +6747,13 @@ export type Database = {
             }
             Returns: boolean
           }
+      anon_executable_definer_functions: {
+        Args: never
+        Returns: {
+          out_arguments: string
+          out_function_name: string
+        }[]
+      }
       answer_departure_prompt: { Args: { p_opt_in: boolean }; Returns: boolean }
       archive_old_ai_conversations: { Args: never; Returns: number }
       attach_own_registered_school: {
@@ -6923,6 +7013,7 @@ export type Database = {
           topic_name: string
         }[]
       }
+      delete_saved_view: { Args: { p_view_id: string }; Returns: boolean }
       delete_timetable_period: {
         Args: { p_period_id: string }
         Returns: {
@@ -7456,6 +7547,17 @@ export type Database = {
         Args: { p_id: string; p_rating: number }
         Returns: number
       }
+      recent_activity: {
+        Args: { p_limit?: number }
+        Returns: {
+          out_actor: string
+          out_at: string
+          out_detail: string
+          out_id: string
+          out_kind: string
+          out_title: string
+        }[]
+      }
       record_api_key_usage: {
         Args: {
           p_key_id: string
@@ -7683,6 +7785,20 @@ export type Database = {
         Args: { p_grant_id: string }
         Returns: boolean
       }
+      sage50_export_rows: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          out_amount: number
+          out_currency: string
+          out_fee_label: string
+          out_method: string
+          out_paid_at: string
+          out_payment_id: string
+          out_receipt_number: string
+          out_student_name: string
+          out_term_number: number
+        }[]
+      }
       save_exam_marks: {
         Args: {
           p_academic_year: string
@@ -7715,6 +7831,17 @@ export type Database = {
           out_via_email: boolean
           out_via_push: boolean
           out_via_whatsapp: boolean
+        }[]
+      }
+      school_attendance_trend: {
+        Args: { p_days?: number }
+        Returns: {
+          out_absent: number
+          out_date: string
+          out_excused: number
+          out_holiday: number
+          out_late: number
+          out_present: number
         }[]
       }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
@@ -8066,6 +8193,16 @@ export type Database = {
           out_teachers: number
         }[]
       }
+      search_everything: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          out_href: string
+          out_id: string
+          out_kind: string
+          out_subtitle: string
+          out_title: string
+        }[]
+      }
       search_schools: {
         Args: {
           p_boarding?: boolean
@@ -8126,6 +8263,7 @@ export type Database = {
         Args: { p_incident_id: string; p_note?: string; p_status: string }
         Returns: boolean
       }
+      set_my_parent_photo: { Args: { p_photo_url: string }; Returns: boolean }
       set_onboarding_override: {
         Args: {
           p_item_key: string
@@ -8210,6 +8348,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_student_photo: {
+        Args: { p_photo_url: string; p_student_id: string }
+        Returns: boolean
       }
       set_timetable_period: {
         Args: {
@@ -8381,6 +8523,12 @@ export type Database = {
           out_message: string
         }[]
       }
+      unguarded_school_tables: {
+        Args: never
+        Returns: {
+          out_table_name: string
+        }[]
+      }
       unlink_parent_from_student: {
         Args: { p_link_id: string }
         Returns: {
@@ -8432,6 +8580,7 @@ export type Database = {
           gateway_transaction_id: string | null
           id: string
           is_voided: boolean
+          mobile_money_provider: string | null
           notes: string | null
           paid_at: string
           payment_method: string
@@ -8482,6 +8631,7 @@ export type Database = {
           out_user_id: string
         }[]
       }
+      worker_capture_platform_metrics: { Args: never; Returns: boolean }
       worker_claim_scheduled_announcements: {
         Args: { p_limit?: number }
         Returns: {

@@ -25,7 +25,7 @@ import { SignedIn, SignedOut } from '@zsms/auth-provider/react'
 
 import { NotificationBell } from '../../components/ui/notification-bell'
 import { AccountMenu } from '../../components/ui/account-menu'
-import { ThemeToggle } from '../../components/ui/theme-toggle'
+import { GlobalSearch } from '../../components/ui/global-search'
 import { TeacherShell } from './teacher-shell'
 import { HubSignIn } from './hub-sign-in'
 
@@ -66,7 +66,16 @@ export default function TeacherHubLayout({ children }: { children: ReactNode }):
         <TeacherShell
           headerActions={
             <>
-              <ThemeToggle />
+            {/*
+              Global search (`0266`).
+
+              Mounted per portal rather than in the shell, because not every audience
+              benefits: a parent has one or two children, so a box that searches them is
+              furniture. The function itself is safe for anyone — it is SECURITY INVOKER
+              and RLS scopes every result — so this is a usefulness decision, not a
+              security one.
+            */}
+            <GlobalSearch placeholder="Search pupils…" />
               <NotificationBell endpoint="/api/session/notices" />
             <AccountMenu />
             </>

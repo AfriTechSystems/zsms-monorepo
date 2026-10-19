@@ -24,7 +24,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
-import { Loader2, Send } from 'lucide-react'
+import { LoaderCircle, Send } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -39,6 +39,7 @@ import { FormActions, FormGrid, FormSection } from '../../../../../components/ui
 import { useToast } from '../../../../../components/ui/toast'
 import { formatKwacha, formatLevel } from '../../school-shared'
 import { FeeLineBuilder } from './fee-line-builder'
+import { DateField } from '../../../../../components/ui/date-field'
 
 interface Structure {
   id: string
@@ -167,20 +168,14 @@ export default function StructuresPage({
                   )}
                 </Field>
 
-                <Field
+                <DateField
+
                   id="gen-due"
                   label="Due date"
                   hint="Left blank, nothing is ever overdue."
-                >
-                  {(props) => (
-                    <Input
-                      {...props}
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                    />
-                  )}
-                </Field>
+                  value={dueDate}
+                  onChange={setDueDate}
+                />
               </FormGrid>
 
               <p className="mt-stack text-sm text-muted-foreground">
@@ -205,7 +200,7 @@ export default function StructuresPage({
               <FormActions>
                 <Button type="submit" disabled={issuing || matching === 0}>
                   {issuing ? (
-                    <Loader2 aria-hidden="true" className="animate-spin" />
+                    <LoaderCircle aria-hidden="true" className="animate-spin" />
                   ) : (
                     <Send aria-hidden="true" />
                   )}

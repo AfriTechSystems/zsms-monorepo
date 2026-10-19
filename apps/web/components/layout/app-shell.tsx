@@ -29,6 +29,7 @@
  */
 
 import type { JSX, ReactNode } from 'react'
+import { Shortcuts } from '../ui/shortcuts'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -62,6 +63,25 @@ export interface AppShellProps {
   /** Shown at the top of the sidebar. The product or the school. */
   title: string
   subtitle?: string
+  /**
+   * The organisation's logo, shown beside the name in the sidebar.
+   *
+   * Optional, and ABSENT rather than placeholdered when not supplied — the AfriTech
+   * and Teacher Hub shells have no logo to show and a dashed box in a sidebar they
+   * can never fill would be an instruction nobody can follow. The placeholder lives
+   * on the settings screen, where somebody can act on it.
+   */
+  logoUrl?: string | null
+  /**
+   * The school's own colour, as a thin stripe at the top of the sidebar.
+   *
+   * **Decorative only, and deliberately so.** `school_branding.anchor_color` is
+   * CHECK-constrained to 4.5:1 against a LIGHT background, which says nothing about
+   * the dark sidebar — so the colour is never used behind text, for an active state,
+   * or for anything a reader has to perceive. A stripe carries no information, so it
+   * has no contrast requirement to fail.
+   */
+  accentColor?: string | null
   groups: NavGroup[]
   /** Account menu, theme toggle, school switcher — whatever belongs to this portal. */
   headerActions?: ReactNode
@@ -74,6 +94,8 @@ export function AppShell({
   base,
   title,
   subtitle,
+  logoUrl,
+  accentColor,
   groups,
   headerActions,
   footer,
@@ -218,6 +240,17 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh bg-background">
+      {/*
+        Shortcuts (`?`), mounted ONCE here rather than per portal.
+
+        Every portal built on this shell gets them, and there is one list to keep
+        honest — a panel that advertises a key nobody wired is worse than no panel,
+        because the reader presses one, nothing happens, and they stop trusting the
+        rest of it. The parent portal does not use this shell and does not get them,
+        which is right: it is phone-first and has no keyboard.
+      */}
+      <Shortcuts />
+
       {/* ---------------- Desktop sidebar ---------------- */}
       <aside
         className={cn(
@@ -225,6 +258,14 @@ export function AppShell({
           collapsed ? 'w-16' : 'w-64',
         )}
       >
+        {accentColor && (
+          <span
+            aria-hidden="true"
+            className="block h-1 w-full shrink-0"
+            style={{ backgroundColor: accentColor }}
+          />
+        )}
+
         <div className={cn('flex items-center gap-2 border-b border-border px-4 py-3', collapsed && 'justify-center px-2')}>
           <Link href={base} className="min-w-0 flex-1">
             {collapsed ? (
@@ -232,7 +273,17 @@ export function AppShell({
                 Z
               </span>
             ) : (
-              <span className="block truncate font-semibold text-text">{title}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                {logoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- an arbitrary R2 host
+                  <img
+                    src={logoUrl}
+                    alt=""
+                    className="size-6 shrink-0 rounded object-contain"
+                  />
+                )}
+                <span className="block truncate font-semibold text-text">{title}</span>
+              </span>
             )}
             {!collapsed && subtitle && (
               <span className="block truncate text-xs text-muted-text">{subtitle}</span>
@@ -291,7 +342,17 @@ export function AppShell({
       )}
 
       {/* ---------------- Content ---------------- */}
-      <div className={cn('transition-[padding]', collapsed ? 'lg:pl-16' : 'lg:pl-64')}>
+      {/*
+        `zsms-shell-pad` is what the assistant panel pushes against (globals.css).
+        The panel sets a `data-assistant` attribute on <html>; this wrapper reserves
+        the width on `lg` and up so the dashboard moves instead of being covered.
+      */}
+      <div
+        className={cn(
+          'zsms-shell-pad transition-[padding]',
+          collapsed ? 'lg:pl-16' : 'lg:pl-64',
+        )}
+      >
         <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
           <div className="flex items-center gap-3 px-gutter py-3">
             <button

@@ -40,6 +40,7 @@ import { Sparkles } from 'lucide-react-native'
 
 import { api } from '../../../lib/api'
 import { useApi } from '../../../lib/use-api'
+import { Segmented } from '../../../components/shell'
 import { useSession } from '../../../lib/auth'
 import {
   Body,
@@ -113,18 +114,16 @@ export default function Create(): JSX.Element {
             <Body muted>Give it a subject, a grade and a topic.</Body>
           </View>
 
-          {/* Segmented rather than a picker: three options is below the threshold where
-              a dropdown earns its extra tap. */}
-          <Row gap={SPACE.xs}>
-            {KINDS.map((k) => (
-              <Button
-                key={k.value}
-                label={k.label}
-                tone={kind === k.value ? 'primary' : 'outline'}
-                onPress={() => setKind(k.value)}
-              />
-            ))}
-          </Row>
+          {/*
+            Segmented rather than a picker: three options is below the threshold where
+            a dropdown earns its extra tap.
+
+            Three outline Buttons until 2026-10-18, which is the same control drawn by
+            hand — and it read differently from every other switcher in the app,
+            because an unselected outline button looks like an action rather than an
+            option not taken.
+          */}
+          <Segmented options={KINDS} value={kind} onChange={setKind} />
 
           {error && <ErrorNote message={error} />}
 

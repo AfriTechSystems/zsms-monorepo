@@ -59,6 +59,17 @@ export interface Meta {
   perPage?: number
   total?: number
   /**
+   * Aggregates computed over the WHOLE collection, for a context rail beside a
+   * paginated table.
+   *
+   * They ride in `meta` for the same reason `capacity` does: they describe the
+   * collection rather than being part of it. `null` means the aggregate itself
+   * failed, which a rail must show differently from an empty one — an empty
+   * distribution reads as a school with no pupils.
+   */
+  distribution?: Record<string, number> | null
+  recent?: unknown[]
+  /**
    * The resolved student ceiling, on list routes where it governs what the
    * caller may do next.
    *

@@ -30,10 +30,11 @@
 import type { ChangeEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, FileUp, Loader2, Upload } from 'lucide-react'
+import { CircleCheck, FileUp, LoaderCircle, Upload } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
+import { SectionLink } from '../../../../../components/ui/section-link'
 import { Button } from '../../../../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../../components/ui/card'
 import { DataTable } from '../../../../../components/ui/data-table'
@@ -279,7 +280,7 @@ export default function ImportPupilsPage({
             <div className="flex flex-wrap gap-2">
               <Button disabled={busy || rows.length === 0} onClick={() => run('validate')}>
                 {busy ? (
-                  <Loader2 aria-hidden="true" className="animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" />
                 ) : (
                   <FileUp aria-hidden="true" />
                 )}
@@ -298,17 +299,26 @@ export default function ImportPupilsPage({
 
         {result?.committed && (
           <Alert variant="success" title="Import finished">
-            {result.created} pupils were added to the roll.{' '}
-            <Link href={`${base}/students`} className="underline">
-              See the roll
-            </Link>
+            {result.created} pupils were added to the roll.
+            {/*
+              A BUTTON, not an underlined link: this is the next action after a
+              successful import, not a reference inside a sentence. The distinction is
+              the design rule — a standalone navigation affordance is a button with an
+              arrow; a link inside prose stays a link, because turning "recorded in the
+              audit trail" into a button would break the sentence it is part of.
+            */}
+            <span className="mt-stack block">
+              <SectionLink href={`${base}/students`} variant="outline">
+                See the roll
+              </SectionLink>
+            </span>
             .
           </Alert>
         )}
 
         {clean && (
           <Alert variant="success" title="The file looks good">
-            <CheckCircle2 aria-hidden="true" className="mr-1 inline size-4" />
+            <CircleCheck aria-hidden="true" className="mr-1 inline size-4" />
             {result?.willCreate} pupils are ready to import. Nothing has been saved yet.
           </Alert>
         )}

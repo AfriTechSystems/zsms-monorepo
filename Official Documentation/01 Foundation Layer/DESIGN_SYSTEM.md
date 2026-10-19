@@ -155,6 +155,61 @@ Body is 15px rather than the more common 16px: the product is table-dense, and 1
 - **Radius** is `sm 4 / md 6 / lg 8 / xl 12`. Cards use `lg`, inputs and buttons `md`.
 - **Elevation** is three shadows only. Depth is used to separate a floating layer from the page, never to decorate a card that is already bounded.
 - **Touch targets** are 44px minimum on the default control size. Below that, tapping on a phone in a school corridor is a coin toss.
+- **Stacking** is six named layers, not raw numbers: `raised` (10) for decoration and sticky cells inside a card, `sticky` (20) for bars inside a scrolling region, `chrome` (30) for the sidebar and bottom tabs, `overlay` (40) for scrims, `popover` (50) for menus, toasts and banners, `top` (60) for the keyboard-shortcuts panel. Added 2026-10-18 by reading the scale the components had already settled into. Reaching for a bracketed `z-[n]` means the layer you want is one of these.
+- **Motion** is three durations (`fast` 120ms, `base` 220ms, `slow` 400ms) and three easings (`standard`, `gentle`, `emphasised`). The ambient loop timings in `globals.css` — the 1.4s splash sweep, the 4s float, the aura's co-prime 19/24/29s drifts — are deliberately **not** tokens. They are scene timings, and tokenising them would imply they are interchangeable with a hover transition. Reduced motion stays a single global rule, because a token cannot express "and also stop the aura".
+
+### One breakpoint, and it used to be two
+
+`BREAKPOINT_SM` is **640px** and it is the only one. `apps/web/tailwind.config.ts` imports it rather than inheriting a default, and `apps/web/lib/breakpoints.test.ts` fails the build if the two diverge.
+
+Until 2026-10-18 they did diverge, silently. The token layer emitted its mobile block at `max-width: 480px` while Tailwind's `sm` was its stock 640px, which this repository never declared and so never reconciled. **Between 480px and 640px a screen got desktop type and padding inside a mobile layout** — 20px card padding, a 24px gutter and full-size headings wrapped around a card stack, because `data-table` goes to one card per row below `sm` and `app-shell` switches to its drawer there. That band is most phones held in landscape and the narrow half of a split-screen tablet.
+
+The media query bound is `BREAKPOINT_SM - 0.02`, not `BREAKPOINT_SM`: `sm:` compiles to `min-width: 640px`, so a `max-width: 640px` would make both apply at exactly 640 — the same bug, one pixel wide.
+
+---
+
+## Icons
+
+One vocabulary, two maps. **`packages/design-tokens/src/icons.ts`** holds 98 semantic
+names — `students`, `attendance`, `fees`, `aiAssistant` — and no glyphs;
+`apps/web/components/ui/icon.tsx` and `apps/mobile/components/icon.tsx` map them to
+`lucide-react` and `lucide-react-native`. Pages ask for a concept, never for a picture.
+
+The split is forced rather than tidy: the two lucide packages export the same names as
+different component types, and the token package is imported by a Railway worker that
+renders PDFs, where React has no business.
+
+**`IconName` makes a missing concept a compile error. It cannot make the two maps
+agree**, so `apps/web/lib/icons.test.ts` asserts they are complete, invent nothing,
+choose the same glyph for every concept, and use no deprecated lucide alias.
+
+### What the registry owns
+
+The concepts that appear in more than one place — navigation destinations, domain
+objects, states. A one-off glyph on a single screen can still be imported directly;
+routing every icon through a registry is ceremony. What drifts is what repeats.
+
+### Why it exists
+
+An audit on 2026-10-19 found 142 distinct glyphs across 155 web files and **22 of 24
+core concepts drawn more than one way**, or differing between web and mobile. The worst
+of it was invisible: lucide renamed several glyphs and kept the old names, so
+`AlertTriangle` (16 files) and `TriangleAlert` were the same picture under two names,
+as were `CheckCircle2` and `CircleCheck`. Nobody could see that drift, which is how it
+spread — and why the guard is a test rather than a review checklist.
+
+### Two rules the test enforces, not just documents
+
+- **`unmarked` is never the `absent` glyph**, on either platform. ATTENDANCE.md's rule
+  is that an unmarked pupil is not an absent one; printed, that error outlives the
+  correction. Its colour role is `neutral`, not `warning` — amber beside a red `absent`
+  reads as a lesser accusation rather than as no answer yet.
+- **No deprecated alias in either map.** They render identically to their replacements,
+  which is exactly what made the original drift impossible to see.
+
+Full guidance, including the eight reference sheets, is in
+`19 Design System/Icons/ZSMS_ICON_CATALOGUE.md`. **No purple token was added**: the
+sheets show `#8B5CF6` and the catalogue states it is not part of the core palette.
 
 ---
 
@@ -164,6 +219,9 @@ Body is 15px rather than the more common 16px: the product is table-dense, and 1
 - **One filled primary button per view.** A screen with three competing filled buttons is a screen where a tired bursar clicks the wrong one. Secondary actions are `outline`, `secondary`, or `ghost`.
 - **`destructive` is reserved** for actions that delete or reverse money. It is not a general-purpose red button.
 - **Every input has a visible label.** Placeholder-as-label disappears exactly when the user needs it.
+- **Dates use `DateField` / `DateRangeField`**, never a raw `<input type="date">`. The native control is kept deliberately — it is keyboard accessible, announced correctly, and opens the operating system's own picker on a phone, which beats anything we would hand-roll for a clerk entering fifty dates. What the wrapper adds is a **linked range**: the `from` input's `max` is whatever `to` holds and vice versa, so an inverted range cannot be entered. Five from/to pairs previously had no such check and an inverted one returned an empty result that read as "there is no data".
+- **"Today" comes from `lib/dates`.** Never `toISOString().slice(0, 10)` — that is UTC, and Zambia is UTC+2, so for the first two hours of every local day it is yesterday. As a default it opens the wrong day; as a maximum it refuses the register a teacher is sitting in front of.
+- **Menus use `usePopover()`.** Escape closes and **returns focus to the trigger**, Tab out closes, an outside click closes. A menu must *not* trap focus — that is a modal's job, and `ui/dialog` delegates it to the native `<dialog>`. Trapping a menu means a user who opened it by accident cannot Tab away.
 - **Errors preserve input.** A validation failure never clears the field it rejected.
 - **Every list has a designed empty state and a designed loading state.** Both are components, not afterthoughts: a blank panel is indistinguishable from a broken one.
 - **Focus is visible everywhere.** A single global `:focus-visible` ring, using a mode-aware token, applied once rather than per component.
@@ -214,6 +272,111 @@ The hint remains attached through `aria-describedby`, so a screen reader still a
 Admin dashboards are **desktop-primary**. On a narrow screen the bar is *graceful, not polished*: multi-column forms collapse to one column, tables scroll inside their own `overflow-x-auto` container rather than stretching the page, nothing overlaps, and padding stays legible. That is the whole requirement — an operator's phone is not where a school is administered.
 
 The parent and teacher portals are genuinely used on phones and get the fuller treatment.
+
+---
+
+## Global search
+
+**Added 2026-10-12** (`0266`). `GlobalSearch` in the top bar, backed by
+`search_everything()`.
+
+### Who gets a box
+
+| Portal | Finds | Why |
+|---|---|---|
+| **AfriTech Admin** | Schools | A platform operator navigates by school name |
+| **School** | Pupils, staff | The two things an office looks up all day |
+| **Teacher** (in a school) | Pupils in their own classes | The same box and the same query — RLS narrows the results, not a different code path |
+| Parent | **No box** | One or two children. A search over two names is furniture |
+| Student / Alumni | **No box** | One record, their own |
+
+The parent and student exclusions are **usefulness decisions, not security ones**. The
+function is safe for them; it would simply find nothing worth finding.
+
+### The security model, which is the whole design
+
+`search_everything()` is **SECURITY INVOKER**, and that is deliberate. Every other
+cross-table function in this schema is DEFINER with a hand-written tenant clause; a
+DEFINER search would have to re-implement, in one function, every rule governing who may
+see a pupil, a member of staff and a school — including the teacher-sees-only-their-
+classes rule in `teacher_assignments`. Four policies restated where no policy test covers
+them, and the restatement is what drifts.
+
+As INVOKER, Postgres applies the caller's existing policies to every table it touches.
+**The function contains no school clause of any kind, and creates no access that did not
+already exist** — it can only return rows the caller could have fetched one table at a
+time.
+
+That also means its own SQL is no evidence that it is safe, so
+`supabase/tests/rls/global_search_test.sql` proves it by running as each audience: two
+schools each hold a pupil surnamed Mwansa, and each school finds exactly one.
+
+### Behaviour
+
+- **Two characters minimum.** A one-character query matches almost everything and is
+  refused outright rather than returning the roll.
+- **Debounced 200ms with an abort controller.** Without the abort, a slow early response
+  can land after a fast later one and replace the right results with stale ones.
+- **Ctrl/Cmd+K** focuses it; arrows and Enter work; Escape closes.
+- **Soft-deleted pupils are not findable.** Search is how somebody would casually check
+  whether a withdrawn pupil is "still in the system", and the answer the roll gives
+  everywhere else is no.
+- **ILIKE, not a trigram index.** `pg_trgm` is available and deliberately not installed:
+  a school has hundreds of pupils, the platform hundreds of schools, and the limit caps
+  the work. Revisit at a scale that actually hurts; the function's shape does not change.
+
+---
+
+## Navigation that is an action is a button
+
+**Added 2026-10-12.**
+
+A link that takes the reader to another section or page, offered alongside other things
+they can do, is a **button with a trailing arrow** — not underlined text. Use
+`SectionLink` (`components/ui/section-link.tsx`), which renders the agreed shape once so
+the decision is not re-made per screen.
+
+"View all" beside a panel heading, "Pricing" leaving the dashboard, "Open checklist" —
+all buttons. As underlined text they read as a footnote, they are smaller than the 44px
+touch target, and they sit inconsistently beside the real buttons next to them.
+
+**What deliberately stays an ordinary link:**
+
+| Case | Why |
+|---|---|
+| A name in a table cell that opens its record | The row is the subject. A button in every row is a wall of chrome |
+| A word inside a sentence | A consent line pointing at the privacy policy, "set on the school profile". Promoting it breaks the sentence |
+| A card title that opens the card's subject | The whole card is already the affordance |
+| `tel:` and `mailto:` | Not navigation |
+
+---
+
+## Profile pictures
+
+**Added 2026-10-12.** `Avatar` and `AvatarName` (`components/ui/avatar.tsx`).
+
+The **initials fallback is the main case, not the error case** — almost no pupil has a
+photo on the day a school is onboarded. A tinted disc with one or two letters, coloured
+deterministically from the name so one person is one colour on every screen. Grey circles
+for everybody would make a class list unreadable.
+
+Who may set whose, enforced by `0265` and not merely by the UI:
+
+| Whose | Who may set it |
+|---|---|
+| A pupil | The school — owner, principal, administrator |
+| A member of staff | Themselves |
+| A parent | Themselves |
+
+**A parent may see their child's photo and may not change it.** The picture identifies a
+child at a gate and on a register, so it is the school's record of who the child is. A
+teacher is excluded too: marking a register is not a reason to change what a child looks
+like.
+
+Uploads go through `/api/uploads/photo` — **2MB**, JPG/PNG/WebP only, verified against the
+file's own magic bytes rather than its declared type. SVG is refused: it is a document
+that can carry script, and serving one from our origin would run that script with our
+origin's privileges.
 
 ---
 
@@ -462,3 +625,7 @@ inconvenience.
 | 2026-08-18 | **Added the Form Layout section; hint moved below the control** | A hint above the control is variable height, so two controls in a row started at different heights and the row stair-stepped. Fixing the ordering fixes every form at once; per-field padding could not have |
 | 2026-08-18 | Form layout extracted into `FormGrid` / `FormSection` / `FormActions` / `CheckboxField`, control appearance unified in one `controlClasses` | The pricing screen had built three grids with different column counts, which cannot align by construction. Shared components make the aligned version the default rather than something each screen re-derives |
 | 2026-08-18 | Stated the admin-vs-portal mobile bar explicitly | Admin screens are desktop-primary; "graceful, not polished" is a deliberate ceiling, so effort goes to the portals parents actually use on phones |
+| 2026-10-18 | **One breakpoint instead of two** — `BREAKPOINT_SM` (640) is now the only one, imported by `tailwind.config.ts` and asserted by `lib/breakpoints.test.ts` | The token layer switched type and spacing at 480px while Tailwind's `sm` was its undeclared stock 640px. Between those widths a screen got desktop padding and headings inside a mobile card-stack layout — most phones in landscape. Nothing could have caught it: the two values were a TypeScript constant and a framework default, and no build step compared them |
+| 2026-10-18 | Added `Z_INDEX` and `MOTION` tokens | The stacking scale already existed implicitly and had started leaking escape hatches (`z-[60]`); naming it was the missing part. Motion durations were literals in `globals.css`. Ambient loop timings deliberately excluded — scene timings are not a scale |
+| 2026-10-19 | **A canonical icon vocabulary shared by web and mobile**, with a test asserting the two maps agree | 142 glyphs across 155 web files and 22 of 24 core concepts drawn more than one way. The worst was invisible — lucide renamed glyphs and kept the old names, so `AlertTriangle` and `TriangleAlert` were one picture under two names across 16 files. 65 files de-duplicated, zero deprecated aliases left. `ErrorState` drew a warning triangle inside a danger Alert whose header drew a circled X, for the same message; sheet 01 F settles it |
+| 2026-10-18 | Added `DateField` / `DateRangeField` and `usePopover()`; `todayIso()` centralised in `lib/dates` | Eighteen raw date inputs across twelve files, five from/to pairs with no check that from ≤ to, and `todayIso()` defined twice with eight further inline UTC variants that return yesterday for the first two hours of every Zambian day. Three hand-rolled popovers had drifted and none returned focus to its trigger on Escape |

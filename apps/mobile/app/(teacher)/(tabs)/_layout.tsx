@@ -29,13 +29,17 @@
 import type { JSX } from 'react'
 import { Tabs } from 'expo-router'
 import { DrawerToggleButton } from 'expo-router/drawer'
-import { CalendarCheck, ClipboardList, FolderOpen, LayoutGrid, WandSparkles } from 'lucide-react-native'
+import { LayoutGrid, WandSparkles } from 'lucide-react-native'
 import { View } from 'react-native'
 
 import { useSession } from '../../../lib/auth'
 import { AskAiFab } from '../../../components/ask-ai-fab'
 import { Loading, Screen, usePalette } from '../../../components/ui'
 import { RADIUS, TAP } from '../../../theme'
+
+// Tab destinations take their glyph from the canonical registry, so the phone's
+// tab bar and the web sidebar cannot disagree about what Attendance looks like.
+import { ICONS } from '../../../components/icon'
 
 export default function TeacherTabs(): JSX.Element {
   const c = usePalette()
@@ -80,7 +84,7 @@ export default function TeacherTabs(): JSX.Element {
         options={{
           title: 'Attendance',
           tabBarIcon: ({ color, focused }) => (
-            <CalendarCheck size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <ICONS.attendance size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />
@@ -127,7 +131,7 @@ export default function TeacherTabs(): JSX.Element {
         options={{
           title: 'Library',
           tabBarIcon: ({ color, focused }) => (
-            <FolderOpen size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <ICONS.library size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />
@@ -139,7 +143,7 @@ export default function TeacherTabs(): JSX.Element {
         options={{
           title: 'Marks',
           tabBarIcon: ({ color, focused }) => (
-            <ClipboardList size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <ICONS.marks size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />

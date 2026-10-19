@@ -26,8 +26,9 @@
 
 import type { FormEvent, JSX } from 'react'
 import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
+import { Avatar } from '../../../../components/ui/avatar'
 import { use, useCallback, useState } from 'react'
-import { Loader2, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
+import { LoaderCircle, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { EditStaff } from './edit-staff'
@@ -51,6 +52,7 @@ interface StaffRow {
   phone_e164: string | null
   location: string | null
   qualifications: string | null
+  photo_url: string | null
   first_name: string | null
   last_name: string | null
   email: string | null
@@ -167,7 +169,7 @@ function InviteForm({ roles, onSent }: { roles: string[]; onSent: () => void }):
         <FormActions>
           <Button type="submit" disabled={sending || !email.trim()}>
             {sending ? (
-              <Loader2 aria-hidden="true" className="animate-spin" />
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
             ) : (
               <MailPlus aria-hidden="true" />
             )}
@@ -287,9 +289,9 @@ export default function StaffPage({
       {loading && !data && !error && <TableSkeleton rows={6} columns={4} />}
 
 
-      {/* Opened from a row's staff record. Above the table rather than inline, so a
-
-          form with nine fields does not push the row being edited off screen. */}
+      {/* Opened from a row's staff record, as a modal. Nine fields rendered inline
+          pushed the row being edited off screen, and on a phone scrolled the table
+          away entirely. */}
 
       {editing && (
 
@@ -349,12 +351,27 @@ export default function StaffPage({
                       header: 'Person',
                       primary: true,
                       cell: (r) => (
-                        <>
-                          <span className="font-medium text-foreground">{fullName(r)}</span>
-                          {r.email && (
-                            <span className="block truncate text-xs text-subtle">{r.email}</span>
-                          )}
-                        </>
+                        /*
+                          A face beside the name. `photo_url` has been on
+                          `staff_members` and in this route's select the whole time;
+                          nothing rendered it.
+
+                          Read-only here. A member of staff sets their own picture on
+                          their account screen — the school records who they are, not
+                          what they look like, and a colleague editing somebody else's
+                          photograph is not a permission this product wants.
+                        */
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <Avatar name={fullName(r)} src={r.photo_url} size="sm" />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-foreground">
+                              {fullName(r)}
+                            </span>
+                            {r.email && (
+                              <span className="block truncate text-xs text-subtle">{r.email}</span>
+                            )}
+                          </span>
+                        </span>
                       ),
                     },
                     {
@@ -511,7 +528,7 @@ export default function StaffPage({
                           onClick={() => void revoke(i)}
                         >
                           {busy === i.id ? (
-                            <Loader2 aria-hidden="true" className="animate-spin" />
+                            <LoaderCircle aria-hidden="true" className="animate-spin" />
                           ) : (
                             <X aria-hidden="true" />
                           )}

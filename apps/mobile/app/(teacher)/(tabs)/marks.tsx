@@ -41,6 +41,7 @@ import {
   Body,
   Button,
   Caption,
+  Card,
   Empty,
   ErrorNote,
   Loading,
@@ -48,6 +49,8 @@ import {
   Screen,
   usePalette,
 } from '../../../components/ui'
+import { Donut, ProgressBar } from '../../../components/stats'
+import { Segmented } from '../../../components/shell'
 import { NUMERIC, RADIUS, SPACE, TAP, TYPE } from '../../../theme'
 import { formatClass } from './attendance'
 
@@ -85,6 +88,14 @@ export default function Marks(): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  /*
+    Marks | Spread, matching the register's Pupils | Summary.
+
+    A tab rather than a second screen: the spread is ABOUT the marks on this sheet, so
+    "go back and fix one" stays a tap. Called "Spread" rather than "Summary" because
+    that is what it shows — the shape of the class, not a recap of the sheet.
+  */
+  const [view, setView] = useState<'marks' | 'spread'>('marks')
 
   const { data: structure } = useApi<Structure>('/api/school/structure')
 
@@ -118,6 +129,49 @@ export default function Marks(): JSX.Element {
 
   const rows = data?.rows ?? []
   const unmarked = rows.filter((r) => !entries[r.studentId]?.trim()).length
+
+  /**
+   * The grade spread, for the Spread tab.
+   *
+   * ## Saved grades only, and the caption says so
+   *
+   * A grade is produced by `grade_from_scale_version()` in the database, never in the
+   * browser — the boundary is implemented once, which is why this screen shows a grade
+   * and never lets anybody type one. So a mark typed and not yet saved has no grade to
+   * count, and this cannot include it. The caption states the number it is drawn from
+   * rather than letting the reader assume it is all of them.
+   *
+   * ## Ordering
+   *
+   * `MarkRow` carries `gradeLetter` but no points, so the order here is the label's own
+   * natural order — numeric-aware, so `10` sorts after `9` in a 1–9 scale. The web's
+   * results screen sorts by `gradePoints`, which is the scale's own ordering and
+   * strictly better; adding that here means widening the sheet endpoint, and a wrong
+   * order on a bar chart is a smaller error than a wrong grade, so it waits.
+   */
+  const spread = useMemo(() => {
+    const counts = new Map<string, number>()
+    let graded = 0
+
+    for (const r of rows) {
+      if (!r.gradeLetter) continue
+      graded += 1
+      counts.set(r.gradeLetter, (counts.get(r.gradeLetter) ?? 0) + 1)
+    }
+
+    const slices = [...counts.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+      /*
+        One hue for every slice, NOT a different colour per grade.
+
+        The slices are one measure — a count of pupils — split by grade. A colour per
+        grade would be colouring by rank, which invites the reader to see a traffic
+        light on a class's results. The label carries the identity.
+      */
+      .map((entry) => ({ label: entry[0], value: entry[1], colour: c.primaryMark }))
+
+    return { slices, graded }
+  }, [rows, c.primaryMark])
 
   const save = useCallback(async () => {
     setSaving(true)
@@ -232,6 +286,60 @@ export default function Marks(): JSX.Element {
               {unmarked > 0 && <Badge label={`${unmarked} not marked`} tone="warning" />}
             </Row>
 
+            <Segmented
+              options={[
+                { value: 'marks', label: `Marks (${rows.length})` },
+                { value: 'spread', label: 'Spread' },
+              ]}
+              value={view}
+              onChange={setView}
+            />
+
+            {view === 'spread' ? (
+              <Card>
+                {spread.slices.length === 0 ? (
+                  <Body muted>
+                    No saved grades yet. Save the sheet to see how the class did.
+                  </Body>
+                ) : (
+                  <>
+                    <Donut
+                      centreValue={String(spread.graded)}
+                      centreLabel={spread.graded === 1 ? 'graded' : 'graded'}
+                      slices={spread.slices}
+                    />
+                    <View style={{ marginTop: SPACE.md }}>
+                      <Caption>
+                        {`${spread.graded} of ${rows.length} pupils have a saved grade.`}
+                        {spread.graded < rows.length - unmarked
+                          ? ' Marks you have typed but not saved are not counted yet.'
+                          : ''}
+                      </Caption>
+                    </View>
+                  </>
+                )}
+              </Card>
+            ) : (
+            <>
+
+            {/*
+              How far through the sheet, matching the register.
+
+              The badge says how many are left; the bar says how far through, which is
+              the question somebody entering forty marks keeps asking. Hidden once the
+              sheet is complete — the Save button already says so, and a full bar is a
+              congratulation nobody needs.
+            */}
+            {unmarked > 0 && (
+              <View style={{ gap: 4 }}>
+                <ProgressBar
+                  value={((rows.length - unmarked) / rows.length) * 100}
+                  tone="primary"
+                />
+                <Caption>{`${rows.length - unmarked} of ${rows.length} entered`}</Caption>
+              </View>
+            )}
+
             {rows.map((r) => (
               <Row
                 key={r.studentId}
@@ -282,6 +390,8 @@ export default function Marks(): JSX.Element {
                 />
               </Row>
             ))}
+            </>
+            )}
           </>
         )}
 

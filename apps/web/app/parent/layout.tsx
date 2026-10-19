@@ -11,10 +11,23 @@
  * about their children — so the portal is `/parent/...` and the child is a query parameter the
  * screens carry.
  *
- * The consequence, stated rather than discovered: a parent with children at two ZSMS schools is
- * in two Clerk organisations, and a session acts in one at a time. Today they see the children of
- * whichever org is active. That is a real limitation and it is recorded in `CLAUDE.md` rather
- * than papered over with a screen that silently shows half a family.
+ * ## A parent is not in a Clerk organisation, and this block used to say otherwise
+ *
+ * Until 2026-10-18 the paragraph here described a limitation: that a parent with children at two
+ * ZSMS schools is in two Clerk organisations, a session acts in one at a time, and so they see
+ * only half a family. **The premise was never true of this schema.** `is_linked_parent_of()`
+ * reads `parent_user_id = public.get_user_id()` and nothing else — no `current_school_uuid()`,
+ * no organisation claim — so **a parent's access is scoped by the link row, not by an
+ * organisation**, and parent policies already span every school a child of theirs attends.
+ * `claim_parent_links()` links across all of them at once, on the verified email address.
+ *
+ * Choosing a school is therefore a screen (`/parent/schools`) and not an organisation switch, and
+ * nothing in that path calls Clerk. That page has carried a note saying this premise is false for
+ * some time; the limitation it contradicted is the one that was written here, which is why both
+ * `CLAUDE.md` and this file have now been corrected.
+ *
+ * The lesson is the repository's standing one: a limitation recorded from a documented claim
+ * rather than from the schema outlives the claim. Verify against the applied schema.
  *
  * ## Bottom tabs on a phone, a sidebar on a desktop
  *
@@ -33,7 +46,6 @@ import type { JSX, ReactNode } from 'react'
 
 import { NotificationBell } from '../../components/ui/notification-bell'
 import { AccountMenu } from '../../components/ui/account-menu'
-import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { ParentShell } from './parent-shell'
 
 export default function ParentLayout({ children }: { children: ReactNode }): JSX.Element {
@@ -45,7 +57,6 @@ export default function ParentLayout({ children }: { children: ReactNode }): JSX
       <ParentShell
         headerActions={
           <>
-            <ThemeToggle />
             <NotificationBell endpoint="/api/parent/notices" allHref="/parent/notices" />
             <AccountMenu />
           </>

@@ -20,7 +20,8 @@
 import type { JSX } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { usePalette } from './ui'
+import { Avatar } from './avatar'
+import { Row, usePalette } from './ui'
 import { RADIUS, SPACE, TAP, TYPE } from '../theme'
 import type { Child } from '../lib/child'
 
@@ -78,14 +79,26 @@ export function ChildSwitcher({
               backgroundColor: active ? c.primaryTint : c.surface,
             }}
           >
-            <Text
-              style={[
-                TYPE.label,
-                { color: active ? c.primaryMark : c.text, fontWeight: active ? '700' : '500' },
-              ]}
-            >
-              {child.firstName}
-            </Text>
+            {/*
+              A face on the chip, so switching between children is recognising rather
+              than reading. Small on purpose — the chip has to stay thumb-sized and a
+              row of large avatars would scroll off a narrow phone.
+            */}
+            <Row gap={SPACE.xs}>
+              <Avatar
+                name={`${child.firstName} ${child.lastName ?? ''}`.trim()}
+                src={child.photoUrl ?? null}
+                size="sm"
+              />
+              <Text
+                style={[
+                  TYPE.label,
+                  { color: active ? c.primaryMark : c.text, fontWeight: active ? '700' : '500' },
+                ]}
+              >
+                {child.firstName}
+              </Text>
+            </Row>
             {spansSchools && child.schoolName && (
               <Text style={[TYPE.caption, { color: c.textSubtle }]} numberOfLines={1}>
                 {child.schoolName}

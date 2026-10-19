@@ -27,6 +27,7 @@ import {
   textRight,
 } from './pdf'
 import type {
+  AttendanceRegisterData,
   ReceiptData,
   RenderedDocument,
   ReportCardData,
@@ -384,7 +385,164 @@ export async function renderTransferLetter(
 }
 
 // Exported so a worker can type the context it assembles for the renderer.
-export type { TransferLetterData } from './types'
+/**
+ * One class's register for one day, as a sheet somebody can file or sign.
+ *
+ * Spec: `Official Documentation/10 Attendance/ATTENDANCE.md` → *Attendance Reports*
+ *
+ * ## What it is for
+ *
+ * The reference design puts a "Download Attendance Report" button on the register's
+ * Summary panel, and the thing a teacher wants from there is the register they have
+ * just marked — to hand to the office, to file, or to sign. So this prints one day,
+ * not a range.
+ *
+ * ATTENDANCE.md's two bigger reports are **not** this. The *Class Attendance Report*
+ * wants a date range with per-pupil totals and a below-threshold list; the *School
+ * Attendance Summary* wants grade rates, top absentees and marking compliance. Both
+ * need data a single register does not hold, and both remain unbuilt.
+ *
+ * ## An unmarked pupil prints as a dash, never as absent
+ *
+ * The rule this whole module has carried since the register was written. On screen an
+ * unmarked pupil is a gap a teacher can still fill; on paper it would become a record
+ * of absence that outlives the correction, and this is a document that gets filed.
+ * The summary line counts them separately for the same reason.
+ *
+ * ## A signature line, because paper is what this is
+ *
+ * A register printed for the office is evidence, and in most Zambian schools it is
+ * countersigned. A PDF that omits the line forces somebody to draw one in biro.
+ */
+export async function renderAttendanceRegister(
+  data: AttendanceRegisterData,
+): Promise<RenderedDocument> {
+  const doc = await newDocument()
+  await header(doc, data.school, 'ATTENDANCE REGISTER')
+
+  text(doc, data.className, { size: 11, bold: true })
+  move(doc, 14)
+  text(doc, longDate(data.date), { size: 9, color: MUTED })
+  move(doc, 22)
+
+  /*
+    Counted here rather than taken from the caller.
+
+    A summary that disagrees with the rows beneath it is worse than no summary, and
+    the only way to guarantee it cannot is to derive it from the same array that gets
+    printed.
+  */
+  const tally = { present: 0, late: 0, absent: 0, excused: 0, unmarked: 0 }
+  for (const row of data.rows) {
+    if (row.status === 'present') tally.present += 1
+    else if (row.status === 'late') tally.late += 1
+    else if (row.status === 'absent') tally.absent += 1
+    else if (row.status === 'excused') tally.excused += 1
+    else tally.unmarked += 1
+  }
+
+  const assessed = tally.present + tally.late + tally.absent + tally.excused
+  const rate = assessed === 0 ? null : Math.round(((tally.present + tally.late) / assessed) * 100)
+
+  text(
+    doc,
+    `${data.rows.length} on the roll  ·  ${tally.present} present  ·  ${tally.late} late  ` +
+      `·  ${tally.absent} absent  ·  ${tally.excused} excused  ·  ${tally.unmarked} not marked`,
+    { size: 9 },
+  )
+  move(doc, 13)
+  text(
+    doc,
+    rate === null
+      ? 'No pupil was marked, so there is no attendance rate for this day.'
+      : `${rate}% attending — present and late, out of those marked.`,
+    { size: 9, color: MUTED },
+  )
+  move(doc, 20)
+
+  const COL = { num: MARGIN, name: MARGIN + 40, status: RIGHT - 190, note: RIGHT - 120 }
+
+  const columnHeadings = (): void => {
+    text(doc, '#', { x: COL.num, size: 8, bold: true, color: MUTED })
+    text(doc, 'PUPIL', { x: COL.name, size: 8, bold: true, color: MUTED })
+    text(doc, 'STATUS', { x: COL.status, size: 8, bold: true, color: MUTED })
+    text(doc, 'NOTE', { x: COL.note, size: 8, bold: true, color: MUTED })
+    rule(doc, 6)
+  }
+  columnHeadings()
+
+  for (const row of data.rows) {
+    if (needsPage(doc, 34)) {
+      newPage(doc)
+      columnHeadings()
+    }
+
+    text(doc, row.studentNumber, { x: COL.num, size: 9, color: MUTED })
+    text(doc, row.studentName, { x: COL.name, size: 9, maxWidth: COL.status - COL.name - 10 })
+    // The em dash is the unmarked pupil. See the header.
+    text(doc, row.status ? STATUS_WORD[row.status] ?? row.status : '—', {
+      x: COL.status,
+      size: 9,
+      bold: row.status === 'absent',
+    })
+    if (row.note) {
+      text(doc, row.note, { x: COL.note, size: 8, color: MUTED, maxWidth: RIGHT - COL.note })
+    }
+    move(doc, 15)
+  }
+
+  move(doc, 18)
+  rule(doc, 6)
+  move(doc, 16)
+
+  if (data.markedBy) {
+    text(doc, `Marked by ${data.markedBy}`, { size: 9 })
+    move(doc, 20)
+  }
+
+  text(doc, 'Checked by ____________________________     Date ______________', {
+    size: 9,
+    color: MUTED,
+  })
+
+  footer(
+    doc,
+    'An em dash means no mark was recorded for that pupil. It is not a record of absence.',
+  )
+  /*
+    The class and the date, so a folder of these sorts by class then by day and a
+    teacher who downloads two registers does not get two files called the same thing.
+    Non-alphanumerics collapse to a hyphen because a class id may legitimately carry a
+    slash, which some filesystems will not take.
+  */
+  const slug = data.className.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return finish(doc, `register-${slug}-${data.date}.pdf`)
+}
+
+/** The word, not the database value. A register read by a parent or an inspector
+ *  should not expose the schema's vocabulary. */
+const STATUS_WORD: Record<string, string> = {
+  present: 'Present',
+  absent: 'Absent',
+  late: 'Late',
+  excused: 'Excused',
+  holiday: 'Holiday',
+}
+
+/** `YYYY-MM-DD` → "Monday, 26 May 2026". Built from the parts rather than
+ *  `toLocaleDateString` on a Date, because parsing the string as a Date would read it
+ *  as UTC midnight and print the previous day for every user east of Greenwich. */
+function longDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return iso
+  const names = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ]
+  return `${d} ${names[m - 1]} ${y}`
+}
+
+export type { AttendanceRegisterData, AttendanceRegisterRow, TransferLetterData } from './types'
 
 export type { TeachingResourceDocument } from './teaching-resource'
 export {

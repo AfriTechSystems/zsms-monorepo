@@ -27,10 +27,19 @@ import {
 import type { LucideIcon } from 'lucide-react-native'
 
 import { DARK, LIGHT, RADIUS, SPACE, TAP, TYPE, type Palette } from '../theme'
+import { useThemePreference } from '../theme/preference'
 
 /** The palette for the device's current appearance. */
 export function usePalette(): Palette {
-  return useColorScheme() === 'dark' ? DARK : LIGHT
+  /*
+    The chosen theme, not the system one.
+
+    Every screen reads its colours through here, so this single line is what makes a
+    Light/System/Dark choice reach the whole app. `useThemePreference()` falls back to
+    the system scheme when no provider is above it, which is the behaviour this had
+    before the preference existed.
+  */
+  return useThemePreference().palette
 }
 
 // ---------------------------------------------------------------------------

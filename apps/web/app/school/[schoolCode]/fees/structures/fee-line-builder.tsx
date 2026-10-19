@@ -39,7 +39,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Loader2, Plus, Receipt, RotateCcw } from 'lucide-react'
+import { LoaderCircle, Plus, Receipt, RotateCcw } from 'lucide-react'
 
 import { Badge } from '../../../../../components/ui/badge'
 import { Input, Select } from '../../../../../components/ui/field'
@@ -431,7 +431,7 @@ export function FeeLineBuilder({
             <div className="flex flex-wrap items-center gap-2">
               <Button type="submit" disabled={busy || terms.length === 0}>
                 {busy ? (
-                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
                 ) : (
                   <Plus aria-hidden="true" />
                 )}

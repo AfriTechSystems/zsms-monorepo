@@ -13,5 +13,6 @@
 export * from './contrast'
 export * from './scale'
 export * from './tokens'
+export * from './icons'
 export * from './theme'
 export * from './css'

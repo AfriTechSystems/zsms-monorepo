@@ -22,7 +22,7 @@
 
 import type { ChangeEvent, JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Copy, KeyRound, Plug, ShieldOff } from 'lucide-react'
+import { TriangleAlert, Copy, KeyRound, Plug, ShieldOff } from 'lucide-react'
 
 import { Button } from '../../../../../components/ui/button'
 import { Card } from '../../../../../components/ui/card'
@@ -168,7 +168,7 @@ export default function ApiKeysPage(): JSX.Element {
       {issued ? (
         <Card className="border-warning bg-warning/5 p-card">
           <p className="flex items-start gap-2 font-medium">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             Copy this now — it will not be shown again
           </p>
           <div className="mt-stack flex flex-wrap items-center gap-2">

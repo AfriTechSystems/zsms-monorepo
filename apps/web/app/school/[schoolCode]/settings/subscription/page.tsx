@@ -27,7 +27,7 @@
 
 import type { JSX } from 'react'
 import { use } from 'react'
-import { AlertTriangle, Receipt, Users, Wallet } from 'lucide-react'
+import { TriangleAlert, Receipt, Users, Wallet } from 'lucide-react'
 
 import { useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -117,7 +117,7 @@ export default function SubscriptionPage({
       <div className="space-y-cards">
         {c?.problem && (
           <Alert variant="danger" title="Your subscription cannot be priced">
-            <AlertTriangle aria-hidden="true" className="mr-1 inline size-4" />
+            <TriangleAlert aria-hidden="true" className="mr-1 inline size-4" />
             {c.problem} Contact AfriTech — until it is resolved no invoice can be issued for
             this period, which is not the same as owing nothing.
           </Alert>

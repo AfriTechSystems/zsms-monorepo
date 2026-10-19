@@ -29,7 +29,7 @@ import type { FormEvent, JSX } from 'react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Banknote, Landmark, Loader2, Send, Wallet } from 'lucide-react'
+import { Banknote, Landmark, LoaderCircle, Send, Wallet } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
@@ -617,7 +617,7 @@ function ParentFees(): JSX.Element {
 
             {uploading && (
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
                 Uploading…
               </p>
             )}
@@ -674,7 +674,7 @@ function ParentFees(): JSX.Element {
               disabled={saving || uploading || !confirmed || num(amount) <= 0}
             >
               {saving ? (
-                <Loader2 aria-hidden="true" className="animate-spin" />
+                <LoaderCircle aria-hidden="true" className="animate-spin" />
               ) : (
                 <Send aria-hidden="true" />
               )}

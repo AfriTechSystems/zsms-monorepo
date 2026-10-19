@@ -33,7 +33,7 @@
 import type { JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Banknote, Building2, CheckCircle2, Info, Loader2 } from 'lucide-react'
+import { Banknote, Building2, CircleCheck, Info, LoaderCircle } from 'lucide-react'
 
 import { Alert } from '../../../components/ui/alert'
 import { Badge } from '../../../components/ui/badge'
@@ -571,9 +571,9 @@ export default function ParentLoansPage(): JSX.Element {
             {step === 3 && (
               <Button disabled={busy || !agreed} onClick={() => void submit()}>
                 {busy ? (
-                  <Loader2 aria-hidden="true" className="animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" />
                 ) : (
-                  <CheckCircle2 aria-hidden="true" />
+                  <CircleCheck aria-hidden="true" />
                 )}
                 Send my application
               </Button>

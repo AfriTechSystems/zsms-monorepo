@@ -34,7 +34,7 @@
 import type { FormEvent, JSX } from 'react'
 import { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarCheck, CheckCheck, Download, Loader2, Save } from 'lucide-react'
+import { CalendarCheck, CheckCheck, Download, LoaderCircle, Save } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -398,7 +398,7 @@ function Register(): JSX.Element {
                   <div className="flex flex-wrap items-center gap-3">
                     <Button type="submit" disabled={saving || marked === 0}>
                       {saving ? (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       ) : (
                         <Save aria-hidden="true" />
                       )}

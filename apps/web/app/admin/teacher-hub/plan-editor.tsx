@@ -33,7 +33,7 @@
 
 import type { JSX } from 'react'
 import { useState } from 'react'
-import { Loader2, Tag } from 'lucide-react'
+import { LoaderCircle, Tag } from 'lucide-react'
 
 import { Badge } from '../../../components/ui/badge'
 import { Input } from '../../../components/ui/field'
@@ -232,7 +232,7 @@ export function PlanEditor({
                     onClick={() => void save(plan)}
                   >
                     {busy === plan.out_plan_code && (
-                      <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
                     )}
                     Save
                   </Button>

@@ -27,7 +27,7 @@ import type { JSX } from 'react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, Phone, PhoneOff, Plus } from 'lucide-react'
+import { TriangleAlert, Phone, PhoneOff, Plus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Badge } from '../../../components/ui/badge'
@@ -383,7 +383,7 @@ function Queue(): JSX.Element {
               role="alert"
               className="mt-stack flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
             >
-              <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               {saveError}
             </p>
           )}

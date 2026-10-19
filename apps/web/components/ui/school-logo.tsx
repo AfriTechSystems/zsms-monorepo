@@ -24,7 +24,7 @@
 
 import type { JSX } from 'react'
 import { useRef, useState } from 'react'
-import { Building2, Camera, Loader2 } from 'lucide-react'
+import { Building2, Camera, LoaderCircle } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 
@@ -98,7 +98,7 @@ export function SchoolLogo({
 
       {busy && (
         <span className="absolute inset-0 inline-flex items-center justify-center bg-black/40">
-          <Loader2 aria-hidden="true" className="size-4 animate-spin text-white" />
+          <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-white" />
         </span>
       )}
 

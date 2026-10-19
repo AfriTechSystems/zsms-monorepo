@@ -18,7 +18,7 @@
 
 import type { ChangeEvent, JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Download, Plug, PauseCircle } from 'lucide-react'
+import { TriangleAlert, Download, Plug, PauseCircle } from 'lucide-react'
 
 import { Button } from '../../../../../components/ui/button'
 import { Card } from '../../../../../components/ui/card'
@@ -210,7 +210,7 @@ export default function IntegrationsPage(): JSX.Element {
       {!data.dispatchReady ? (
         <Card className="border-warning/40 bg-warning/5 p-card">
           <p className="flex items-start gap-2 text-sm">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span>
               <span className="font-medium">Nothing is being sent yet.</span> You can set a
               connection up here and ZSMS will keep the configuration, but delivery is not

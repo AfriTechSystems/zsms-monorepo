@@ -21,17 +21,15 @@ import type { JSX } from 'react'
 import { View } from 'react-native'
 import { Tabs } from 'expo-router'
 import { DrawerToggleButton } from 'expo-router/drawer'
-import {
-  CalendarCheck,
-  GraduationCap,
-  LayoutGrid,
-  Megaphone,
-  Wallet,
-} from 'lucide-react-native'
+import { LayoutGrid } from 'lucide-react-native'
 
 import { AskAiFab } from '../../../components/ask-ai-fab'
 import { usePalette } from '../../../components/ui'
 import { RADIUS, TAP } from '../../../theme'
+
+// Tab destinations take their glyph from the canonical registry, so the phone's
+// tab bar and the web sidebar cannot disagree about what Attendance looks like.
+import { ICONS } from '../../../components/icon'
 
 export default function ParentTabs(): JSX.Element {
   const c = usePalette()
@@ -66,7 +64,7 @@ export default function ParentTabs(): JSX.Element {
         options={{
           title: 'Fees',
           tabBarIcon: ({ color, focused }) => (
-            <Wallet size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <ICONS.fees size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />
@@ -75,7 +73,7 @@ export default function ParentTabs(): JSX.Element {
         options={{
           title: 'Attendance',
           tabBarIcon: ({ color, focused }) => (
-            <CalendarCheck size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <ICONS.attendance size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />
@@ -113,7 +111,7 @@ export default function ParentTabs(): JSX.Element {
         options={{
           title: 'Results',
           tabBarIcon: ({ color, focused }) => (
-            <GraduationCap size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <ICONS.results size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />
@@ -122,7 +120,7 @@ export default function ParentTabs(): JSX.Element {
         options={{
           title: 'Notices',
           tabBarIcon: ({ color, focused }) => (
-            <Megaphone size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+            <ICONS.announcement size={22} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
         }}
       />

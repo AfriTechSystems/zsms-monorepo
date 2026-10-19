@@ -18,7 +18,7 @@
  * error — that is the single most common support call a bursar fields.
  */
 
-import { CalendarClock, CheckCircle2, TriangleAlert } from 'lucide-react'
+import { CalendarClock, CircleCheck, TriangleAlert } from 'lucide-react'
 
 import { Badge } from '../ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
@@ -44,8 +44,8 @@ export interface FeeCardProps {
   action?: React.ReactNode
 }
 
-const STATUS: Record<FeeStatus, { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral'; Icon: typeof CheckCircle2 }> = {
-  paid: { label: 'Paid in full', variant: 'success', Icon: CheckCircle2 },
+const STATUS: Record<FeeStatus, { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral'; Icon: typeof CircleCheck }> = {
+  paid: { label: 'Paid in full', variant: 'success', Icon: CircleCheck },
   partial: { label: 'Part paid', variant: 'warning', Icon: CalendarClock },
   due_soon: { label: 'Due soon', variant: 'warning', Icon: CalendarClock },
   overdue: { label: 'Overdue', variant: 'danger', Icon: TriangleAlert },

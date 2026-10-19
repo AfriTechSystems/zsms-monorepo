@@ -16,11 +16,19 @@
 import type { JSX, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, LayoutDashboard, School, Sparkles, UserCog, Users } from 'lucide-react'
+import {
+  School,
+  Sparkles,
+  Users,
+} from 'lucide-react'
 
 import { AskAi } from '../../components/assistant/ask-ai'
 import { AppShell } from '../../components/layout/app-shell'
 import type { NavGroup } from '../../components/layout/nav-config'
+
+// Navigation destinations take their glyph from the canonical registry, so the
+// sidebar and the phone's tab bar cannot drift apart on what Attendance looks like.
+import { ICONS } from '../../components/ui/icon'
 
 interface SchoolOption {
   out_school_code: string
@@ -57,13 +65,13 @@ export function TeacherShell({
   const groups: NavGroup[] = [
     {
       label: null,
-      items: [{ path: '', label: 'Hub', icon: LayoutDashboard, exact: true }],
+      items: [{ path: '', label: 'Hub', icon: ICONS.dashboard, exact: true }],
     },
     {
       label: 'Make',
       items: [
         { path: '/create', label: 'Create', icon: Sparkles },
-        { path: '/library', label: 'My library', icon: BookOpen },
+        { path: '/library', label: 'My library', icon: ICONS.subjects },
         // Other teachers' shared work. Under "Make" rather than its own group,
         // because taking somebody's plan and editing it IS making one.
         { path: '/community', label: 'Community Library', icon: Users },
@@ -71,7 +79,7 @@ export function TeacherShell({
     },
     {
       label: 'Account',
-      items: [{ path: '/account', label: 'Plan & profile', icon: UserCog }],
+      items: [{ path: '/account', label: 'Plan & profile', icon: ICONS.teacher }],
     },
   ]
 

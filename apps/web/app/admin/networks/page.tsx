@@ -25,7 +25,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Building2, KeyRound, Lightbulb, Loader2, Plus, Unlink, UserPlus } from 'lucide-react'
+import { Building2, KeyRound, Lightbulb, LoaderCircle, Plus, Unlink, UserPlus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
@@ -255,7 +255,7 @@ export default function AdminNetworksPage(): JSX.Element {
             <FormActions>
               <Button type="submit" disabled={busy !== null || !name || !slug}>
                 {busy === 'create' ? (
-                  <Loader2 aria-hidden="true" className="animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" />
                 ) : (
                   <Plus aria-hidden="true" />
                 )}
@@ -477,7 +477,7 @@ export default function AdminNetworksPage(): JSX.Element {
                       }}
                     >
                       {busy === 'attach' ? (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       ) : (
                         <Plus aria-hidden="true" />
                       )}
@@ -558,7 +558,7 @@ export default function AdminNetworksPage(): JSX.Element {
                   }}
                 >
                   {busy === 'grant' ? (
-                    <Loader2 aria-hidden="true" className="animate-spin" />
+                    <LoaderCircle aria-hidden="true" className="animate-spin" />
                   ) : (
                     <KeyRound aria-hidden="true" />
                   )}
@@ -672,7 +672,7 @@ export default function AdminNetworksPage(): JSX.Element {
                     }}
                   >
                     {busy === 'addmember' ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : (
                       <UserPlus aria-hidden="true" />
                     )}

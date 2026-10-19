@@ -12,7 +12,12 @@
 
 import type { JSX, ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { ShieldAlert } from 'lucide-react'
+
+// The error and refresh glyphs come from the canonical registry; ShieldAlert stays
+// local because "permission denied" is this component's own concept and appears
+// nowhere else — the registry owns what is reused, not every glyph in the app.
+import { ICONS } from './icon'
 
 import { Alert } from './alert'
 import { Button } from './button'
@@ -45,10 +50,20 @@ export function ErrorState({
     >
       <div className="space-y-3">
         <p className="flex items-start gap-2">
+          {/*
+            `ICONS.error` is a circled X, and it used to be a warning triangle here.
+
+            That was a real inconsistency rather than a style choice: this branch is the
+            `danger` variant, so the Alert's own header already drew a circled X while
+            the body beside it drew an amber-shaped warning glyph for the same message.
+            Reference sheet 01 section F is explicit — a circled X is Error, a triangle
+            is Warning — and the forbidden branch keeps ShieldAlert because "you do not
+            have access" is neither.
+          */}
           {forbidden ? (
             <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           ) : (
-            <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <ICONS.error aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           )}
           <span>{message}</span>
         </p>
@@ -61,7 +76,7 @@ export function ErrorState({
         ) : (
           onRetry && (
             <Button variant="outline" size="sm" onClick={onRetry}>
-              <RefreshCw aria-hidden="true" />
+              <ICONS.refresh aria-hidden="true" />
               Try again
             </Button>
           )
@@ -153,7 +168,7 @@ export function PageHeader({
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
         >
-          <ArrowLeft aria-hidden="true" className="size-4 shrink-0" />
+          <ICONS.back aria-hidden="true" className="size-4 shrink-0" />
           {backLabel ?? 'Back'}
         </Link>
       )}

@@ -28,7 +28,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Loader2, PencilLine } from 'lucide-react'
+import { LoaderCircle, PencilLine } from 'lucide-react'
 
 import { Alert } from '../../../../../components/ui/alert'
 import { Input, Select } from '../../../../../components/ui/field'
@@ -205,7 +205,7 @@ export function ReviseIssued({
 
           <div className="flex flex-wrap items-center gap-2">
             <Button type="submit" disabled={busy || !label || reason.trim().length < 4}>
-              {busy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+              {busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Correct these bills
             </Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>

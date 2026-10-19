@@ -27,7 +27,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, Save } from 'lucide-react'
+import { LoaderCircle, Save } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -140,7 +140,7 @@ export function CustomFieldsPanel({ studentId }: { studentId: string }): JSX.Ele
           <FormActions>
             <Button type="submit" disabled={saving}>
               {saving ? (
-                <Loader2 aria-hidden="true" className="animate-spin" />
+                <LoaderCircle aria-hidden="true" className="animate-spin" />
               ) : (
                 <Save aria-hidden="true" />
               )}

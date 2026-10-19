@@ -29,7 +29,7 @@
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
 import { useUser } from '@zsms/auth-provider/react'
-import { AlertTriangle, ArrowLeft, Download, ShieldCheck, Trash2, Undo2 } from 'lucide-react'
+import { TriangleAlert, ArrowLeft, Download, ShieldCheck, Trash2, Undo2 } from 'lucide-react'
 import Link from 'next/link'
 
 import { Alert } from '../../components/ui/alert'
@@ -357,7 +357,7 @@ export default function AccountPage(): JSX.Element {
                       disabled={busy || typed !== 'DELETE'}
                       onClick={() => void requestErasure()}
                     >
-                      <AlertTriangle aria-hidden="true" />
+                      <TriangleAlert aria-hidden="true" />
                       {busy ? 'Recording…' : 'Request deletion'}
                     </Button>
                     <Button variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>

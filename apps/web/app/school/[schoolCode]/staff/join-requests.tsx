@@ -25,7 +25,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Check, Loader2, UserPlus, X } from 'lucide-react'
+import { Check, LoaderCircle, UserPlus, X } from 'lucide-react'
 
 import { Button } from '../../../../components/ui/button'
 import {
@@ -180,7 +180,7 @@ export function JoinRequests(): JSX.Element | null {
                     onClick={() => decide(request.id, true)}
                   >
                     {busyId === request.id ? (
-                      <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
                     ) : (
                       <Check aria-hidden="true" />
                     )}

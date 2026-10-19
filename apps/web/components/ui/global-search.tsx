@@ -26,7 +26,7 @@
 import type { JSX } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { GraduationCap, Loader2, School, Search, UserRound, X } from 'lucide-react'
+import { GraduationCap, LoaderCircle, School, Search, UserRound, X } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 
@@ -188,7 +188,7 @@ export function GlobalSearch({ placeholder }: { placeholder?: string }): JSX.Ele
         />
 
         <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1">
-          {busy && <Loader2 aria-hidden className="size-3.5 animate-spin text-muted-foreground" />}
+          {busy && <LoaderCircle aria-hidden className="size-3.5 animate-spin text-muted-foreground" />}
           {term ? (
             <button
               type="button"

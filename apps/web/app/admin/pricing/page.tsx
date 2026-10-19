@@ -38,7 +38,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Loader2, Wallet } from 'lucide-react'
+import { LoaderCircle, Wallet } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { PriceBands, usePriceBands } from './price-bands'
@@ -385,7 +385,7 @@ function TierEditor({
 
         <FormActions>
           <Button type="submit" disabled={saving}>
-            {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
+            {saving && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             Save {tier.display_name}
           </Button>
           {/* Announced, not just shown — the button does not change shape on

@@ -168,6 +168,51 @@ The media query bound is `BREAKPOINT_SM - 0.02`, not `BREAKPOINT_SM`: `sm:` comp
 
 ---
 
+## Icons
+
+One vocabulary, two maps. **`packages/design-tokens/src/icons.ts`** holds 98 semantic
+names — `students`, `attendance`, `fees`, `aiAssistant` — and no glyphs;
+`apps/web/components/ui/icon.tsx` and `apps/mobile/components/icon.tsx` map them to
+`lucide-react` and `lucide-react-native`. Pages ask for a concept, never for a picture.
+
+The split is forced rather than tidy: the two lucide packages export the same names as
+different component types, and the token package is imported by a Railway worker that
+renders PDFs, where React has no business.
+
+**`IconName` makes a missing concept a compile error. It cannot make the two maps
+agree**, so `apps/web/lib/icons.test.ts` asserts they are complete, invent nothing,
+choose the same glyph for every concept, and use no deprecated lucide alias.
+
+### What the registry owns
+
+The concepts that appear in more than one place — navigation destinations, domain
+objects, states. A one-off glyph on a single screen can still be imported directly;
+routing every icon through a registry is ceremony. What drifts is what repeats.
+
+### Why it exists
+
+An audit on 2026-10-19 found 142 distinct glyphs across 155 web files and **22 of 24
+core concepts drawn more than one way**, or differing between web and mobile. The worst
+of it was invisible: lucide renamed several glyphs and kept the old names, so
+`AlertTriangle` (16 files) and `TriangleAlert` were the same picture under two names,
+as were `CheckCircle2` and `CircleCheck`. Nobody could see that drift, which is how it
+spread — and why the guard is a test rather than a review checklist.
+
+### Two rules the test enforces, not just documents
+
+- **`unmarked` is never the `absent` glyph**, on either platform. ATTENDANCE.md's rule
+  is that an unmarked pupil is not an absent one; printed, that error outlives the
+  correction. Its colour role is `neutral`, not `warning` — amber beside a red `absent`
+  reads as a lesser accusation rather than as no answer yet.
+- **No deprecated alias in either map.** They render identically to their replacements,
+  which is exactly what made the original drift impossible to see.
+
+Full guidance, including the eight reference sheets, is in
+`19 Design System/Icons/ZSMS_ICON_CATALOGUE.md`. **No purple token was added**: the
+sheets show `#8B5CF6` and the catalogue states it is not part of the core palette.
+
+---
+
 ## Component Rules
 
 - **Colour arrives as a tint.** A coloured area is `bg-<role>-tint` with `text-<role>-text` on it. Saturated fills are reserved for the one primary button and for small marks — icons, status dots, bar segments — drawn in `<role>-fill`, the step derived to clear 3:1 against its own tint.
@@ -582,4 +627,5 @@ inconvenience.
 | 2026-08-18 | Stated the admin-vs-portal mobile bar explicitly | Admin screens are desktop-primary; "graceful, not polished" is a deliberate ceiling, so effort goes to the portals parents actually use on phones |
 | 2026-10-18 | **One breakpoint instead of two** — `BREAKPOINT_SM` (640) is now the only one, imported by `tailwind.config.ts` and asserted by `lib/breakpoints.test.ts` | The token layer switched type and spacing at 480px while Tailwind's `sm` was its undeclared stock 640px. Between those widths a screen got desktop padding and headings inside a mobile card-stack layout — most phones in landscape. Nothing could have caught it: the two values were a TypeScript constant and a framework default, and no build step compared them |
 | 2026-10-18 | Added `Z_INDEX` and `MOTION` tokens | The stacking scale already existed implicitly and had started leaking escape hatches (`z-[60]`); naming it was the missing part. Motion durations were literals in `globals.css`. Ambient loop timings deliberately excluded — scene timings are not a scale |
+| 2026-10-19 | **A canonical icon vocabulary shared by web and mobile**, with a test asserting the two maps agree | 142 glyphs across 155 web files and 22 of 24 core concepts drawn more than one way. The worst was invisible — lucide renamed glyphs and kept the old names, so `AlertTriangle` and `TriangleAlert` were one picture under two names across 16 files. 65 files de-duplicated, zero deprecated aliases left. `ErrorState` drew a warning triangle inside a danger Alert whose header drew a circled X, for the same message; sheet 01 F settles it |
 | 2026-10-18 | Added `DateField` / `DateRangeField` and `usePopover()`; `todayIso()` centralised in `lib/dates` | Eighteen raw date inputs across twelve files, five from/to pairs with no check that from ≤ to, and `todayIso()` defined twice with eight further inline UTC variants that return yesterday for the first two hours of every Zambian day. Three hand-rolled popovers had drifted and none returned focus to its trigger on Escape |

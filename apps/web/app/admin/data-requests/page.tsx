@@ -32,10 +32,10 @@
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
 import {
-  AlertTriangle,
+  TriangleAlert,
   Download,
   Inbox,
-  Loader2,
+  LoaderCircle,
   Search,
   ShieldAlert,
 } from 'lucide-react'
@@ -329,7 +329,7 @@ export default function DataRequests(): JSX.Element {
           </CardHeader>
           <CardContent>
             <Button disabled={!ready || busy !== null} onClick={() => void exportSubject()}>
-              {busy === 'export' && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+              {busy === 'export' && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Export this subject
             </Button>
           </CardContent>
@@ -397,9 +397,9 @@ export default function DataRequests(): JSX.Element {
                       onClick={() => void erase()}
                     >
                       {busy === 'erase' && (
-                        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
                       )}
-                      <AlertTriangle aria-hidden="true" />
+                      <TriangleAlert aria-hidden="true" />
                       Yes, erase permanently
                     </Button>
                     <Button variant="ghost" onClick={() => setConfirming(false)}>

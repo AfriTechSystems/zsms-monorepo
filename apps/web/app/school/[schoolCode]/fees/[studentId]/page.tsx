@@ -35,7 +35,7 @@
 import type { FormEvent, JSX } from 'react'
 import { SectionTabs, useSectionTabs } from '../../../../../components/ui/section-tabs'
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, Receipt } from 'lucide-react'
+import { LoaderCircle, Receipt } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -433,7 +433,7 @@ export default function StudentFeesPage({
                   <FormActions>
                     <Button type="submit" disabled={saving || parsedAmount <= 0 || unallocated < 0}>
                       {saving ? (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       ) : (
                         <Receipt aria-hidden="true" />
                       )}

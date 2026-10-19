@@ -21,7 +21,7 @@
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Check, CircleDashed, Mail, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
+import { TriangleAlert, Check, CircleDashed, Mail, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { apiSend } from '../../../../lib/use-api'
 import { useToast } from '../../../../components/ui/toast'
@@ -195,7 +195,7 @@ export function OnboardingPanel({
           className="rounded-lg border border-danger/30 bg-danger/5 p-card text-sm"
         >
           <p className="flex items-start gap-2 font-medium text-danger">
-            <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
             This school has no Clerk organisation
           </p>
           <p className="mt-2 text-muted-foreground">
@@ -534,7 +534,7 @@ export function OnboardingPanel({
           role="alert"
           className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
         >
-          <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           {error}
         </p>
       )}

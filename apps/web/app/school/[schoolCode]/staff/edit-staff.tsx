@@ -28,7 +28,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Loader2, Save, X } from 'lucide-react'
+import { LoaderCircle, Save, X } from 'lucide-react'
 
 import { Button } from '../../../../components/ui/button'
 import { Field, Input, Select, Textarea } from '../../../../components/ui/field'
@@ -243,7 +243,7 @@ export function EditStaff({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={busy}>
-          {busy ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Save aria-hidden="true" />}
+          {busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Save aria-hidden="true" />}
           Save record
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel}>

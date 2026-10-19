@@ -30,7 +30,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useState } from 'react'
-import { Loader2, Plus, ShieldAlert, Tag } from 'lucide-react'
+import { LoaderCircle, Plus, ShieldAlert, Tag } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -304,7 +304,7 @@ export default function PupilFieldsPage({
                 <FormActions>
                   <Button type="submit" disabled={saving || !label || !fieldKey}>
                     {saving ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : (
                       <Plus aria-hidden="true" />
                     )}

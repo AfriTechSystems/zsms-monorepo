@@ -27,7 +27,7 @@
 
 import type { ChangeEvent, JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, KeyRound, Clock, ShieldOff } from 'lucide-react'
+import { TriangleAlert, KeyRound, Clock, ShieldOff } from 'lucide-react'
 
 import { Button } from '../../../../../components/ui/button'
 import { Card } from '../../../../../components/ui/card'
@@ -217,7 +217,7 @@ export default function PermissionsPage(): JSX.Element {
       {data.meta.expiringSoon > 0 ? (
         <Card className="border-warning/40 bg-warning/5 p-card text-sm">
           <p className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span>
               <span data-numeric>{data.meta.expiringSoon}</span> grant
               {data.meta.expiringSoon === 1 ? '' : 's'} lapse within two days. If the cover

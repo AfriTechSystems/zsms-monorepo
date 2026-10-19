@@ -33,7 +33,7 @@
 import type { ChangeEvent, JSX } from 'react'
 import { use, useCallback, useState } from 'react'
 import Link from 'next/link'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, LoaderCircle, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -232,7 +232,7 @@ export default function VerifyPage({
                                   onClick={() => decide(p.id, 'rejected', reason.trim())}
                                 >
                                   {busy === p.id ? (
-                                    <Loader2 aria-hidden="true" className="animate-spin" />
+                                    <LoaderCircle aria-hidden="true" className="animate-spin" />
                                   ) : (
                                     <X aria-hidden="true" />
                                   )}
@@ -255,7 +255,7 @@ export default function VerifyPage({
                                   onClick={() => decide(p.id, 'verified')}
                                 >
                                   {busy === p.id ? (
-                                    <Loader2 aria-hidden="true" className="animate-spin" />
+                                    <LoaderCircle aria-hidden="true" className="animate-spin" />
                                   ) : (
                                     <Check aria-hidden="true" />
                                   )}

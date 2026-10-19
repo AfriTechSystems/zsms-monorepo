@@ -30,7 +30,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useEffect, useState } from 'react'
-import { Loader2, Mail, Phone, Plus, Save, UserMinus, Users } from 'lucide-react'
+import { LoaderCircle, Mail, Phone, Plus, Save, UserMinus, Users } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { can } from '../../../../../lib/roles'
@@ -716,7 +716,7 @@ export default function StudentDetailPage({
 
                     <div className="flex flex-wrap items-center gap-2">
                       <Button type="submit" disabled={gBusy}>
-                        {gBusy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                        {gBusy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                         Link guardian
                       </Button>
                       <Button type="button" variant="ghost" onClick={() => setGOpen(false)}>
@@ -898,7 +898,7 @@ export default function StudentDetailPage({
                 <FormActions>
                   <Button type="submit" disabled={saving || !dirty}>
                     {saving ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : form.status && data.status !== form.status && !onRoll(form.status) ? (
                       <UserMinus aria-hidden="true" />
                     ) : (
@@ -1009,7 +1009,7 @@ export default function StudentDetailPage({
 
                       <div className="flex flex-wrap items-center gap-2">
                         <Button type="submit" disabled={leaving || leaveReason.trim().length < 4}>
-                          {leaving && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                          {leaving && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                           Record it
                         </Button>
                         <Button type="button" variant="ghost" onClick={() => setLeaveOpen(false)}>

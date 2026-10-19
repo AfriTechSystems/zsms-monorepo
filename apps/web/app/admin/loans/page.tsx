@@ -27,7 +27,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Banknote, Loader2 } from 'lucide-react'
+import { Banknote, LoaderCircle } from 'lucide-react'
 
 import { Alert } from '../../../components/ui/alert'
 import { Badge } from '../../../components/ui/badge'
@@ -231,7 +231,7 @@ export default function AdminLoansPage(): JSX.Element {
               }
               onClick={() => void save()}
             >
-              {busy && <Loader2 aria-hidden="true" className="animate-spin" />}
+              {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
               Save
             </Button>
             <Button variant="ghost" disabled={busy} onClick={() => setEditing(null)}>

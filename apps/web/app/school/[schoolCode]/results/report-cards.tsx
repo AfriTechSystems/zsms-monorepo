@@ -30,7 +30,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { FileText, Loader2, RefreshCw } from 'lucide-react'
+import { FileText, LoaderCircle, RefreshCw } from 'lucide-react'
 
 import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
@@ -159,7 +159,7 @@ export function ReportCards({
             </Badge>
             {summary.pending > 0 && (
               <Badge variant="info">
-                <Loader2 aria-hidden="true" className="mr-1 inline size-3 animate-spin" />
+                <LoaderCircle aria-hidden="true" className="mr-1 inline size-3 animate-spin" />
                 <span data-numeric>{summary.pending}</span> generating
               </Badge>
             )}
@@ -222,7 +222,7 @@ export function ReportCards({
         {canGenerate ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button disabled={starting} onClick={() => void generate('term')}>
-              {starting && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+              {starting && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Generate for the whole term
             </Button>
             {/* A single class, for the common case of one mark sheet arriving late after

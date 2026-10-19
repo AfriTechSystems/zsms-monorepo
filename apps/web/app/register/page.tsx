@@ -32,7 +32,7 @@ import type { JSX } from 'react'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react'
+import { TriangleAlert, ArrowLeft, ArrowRight, Check, LoaderCircle } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 import { SignedIn, SignedOut, useAuth, useOrganization } from '@zsms/auth-provider/react'
@@ -498,7 +498,7 @@ function RegistrationForm(): JSX.Element {
               role="alert"
               className="mt-stack flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
             >
-              <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               {error}
             </p>
           )}
@@ -509,7 +509,7 @@ function RegistrationForm(): JSX.Element {
               Back
             </Button>
             <Button disabled={!canSubmit || submitting || !userId} onClick={() => void submit()}>
-              {submitting && <Loader2 aria-hidden="true" className="animate-spin" />}
+              {submitting && <LoaderCircle aria-hidden="true" className="animate-spin" />}
               {submitting ? 'Setting up your school…' : `Start my ${TRIAL_DAYS}-day trial`}
             </Button>
           </div>

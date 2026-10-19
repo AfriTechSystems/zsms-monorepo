@@ -21,7 +21,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
-import { GraduationCap, Loader2, Plus, Trash2 } from 'lucide-react'
+import { GraduationCap, LoaderCircle, Plus, Trash2 } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -280,7 +280,7 @@ export default function TeachingPage({
                               onClick={() => void remove(a)}
                             >
                               {busy === a.id ? (
-                                <Loader2 aria-hidden="true" className="animate-spin" />
+                                <LoaderCircle aria-hidden="true" className="animate-spin" />
                               ) : (
                                 <Trash2 aria-hidden="true" />
                               )}
@@ -447,7 +447,7 @@ export default function TeachingPage({
                 <FormActions>
                   <Button type="submit" disabled={saving || !complete}>
                     {saving ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : (
                       <Plus aria-hidden="true" />
                     )}

@@ -32,7 +32,7 @@ import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, UserPlus } from 'lucide-react'
+import { LoaderCircle, UserPlus } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { ROLE_LABEL, can } from '../../../../../lib/roles'
@@ -398,7 +398,7 @@ export default function NewStudentPage({
                   }
                 >
                   {saving ? (
-                    <Loader2 aria-hidden="true" className="animate-spin" />
+                    <LoaderCircle aria-hidden="true" className="animate-spin" />
                   ) : (
                     <UserPlus aria-hidden="true" />
                   )}

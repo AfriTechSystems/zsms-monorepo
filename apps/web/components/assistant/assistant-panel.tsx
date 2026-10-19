@@ -49,7 +49,7 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
-  Loader2,
+  LoaderCircle,
   Maximize2,
   Minimize2,
   Plus,
@@ -611,7 +611,7 @@ export function AssistantPanel({
                             onClick={() => m.id && void confirm(m.id)}
                           >
                             {confirming === m.id ? (
-                              <Loader2 aria-hidden="true" className="animate-spin" />
+                              <LoaderCircle aria-hidden="true" className="animate-spin" />
                             ) : (
                               <Check aria-hidden="true" />
                             )}
@@ -646,7 +646,7 @@ export function AssistantPanel({
 
           {busy && (
             <p className="mt-cards flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+              <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
               Thinking…
             </p>
           )}
@@ -693,7 +693,7 @@ export function AssistantPanel({
                 className="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
               >
                 {busy ? (
-                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
                 ) : (
                   <ArrowUp aria-hidden="true" className="size-4" />
                 )}

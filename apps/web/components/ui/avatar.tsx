@@ -26,7 +26,7 @@
 
 import type { JSX } from 'react'
 import { useRef, useState } from 'react'
-import { Camera, Loader2 } from 'lucide-react'
+import { Camera, LoaderCircle } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 import { useToast } from './toast'
@@ -158,7 +158,7 @@ export function Avatar({
 
       {busy && (
         <span className="absolute inset-0 flex items-center justify-center bg-surface/70">
-          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
         </span>
       )}
     </span>

@@ -33,7 +33,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { Building2, Check, Clock, Loader2, X } from 'lucide-react'
+import { Building2, Check, Clock, LoaderCircle, X } from 'lucide-react'
 
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -254,7 +254,7 @@ export function SchoolLinkCard({
             )}
 
             <Button type="submit" disabled={busy || loading || code.trim().length === 0}>
-              {busy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+              {busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Ask this school
             </Button>
           </form>

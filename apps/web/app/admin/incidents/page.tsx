@@ -24,7 +24,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Info, ShieldAlert, Siren } from 'lucide-react'
+import { TriangleAlert, CircleCheck, Info, ShieldAlert, Siren } from 'lucide-react'
 
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
@@ -60,7 +60,7 @@ interface Payload {
 const SEVERITY_ICON = {
   critical: Siren,
   error: ShieldAlert,
-  warning: AlertTriangle,
+  warning: TriangleAlert,
   info: Info,
 } as const
 
@@ -183,7 +183,7 @@ export default function IncidentsPage(): JSX.Element {
           <ErrorState message={error} onRetry={() => void load()} />
         ) : incidents.length === 0 ? (
           <EmptyState
-            icon={CheckCircle2}
+            icon={CircleCheck}
             title={filter === 'open' ? 'Nothing is broken' : 'Nothing to show'}
             description={
               filter === 'open'

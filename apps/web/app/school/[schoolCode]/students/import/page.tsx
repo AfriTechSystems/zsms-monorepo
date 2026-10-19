@@ -30,7 +30,7 @@
 import type { ChangeEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, FileUp, Loader2, Upload } from 'lucide-react'
+import { CircleCheck, FileUp, LoaderCircle, Upload } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -280,7 +280,7 @@ export default function ImportPupilsPage({
             <div className="flex flex-wrap gap-2">
               <Button disabled={busy || rows.length === 0} onClick={() => run('validate')}>
                 {busy ? (
-                  <Loader2 aria-hidden="true" className="animate-spin" />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" />
                 ) : (
                   <FileUp aria-hidden="true" />
                 )}
@@ -318,7 +318,7 @@ export default function ImportPupilsPage({
 
         {clean && (
           <Alert variant="success" title="The file looks good">
-            <CheckCircle2 aria-hidden="true" className="mr-1 inline size-4" />
+            <CircleCheck aria-hidden="true" className="mr-1 inline size-4" />
             {result?.willCreate} pupils are ready to import. Nothing has been saved yet.
           </Alert>
         )}

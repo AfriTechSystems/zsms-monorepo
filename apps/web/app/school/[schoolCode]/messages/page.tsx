@@ -25,7 +25,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, CornerDownRight, Mail, MessageSquare, Smartphone } from 'lucide-react'
+import { TriangleAlert, CornerDownRight, Mail, MessageSquare, Smartphone } from 'lucide-react'
 
 import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
@@ -118,7 +118,7 @@ export default function MessageLogPage(): JSX.Element {
       {providerIsMock && (
         <Alert variant="warning" className="mb-cards">
           <span className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               <strong>No messages are actually being delivered yet.</strong> ZSMS has no
               WhatsApp, SMS or email account connected, so the rows below record what

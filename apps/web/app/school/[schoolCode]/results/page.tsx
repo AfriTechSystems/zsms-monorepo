@@ -35,7 +35,7 @@
 import type { FormEvent, JSX } from 'react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ClipboardList, Loader2, Lock, Save, Send } from 'lucide-react'
+import { ClipboardList, LoaderCircle, Lock, Save, Send } from 'lucide-react'
 
 import { CHART_SERIES } from '@zsms/design-tokens'
 
@@ -984,7 +984,7 @@ function MarkSheet(): JSX.Element {
                 <div className="sticky bottom-0 z-10 mt-stack flex flex-wrap gap-2 border-t border-border bg-background/95 p-gutter backdrop-blur">
                   <Button type="submit" disabled={saving || overMax > 0}>
                     {saving ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : (
                       <Save aria-hidden="true" />
                     )}
@@ -999,7 +999,7 @@ function MarkSheet(): JSX.Element {
                       onClick={publish}
                     >
                       {publishing ? (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       ) : (
                         <Send aria-hidden="true" />
                       )}

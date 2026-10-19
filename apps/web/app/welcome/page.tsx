@@ -60,7 +60,7 @@ import { PortalCards } from '../../components/public/portal-cards'
 import { SchoolTexture } from '../../components/public/school-texture'
 import Link from 'next/link'
 import Image from 'next/image'
-import { AlertTriangle, ArrowLeft, Building2, Sparkles, Users } from 'lucide-react'
+import { TriangleAlert, ArrowLeft, Building2, Sparkles, Users } from 'lucide-react'
 
 import { getAuthProvider } from '@zsms/auth-provider'
 
@@ -277,7 +277,7 @@ export default async function WelcomePage(): Promise<JSX.Element> {
       {emailClaimMissing ? (
         <section className="rounded-xl border border-danger/40 bg-danger/5 p-3 sm:p-card">
           <h2 className="flex items-center gap-2 text-sm font-semibold sm:text-base">
-            <AlertTriangle aria-hidden="true" className="size-4 shrink-0 text-danger sm:size-5" />
+            <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-danger sm:size-5" />
             We can&rsquo;t read your email address
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">

@@ -30,7 +30,7 @@ import { use } from 'react'
 import {
   Check,
   KeyRound,
-  Loader2,
+  LoaderCircle,
   Minus,
   ShieldAlert,
   Ticket,
@@ -239,7 +239,7 @@ function SubscriptionPanel({ school, onSaved }: { school: School; onSaved: () =>
 
         <FormActions>
           <Button type="submit" disabled={saving || !dirty}>
-            {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
+            {saving && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             Save changes
           </Button>
           <p role="status" aria-live="polite" className="text-sm text-success-text">
@@ -440,7 +440,7 @@ function OverrideForm({ schoolId, features, capacity, onSaved }: {
           type="submit"
           disabled={saving || reason.trim().length < 10 || (isLimit && !unlimited && limit === '')}
         >
-          {saving && <Loader2 aria-hidden="true" className="animate-spin" />}
+          {saving && <LoaderCircle aria-hidden="true" className="animate-spin" />}
           Record override
         </Button>
       </FormActions>
@@ -728,7 +728,7 @@ export default function AdminSchoolDetailPage({
                               onClick={() => void revoke(o)}
                             >
                               {revoking === o.id ? (
-                                <Loader2 aria-hidden="true" className="animate-spin" />
+                                <LoaderCircle aria-hidden="true" className="animate-spin" />
                               ) : (
                                 <Undo2 aria-hidden="true" />
                               )}

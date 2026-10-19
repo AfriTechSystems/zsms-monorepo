@@ -27,7 +27,7 @@
 import type { JSX } from 'react'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Building2 } from 'lucide-react'
+import { TriangleAlert, Building2 } from 'lucide-react'
 
 import { getCountryConfig } from '@zsms/config'
 import { useAuth } from '@zsms/auth-provider/react'
@@ -422,7 +422,7 @@ export default function NewSchoolPage(): JSX.Element {
             role="alert"
             className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
           >
-            <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
             {error}
           </p>
         )}

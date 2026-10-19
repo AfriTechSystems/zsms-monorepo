@@ -32,7 +32,7 @@
 import type { FormEvent, JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check, FileText, Gauge, Loader2, Megaphone, Send, X } from 'lucide-react'
+import { Check, FileText, Gauge, LoaderCircle, Megaphone, Send, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
@@ -752,7 +752,7 @@ export default function AnnouncementsPage(): JSX.Element {
                     onClick={() => void submit('now')}
                   >
                     {busy === 'now' ? (
-                      <Loader2 aria-hidden="true" className="animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="animate-spin" />
                     ) : (
                       <Send aria-hidden="true" />
                     )}
@@ -767,7 +767,7 @@ export default function AnnouncementsPage(): JSX.Element {
                       onClick={() => void submit('schedule')}
                     >
                       {busy === 'schedule' && (
-                        <Loader2 aria-hidden="true" className="animate-spin" />
+                        <LoaderCircle aria-hidden="true" className="animate-spin" />
                       )}
                       Schedule
                     </Button>
@@ -778,7 +778,7 @@ export default function AnnouncementsPage(): JSX.Element {
                     variant="ghost"
                     disabled={busy !== null || !title || !bodyText}
                   >
-                    {busy === 'draft' && <Loader2 aria-hidden="true" className="animate-spin" />}
+                    {busy === 'draft' && <LoaderCircle aria-hidden="true" className="animate-spin" />}
                     Save as draft
                   </Button>
                 </FormActions>

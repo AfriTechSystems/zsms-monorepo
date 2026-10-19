@@ -28,7 +28,7 @@ import type { FormEvent, JSX } from 'react'
 import { SectionTabs, useSectionTabs } from '../../../../components/ui/section-tabs'
 import { Avatar } from '../../../../components/ui/avatar'
 import { use, useCallback, useState } from 'react'
-import { Loader2, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
+import { LoaderCircle, MailPlus, ShieldOff, UserCog, X } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { EditStaff } from './edit-staff'
@@ -169,7 +169,7 @@ function InviteForm({ roles, onSent }: { roles: string[]; onSent: () => void }):
         <FormActions>
           <Button type="submit" disabled={sending || !email.trim()}>
             {sending ? (
-              <Loader2 aria-hidden="true" className="animate-spin" />
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
             ) : (
               <MailPlus aria-hidden="true" />
             )}
@@ -528,7 +528,7 @@ export default function StaffPage({
                           onClick={() => void revoke(i)}
                         >
                           {busy === i.id ? (
-                            <Loader2 aria-hidden="true" className="animate-spin" />
+                            <LoaderCircle aria-hidden="true" className="animate-spin" />
                           ) : (
                             <X aria-hidden="true" />
                           )}

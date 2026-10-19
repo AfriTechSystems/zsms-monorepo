@@ -24,7 +24,7 @@
 
 import type { FormEvent, JSX } from 'react'
 import { use, useCallback, useMemo, useState } from 'react'
-import { Loader2, Send } from 'lucide-react'
+import { LoaderCircle, Send } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../../../lib/use-api'
 import { Alert } from '../../../../../components/ui/alert'
@@ -200,7 +200,7 @@ export default function StructuresPage({
               <FormActions>
                 <Button type="submit" disabled={issuing || matching === 0}>
                   {issuing ? (
-                    <Loader2 aria-hidden="true" className="animate-spin" />
+                    <LoaderCircle aria-hidden="true" className="animate-spin" />
                   ) : (
                     <Send aria-hidden="true" />
                   )}

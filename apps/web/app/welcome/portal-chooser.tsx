@@ -30,7 +30,7 @@ import {
   ArrowRight,
   Building2,
   GraduationCap,
-  Loader2,
+  LoaderCircle,
   Network,
   ShieldCheck,
   Users,
@@ -115,7 +115,7 @@ export function PortalChooser({
               >
                 <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
                   {switching ? (
-                    <Loader2 aria-hidden="true" className="size-4 animate-spin text-primary" />
+                    <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-primary" />
                   ) : (
                     <Icon aria-hidden="true" className="size-4 text-primary" />
                   )}

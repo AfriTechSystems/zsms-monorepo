@@ -31,7 +31,7 @@
 import type { JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, Check, Loader2 } from 'lucide-react'
+import { Building2, Check, LoaderCircle } from 'lucide-react'
 
 import { useOrganizationList } from '@zsms/auth-provider/react'
 
@@ -151,7 +151,7 @@ export function SchoolSwitcher(): JSX.Element | null {
                     )}
                   >
                     {busy ? (
-                      <Loader2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />
+                      <LoaderCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />
                     ) : s.current ? (
                       <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                     ) : (

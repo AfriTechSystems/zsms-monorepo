@@ -24,7 +24,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { ArrowUp, Loader2 } from 'lucide-react'
+import { ArrowUp, LoaderCircle } from 'lucide-react'
 
 import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
@@ -110,7 +110,7 @@ export function YearEnd({ onDone }: { onDone: () => void }): JSX.Element {
         {!confirming ? (
           <div>
             <Button disabled={busy} onClick={() => void run(true)}>
-              {busy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+              {busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Preview the promotion
             </Button>
           </div>
@@ -150,7 +150,7 @@ export function YearEnd({ onDone }: { onDone: () => void }): JSX.Element {
 
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="destructive" disabled={busy} onClick={() => void run(false)}>
-                {busy && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+                {busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                 Move {preview?.moving ?? 0} pupils up
               </Button>
               <Button variant="ghost" onClick={() => setConfirming(false)}>

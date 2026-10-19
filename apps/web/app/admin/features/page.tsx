@@ -29,7 +29,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { Check, Info, Loader2, Minus, ToggleRight } from 'lucide-react'
+import { Check, Info, LoaderCircle, Minus, ToggleRight } from 'lucide-react'
 
 import { apiSend, useApi } from '../../../lib/use-api'
 import { Alert } from '../../../components/ui/alert'
@@ -247,7 +247,7 @@ export default function AdminFeaturesPage(): JSX.Element {
                                     )}
                                   >
                                     {busy ? (
-                                      <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                                      <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
                                     ) : on ? (
                                       <Check aria-hidden="true" className="size-4" />
                                     ) : (

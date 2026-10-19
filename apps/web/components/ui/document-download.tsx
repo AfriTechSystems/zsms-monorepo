@@ -34,7 +34,7 @@
 
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import { AlertCircle, Download, Loader2 } from 'lucide-react'
+import { CircleAlert, Download, LoaderCircle } from 'lucide-react'
 
 import { Button } from './button'
 import { useToast } from './toast'
@@ -106,7 +106,7 @@ export function DocumentDownload({
   if (state === 'failed' || (state === 'idle' && knownFailure)) {
     return (
       <span className="inline-flex items-center gap-1.5 text-sm text-danger">
-        <AlertCircle aria-hidden="true" className="size-4 shrink-0" />
+        <CircleAlert aria-hidden="true" className="size-4 shrink-0" />
         <span>{why ?? 'Could not be produced'}</span>
       </span>
     )
@@ -121,7 +121,7 @@ export function DocumentDownload({
         onClick={() => void download()}
       >
         {state === 'working' ? (
-          <Loader2 aria-hidden="true" className="animate-spin" />
+          <LoaderCircle aria-hidden="true" className="animate-spin" />
         ) : (
           <Download aria-hidden="true" />
         )}

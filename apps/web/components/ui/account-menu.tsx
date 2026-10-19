@@ -47,7 +47,7 @@ import {
   Check,
   ChevronDown,
   LayoutGrid,
-  Loader2,
+  LoaderCircle,
   LogOut,
   Monitor,
   Moon,
@@ -322,7 +322,7 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
 
           {switching && (
             <p className="flex items-center gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+              <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
               Switching…
             </p>
           )}

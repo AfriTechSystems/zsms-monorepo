@@ -45,6 +45,7 @@ import {
   Check,
   CircleSlash,
   Clock,
+  Download,
   FileText,
   Users,
 } from 'lucide-react-native'
@@ -53,6 +54,7 @@ import { api } from '../../../../lib/api'
 import { useApi } from '../../../../lib/use-api'
 import { todayIso } from '../../../../lib/dates'
 import { useSession } from '../../../../lib/auth'
+import { downloadAndShare } from '../../../../lib/download'
 import {
   Badge,
   Body,
@@ -240,6 +242,9 @@ export default function Register(): JSX.Element {
 
             {view === 'summary' ? (
               <RegisterSummary
+                classId={classId}
+                date={today}
+                getToken={getToken}
                 total={rows.length}
                 present={present}
                 absent={absent}
@@ -480,6 +485,9 @@ function PupilRow({
  * an accusation about thirty children who are sitting in front of them.
  */
 function RegisterSummary({
+  classId,
+  date,
+  getToken,
   total,
   present,
   absent,
@@ -489,6 +497,9 @@ function RegisterSummary({
   rate,
   notes,
 }: {
+  classId: string
+  date: string
+  getToken: () => Promise<string | null>
   total: number
   present: number
   absent: number
@@ -499,6 +510,8 @@ function RegisterSummary({
   notes: Array<{ id: string; name: string; status: Status }>
 }): JSX.Element {
   const c = usePalette()
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   return (
     <View style={{ gap: SPACE.cards }}>
@@ -542,6 +555,39 @@ function RegisterSummary({
           </Caption>
         </View>
       </Card>
+
+      {/*
+        The register as a PDF, which is what goes to the office.
+
+        Rendered by the same route the web screen links to, so the sheet a teacher
+        shares from their phone and the one the bursar prints are the same document.
+        Shown only once something is marked: a register of em dashes is not a document
+        anybody wants filed, and offering it would invite exactly that.
+      */}
+      {total > unmarked && (
+        <Button
+          label={downloading ? 'Preparing…' : 'Download register'}
+          tone="outline"
+          icon={Download}
+          busy={downloading}
+          full
+          onPress={() => {
+            setDownloading(true)
+            setDownloadError(null)
+            void downloadAndShare(
+              `/api/school/attendance/register/export?classId=${encodeURIComponent(classId)}&date=${encodeURIComponent(date)}`,
+              `register-${classId.replace(/[^A-Za-z0-9]+/g, '-')}-${date}.pdf`,
+              getToken,
+            )
+              .then((result) => {
+                if (!result.ok) setDownloadError(result.error)
+              })
+              .finally(() => setDownloading(false))
+          }}
+        />
+      )}
+
+      {downloadError && <ErrorNote message={downloadError} />}
 
       {/*
         Who was not simply present. The mockup lists these under "Notes", and the

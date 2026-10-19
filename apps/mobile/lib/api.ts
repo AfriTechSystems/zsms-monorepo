@@ -50,6 +50,18 @@ const configured = [
 
 const BASE_URL = configured ?? 'http://localhost:3000'
 
+/**
+ * The API origin, for callers that cannot go through `apiCall`.
+ *
+ * `lib/download.ts` fetches a PDF, which is bytes rather than the JSON envelope every
+ * helper below parses — so it needs the base URL but not the rest. Exported rather than
+ * duplicating the resolution order, which has already been got wrong once: an unset
+ * variable became the empty string and every request went to the app's own origin.
+ */
+export function apiBaseUrl(): string {
+  return BASE_URL
+}
+
 export interface ApiResult<T> {
   data: T | null
   error: string | null

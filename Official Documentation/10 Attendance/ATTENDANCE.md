@@ -302,10 +302,19 @@ so storing the rendering would keep a second copy of a fact the database already
 unmarked pupil is a gap a teacher can still fill; on paper it would become a record of
 absence that outlives the correction, and this is a document that gets filed.
 
-Reachable from the web attendance screen beside *Print register*. **Not yet reachable
-from the phone**: saving a file to the device needs `expo-file-system` and
-`expo-sharing`, two dependencies this app does not have, and this repository has a
-history of mobile dependency incidents. That is a deliberate pause, not an omission.
+Reachable from **both** surfaces as of 2026-10-19: the web attendance screen beside
+*Print register*, and the phone's register Summary tab. `expo-file-system` and
+`expo-sharing` were added for the latter.
+
+On the phone it **shares rather than saves**. Android and iOS disagree about what
+"download" means and neither has a folder a teacher can reliably find afterwards, so
+the system sheet lets them send the register to WhatsApp, email it to the office, or
+save it to Files. The file lands in the cache directory, because the register is
+reproducible from the server at any time and a copy kept on the device would be a
+second and staler truth — the same reasoning the route uses for storing nothing in R2.
+
+The button appears only once something is marked. A register of em dashes is not a
+document anybody wants filed.
 
 **Still outstanding from the specification above:** grade-by-grade rates, top
 absentees, teacher marking compliance, and the CSV form of any of it.
@@ -332,5 +341,6 @@ absentees, teacher marking compliance, and the CSV form of any of it.
 | 2026-04-26 | Added timetable integration for class suggestion | Timetable module confirmed |
 | 2026-04-26 | Portal-first model — monthly summaries replace per-absence default | Communication model update |
 | 2026-04-26 | Added holiday bulk marking | Schools need to handle non-school days cleanly |
+| 2026-10-19 | The register PDF is now reachable from the phone as well as the web | `expo-file-system` and `expo-sharing` added. The v57 file API is safer than the one it replaced: `File.downloadFileAsync` rejects on a non-2xx and creates no file, where the old `downloadAsync` would have written an API refusal to disk as a `.pdf` containing the error envelope and opened it as a corrupt document. Shares rather than saves, because neither mobile OS has a folder a teacher can find again. |
 | 2026-10-18 | The register as a PDF — `renderAttendanceRegister()` and `GET /api/school/attendance/register/export` | The *Attendance Reports* section has specified a downloadable register since the initial draft and nothing rendered one. Scoped to ONE DAY, which is narrower than the two reports specified: the button it serves sits on a register a teacher has just marked, and that is what goes to the office. Synchronous and stored nowhere — a register is reproducible from the rows, so a saved rendering is a second copy that goes stale on the first correction. An unmarked pupil prints as an em dash, with the footer stating it is not a record of absence. Reachable from the web screen; the phone needs `expo-file-system` and `expo-sharing`, deliberately not added mid-session. |
 | 2026-10-18 | `school_attendance_trend()` (`0274`) and the dashboard trend chart | The day-by-day rate this document has specified since the initial draft had no data function behind it. SECURITY INVOKER so RLS scopes it per role; `holiday` kept as its own count because a closed day is not a day of total absence. Grade-by-grade rates, top absentees, marking compliance and the PDF/CSV export remain unbuilt. |

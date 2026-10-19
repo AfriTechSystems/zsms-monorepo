@@ -587,6 +587,84 @@ The actual glyph names must be filled in after repository inspection. Do not inv
 
 ---
 
+## 10b. As implemented (2026-10-19)
+
+This section records what was actually built, so the catalogue stays aligned with the
+codebase rather than becoming the aspirational list §6 warns about.
+
+### Where it lives
+
+| Piece | Path |
+|---|---|
+| The vocabulary — 98 semantic names, **no glyphs** | `packages/design-tokens/src/icons.ts` |
+| Web map (`lucide-react ^0.469`) | `apps/web/components/ui/icon.tsx` |
+| Mobile map (`lucide-react-native ^1.49`) | `apps/mobile/components/icon.tsx` |
+| The guard — 28 assertions | `apps/web/lib/icons.test.ts` |
+
+**No icon library was added.** Both apps were already on lucide, and every glyph chosen
+resolved in both packages, so no substitution was needed anywhere.
+
+### Why the names and the maps are separate
+
+§5.2 asks for a central registry. It is split in two because it has to be:
+
+- The two lucide packages export the same names as **different component types**, so one
+  map cannot type-check against both.
+- `@zsms/design-tokens` is imported by `@zsms/documents` and `@zsms/notifications`, which
+  render PDFs and email inside a Railway worker. A React icon library in that dependency
+  tree would put React in a worker that draws a receipt.
+
+`IconName` is a union, so a platform that omits a concept **fails to compile**. What a
+type cannot check is *agreement* — nothing stops web drawing `students` as `Users` while
+mobile draws it as `GraduationCap` — so the test asserts both maps are complete, invent
+nothing, choose the same glyph for every concept, and use no deprecated lucide alias.
+
+### What the audit found
+
+| | |
+|---|---|
+| Web | 142 distinct glyphs across 155 files |
+| Mobile | 45 across 35 files |
+| Drift | **22 of 24 core concepts** drawn more than one way, or web and mobile disagreeing |
+| Invisible drift | `AlertTriangle` (16 files) and `TriangleAlert` are the **same picture under two names**; so are `CheckCircle2` and `CircleCheck`. lucide renamed them and kept the old names as aliases |
+| Fixed | 65 files de-duplicated; **zero deprecated aliases remain** |
+
+The invisible drift is the part worth remembering. Nobody could see it, so no review
+would have caught it, which is why the guard is a mechanical test rather than guidance.
+
+### Two domain rules the test enforces rather than documents
+
+- **`unmarked` is never the `absent` glyph**, on either platform — asserted, not trusted
+  to a comment. `ATTENDANCE.md`'s rule is that an unmarked pupil is not an absent one,
+  and on a printed register that error outlives the correction. Its colour role is
+  `neutral`, not `warning`: amber beside a red `absent` reads as a lesser accusation
+  rather than as no answer yet.
+- **No deprecated alias in either map.** They render identically to their replacements,
+  which is exactly what made the original drift impossible to see.
+
+### Deliberate departures from the sheets
+
+| Sheet | Decision |
+|---|---|
+| Purple `#8B5CF6` appears on every poster | **Not added.** §2.1 says it is not part of the core palette, and a colour outside the token package is one no school can theme and no contrast check has measured |
+| Attendance drawn as a clipboard (01 A, 02 D) | **Adopted**, replacing `CalendarCheck` in both apps. Also the better symbol: a register is a clipboard, and a calendar glyph competed with Timetable two rows below it in the same sidebar |
+| Eight sheets expected (§3) | **Seven are present** in the Icons folder. The work used those plus the §6 tables |
+
+### What the registry owns
+
+The concepts that appear in more than one place — navigation destinations, domain
+objects, states. A one-off glyph on a single screen may still import lucide directly;
+routing every icon through a registry is ceremony. **What drifts is what repeats.**
+
+### Adding a concept
+
+Add the name to `ICON_NAMES`, then both maps. The type error in each app is the point:
+it is what stops a concept existing on one platform only. Do not add a name for a
+feature that does not exist — §3 is explicit that a module must not be invented because
+a poster shows an icon for it.
+
+---
+
 ## 11. Implementation workflow for Claude Code
 
 Follow this sequence rather than making broad, unreviewed changes.

@@ -4,6 +4,114 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-10-19 (later) — One icon vocabulary, and the register reaches the phone
+
+Branch `integration`, after PR #3 merged. The icon audit and registry, the mobile
+register download, and the documentation brought level. `ci:checks` green;
+`db:verify` 9/9 over 228 migrations; 28 unit tests; the authenticated walk still 0
+broken.
+
+### The drift nobody could see
+
+The icon audit found what the catalogue predicted — 142 distinct glyphs across 155 web
+files, and **22 of 24 core concepts drawn more than one way or differing between web and
+mobile**. That much was expected.
+
+What was not expected is that the worst of it was **invisible**. lucide renamed several
+glyphs and kept the old names as aliases, so `AlertTriangle` (16 files) and
+`TriangleAlert` were the same picture under two names, as were `CheckCircle2` and
+`CircleCheck`. No reviewer would ever have caught that: the screens looked identical
+because they *were* identical. It is the clearest case yet for the rule this repository
+keeps rediscovering — **an invariant nobody can see needs an assertion, not guidance.**
+
+So the guard is `apps/web/lib/icons.test.ts`: both maps complete, inventing nothing,
+agreeing glyph for glyph, and using no deprecated alias. 65 files de-duplicated and zero
+aliases remain.
+
+### One vocabulary, two maps, and why that is forced
+
+`packages/design-tokens/src/icons.ts` holds 98 semantic names and no glyphs. Each app
+maps them to its own lucide package. The split is not architectural tidiness:
+
+- The two lucide packages export the same names as **different component types**, so one
+  map cannot type-check against both.
+- The token package is imported by `@zsms/documents` and `@zsms/notifications`, which
+  render PDFs and email inside a Railway worker. A React icon library there would put
+  React in a worker that draws a receipt.
+
+`IconName` makes a missing concept a compile error. It cannot make the two maps *agree*
+— that is what the test is for.
+
+Every glyph resolved in both packages with **zero substitutions**, so the two apps
+genuinely draw the same picture for every concept.
+
+### Two real inconsistencies, found by looking rather than by the audit
+
+`ErrorState` drew a warning triangle in its body while the `danger` Alert around it drew
+a circled X in its header — the same message, two severities. Reference sheet 01 F
+settles it: circled X is Error, triangle is Warning.
+
+Attendance was `CalendarCheck` in both apps — consistent with each other and wrong
+against the sheets, which draw a clipboard. The sheets are also right on the merits: a
+register is a clipboard, and a calendar glyph competed with Timetable two rows below it
+in the same sidebar.
+
+### A mistake worth recording
+
+The first alias-rename script rewrote string literals and prose inside the registry and
+its own test, and a dedup regex deleted two map values outright — `approved:` and
+`rejected:` were left with no glyph. Caught by reading the file rather than by the gate,
+because it still compiled right up until the values vanished.
+
+The fix was to repair both files and exclude them explicitly from every later rename.
+The lesson is narrower than "be careful": **a mechanical rename must not run over the
+file whose job is to hold those names as data.**
+
+### The register reaches the phone
+
+`expo-file-system` and `expo-sharing` were installed from the repo root, which put them
+in `node_modules` and the lockfile but **not** in `apps/mobile/package.json`. That works
+on this machine and breaks on any clean install or EAS build. Both are now declared.
+
+The v57 file API turned out safer than the one I had planned against. `downloadAsync` is
+gone; `File.downloadFileAsync` **rejects on a non-2xx and creates no file**. The old call
+writes whatever comes back — so an API refusal would have landed on disk as a `.pdf`
+containing `{"error":"Your role does not include attendance."}` and opened as a corrupt
+document. The status is all the new API gives, so it is all the message can explain
+from, but 401/403 and a server fault send a teacher to different places and get
+different sentences.
+
+It shares rather than saves. Neither mobile OS has a folder a teacher can reliably find
+again, and the system sheet lets them send the register to WhatsApp or the office —
+whichever they were going to do next. The file sits in cache, because the register is
+reproducible from the server and a copy on the device would be a second, staler truth.
+
+### What the APK needs, and does not have
+
+`EXPO_PUBLIC_API_URL` is **not set as a repository variable**. A `standalone` APK would
+bake in an unreachable API and fail every request after sign-in. The `development`
+variant does not have that problem — it is a shell, and `npm run mobile` detects the
+machine's LAN address and supplies it through Metro at runtime. A standalone build
+becomes useful once the web app is deployed somewhere a phone can reach.
+
+The APK only needs rebuilding when a **native** package changes, which is exactly what
+happened here.
+
+### Carried forward
+
+- **`main` is 54 commits behind `integration`.** A release decision, not engineering.
+- **Authenticated screens remain visually unverified.** The icon work is type-checked,
+  asserted for agreement, and renders correctly on `/design` (`lucide-triangle-alert`,
+  `lucide-circle-check`, `lucide-info` all served) — but nobody has *looked* at a rebuilt
+  sidebar, because that needs a signed-in browser session this environment cannot make.
+- **Seven of the eight reference sheets are present**, and the work used those plus the
+  catalogue's own tables.
+- **Two glyph choices are judgement calls** worth a designer's eye: `marks` → `Percent`
+  and `results` → `Award`. The sheets distinguish the two concepts; the glyphs are my
+  reading of them.
+
+---
+
 ## 2026-10-19 — The chain closes: a real token, spent against the running app
 
 Branch `rls/anon-execute-boundary`. `scripts/e2e-walk.mjs`, the last two mobile screens,

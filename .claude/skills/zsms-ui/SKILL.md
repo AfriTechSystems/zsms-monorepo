@@ -61,7 +61,91 @@ than warns. Never work around it.
 
 ## 3. Reach for the existing primitive first
 
-28 modules in `apps/web/components/ui/`. The ones people get wrong:
+42 modules in `apps/web/components/ui/` — 40 components, plus `auth-appearance.ts` (the
+Clerk appearance object) and `subject-colour.ts` (`subjectColour()`, `NON_TEACHING`), which
+are not components. This line said 28 until 2026-10-18; **count it before quoting it.**
+
+Six of the 40 are feature components that happen to live in `ui/` rather than primitives —
+`activity-feed`, `settings-history`, `staff-record-sync` (returns `null`, side-effect only),
+`custom-field-input`, `draft-notice`, and `school-logo` (which duplicates
+`brand/school-logo.tsx`). Do not treat everything in this folder as a primitive.
+
+### Mobile: the shared chrome lives in `components/shell` (added 2026-10-18)
+
+Built against the four reference mockups in `Official Documentation/19 Design System/`.
+`ui.tsx` holds what a screen is *made of*; `shell.tsx` holds what every screen
+*repeats*. Reach for these before drawing one:
+
+- **`IconTile`** — the rounded tinted square that fronts almost every row and grid
+  cell. Six screens had each hand-rolled it at a different size and radius (38, 40,
+  42, 44), which is how an app comes to look assembled rather than designed and is
+  invisible in review because each copy looks right on its own. A grep for the
+  hand-rolled pattern should return only `stats.tsx` and `wordmark.tsx`.
+- **`AppHeader`** — mark, school name, bell with a count, avatar. Pinned outside the
+  ScrollView: a notification count that scrolls away is one nobody sees. Both portals
+  put it in the same corner, because a parent who is also a teacher switches between
+  them.
+- **`Greeting`**, **`SectionHeader`** (with the mockups' "View All"), **`ListRow`**,
+  **`RowDivider`**, **`Segmented`**.
+- **`TodaySchedule`** (`components/today-schedule`) — the home timeline with the NOW
+  badge, computed from the device clock against the wall-clock times the API returns.
+  Those carry no timezone, which is correct for a school day and the reason they must
+  never be compared against a UTC instant.
+- **`NoticeList`** (`components/notice-list`) — both portals' notices. The endpoint is
+  a prop; everything else is shared.
+- **`Donut`** (`components/stats`) — the mobile counterpart of the web's `DonutChart`.
+
+**Tones are `primary | success | warning | danger | accent | neutral` and nothing
+else.** `accent` and `anchor` were added to the mobile palette on 2026-10-18; they had
+existed in the token package since the foundation and mobile exposed neither, so the
+action grid drew all twelve tiles in one blue. **Do not add a seventh hue to match a
+mockup pixel-for-pixel** — a colour outside the token package is one no school can
+theme and no contrast check has measured.
+
+Assign a tone by what a thing IS, never by where it sits: colour follows the entity,
+not its rank, so gating or re-ordering a list never repaints what remains.
+
+**`todayIso()` is in `apps/mobile/lib/dates`**, and the UTC form is a real bug here
+too — the register computed `toISOString().slice(0, 10)` and so opened *yesterday's*
+sheet before 02:00, seeding yesterday's marks into one a teacher was about to correct.
+
+**The mockups are suggestion, not specification**, and two departures are recorded in
+code: the notices filter is All/Unread/Important rather than All/Notices/**Messages**
+(no message category exists in the data — that tab would always be empty or imply a
+channel somebody waits on), and a child's result never gets a traffic light, because
+red-amber-green on a mark is ZSMS passing a judgement the school has not.
+
+### Added 2026-10-18 — reach for these before writing the behaviour again
+
+- **Dates: `DateField` / `DateRangeField`** (`components/ui/date-field`), never a raw
+  `<input type="date">`. There were eighteen of those across twelve files.
+  `DateRangeField` links the two bounds — the `from` input's `max` is whatever `to`
+  holds and vice versa — so an inverted range cannot be entered. Five existing
+  from/to pairs had no such check and returned an empty result that read as "no
+  data". Use `notFuture` where a future value is always a typo (a date of birth, a
+  join date, an audit window, a register) and leave it off where the future is
+  legitimate (an enrolment next term, a fee due date).
+- **`todayIso()` lives in `lib/dates`**, and it is the only correct one. **Never
+  `new Date().toISOString().slice(0, 10)`** — that is UTC, and Zambia is UTC+2, so
+  for the first two hours of every local day it returns *yesterday*. As a default it
+  opens the wrong day; as a `max` it refuses the date a teacher is sitting in.
+- **Menus and dropdowns: `usePopover()`** (`lib/use-popover`). Handles Escape,
+  outside click, Tab-out, `aria-expanded`/`aria-haspopup`/`aria-controls`, and
+  **returns focus to the trigger on close**. Three components had hand-rolled copies
+  that drifted. A menu must **not** trap focus — that is a modal's job and
+  `ui/dialog` already does it natively; see the file for why.
+- **Stacking: `z-raised` / `z-sticky` / `z-chrome` / `z-overlay` / `z-popover` /
+  `z-top`**, not `z-10`…`z-50`. If you are reaching for `z-[60]`, the layer you want
+  is `z-top`.
+- **Motion: `duration-fast|base|slow` and `ease-standard|gentle|emphasised`.** The
+  ambient loop timings in `globals.css` are deliberately not tokens — they are scene
+  timings, not a scale.
+- **One breakpoint.** `BREAKPOINT_SM` (640) is the only one; Tailwind's `sm` is
+  imported from it and `lib/breakpoints.test.ts` fails the build if they diverge. The
+  token layer swaps type and spacing below it, which is why `p-card` and `text-3xl`
+  need no responsive modifier.
+
+The ones people get wrong:
 
 - **`EmptyState` is in its own module** (`components/ui/empty-state`), not in `data-states`
   with `ErrorState`, `TableSkeleton`, `StatSkeleton` and `PageHeader`. This has caused build
@@ -99,7 +183,14 @@ because a page feels special.
 | **Settings** | Section tabs → one section at a time → explicit save, with a right rail of read-only context | `/school/[code]/settings` |
 | **Dense entry** | Context row → toolbar → the grid → a summary rail | `/school/[code]/results`, `/attendance` |
 | **Auth** | Centred card on the branded `auth-shell` | `/sign-in` |
-| **States** | The eight states side by side | `/design` |
+| **States** | Every interface state, rendered against the live tokens | `/design` |
+
+`/design` has eleven sections, each with an `id` — `#palette`, `#contrast`, `#typography`,
+`#buttons`, `#forms`, `#loading`, `#responsive`, `#dashboard`, `#tints`, `#semantic`,
+`#theming`. There is **no `#states` section**: the state examples live inside `#forms`
+(error, loading, empty, and the three `Alert` variants) and `#loading` (`BrandSplash`
+against skeletons). This row claimed "the eight states side by side" until 2026-10-18 and
+nothing on the page ever matched it.
 
 **Tabs must switch the view, not scroll to a section.** Use `SectionTabs` with its URL state so
 the browser back button works and a link can address a tab.

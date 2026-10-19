@@ -51,12 +51,14 @@ import {
 
 import { api } from '../../../../lib/api'
 import { useApi } from '../../../../lib/use-api'
+import { todayIso } from '../../../../lib/dates'
 import { useSession } from '../../../../lib/auth'
 import {
   Badge,
   Body,
   Button,
   Caption,
+  Card,
   Empty,
   ErrorNote,
   Loading,
@@ -64,7 +66,8 @@ import {
   Screen,
   usePalette,
 } from '../../../../components/ui'
-import { ProgressBar } from '../../../../components/stats'
+import { Donut, ProgressBar, StatTile } from '../../../../components/stats'
+import { Segmented } from '../../../../components/shell'
 import { RADIUS, SPACE, TAP, TYPE } from '../../../../theme'
 import { formatClass } from '../attendance'
 
@@ -109,7 +112,12 @@ export default function Register(): JSX.Element {
   const insets = useSafeAreaInsets()
   const { getToken } = useSession()
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  /*
+    Local, not `toISOString()`. That is UTC and Zambia is UTC+2, so before 02:00 this
+    opened YESTERDAY's register — seeding yesterday's marks into a sheet a teacher was
+    about to correct. See lib/dates.
+  */
+  const today = useMemo(() => todayIso(), [])
   const { data, loading, error, reload } = useApi<RegisterPayload>(
     classId ? `/api/school/attendance/register?classId=${encodeURIComponent(classId)}&date=${today}` : null,
   )
@@ -118,6 +126,15 @@ export default function Register(): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  /*
+    Students | Summary, as the reference designs have it.
+
+    A tab rather than a second screen: the summary is ABOUT the marks on this sheet,
+    and pushing a route would make "go back and fix one" a navigation rather than a
+    tap. It switches the view and does not scroll to a section — the same rule the web
+    carries for SectionTabs.
+  */
+  const [view, setView] = useState<'students' | 'summary'>('students')
 
   // Seed from what the server already holds, so re-opening a marked register shows the
   // marks rather than an empty one a teacher would dutifully fill in again.
@@ -134,6 +151,20 @@ export default function Register(): JSX.Element {
   const unmarked = rows.filter((r) => !marks[r.studentId]).length
   const present = rows.filter((r) => marks[r.studentId] === 'present').length
   const absent = rows.filter((r) => marks[r.studentId] === 'absent').length
+  const late = rows.filter((r) => marks[r.studentId] === 'late').length
+  const excused = rows.filter((r) => marks[r.studentId] === 'excused').length
+
+  /*
+    The attendance rate, over the pupils actually assessed.
+
+    Present and late both count as attending — a late pupil came to school, and
+    counting them absent would make punctuality and attendance the same measure when
+    the register already separates them. Unmarked pupils are excluded from the
+    denominator entirely: an unmarked pupil is not an absent one, which is the rule
+    this screen's header has carried since it was written.
+  */
+  const assessed = present + late + absent + excused
+  const attendingRate = assessed === 0 ? null : Math.round(((present + late) / assessed) * 100)
 
   const markAllPresent = useCallback(() => {
     setSaved(false)
@@ -198,6 +229,37 @@ export default function Register(): JSX.Element {
 
         {data && rows.length > 0 && (
           <>
+            <Segmented
+              options={[
+                { value: 'students', label: `Pupils (${rows.length})` },
+                { value: 'summary', label: 'Summary' },
+              ]}
+              value={view}
+              onChange={setView}
+            />
+
+            {view === 'summary' ? (
+              <RegisterSummary
+                total={rows.length}
+                present={present}
+                absent={absent}
+                late={late}
+                excused={excused}
+                unmarked={unmarked}
+                rate={attendingRate}
+                notes={rows
+                  .filter((r) => {
+                    const mark = marks[r.studentId]
+                    return mark && mark !== 'present'
+                  })
+                  .map((r) => ({
+                    id: r.studentId,
+                    name: `${r.firstName} ${r.lastName}`,
+                    status: marks[r.studentId] as Status,
+                  }))}
+              />
+            ) : (
+            <>
             <Row gap={SPACE.sm} style={{ flexWrap: 'wrap' }}>
               <Badge label={`${present} in`} tone={present > 0 ? 'success' : 'neutral'} />
               <Badge label={`${absent} out`} tone={absent > 0 ? 'danger' : 'neutral'} />
@@ -257,6 +319,8 @@ export default function Register(): JSX.Element {
                 />
               ))}
             </View>
+            </>
+            )}
           </>
         )}
 
@@ -393,4 +457,136 @@ function PupilRow({
       </Row>
     </View>
   )
+}
+
+/**
+ * What the register adds up to.
+ *
+ * Spec: `Official Documentation/19 Design System/ZSMS Teacher App Dashboard Flow.png`
+ *
+ * ## It describes the sheet on screen, not the saved one
+ *
+ * Every figure here is computed from `marks` — what the teacher has tapped — rather
+ * than from the server's copy. That is deliberate and it is why the caption says
+ * "on this sheet": a teacher correcting four pupils wants the total to move as they
+ * work, and a summary that only updated on save would disagree with the list directly
+ * above it until they pressed the button.
+ *
+ * ## Unmarked is a slice, and it is not absence
+ *
+ * The donut carries `unmarked` as its own grey slice and the rate excludes those
+ * pupils from the denominator entirely. Folding them into absence would report a
+ * half-finished register as a day of mass truancy, and the teacher would be looking at
+ * an accusation about thirty children who are sitting in front of them.
+ */
+function RegisterSummary({
+  total,
+  present,
+  absent,
+  late,
+  excused,
+  unmarked,
+  rate,
+  notes,
+}: {
+  total: number
+  present: number
+  absent: number
+  late: number
+  excused: number
+  unmarked: number
+  rate: number | null
+  notes: Array<{ id: string; name: string; status: Status }>
+}): JSX.Element {
+  const c = usePalette()
+
+  return (
+    <View style={{ gap: SPACE.cards }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm }}>
+        <View style={{ flexBasis: '48%', flexGrow: 1 }}>
+          <StatTile label="Present" value={String(present)} icon={Check} tone="success" />
+        </View>
+        <View style={{ flexBasis: '48%', flexGrow: 1 }}>
+          <StatTile label="Absent" value={String(absent)} icon={CircleSlash} tone="danger" />
+        </View>
+        <View style={{ flexBasis: '48%', flexGrow: 1 }}>
+          <StatTile label="Late" value={String(late)} icon={Clock} tone="warning" />
+        </View>
+        <View style={{ flexBasis: '48%', flexGrow: 1 }}>
+          <StatTile
+            label="Not marked"
+            value={String(unmarked)}
+            icon={Users}
+            tone={unmarked > 0 ? 'warning' : 'neutral'}
+          />
+        </View>
+      </View>
+
+      <Card>
+        <Donut
+          centreValue={String(total)}
+          centreLabel={total === 1 ? 'pupil' : 'pupils'}
+          slices={[
+            { label: 'Present', value: present, colour: c.success },
+            { label: 'Late', value: late, colour: c.warning },
+            { label: 'Excused', value: excused, colour: c.primaryMark },
+            { label: 'Absent', value: absent, colour: c.danger },
+            { label: 'Not marked', value: unmarked, colour: c.textSubtle },
+          ]}
+        />
+        <View style={{ marginTop: SPACE.md }}>
+          <Caption>
+            {rate === null
+              ? 'Nothing marked yet, so there is no rate to show.'
+              : `${rate}% attending on this sheet — present and late, out of those marked.`}
+          </Caption>
+        </View>
+      </Card>
+
+      {/*
+        Who was not simply present. The mockup lists these under "Notes", and the
+        reason it earns its place is that it is the list a teacher reads back to the
+        office — four names out of forty, rather than scrolling the whole register
+        hunting for the red chips.
+      */}
+      {notes.length > 0 && (
+        <View style={{ gap: SPACE.sm }}>
+          <Text style={[TYPE.heading, { color: c.text }]}>
+            {notes.length === 1 ? 'One pupil to mention' : `${notes.length} pupils to mention`}
+          </Text>
+          <Card style={{ gap: SPACE.sm }}>
+            {notes.map((note) => (
+              <View
+                key={note.id}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}
+              >
+                <Text style={[TYPE.body, { color: c.text, flex: 1 }]} numberOfLines={1}>
+                  {note.name}
+                </Text>
+                <Badge
+                  label={STATUS_LABEL[note.status]}
+                  tone={
+                    note.status === 'absent'
+                      ? 'danger'
+                      : note.status === 'late'
+                        ? 'warning'
+                        : 'primary'
+                  }
+                />
+              </View>
+            ))}
+          </Card>
+        </View>
+      )}
+    </View>
+  )
+}
+
+/** The word, not the abbreviation the marking chips use. A chip has room for "Exc."
+ *  and a summary read back to the office does not. */
+const STATUS_LABEL: Record<Status, string> = {
+  present: 'Present',
+  absent: 'Absent',
+  late: 'Late',
+  excused: 'Excused',
 }

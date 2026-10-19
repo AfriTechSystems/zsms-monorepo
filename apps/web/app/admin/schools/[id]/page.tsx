@@ -49,6 +49,8 @@ import { FormActions, FormGrid, FormSection } from '../../../../components/ui/fo
 import { StatusBadge, TIER_LABEL, formatKwacha } from '../../health-shared'
 import { AiUsagePanel } from './ai-usage-panel'
 import { SettingsHistory } from '../../../../components/ui/settings-history'
+import { DateField } from '../../../../components/ui/date-field'
+import { todayIso } from '../../../../lib/dates'
 import {
   OnboardingPanel,
   type ChecklistItem,
@@ -408,9 +410,16 @@ function OverrideForm({ schoolId, features, capacity, onSaved }: {
           )}
         </Field>
 
-        <Field id="override-expires" label="Expires" hint="Optional — blank means indefinite">
-          {(props) => <Input {...props} type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />}
-        </Field>
+        {/* An override that expires in the past is already expired, so the
+            earliest useful value is today. */}
+        <DateField
+          id="override-expires"
+          label="Expires"
+          hint="Optional — blank means indefinite"
+          value={expires}
+          onChange={setExpires}
+          min={todayIso()}
+        />
       </FormGrid>
 
       {belowRoll && capacity && (

@@ -155,6 +155,16 @@ Body is 15px rather than the more common 16px: the product is table-dense, and 1
 - **Radius** is `sm 4 / md 6 / lg 8 / xl 12`. Cards use `lg`, inputs and buttons `md`.
 - **Elevation** is three shadows only. Depth is used to separate a floating layer from the page, never to decorate a card that is already bounded.
 - **Touch targets** are 44px minimum on the default control size. Below that, tapping on a phone in a school corridor is a coin toss.
+- **Stacking** is six named layers, not raw numbers: `raised` (10) for decoration and sticky cells inside a card, `sticky` (20) for bars inside a scrolling region, `chrome` (30) for the sidebar and bottom tabs, `overlay` (40) for scrims, `popover` (50) for menus, toasts and banners, `top` (60) for the keyboard-shortcuts panel. Added 2026-10-18 by reading the scale the components had already settled into. Reaching for a bracketed `z-[n]` means the layer you want is one of these.
+- **Motion** is three durations (`fast` 120ms, `base` 220ms, `slow` 400ms) and three easings (`standard`, `gentle`, `emphasised`). The ambient loop timings in `globals.css` — the 1.4s splash sweep, the 4s float, the aura's co-prime 19/24/29s drifts — are deliberately **not** tokens. They are scene timings, and tokenising them would imply they are interchangeable with a hover transition. Reduced motion stays a single global rule, because a token cannot express "and also stop the aura".
+
+### One breakpoint, and it used to be two
+
+`BREAKPOINT_SM` is **640px** and it is the only one. `apps/web/tailwind.config.ts` imports it rather than inheriting a default, and `apps/web/lib/breakpoints.test.ts` fails the build if the two diverge.
+
+Until 2026-10-18 they did diverge, silently. The token layer emitted its mobile block at `max-width: 480px` while Tailwind's `sm` was its stock 640px, which this repository never declared and so never reconciled. **Between 480px and 640px a screen got desktop type and padding inside a mobile layout** — 20px card padding, a 24px gutter and full-size headings wrapped around a card stack, because `data-table` goes to one card per row below `sm` and `app-shell` switches to its drawer there. That band is most phones held in landscape and the narrow half of a split-screen tablet.
+
+The media query bound is `BREAKPOINT_SM - 0.02`, not `BREAKPOINT_SM`: `sm:` compiles to `min-width: 640px`, so a `max-width: 640px` would make both apply at exactly 640 — the same bug, one pixel wide.
 
 ---
 
@@ -164,6 +174,9 @@ Body is 15px rather than the more common 16px: the product is table-dense, and 1
 - **One filled primary button per view.** A screen with three competing filled buttons is a screen where a tired bursar clicks the wrong one. Secondary actions are `outline`, `secondary`, or `ghost`.
 - **`destructive` is reserved** for actions that delete or reverse money. It is not a general-purpose red button.
 - **Every input has a visible label.** Placeholder-as-label disappears exactly when the user needs it.
+- **Dates use `DateField` / `DateRangeField`**, never a raw `<input type="date">`. The native control is kept deliberately — it is keyboard accessible, announced correctly, and opens the operating system's own picker on a phone, which beats anything we would hand-roll for a clerk entering fifty dates. What the wrapper adds is a **linked range**: the `from` input's `max` is whatever `to` holds and vice versa, so an inverted range cannot be entered. Five from/to pairs previously had no such check and an inverted one returned an empty result that read as "there is no data".
+- **"Today" comes from `lib/dates`.** Never `toISOString().slice(0, 10)` — that is UTC, and Zambia is UTC+2, so for the first two hours of every local day it is yesterday. As a default it opens the wrong day; as a maximum it refuses the register a teacher is sitting in front of.
+- **Menus use `usePopover()`.** Escape closes and **returns focus to the trigger**, Tab out closes, an outside click closes. A menu must *not* trap focus — that is a modal's job, and `ui/dialog` delegates it to the native `<dialog>`. Trapping a menu means a user who opened it by accident cannot Tab away.
 - **Errors preserve input.** A validation failure never clears the field it rejected.
 - **Every list has a designed empty state and a designed loading state.** Both are components, not afterthoughts: a blank panel is indistinguishable from a broken one.
 - **Focus is visible everywhere.** A single global `:focus-visible` ring, using a mode-aware token, applied once rather than per component.
@@ -567,3 +580,6 @@ inconvenience.
 | 2026-08-18 | **Added the Form Layout section; hint moved below the control** | A hint above the control is variable height, so two controls in a row started at different heights and the row stair-stepped. Fixing the ordering fixes every form at once; per-field padding could not have |
 | 2026-08-18 | Form layout extracted into `FormGrid` / `FormSection` / `FormActions` / `CheckboxField`, control appearance unified in one `controlClasses` | The pricing screen had built three grids with different column counts, which cannot align by construction. Shared components make the aligned version the default rather than something each screen re-derives |
 | 2026-08-18 | Stated the admin-vs-portal mobile bar explicitly | Admin screens are desktop-primary; "graceful, not polished" is a deliberate ceiling, so effort goes to the portals parents actually use on phones |
+| 2026-10-18 | **One breakpoint instead of two** — `BREAKPOINT_SM` (640) is now the only one, imported by `tailwind.config.ts` and asserted by `lib/breakpoints.test.ts` | The token layer switched type and spacing at 480px while Tailwind's `sm` was its undeclared stock 640px. Between those widths a screen got desktop padding and headings inside a mobile card-stack layout — most phones in landscape. Nothing could have caught it: the two values were a TypeScript constant and a framework default, and no build step compared them |
+| 2026-10-18 | Added `Z_INDEX` and `MOTION` tokens | The stacking scale already existed implicitly and had started leaking escape hatches (`z-[60]`); naming it was the missing part. Motion durations were literals in `globals.css`. Ambient loop timings deliberately excluded — scene timings are not a scale |
+| 2026-10-18 | Added `DateField` / `DateRangeField` and `usePopover()`; `todayIso()` centralised in `lib/dates` | Eighteen raw date inputs across twelve files, five from/to pairs with no check that from ≤ to, and `todayIso()` defined twice with eight further inline UTC variants that return yesterday for the first two hours of every Zambian day. Three hand-rolled popovers had drifted and none returned focus to its trigger on Escape |

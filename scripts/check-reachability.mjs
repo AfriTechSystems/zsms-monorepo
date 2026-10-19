@@ -72,6 +72,21 @@ const ACCEPTED = new Map([
       'silently miss its write guard — fourteen had, and the omission has no symptom ' +
       'because the writes simply succeed (0270).',
   ],
+  [
+    'reminder_days_are_sane',
+    'Called by a CHECK constraint, not by any source — Postgres is the caller, so a ' +
+      'source grep can never find it. Verified: pg_constraint holds one definition ' +
+      'referencing it. Listing it as a gap every run trains people to skim this list, ' +
+      'which is how a real one gets missed.',
+  ],
+  [
+    'anon_executable_definer_functions',
+    'The same shape as unguarded_school_tables: a catalogue check called by ' +
+      'anon_execute_boundary_test, not by any source. It exists because 67 SECURITY ' +
+      'DEFINER functions were executable by anon over PostgREST and nothing reported ' +
+      'it — the suites all assert policies, and a DEFINER function never consults one, ' +
+      'so the exposure sat one layer in front of everything they cover (0272).',
+  ],
   /*
     Called by other SQL, not by application source.
 

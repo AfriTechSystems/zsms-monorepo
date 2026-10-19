@@ -47,6 +47,8 @@ import {
   type CustomFieldState,
 } from '../../../../../components/ui/custom-field-input'
 import { formatCount } from '../../school-shared'
+import { DateField } from '../../../../../components/ui/date-field'
+import { todayIso } from '../../../../../lib/dates'
 
 interface Structure {
   role: string
@@ -59,12 +61,6 @@ interface CapacityMeta {
   is_unlimited: boolean
   current_count: number
   at_capacity: boolean
-}
-
-/** Today as YYYY-MM-DD, for the enrolment-date default and the DOB maximum. */
-function todayIso(): string {
-  const d = new Date()
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
 }
 
 export default function NewStudentPage({
@@ -324,17 +320,14 @@ export default function NewStudentPage({
                   )}
                 </Field>
 
-                <Field id="dob" label="Date of birth" hint="Optional">
-                  {(props) => (
-                    <Input
-                      {...props}
-                      type="date"
-                      value={dateOfBirth}
-                      max={todayIso()}
-                      onChange={(e) => setDateOfBirth(e.target.value)}
-                    />
-                  )}
-                </Field>
+                <DateField
+                  id="dob"
+                  label="Date of birth"
+                  hint="Optional"
+                  value={dateOfBirth}
+                  onChange={setDateOfBirth}
+                  notFuture
+                />
 
                 <Field id="gender" label="Gender" hint="Optional">
                   {(props) => (
@@ -347,10 +340,14 @@ export default function NewStudentPage({
                   )}
                 </Field>
 
-                <Field
+                {/* No `notFuture`: a school may record an enrolment that starts
+                    next term, and this field never had a maximum. */}
+                <DateField
                   id="enrolment-date"
                   label="Enrolment date"
                   hint="Defaults to today."
+                  value={enrolmentDate}
+                  onChange={setEnrolmentDate}
                   footer={
                     <CheckboxField
                       id="boarding"
@@ -359,16 +356,7 @@ export default function NewStudentPage({
                       onChange={setIsBoarding}
                     />
                   }
-                >
-                  {(props) => (
-                    <Input
-                      {...props}
-                      type="date"
-                      value={enrolmentDate}
-                      onChange={(e) => setEnrolmentDate(e.target.value)}
-                    />
-                  )}
-                </Field>
+                />
               </FormGrid>
 
               {submitError && (

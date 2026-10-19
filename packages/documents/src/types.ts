@@ -176,3 +176,36 @@ export interface RenderedDocument {
     | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   suggestedFilename: string
 }
+
+/**
+ * One class's register for one day.
+ *
+ * Spec: `Official Documentation/10 Attendance/ATTENDANCE.md` → *Attendance Reports*
+ *       `Official Documentation/19 Design System/ZSMS Teacher App Dashboard Flow.png`
+ *         — the "Download Attendance Report" button on the Summary panel
+ *
+ * Scoped to ONE DAY, which is narrower than the two reports ATTENDANCE.md specifies.
+ * That is deliberate: the button this serves sits on a register a teacher has just
+ * marked, and the thing they take to the office is that register. The *Class
+ * Attendance Report* (a date range, with per-pupil totals and a below-threshold list)
+ * and the *School Attendance Summary* (grade rates, top absentees, marking
+ * compliance) are both still unbuilt and both need data this page does not hold.
+ */
+export interface AttendanceRegisterData {
+  school: SchoolBranding
+  className: string
+  /** `YYYY-MM-DD`. Printed long-form; kept ISO here so the caller does no formatting. */
+  date: string
+  /** Who marked it, for the signature line a paper register is expected to carry. */
+  markedBy?: string
+  rows: AttendanceRegisterRow[]
+}
+
+export interface AttendanceRegisterRow {
+  studentNumber: string
+  studentName: string
+  /** `present | absent | late | excused`, or null for a pupil nobody marked. */
+  status: string | null
+  /** The note a teacher attached — a reason for an absence, usually. */
+  note?: string | null
+}

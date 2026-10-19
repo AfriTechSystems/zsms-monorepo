@@ -26,25 +26,29 @@ import type { JSX } from 'react'
 import { useMemo } from 'react'
 import { useRouter } from 'expo-router'
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
-import { CalendarCheck, ChevronRight, ClipboardList, School } from 'lucide-react-native'
+import { CalendarCheck, ClipboardList, Megaphone, School } from 'lucide-react-native'
 
 import { FEATURES, featureState } from '../../../lib/features'
 import { FeatureGrid } from '../../../components/feature-grid'
-import { SectionTitle, StatTile } from '../../../components/stats'
+import { StatTile } from '../../../components/stats'
+import { AppHeader, Greeting, IconTile, ListRow, RowDivider, SectionHeader } from '../../../components/shell'
+import { TodaySchedule, type ScheduleEntry } from '../../../components/today-schedule'
+import { Avatar } from '../../../components/avatar'
+import { Mark } from '../../../components/wordmark'
 import { useApi } from '../../../lib/use-api'
 import { useSession } from '../../../lib/auth'
-import {
-  Badge,
-  Body,
-  Caption,
-  Card,
-  ErrorNote,
-  Row,
-  Screen,
-  Title,
-  usePalette,
-} from '../../../components/ui'
+import { Caption, Card, ErrorNote, Row, Screen, usePalette } from '../../../components/ui'
 import { RADIUS, SPACE, TAP, TYPE } from '../../../theme'
+
+interface Slot {
+  out_day_of_week: number
+  out_period_name: string
+  out_start_time: string
+  out_end_time: string
+  out_class_id: string
+  out_subject_name: string | null
+  out_slot_type: string
+}
 
 interface Overview {
   school: { name?: string } | null
@@ -60,6 +64,25 @@ export default function Home(): JSX.Element {
   const router = useRouter()
   const { firstName } = useSession()
   const { data, loading, error, reload } = useApi<Overview>('/api/teacher/overview')
+
+  /*
+    Two more reads, deliberately.
+
+    The reference home screen leads with today's lessons and a notification count, and
+    neither is in `/api/teacher/overview`. Three parallel requests on a screen opened
+    once a lesson is the right trade against inventing a fourth aggregate endpoint
+    whose only consumer is this screen — and each one degrades on its own, so a failed
+    timetable does not blank the grid.
+  */
+  const timetable = useApi<{ slots: Slot[] }>('/api/teacher/timetable')
+  const notices = useApi<{
+    unread: number
+    notices: Array<{ id: string; title: string; importance: string; sentAt: string | null; read: boolean }>
+  }>('/api/session/notices')
+
+  /* Three is what fits above the fold under the grid; the bell and "View all" carry
+     the rest. A home screen that lists every notice is a notices screen. */
+  const noticeList = (notices.data?.notices ?? []).slice(0, 3)
 
   /*
     Linked is "the session resolves a school", not "assignments exist".
@@ -99,18 +122,69 @@ export default function Home(): JSX.Element {
     [],
   )
 
+  /*
+    Today's lessons, from the week the timetable endpoint already returns.
+
+    `out_day_of_week` is 1–7 with Monday as 1, so `getDay()` — which starts at Sunday
+    — is remapped rather than used directly. Getting that wrong shows Monday's lessons
+    on Sunday, which is the kind of error that looks like the timetable being broken.
+  */
+  const todaysLessons = useMemo<ScheduleEntry[]>(() => {
+    const jsDay = new Date().getDay()
+    const isoDay = jsDay === 0 ? 7 : jsDay
+
+    return (timetable.data?.slots ?? [])
+      .filter((slot) => slot.out_day_of_week === isoDay)
+      .map((slot) => {
+        const teaching = slot.out_slot_type === 'lesson'
+        const entry: ScheduleEntry = {
+          startTime: slot.out_start_time,
+          endTime: slot.out_end_time,
+          title: slot.out_subject_name ?? slot.out_period_name,
+          subtitle: teaching ? slot.out_class_id : null,
+          nonTeaching: !teaching,
+        }
+        /*
+          The action is "take the register", and only for a class whose register is
+          still unmarked. Offering it for one already marked would invite a teacher to
+          re-open a finished register between lessons, which is how a correct register
+          gets overwritten.
+        */
+        if (teaching && (data?.classes ?? []).some((k) => k.classId === slot.out_class_id && !k.registerMarkedToday)) {
+          entry.actionLabel = 'Register'
+          entry.onPress = () =>
+            router.push(`/(teacher)/(tabs)/register/${encodeURIComponent(slot.out_class_id)}` as never)
+        }
+        return entry
+      })
+  }, [timetable.data, data?.classes, router])
+
   return (
     <Screen>
+      {/*
+        Outside the ScrollView, so the mark, the school, the bell and the avatar stay
+        put while the day scrolls under them. The reference designs pin it, and a
+        notification count that scrolls away is a notification count nobody sees.
+      */}
+      <AppHeader
+        left={<Mark size={32} />}
+        schoolName={data?.school?.name ?? null}
+        unread={notices.data?.unread ?? 0}
+        onPressBell={() => router.push('/(teacher)/(tabs)/notices' as never)}
+        onPressAvatar={() => router.push('/(teacher)/(tabs)/account' as never)}
+        avatar={<Avatar name={firstName ?? 'You'} size="sm" />}
+      />
+
       <ScrollView
         contentContainerStyle={{ padding: SPACE.gutter, gap: SPACE.cards, paddingBottom: SPACE.xxl }}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={reload} tintColor={c.primary} />
         }
       >
-        <View style={{ gap: 2 }}>
-          <Caption>{today}</Caption>
-          <Title>{firstName ? `Hello, ${firstName}` : 'Your teaching'}</Title>
-        </View>
+        <Greeting
+          name={firstName ? firstName : 'Your teaching'}
+          subtitle={`Here is your day — ${today}.`}
+        />
 
         {/*
           Stated, and above everything that depends on the answer. Without this a
@@ -127,18 +201,9 @@ export default function Home(): JSX.Element {
         {!error && (data || !loading) && (
         <Card>
           <Row gap={SPACE.md}>
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: RADIUS.md,
-                backgroundColor: linked ? c.primaryTint : c.surfaceSunken,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <School size={20} color={linked ? c.primaryMark : c.textSubtle} strokeWidth={2} />
-            </View>
+            {/* Muted when there is no school, which is a state and not a fault —
+                a standalone teacher is not in a broken account. */}
+            <IconTile icon={School} tone="primary" muted={!linked} />
             <View style={{ flex: 1 }}>
               <Text style={[TYPE.heading, { color: c.text }]} numberOfLines={1}>
                 {data?.school?.name ?? 'No school linked'}
@@ -167,7 +232,7 @@ export default function Home(): JSX.Element {
         */}
         {linked && (unmarkedCount > 0 || unpublishedCount > 0) && (
           <>
-            <SectionTitle>Waiting for you</SectionTitle>
+            <SectionHeader title="Waiting for you" />
 
             {unmarkedCount > 0 && (
               <StatTile
@@ -195,7 +260,34 @@ export default function Home(): JSX.Element {
           </>
         )}
 
-        <SectionTitle>Everything else</SectionTitle>
+        {/*
+          Today, before the grid of everything.
+
+          The reference designs lead with this and the reasoning holds: a teacher
+          between lessons wants the next forty minutes, not a catalogue. The grid is
+          what they scroll to when they are looking for something specific.
+        */}
+        {linked && (
+          <>
+            <SectionHeader
+              title="Today"
+              actionLabel="Full timetable"
+              onPressAction={() => router.push('/(teacher)/(tabs)/timetable' as never)}
+            />
+            {timetable.error ? (
+              <ErrorNote message={timetable.error} onRetry={timetable.reload} />
+            ) : (
+              <TodaySchedule
+                entries={todaysLessons}
+                emptyLabel={
+                  timetable.loading ? 'Loading your day…' : 'No lessons on your timetable today.'
+                }
+              />
+            )}
+          </>
+        )}
+
+        <SectionHeader title="Everything else" />
 
         <FeatureGrid
           features={FEATURES.map((f) => ({
@@ -204,10 +296,42 @@ export default function Home(): JSX.Element {
             icon: f.icon,
             href: f.href,
             state: featureState(f, linked),
+            tone: f.tone,
           }))}
           onPress={(href) => router.push(href as never)}
           lockedLabel="Needs school"
         />
+
+        {/*
+          Recent notices, last — the mockup puts them at the foot of the home screen
+          and that is the right rank: a notice is something to read when there is a
+          moment, not the reason the app was opened. The bell carries the count for
+          anybody who needs it sooner.
+        */}
+        {linked && (noticeList.length > 0) && (
+          <>
+            <SectionHeader
+              title="Recent notices"
+              actionLabel="View all"
+              onPressAction={() => router.push('/(teacher)/(tabs)/notices' as never)}
+            />
+            <Card style={{ paddingVertical: SPACE.xs }}>
+              {noticeList.map((notice, i) => (
+                <View key={notice.id}>
+                  {i > 0 && <RowDivider />}
+                  <ListRow
+                    icon={Megaphone}
+                    tone={notice.importance === 'urgent' ? 'danger' : 'primary'}
+                    title={notice.title}
+                    subtitle={notice.sentAt ? new Date(notice.sentAt).toLocaleDateString('en-ZM', { day: 'numeric', month: 'long' }) : null}
+                    unread={!notice.read}
+                    onPress={() => router.push('/(teacher)/(tabs)/notices' as never)}
+                  />
+                </View>
+              ))}
+            </Card>
+          </>
+        )}
       </ScrollView>
     </Screen>
   )

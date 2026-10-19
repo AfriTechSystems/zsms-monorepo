@@ -245,7 +245,7 @@ export const SPACING = {
  * protector is not the place to test whether 36px is good enough.
  */
 export const SIZING = {
-  /** ≥ 480px. */
+  /** At and above `BREAKPOINT_SM`. */
   base: {
     cardPadding: 20,
     cardGap: 20,
@@ -254,7 +254,7 @@ export const SIZING = {
     pageGutter: 24,
     tapTarget: 44,
   },
-  /** < 480px. */
+  /** Below `BREAKPOINT_SM`. */
   mobile: {
     cardPadding: 14,
     cardGap: 12,
@@ -265,8 +265,43 @@ export const SIZING = {
   },
 } as const
 
-/** The breakpoint the mobile row applies below. */
-export const MOBILE_MAX_WIDTH = 480
+/**
+ * **The one breakpoint.** Tailwind's `sm` must equal this, and
+ * `apps/web/lib/breakpoints.test.ts` fails the build if it does not.
+ *
+ * ## Why this is 640 and not 480
+ *
+ * It was 480 until 2026-10-18, and Tailwind's `sm` has always been its stock
+ * 640px — a value this repository never declared and therefore never reconciled.
+ * The two systems divide the viewport differently, so **between 480px and 640px a
+ * screen got desktop type and padding inside a mobile layout**: `data-table.tsx`
+ * renders one card per row below `sm` and `app-shell.tsx` switches to its drawer
+ * there, while the token layer had already handed back the 20px card padding, the
+ * 24px gutter and the full-size headings at 481px.
+ *
+ * That band is not an edge case. It covers most phones held in landscape and the
+ * narrow half of a split-screen tablet.
+ *
+ * Raising this to match `sm` was the one-line half of the fix; the other half is
+ * that nothing connected them. Tailwind only ever *names* CSS variables emitted
+ * from here, so there is no import to make the agreement structural — hence the
+ * test, which reads both and asserts they are the same number.
+ *
+ * Changing this value is a visual change at every width in the affected band.
+ * Change it here, and only here.
+ */
+export const BREAKPOINT_SM = 640
+
+/**
+ * The media query bound for the mobile row, as `max-width`.
+ *
+ * `BREAKPOINT_SM - 0.02` rather than `BREAKPOINT_SM`, because Tailwind's `sm:`
+ * compiles to `min-width: 640px`. A `max-width: 640px` here would make both rules
+ * apply at exactly 640px — mobile tokens inside a desktop layout, the same class of
+ * bug one pixel wide. Subtracting a hundredth leaves no width where neither applies
+ * and none where both do.
+ */
+export const MOBILE_MAX_WIDTH = BREAKPOINT_SM - 0.02
 
 export const RADIUS = {
   none: 0,
@@ -523,3 +558,83 @@ export function buildDarkTheme(brand: {
 /** The ZSMS default theme — the fallback whenever a school has set nothing. */
 export const ZSMS_LIGHT = buildLightTheme(BRAND)
 export const ZSMS_DARK = buildDarkTheme(BRAND)
+
+/**
+ * Stacking order.
+ *
+ * Added 2026-10-18. The scale is not invented — it is the one the components had
+ * already settled into, read off the tree and named. What was missing was the
+ * naming, and the cost of that was visible: `shortcuts.tsx` had reached for an
+ * arbitrary `z-[60]` escape hatch, and `school-switcher.tsx` used `z-40` for its
+ * panel while `account-menu.tsx` and `notification-bell.tsx` used `z-50` for
+ * theirs — three components doing the same job on two different layers, which is
+ * the kind of disagreement that only shows up when two of them are open at once.
+ *
+ * Layers, lowest first:
+ *
+ * | Token      | Was    | For |
+ * |------------|--------|-----|
+ * | `raised`   | `z-10` | Decoration and sticky cells inside a card — the pinned pupil-name column on the results grid, the public page texture |
+ * | `sticky`   | `z-20` | Bars that stick within a scrolling region: the bulk-action bar, the attendance toolbar |
+ * | `chrome`   | `z-30` | Persistent app chrome — the sidebar, the parent portal's bottom tabs |
+ * | `overlay`  | `z-40` | Scrims, and surfaces drawn over page content |
+ * | `popover`  | `z-50` | Menus, toasts, banners — anything dismissed with Escape |
+ * | `top`      | `z-60` | Deliberately above everything. The keyboard-shortcuts panel, which must be readable while any of the above is open |
+ *
+ * **If something needs a layer that is not here, the answer is usually that it
+ * belongs on one of these.** Add a level only when two things genuinely must
+ * stack and neither can move.
+ */
+export const Z_INDEX = {
+  raised: 10,
+  sticky: 20,
+  chrome: 30,
+  overlay: 40,
+  popover: 50,
+  top: 60,
+} as const
+
+/**
+ * Motion.
+ *
+ * Added 2026-10-18, from the literals already in `globals.css` and
+ * `tailwind.config.ts` rather than from a fresh opinion.
+ *
+ * ## Why only transitions, and not every animation in the stylesheet
+ *
+ * `globals.css` also carries ambient loop timings — a 1.4s sweep on the splash,
+ * a 4s float on the flag, and the aura's 19s/24s/29s drifts, deliberately
+ * co-prime so the three gradients never resynchronise. **Those are scene
+ * timings, not a scale.** Tokenising them would imply they are interchangeable
+ * with each other and with a hover transition, which is exactly wrong, so they
+ * stay where they are.
+ *
+ * What belongs here is the small set of durations a UI transition may choose
+ * from, so that two menus do not open at subtly different speeds.
+ *
+ * ## Reduced motion is not expressed here
+ *
+ * `globals.css` collapses every duration to 0.01ms under
+ * `prefers-reduced-motion: reduce`, and three ambient animations are switched off
+ * outright rather than merely shortened — a looping animation at 0.01ms is a
+ * strobe, which is worse than the thing the preference asks to avoid. That rule
+ * is global and stays global: a token cannot express "and also stop the aura".
+ */
+export const MOTION = {
+  duration: {
+    /** Colour and opacity on hover or focus. Short enough not to feel laggy on a trackpad. */
+    fast: 120,
+    /** The default for anything that moves or resizes — panels, drawers, the splash. */
+    base: 220,
+    /** Deliberate, for something entering from off-screen that the eye should follow. */
+    slow: 400,
+  },
+  easing: {
+    /** Decelerate into place. The default for anything arriving. */
+    standard: 'ease-out',
+    /** Symmetric, for something that leaves the way it came, and for ambient loops. */
+    gentle: 'ease-in-out',
+    /** Strong acceleration both ends. Used by the splash sweep; rarely the right choice. */
+    emphasised: 'cubic-bezier(0.65, 0, 0.35, 1)',
+  },
+} as const

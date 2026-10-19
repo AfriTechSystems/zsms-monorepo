@@ -35,6 +35,7 @@ import {
 import { ProgressBar } from '../../../components/stats'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { useApi } from '../../../lib/use-api'
+import { SectionHeader } from '../../../components/shell'
 import { NUMERIC, SPACE, TYPE } from '../../../theme'
 
 interface Result {
@@ -99,7 +100,9 @@ export default function ParentResults(): JSX.Element {
 
         {terms.map(([term, rows]) => (
           <View key={term} style={{ gap: SPACE.sm }}>
-            <Caption>{term}</Caption>
+            {/* A heading, not a caption. These group the whole screen and a 12px
+                muted line was doing a section heading's job at a label's weight. */}
+            <SectionHeader title={term} />
             {rows.map((r) => (
               <Card key={r.id}>
                 <Row gap={SPACE.sm}>

@@ -36,6 +36,9 @@ import {
   usePalette,
 } from '../../../components/ui'
 import { Ring, SectionTitle, StatTile } from '../../../components/stats'
+import { AppHeader, Greeting } from '../../../components/shell'
+import { Mark } from '../../../components/wordmark'
+import { useSession } from '../../../lib/auth'
 import { childQuery, useChild, type Child } from '../../../lib/child'
 import { PARENT_FEATURES, parentFeatureState } from '../../../lib/parent-features'
 import { useApi } from '../../../lib/use-api'
@@ -65,6 +68,11 @@ export default function ParentHome(): JSX.Element {
   const router = useRouter()
   const { childId, setChildId } = useChild()
 
+  const { firstName } = useSession()
+  /* Only the count is read here — the bell is a number, and the list lives on the
+     notices tab. A home screen that fetches every notice to render one badge is a
+     request a parent pays for on a metered connection. */
+  const notices = useApi<{ unread: number }>('/api/parent/notices')
   const { data, loading, error, reload } = useApi<Overview>(
     `/api/parent/overview${childQuery(childId)}`,
   )
@@ -90,6 +98,28 @@ export default function ParentHome(): JSX.Element {
 
   return (
     <Screen>
+      {/*
+        The same header the teacher portal carries, for the same reason and in the same
+        place. Two portals of one product that put the school name, the bell and the
+        account in different corners read as two products — and a parent who is also a
+        teacher switches between them.
+      */}
+      <AppHeader
+        left={<Mark size={32} />}
+        schoolName={data?.school?.name ?? null}
+        unread={notices.data?.unread ?? 0}
+        onPressBell={() => router.push('/(parent)/(tabs)/notices' as never)}
+        onPressAvatar={() => router.push('/(parent)/(tabs)/account' as never)}
+        avatar={<Avatar name={firstName ?? 'You'} size="sm" />}
+      />
+
+      <Greeting
+        name={firstName ? firstName : 'Your children'}
+        subtitle="Here is what is happening today."
+      />
+
+      <View style={{ height: SPACE.md }} />
+
       <ChildSwitcher children={kids} selectedId={childId} onSelect={setChildId} />
 
       <ScrollView

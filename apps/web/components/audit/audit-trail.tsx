@@ -33,6 +33,7 @@ import { ErrorState, TableSkeleton } from '../ui/data-states'
 import { EmptyState } from '../ui/empty-state'
 import { Field, Input, Select } from '../ui/field'
 import { useApi } from '../../lib/use-api'
+import { DateRangeField } from '../ui/date-field'
 
 interface Entry {
   id: string
@@ -205,27 +206,16 @@ export function AuditTrail({
             )}
           </Field>
 
-          <Field id="a-from" label="From">
-            {(props) => (
-              <Input
-                {...props}
-                type="date"
-                value={from}
-                onChange={(e) => resetAnd(() => setFrom(e.target.value))}
-              />
-            )}
-          </Field>
-
-          <Field id="a-to" label="To">
-            {(props) => (
-              <Input
-                {...props}
-                type="date"
-                value={to}
-                onChange={(e) => resetAnd(() => setTo(e.target.value))}
-              />
-            )}
-          </Field>
+          {/* An audit trail can only run backwards, so `notFuture` caps both
+              ends at today. */}
+          <DateRangeField
+            idPrefix="a"
+            from={from}
+            to={to}
+            onFromChange={(v) => resetAnd(() => setFrom(v))}
+            onToChange={(v) => resetAnd(() => setTo(v))}
+            notFuture
+          />
         </CardContent>
       </Card>
 

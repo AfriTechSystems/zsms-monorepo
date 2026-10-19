@@ -37,11 +37,13 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ClipboardList, Loader2, Lock, Save, Send } from 'lucide-react'
 
+import { CHART_SERIES } from '@zsms/design-tokens'
+
 import { apiSend, useApi } from '../../../../lib/use-api'
 import { Alert } from '../../../../components/ui/alert'
 import { Badge } from '../../../../components/ui/badge'
 import { Button } from '../../../../components/ui/button'
-import { Card, CardContent } from '../../../../components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { EmptyState } from '../../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../../components/ui/data-states'
 import { PrintButton, PrintHeading } from '../../../../components/ui/print-button'
@@ -51,6 +53,7 @@ import { ReportCards } from './report-cards'
 import { FormGrid, FormSection } from '../../../../components/ui/form'
 import { InfoHint } from '../../../../components/ui/info-hint'
 import { useToast } from '../../../../components/ui/toast'
+import { BarChart } from '../../../../components/ui/chart'
 
 interface Row {
   studentId: string
@@ -226,6 +229,65 @@ function MarkSheet(): JSX.Element {
       Object.values(entries).filter((v) => v.trim() !== '' && Number(v) > total).length,
     [entries, total],
   )
+
+  /**
+   * The grade distribution, for the chart below the sheet.
+   *
+   * ## Saved grades only, and the caption says so
+   *
+   * A grade is produced by `grade_from_scale_version()` in the database, never in the
+   * browser — the boundary is implemented once, which is the whole reason this screen
+   * shows a grade and never lets anybody type one. So a mark typed and not yet saved
+   * has no grade to count, and this chart cannot include it. Silently leaving those
+   * out would make the chart quietly wrong after a round of edits, so the caption
+   * states the count it is drawn from rather than letting the reader assume it is all
+   * of them.
+   *
+   * An overridden grade counts as the override — that is the grade on the report
+   * card, and a distribution that disagreed with the sheet above it would be worse
+   * than no distribution.
+   *
+   * ## Ordering
+   *
+   * By `gradePoints` where the scale supplies them, because that is the scale's own
+   * ordering and ZSMS supports four of them — ECZ Traditional runs 1–9, Cambridge
+   * runs A*–U, and a school-defined scale may do anything. Sorting alphabetically
+   * would put `A*` after `A` in one scale and scramble `10` before `9` in another.
+   * No direction is claimed in the UI, because ascending points mean "best" in some
+   * scales and "worst" in others, and the axis labels carry the meaning anyway.
+   */
+  const distribution = useMemo(() => {
+    const counts = new Map<string, { count: number; points: number | null }>()
+    let graded = 0
+
+    for (const r of data?.rows ?? []) {
+      const grade = r.gradeOverride ?? r.gradeLetter
+      if (!grade) continue
+      graded += 1
+      const seen = counts.get(grade)
+      if (seen) seen.count += 1
+      else counts.set(grade, { count: 1, points: r.gradePoints })
+    }
+
+    const bars = [...counts.entries()]
+      .sort((a, b) => {
+        const ap = a[1].points
+        const bp = b[1].points
+        if (ap !== null && bp !== null && ap !== bp) return ap - bp
+        return a[0].localeCompare(b[0], undefined, { numeric: true })
+      })
+      /*
+        One colour for every bar, NOT `seriesColour(i)`.
+
+        The bars are one measure — a count of pupils — split by grade. Giving each
+        bar its own hue would be colouring by rank, which reads as six different
+        things being compared and makes the eye look for a meaning the data does not
+        have. The grade letter under each bar is the identity; the colour is not.
+      */
+      .map((entry) => ({ label: entry[0], value: entry[1].count, colour: CHART_SERIES[1] }))
+
+    return { bars, graded }
+  }, [data?.rows])
 
   const save = useCallback(
     async (event: FormEvent) => {
@@ -881,6 +943,36 @@ function MarkSheet(): JSX.Element {
                   )}
                 </CardContent>
               </Card>
+
+              {/*
+                Below the sheet, not above it: this is what the marks turned out to
+                be, which is only worth reading once they are entered. A teacher
+                scrolling a column of forty numbers cannot see the shape of the class
+                from the numbers themselves, and that shape is the one thing a mark
+                sheet does not already say.
+
+                A bar chart rather than a donut — the categories are ordered and
+                there are more than three of them, and a donut over an ordered scale
+                throws the order away. One series, so no legend: the title names it
+                and every bar carries its own count.
+              */}
+              {distribution.bars.length > 0 && (
+                <Card className="mt-stack">
+                  <CardHeader>
+                    <CardTitle>How the class did</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {distribution.graded} of {data.rows.length} pupils have a saved grade.
+                      {distribution.graded < entered && ' Marks you have typed but not saved are not counted yet.'}
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <BarChart
+                      data={distribution.bars}
+                      emptyMessage="No grades yet. Save the sheet to see the spread."
+                    />
+                  </CardContent>
+                </Card>
+              )}
 
               {/* `hasEditableRow`, not `!data.published`: after unlocking one mark for
                   correction the sheet is still "published" overall, and gating on that

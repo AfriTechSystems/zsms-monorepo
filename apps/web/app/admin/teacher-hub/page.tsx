@@ -31,12 +31,14 @@ import { Sparkles } from 'lucide-react'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card'
-import { Field, Input, Select } from '../../../components/ui/field'
+import { Field, Select } from '../../../components/ui/field'
 import { EmptyState } from '../../../components/ui/empty-state'
 import { ErrorState, PageHeader, TableSkeleton } from '../../../components/ui/data-states'
 import { StatCard } from '../../../components/ui/stat-card'
 import { useToast } from '../../../components/ui/toast'
 import { PlanEditor, type HubPlan } from './plan-editor'
+import { DateField } from '../../../components/ui/date-field'
+import { todayIso } from '../../../lib/dates'
 
 interface HubAccount {
   clerk_user_id: string
@@ -214,20 +216,16 @@ export default function AdminTeacherHubPage(): JSX.Element {
                 )}
               </Field>
 
-              <Field
+              {/* Paid-up-to is necessarily in the future; a past date would
+                  expire the subscription the moment it was saved. */}
+              <DateField
                 id="paid-until"
                 label="Paid until"
                 hint="Optional. Leave blank to run one full period from today."
-              >
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="date"
-                    value={paidUntil}
-                    onChange={(e) => setPaidUntil(e.target.value)}
-                  />
-                )}
-              </Field>
+                value={paidUntil}
+                onChange={setPaidUntil}
+                min={todayIso()}
+              />
             </div>
 
             <Button onClick={() => void activate()} disabled={saving || !selected || !planCode}>

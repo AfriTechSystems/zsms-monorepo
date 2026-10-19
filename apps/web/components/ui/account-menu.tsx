@@ -29,7 +29,7 @@
  */
 
 import type { JSX } from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 /*
   Through the provider, never from `@clerk/nextjs` directly (ADR-032). Nothing outside
@@ -57,6 +57,7 @@ import {
 } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
+import { usePopover } from '../../lib/use-popover'
 import { clearAllDrafts } from '../../lib/use-form-draft'
 import { useTheme, type ThemeChoice } from '../../lib/use-theme'
 import { Avatar } from './avatar'
@@ -77,10 +78,11 @@ const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
 ]
 
 export function AccountMenu({ className }: { className?: string }): JSX.Element | null {
-  const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [portals, setPortals] = useState<Portal[]>([])
-  const wrapRef = useRef<HTMLDivElement>(null)
+  // Open/close, outside click, Escape, Tab-out and focus restoration all live in
+  // `usePopover` — this component had its own copy, as did two others.
+  const { open, setOpen, wrapRef, triggerProps, panelProps } = usePopover('menu')
 
   const { user } = useUser()
   const { orgId } = useAuth()
@@ -107,23 +109,6 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
         /* A menu that fails to list portals still signs you out. */
       })
   }, [open, portals.length])
-
-  // Close on an outside click or Escape, which is what a menu is expected to do.
-  useEffect(() => {
-    if (!open) return undefined
-    const onDown = (e: MouseEvent): void => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
 
   /**
    * Move to another organisation or another portal.
@@ -161,9 +146,7 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
     <div ref={wrapRef} className={cn('relative shrink-0', className)}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
+        {...triggerProps}
         className="inline-flex min-h-tap items-center gap-2 rounded-md border border-border px-2 py-1 text-sm transition-colors hover:bg-sunken"
       >
         <Avatar name={name} src={user?.imageUrl ?? null} size="sm" />
@@ -177,11 +160,12 @@ export function AccountMenu({ className }: { className?: string }): JSX.Element 
       {open && (
         <div
           role="menu"
+          {...panelProps}
           /*
             Right-aligned and width-capped. A menu anchored left would run off the
             screen on a phone, where this trigger sits at the right edge of the header.
           */
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[17rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-border bg-surface shadow-xl"
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-popover w-[17rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-border bg-surface shadow-xl"
         >
           {/* --- who you are ------------------------------------------------ */}
           <div className="flex items-center gap-2.5 border-b border-border p-3">

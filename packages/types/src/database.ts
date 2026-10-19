@@ -2240,6 +2240,7 @@ export type Database = {
           gateway_transaction_id: string | null
           id: string
           is_voided: boolean
+          mobile_money_provider: string | null
           notes: string | null
           paid_at: string
           payment_method: string
@@ -2271,6 +2272,7 @@ export type Database = {
           gateway_transaction_id?: string | null
           id?: string
           is_voided?: boolean
+          mobile_money_provider?: string | null
           notes?: string | null
           paid_at?: string
           payment_method: string
@@ -2302,6 +2304,7 @@ export type Database = {
           gateway_transaction_id?: string | null
           id?: string
           is_voided?: boolean
+          mobile_money_provider?: string | null
           notes?: string | null
           paid_at?: string
           payment_method?: string
@@ -6744,6 +6747,13 @@ export type Database = {
             }
             Returns: boolean
           }
+      anon_executable_definer_functions: {
+        Args: never
+        Returns: {
+          out_arguments: string
+          out_function_name: string
+        }[]
+      }
       answer_departure_prompt: { Args: { p_opt_in: boolean }; Returns: boolean }
       archive_old_ai_conversations: { Args: never; Returns: number }
       attach_own_registered_school: {
@@ -7823,6 +7833,17 @@ export type Database = {
           out_via_whatsapp: boolean
         }[]
       }
+      school_attendance_trend: {
+        Args: { p_days?: number }
+        Returns: {
+          out_absent: number
+          out_date: string
+          out_excused: number
+          out_holiday: number
+          out_late: number
+          out_present: number
+        }[]
+      }
       school_branding_by_slug: { Args: { p_slug: string }; Returns: Json }
       school_can_enrol: { Args: { p_school_id: string }; Returns: boolean }
       school_can_write: { Args: { p_school_id: string }; Returns: boolean }
@@ -8559,6 +8580,7 @@ export type Database = {
           gateway_transaction_id: string | null
           id: string
           is_voided: boolean
+          mobile_money_provider: string | null
           notes: string | null
           paid_at: string
           payment_method: string

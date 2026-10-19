@@ -35,6 +35,7 @@ import {
 } from '../../../components/ui'
 import { ThemeChoiceRow } from '../../../components/theme-choice'
 import { useSession } from '../../../lib/auth'
+import { IconTile } from '../../../components/shell'
 import {
   enablePush,
   pushState,
@@ -78,12 +79,13 @@ export default function ParentAccount(): JSX.Element {
 
         {/* ---- Notifications ---- */}
         <Card>
-          <Row gap={SPACE.sm}>
-            {push === 'on' ? (
-              <Bell size={21} color={c.primaryMark} strokeWidth={2} />
-            ) : (
-              <BellOff size={21} color={c.textSubtle} strokeWidth={2} />
-            )}
+          <Row gap={SPACE.md}>
+            {/* The same tile, the same tones, the same meaning as the teacher's
+                account screen. Green when notices will actually arrive. */}
+            <IconTile
+              icon={push === 'on' ? Bell : BellOff}
+              tone={push === 'on' ? 'success' : 'neutral'}
+            />
             <View style={{ flex: 1 }}>
               <Body>Notifications</Body>
               <Caption>
@@ -123,8 +125,8 @@ export default function ParentAccount(): JSX.Element {
           <ThemeChoiceRow />
         </Card>
         <Card>
-          <Row gap={SPACE.sm}>
-            <ShieldCheck size={21} color={c.primaryMark} strokeWidth={2} />
+          <Row gap={SPACE.md}>
+            <IconTile icon={ShieldCheck} tone="accent" />
             <View style={{ flex: 1 }}>
               <Body>Your data</Body>
               <Caption>

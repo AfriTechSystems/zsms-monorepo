@@ -40,6 +40,7 @@
     "dev:turbo": "turbo dev --filter=@zsms/web",
     "dev:workers": "npm run dev:worker --workspace @zsms/workers",
     "docs:smoke": "node --env-file=.env.local --import tsx scripts/documents-smoke.ts",
+    "e2e:walk": "node --env-file=.env.local scripts/e2e-walk.mjs",
     "gaps": "node scripts/check-reachability.mjs",
     "gaps:mobile": "node scripts/check-mobile-reachability.mjs",
     "lint": "turbo lint",

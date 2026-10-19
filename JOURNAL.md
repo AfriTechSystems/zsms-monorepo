@@ -4,6 +4,127 @@ Running log of substantive work on the ZSMS repository. Newest entry first.
 
 ---
 
+## 2026-10-19 — The chain closes: a real token, spent against the running app
+
+Branch `rls/anon-execute-boundary`. `scripts/e2e-walk.mjs`, the last two mobile screens,
+and the gaps list cleared of its one false positive. `ci:checks` green; `db:verify` 9/9;
+41 pgTAP suites / 926 assertions; the 28-check payment E2E green; `security:audit`
+15 pass / 0 fail.
+
+### The thing nobody had evidence for
+
+Every check in this repository stopped one link short of the whole chain, and the gap
+was in the same place each time:
+
+| Check | What it proves | What it leaves open |
+|---|---|---|
+| `ci:checks` | it compiles, lints, builds | a route that 500s on first contact compiles |
+| `db:verify`, 41 pgTAP suites | the policies are right | the session is synthetic, set by `set_config` |
+| `clerk:check` | the token carries the claims | it is never spent |
+| `gaps` | a route is REFERENCED by a screen | never that it answers |
+
+So the join was unevidenced: a token Clerk actually minted, carried through
+`middleware.ts`, resolved by `getSessionUser()`, spent against PostgREST, filtered by
+RLS, and returned as JSON the envelope admits.
+
+`npm run e2e:walk` closes it. **13 served, 6 refused by role, 0 broken**, stable over
+three consecutive runs, with real rows coming back — `/api/school/structure` returned 12
+grade levels and 4 subjects, `/api/parent/fees` returned a child, two school accounts, a
+statement line and a fee record.
+
+### Why it was impossible until now, and what changed
+
+The 2026-08-23 entry recorded that **no portal screen had ever been seen rendering real
+data**, because every seeded school's `clerk_org_id` was a placeholder (`org_test_d`) and
+no Clerk session could resolve to one. That entry ended: *"That is a two-minute action in
+the Clerk dashboard and it is not mine to take."*
+
+Somebody took it. Three schools now carry real organisation ids — `ZM-LSK-9001`,
+`ZM-LSK-9004`, `ZM-LSK-9005` — so the walk is finally possible. **This is the first
+recorded evidence of a ZSMS portal endpoint serving real rows to a real session.**
+
+### The six refusals are the product working
+
+The session resolves as `staff` at `zm-lsk-9001`, and it is refused the AfriTech
+endpoints, the staff list, teaching assignments, fees and results — each with its own
+message rather than a generic denial. That is `can()` and RLS agreeing, observed rather
+than asserted. A walk that reported those as failures would be measuring the wrong thing,
+so a 403 is counted separately and never as a fault.
+
+What IS counted as broken: a 500, a 404 on a route `gaps` says exists, and a 200 whose
+body is neither `{data}` nor `{error}` — the envelope every screen is written against.
+
+### Two findings, and one of them was mine
+
+**`/api/health` was reported broken, and the rule was wrong.** It returns component-level
+status rather than the envelope, deliberately: `AVAILABILITY.md` has it distinguish "the
+app is down" from "the app is up but cannot reach the database", and a monitor polling it
+wants that shape. Exempted with the reason inline. Worth stating because the instinct on
+a red line is to change the code.
+
+**One route answered 401 on the very first walk and served on every run after.** That is
+the Clerk/Supabase sub-second clock skew this repository already handles —
+`fromPostgrestError` remaps PostgREST's `PGRST303 JWT not yet valid` for exactly this. A
+token whose `nbf` is a fraction of a second ahead is not yet valid when it arrives.
+Recorded in the script rather than smoothed over: one first-run refusal is worth
+repeating before investigating; one that survives a second run is not this.
+
+### The mobile sweep finished
+
+`create` and `marks` were the last two untouched screens.
+
+`create` had three outline Buttons standing in for a segmented control, with a comment
+correctly arguing that a segmented control was right — the control just had to be drawn
+by hand, and an unselected outline button reads as an action rather than an option not
+taken.
+
+`marks` gained a **Spread** tab, mirroring the register's Pupils | Summary and the web
+results screen's distribution, so one question gets one answer on all three surfaces. One
+hue for every slice, not a colour per grade: the slices are one measure split by grade, so
+colouring by grade would be colouring by rank and would put a traffic light on a class's
+results. Saved grades only, with the caption naming the number it is drawn from — a grade
+comes from `grade_from_scale_version()` in the database, never the browser.
+
+A grep for the hand-rolled icon tile now returns only `stats.tsx` and `wordmark.tsx`,
+which legitimately draw their own.
+
+### `gaps` had one false positive and two real ones
+
+`reminder_days_are_sane` is called by a **CHECK constraint** — Postgres is the caller, so
+a source grep can never find it. Accepted with that reason, because listing it every run
+trains people to skim the list, which is how a real one gets missed.
+
+The two that remain are real and pre-existing, now tracked in `CLAUDE.md` rather than
+recurring as a warning nobody actions:
+
+- **`ai_credit_topup()`** is the PERSONAL credit purchase. Schools are fine — they buy
+  through `school_purchase_credits()`, which `/api/school/credits` calls. The gap is that
+  **a standalone Teacher Hub teacher cannot buy credits**; they get their plan's monthly
+  allowance and nothing more. It needs a payment path, and the 2026-10-18 decision was to
+  keep the claim model rather than integrate a gateway, so it waits on that.
+- **`admin_publish_prompt_template()`** versions the AI prompts and has no screen. Low
+  priority while `AI_GENERATOR` is `template` and no model runs.
+
+### Carried forward
+
+- **PR #3 is green and unmerged.** `gh pr merge` was refused by the permission classifier
+  ("Merge Without Review"). It needs a human, from the GitHub UI or by allowing that here.
+- **The register PDF is not reachable from the phone.** The route and renderer work and
+  are wired on the web attendance screen; saving a file on the device needs
+  `expo-file-system` and `expo-sharing`. Given this repository's history with mobile
+  dependencies — two copies of gesture-handler at incompatible majors,
+  `expo-notifications` killing startup — that is not a decision to take without being able
+  to run an Android build.
+- **The walk covers 20 routes of 139.** It is a spine, not a sweep: one or two per surface,
+  chosen so a broken layer shows up somewhere. Widening it is cheap and worth doing before
+  a pilot.
+- **Nothing writes in the walk, by design.** The write paths — enrolling a pupil,
+  recording a payment, marking a register — are still only proven by pgTAP against a
+  synthetic session. Proving those end to end means a walk that writes, which means a
+  database it is safe to write to, which means staging.
+
+---
+
 ## 2026-10-18 — 64 SECURITY DEFINER functions were executable by `anon`, and four documents reported finished work as missing
 
 Branch `rls/anon-execute-boundary`, PR #3. Migrations `0272` and `0273`, one new pgTAP suite

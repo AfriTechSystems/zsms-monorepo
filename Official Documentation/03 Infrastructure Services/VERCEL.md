@@ -11,10 +11,19 @@
 
 ---
 
-## Implementation Status (2026-10-11)
+## Implementation Status (2026-10-20)
 
-**Dev only.** The application builds and deploys; `zsms-staging` and `zsms-zm` do not
-exist as Vercel projects any more than they do as Supabase projects.
+**No Vercel project exists yet.** The application *builds* — `npx turbo build
+--filter=@zsms/web` succeeds and CI runs it on every push — but as of this date it has
+never been deployed anywhere, and `next dev` on a developer's laptop is still the only
+way to reach it. `zsms-staging` and `zsms-zm` do not exist as Vercel projects any more
+than they do as Supabase projects.
+
+*(This block read "the application builds and deploys" until 2026-10-20. It built; it had
+never deployed. Update this paragraph the day a project is actually created rather than
+the day one is planned.)*
+
+*Deploying the dev instance on the free tier* below is the procedure for changing that.
 
 There is no `vercel.json` — configuration is dashboard-side. The one thing that IS in the
 repository is the security headers in `next.config.mjs`, which belong there rather than in
@@ -61,8 +70,16 @@ One Vercel project per country. For Zambia:
 - **Repository:** `AfriTechSystems/zsms-monorepo`
 - **Root directory:** `apps/web`
 - **Framework preset:** Next.js
-- **Build command:** `cd ../.. && npx turbo build --filter=web`
+- **Build command:** `cd ../.. && npx turbo build --filter=@zsms/web`
 - **Output directory:** `.next`
+
+> **The filter must be the full package name.** This read `--filter=web` until
+> 2026-10-20. `apps/web/package.json` declares `"name": "@zsms/web"`, and turbo
+> matches package names, not directory basenames — so `--filter=web` resolves to
+> **zero tasks**, exits 0, and builds nothing. On Vercel that is the worst shape a
+> mistake can take: the deployment is marked successful, and the site 404s because
+> `.next` was never produced. Verified with
+> `npx turbo build --filter=web --dry-run=json`, which returns an empty task list.
 
 When adding Botswana:
 - **Project name:** `zsms-bw`
@@ -244,6 +261,115 @@ Turborepo manages the monorepo build. Vercel's Turborepo integration caches buil
 
 ---
 
+## Deploying the Dev Instance on the Free Tier
+
+Added 2026-10-20. Until this date the application had **never been hosted anywhere** —
+`next dev` on one laptop was the only way to reach it, and the mobile app could only be
+used by a phone on the same Wi-Fi with Metro running. This section is the free-tier path
+that ends both constraints. It is for the **development** instance against `zsms-dev`,
+and it is explicitly not a staging or production procedure: those are gated by
+prohibition 10 and by `af-south-1`.
+
+### What is already hosted, and what is not
+
+Worth stating plainly, because it is the reason this is a short procedure rather than a
+migration. Of the services ZSMS depends on, **five already run off-machine**: Supabase,
+Clerk, Cloudflare R2, Upstash Redis and PostHog. Only two things were ever local — the
+Next.js app and the Metro bundler. Deploying the first makes the second optional.
+
+The Railway workers stay local by decision. Railway has no free tier, and nothing else
+hosts a long-running worker for free on terms worth the setup. Jobs enqueue to Upstash
+and wait; running `npm run dev:workers` drains them. So receipts and report cards are
+**delayed rather than lost**, which is an acceptable property for a dev instance and an
+unacceptable one for a school.
+
+### Project settings
+
+| Setting | Value |
+|---|---|
+| Repository | `AfriTechSystems/zsms-monorepo` |
+| Root directory | `apps/web` |
+| Framework preset | Next.js |
+| Build command | `cd ../.. && npx turbo build --filter=@zsms/web` |
+| Output directory | `.next` |
+| Production branch | `main` |
+
+The build command is the one thing here that fails silently if it is wrong — see the note
+under *Vercel Project Structure*.
+
+### Environment variables
+
+The seven in `env.local.template` are the minimum for the app to run:
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+CLERK_SECRET_KEY
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+AUTH_PROVIDER
+NEXT_PUBLIC_COUNTRY_CODE
+AI_GENERATOR
+```
+
+Add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` as well. Rate limiting is not
+load-bearing for correctness — every call site guards with `?.trim()` and the limiter
+fails open by design — but a public URL with no limiter is an invitation, and the
+credentials already exist.
+
+**Keep the Clerk development instance.** Its keys work from any origin, and the `role`
+and `email` session claims this repository depends on are already configured on it. A
+Clerk *production* instance means new keys, re-creating all seven `org:*` roles and
+re-creating every organisation; it is real work and it buys nothing until a real school
+exists.
+
+### Making the APK real
+
+This is the smaller half, because `.github/workflows/android-build.yml` already reads the
+value — the gap was only ever that the variable was unset.
+
+```bash
+gh variable set EXPO_PUBLIC_API_URL --body "https://<project>.vercel.app"
+```
+
+`EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` is already a repository **secret** and needs nothing.
+Then run the workflow with `universal` + `standalone`. The result talks to Vercel over
+HTTPS and needs no Metro, no `npm run dev`, and no shared network — it can be handed to
+somebody in another town.
+
+It is signed with the **debug key**: installable for testing, not publishable to the Play
+Store, which needs a real keystore and a decision about who holds it.
+
+### What the free tier actually costs
+
+Four constraints, none of them technical surprises if they are read first:
+
+1. **Vercel Hobby prohibits commercial use.** It is free while nobody is paying for ZSMS.
+   The day a school is invoiced, this needs Pro. That is a licence term, not a
+   rate limit, and it will not announce itself.
+2. **A free Supabase project pauses after roughly a week of inactivity.** The hosted app
+   goes dark until someone opens the dashboard. For an instance that exists to be
+   demonstrated occasionally, that is the sharpest edge here.
+3. **A free deployment is still a public URL.** `/design` already refuses production to
+   anyone who is not a signed-in AfriTech admin, and answers `404` rather than `403` so
+   the route's existence is not itself disclosed. Any page added later is public by
+   default; that is each page's own job, because middleware establishes identity and
+   never authorises.
+4. **No custom domain is free any more.** `*.vercel.app` is the free option.
+   `zsms.co.zm` goes through a ZICTA-accredited registrar and is worth doing nearer to
+   selling, not now.
+
+### The constraint that is not negotiable
+
+This deployment points at `zsms-dev`, which is in `eu-west-1`. That region is a
+**documented exception that holds only because the data is synthetic** — see
+`COMPLIANCE.md` → Environment Data Residency. Putting the app behind a public URL does
+not change the exception; it widens who can reach it.
+
+So the existing prohibition applies with more force, not less: **no production dumps, no
+anonymised extracts, no pilot records.** The first real pupil in this database is a ZDPA
+problem, and a hosted URL makes it one that is harder to notice. A real school waits for
+`zsms-staging` in `af-south-1`.
+
 ## Business Rules
 
 1. Production deployments happen only by merging `integration` to `main`. Direct pushes to `main` are not permitted (enforced via GitHub branch protection).
@@ -267,3 +393,5 @@ Turborepo manages the monorepo build. Vercel's Turborepo integration caches buil
 | Date | Change | Reason |
 |---|---|---|
 | 2026-04-26 | Initial complete draft | Stage 3 infrastructure documentation |
+| 2026-10-20 | Corrected the build command to `--filter=@zsms/web` | `--filter=web` matched no package, so the build produced nothing and Vercel reported success while the site 404'd |
+| 2026-10-20 | Added *Deploying the dev instance on the free tier* | The app had never been hosted anywhere; a free Vercel deployment is what makes a standalone APK and remote testing possible |
